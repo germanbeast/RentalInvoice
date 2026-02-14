@@ -17,15 +17,26 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y git curl
 
 # 2. Projekt herunterladen (falls noch nicht vorhanden)
-if [ ! -d "$PROJECT_DIR" ]; then
+if [ -f "package.json" ]; then
+    echo "✅ Bereits im Projekt-Ordner. Lade aktuelle Änderungen..."
+    if [ -d ".git" ]; then
+        git pull || echo "⚠️ Konnte git pull nicht ausführen."
+    fi
+elif [ -d "$PROJECT_DIR" ]; then
+    echo "📂 Projekt-Ordner '$PROJECT_DIR' existiert. Gehe in den Ordner..."
+    cd "$PROJECT_DIR"
+    git pull || echo "⚠️ Konnte git pull nicht ausführen."
+else
     echo "📂 Klone Projekt von GitHub..."
     git clone "$REPO_URL" "$PROJECT_DIR"
     cd "$PROJECT_DIR"
-else
-    echo "✅ Projekt-Ordner existiert bereits. Gehe in den Ordner..."
-    cd "$PROJECT_DIR"
-    echo "🔄 Lade aktuelle Änderungen (git pull)..."
-    git pull
+fi
+
+# Sicherheitscheck: package.json muss existieren
+if [ ! -f "package.json" ]; then
+    echo "❌ FEHLER: package.json wurde nicht gefunden! Befinde mich in: $(pwd)"
+    echo "Das Skript konnte die Dateien nicht von GitHub laden."
+    exit 1
 fi
 
 # 3. Node.js Installation (v20 LTS)
