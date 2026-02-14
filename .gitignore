@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.pdf
+.DS_Store
+Thumbs.db
+.system_generated/
+.tempmediaStorage/
+brain/
+*.webp
+*.png
+!logo.png
+!favicon.ico
