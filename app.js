@@ -77,6 +77,7 @@
         e.preventDefault();
         const username = $('#login-user').value;
         const password = $('#login-pass').value;
+        console.log(`🔑 Login-Versuch gestartet fÃ¼r: ${username}`);
 
         try {
             const response = await fetch('/api/login', {
@@ -84,14 +85,19 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
+            console.log(`🌐 Server-Antwort Status: ${response.status}`);
+
             const data = await response.json();
             if (data.success) {
+                console.log('✅ Login erfolgreich!');
                 showToast('Erfolgreich angemeldet!', 'success');
                 showApp();
             } else {
+                console.warn('❌ Login fehlgeschlagen:', data.message);
                 showToast(data.message || 'Login fehlgeschlagen', 'error');
             }
         } catch (err) {
+            console.error('🔥 Fetch-Fehler beim Login:', err);
             showToast('Verbindungsfehler zum Server', 'error');
         }
     });

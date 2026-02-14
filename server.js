@@ -62,14 +62,24 @@ function ensureAuthenticated(req, res, next) {
 // API: Login
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-    const users = JSON.parse(fs.readFileSync(USERS_FILE));
+    console.log(`🔐 Login-Versuch fÃ¼r Benutzer: ${username}`);
 
+    const users = JSON.parse(fs.readFileSync(USERS_FILE));
     const user = users[username];
-    if (user && bcrypt.compareSync(password, user.password)) {
+
+    if (!user) {
+        console.warn(`❌ Benutzer ${username} nicht gefunden.`);
+        return res.status(401).json({ success: false, message: 'Benutzer nicht gefunden' });
+    }
+
+    const isMatch = bcrypt.compareSync(password, user.password);
+    console.log(`🔍 Passwort-Match fÃ¼r ${username}: ${isMatch}`);
+
+    if (isMatch) {
         req.session.user = { username: user.username, role: user.role };
         res.json({ success: true, user: req.session.user });
     } else {
-        res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' });
+        res.status(401).json({ success: false, message: 'UngÃ¼ltiges Passwort' });
     }
 });
 
