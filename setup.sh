@@ -1,16 +1,34 @@
 #!/bin/bash
-# Ferienwohnung Rechnung - Ubuntu Setup Script
+# Ferienwohnung Rechnung - All-in-One Ubuntu Setup Script
+# Dieses Skript kann auf einem frischen Ubuntu-Server ausgeführt werden.
 
-# Exit on error
+# Einstellungen
+REPO_URL="https://github.com/germanbeast/RentalInvoice.git"
+PROJECT_DIR="RentalInvoice"
+
+# Fehler abfangen
 set -e
 
-echo "🚀 Starte Setup für Ferienwohnung Rechnung..."
+echo "🚀 Starte All-in-One Setup für RentalInvoice..."
 
-# 1. System-Updates
-echo "📦 Aktualisiere Systempakete..."
+# 1. System-Updates & Basis-Abhängigkeiten
+echo "📦 Aktualisiere Systempakete & installiere Git..."
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl
 
-# 2. Node.js Installation (v20 LTS)
+# 2. Projekt herunterladen (falls noch nicht vorhanden)
+if [ ! -d "$PROJECT_DIR" ]; then
+    echo "📂 Klone Projekt von GitHub..."
+    git clone "$REPO_URL" "$PROJECT_DIR"
+    cd "$PROJECT_DIR"
+else
+    echo "✅ Projekt-Ordner existiert bereits. Gehe in den Ordner..."
+    cd "$PROJECT_DIR"
+    echo "🔄 Lade aktuelle Änderungen (git pull)..."
+    git pull
+fi
+
+# 3. Node.js Installation (v20 LTS)
 if ! command -v node &> /dev/null; then
     echo "🟢 Installiere Node.js v20..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -19,7 +37,7 @@ else
     echo "✅ Node.js ist bereits installiert ($(node -v))"
 fi
 
-# 3. Puppeteer Abhängigkeiten (für PDF-Generierung)
+# 4. Puppeteer Abhängigkeiten (für PDF-Generierung)
 echo "🌐 Installiere Browser-Abhängigkeiten für Puppeteer..."
 sudo apt install -y \
     ca-certificates \
@@ -59,37 +77,37 @@ sudo apt install -y \
     wget \
     xdg-utils
 
-# 4. App Abhängigkeiten installieren
-echo "npm 📚 Installiere App-Abhängigkeiten..."
+# 5. App Abhängigkeiten installieren
+echo "📚 Installiere App-Abhängigkeiten..."
 npm install
 
-# 5. PM2 Setup
+# 6. PM2 Setup
 if ! command -v pm2 &> /dev/null; then
     echo "⚡ Installiere PM2 global..."
     sudo npm install -g pm2
 fi
 
-# 6. .env Setup
+# 7. .env Setup
 if [ ! -f .env ]; then
     echo "📝 Erstelle .env Datei aus Vorlage..."
     cp .env.example .env
-    echo "⚠️  BITTE VERGISS NICHT, DIE .env DATEI ANZUPASSEN!"
+    echo "⚠️  HINWEIS: Bitte bearbeite jetzt die '.env' Datei (z.B. mit 'nano .env')."
 fi
 
-# 7. Start mit PM2
+# 8. Start mit PM2
 echo "▶️ Starte Server mit PM2..."
-pm2 start server.js --name "invoice-app"
+pm2 start server.js --name "invoice-app" || pm2 restart "invoice-app"
 pm2 save
 
-# 8. Autostart bei Reboot
+# 9. Autostart bei Reboot
 echo "🔄 Konfiguriere Autostart..."
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+# Generiert den systemd Startup-Befehl für den aktuellen User
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME || true
 
-echo "✅ Setup abgeschlossen!"
-echo "--------------------------------------------------"
-echo "Die App läuft nun unter: http://localhost:3000 (oder deiner Server-IP)"
-echo "Nutze 'pm2 logs invoice-app' um Logs zu sehen."
-echo "Nutze 'pm2 restart invoice-app' nach Änderungen an der .env Datei."
-echo "💡 Tipp: Nutze 'git pull' um Updates von deinem Repository zu laden."
-echo "--------------------------------------------------"
-
+echo "✅ Setup erfolgreich abgeschlossen!"
+echo "----------------------------------------------------------------"
+echo "1. WICHTIG: Bearbeite die Zugangsdaten in der .env Datei!"
+echo "   Befehl: nano .env"
+echo "2. Starte die App danach neu: pm2 restart invoice-app"
+echo "3. Logs ansehen: pm2 logs invoice-app"
+echo "----------------------------------------------------------------"
