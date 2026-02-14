@@ -4,14 +4,92 @@ const nodemailer = require('nodemailer');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
+const bcrypt = require('bcryptjs');
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const USERS_FILE = path.join(__dirname, 'users.json');
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(cookieParser());
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'ferienwohnung-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: false, // Set to true if using HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
+
+// Initialisiere Users-Datei falls nicht vorhanden
+function initUsers() {
+    if (!fs.existsSync(USERS_FILE)) {
+        const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
+        const hashedPassword = bcrypt.hashSync(defaultPassword, 10);
+        const users = {
+            "admin": {
+                username: "admin",
+                password: hashedPassword,
+                role: "admin"
+            }
+        };
+        fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+        console.log('✅ Standard-Benutzer "admin" erstellt.');
+    }
+}
+initUsers();
+
+// Auth Middleware
+function ensureAuthenticated(req, res, next) {
+    if (req.session.user) {
+        return next();
+    }
+    // API Call?
+    if (req.path.startsWith('/api/') && req.path !== '/api/login') {
+        return res.status(401).json({ error: 'Nicht authentifiziert' });
+    }
+    // Static file/Page? -> Redirect handled in frontend or serve login
+    next();
+}
+
+// API: Login
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+    const users = JSON.parse(fs.readFileSync(USERS_FILE));
+
+    const user = users[username];
+    if (user && bcrypt.compareSync(password, user.password)) {
+        req.session.user = { username: user.username, role: user.role };
+        res.json({ success: true, user: req.session.user });
+    } else {
+        res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' });
+    }
+});
+
+// API: Logout
+app.post('/api/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
+
+// API: Me (Check status)
+app.get('/api/me', (req, res) => {
+    if (req.session.user) {
+        res.json({ authenticated: true, user: req.session.user });
+    } else {
+        res.json({ authenticated: false });
+    }
+});
+
+// Statische Dateien nach Auth-Check
+app.use(ensureAuthenticated);
 app.use(express.static(path.join(__dirname)));
 
 // API: Generate PDF
@@ -26,7 +104,6 @@ app.post('/api/generate-pdf', async (req, res) => {
         });
         const page = await browser.newPage();
 
-        // Use a wrapper to ensure styles are loaded or passed
         await page.setContent(html, { waitUntil: 'networkidle0' });
 
         const pdf = await page.pdf({
@@ -89,31 +166,42 @@ app.post('/api/send-email', async (req, res) => {
 // API: Self-Update
 app.post('/api/update', (req, res) => {
     const { exec } = require('child_process');
-    console.log('🔄 Update-Prozess gestartet...');
+    console.log('🔄 Update-Check gestartet...');
 
-    // 1. Git Pull
-    exec('git pull', (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Git Pull Error: ${error.message}`);
-            return res.status(500).send(`Git Pull failed: ${error.message}`);
+    // 1. Git Fetch um Remote-Status zu prüfen
+    exec('git fetch origin main', (fetchErr) => {
+        if (fetchErr) {
+            return res.status(500).json({ success: false, message: 'Git Fetch failed: ' + fetchErr.message });
         }
-        console.log(`Git Pull Success: ${stdout}`);
 
-        // 2. NPM Install
-        exec('npm install', (npmError, npmStdout, npmStderr) => {
-            if (npmError) {
-                console.error(`NPM Install Warning: ${npmError.message}`);
+        // 2. Prüfen ob Änderungen vorliegen
+        exec('git status -uno', (statusErr, stdout) => {
+            if (statusErr) {
+                return res.status(500).json({ success: false, message: 'Git Status failed' });
             }
-            console.log(`NPM Install Success: ${npmStdout}`);
 
-            // 3. Erfolg melden und Neustart einleiten
-            res.send({ success: true, message: 'Update erfolgreich. Server startet neu...' });
+            if (stdout.includes('Your branch is up to date')) {
+                return res.json({ success: true, status: 'no_updates', message: 'Keine Updates verfügbar.' });
+            }
 
-            // Kurze Verzögerung für den Response, dann Exit (PM2 startet neu)
-            setTimeout(() => {
-                console.log('🔄 Starte Server neu (PM2 auto-restart)...');
-                process.exit(0);
-            }, 1000);
+            // 3. Wenn Updates da sind -> Pull & Install
+            console.log('📥 Neue Updates gefunden. Starte Pull...');
+            exec('git pull origin main', (pullErr, pullStdout) => {
+                if (pullErr) {
+                    return res.status(500).json({ success: false, message: 'Git Pull failed' });
+                }
+
+                exec('npm install', (npmErr) => {
+                    if (npmErr) console.warn('NPM Install Warning');
+
+                    res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
+
+                    setTimeout(() => {
+                        console.log('🔄 Starte Server neu...');
+                        process.exit(0);
+                    }, 1500);
+                });
+            });
         });
     });
 });

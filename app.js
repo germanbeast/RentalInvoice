@@ -36,12 +36,74 @@
     const modalSettings = $('#modal-settings');
     const modalArchive = $('#modal-archive');
     const toastContainer = $('#toast-container');
+    const appWrapper = $('#app-wrapper');
+    const loginScreen = $('#login-screen');
+    const loginForm = $('#login-form');
+    const updateOverlay = $('#update-overlay');
+    const updateStatusText = $('#update-status-text');
+
+    // =======================
+    // Authentication
+    // =======================
+    async function checkAuth() {
+        try {
+            const response = await fetch('/api/me');
+            const data = await response.json();
+            if (data.authenticated) {
+                showApp();
+            } else {
+                showLogin();
+            }
+        } catch (err) {
+            console.error('Auth check failed:', err);
+            showLogin();
+        }
+    }
+
+    function showLogin() {
+        loginScreen.style.display = 'flex';
+        appWrapper.style.display = 'none';
+        appWrapper.classList.remove('authenticated');
+    }
+
+    function showApp() {
+        loginScreen.style.display = 'none';
+        appWrapper.style.display = 'block';
+        setTimeout(() => appWrapper.classList.add('authenticated'), 10);
+        init(); // Start the app
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = $('#login-user').value;
+        const password = $('#login-pass').value;
+
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+            if (data.success) {
+                showToast('Erfolgreich angemeldet!', 'success');
+                showApp();
+            } else {
+                showToast(data.message || 'Login fehlgeschlagen', 'error');
+            }
+        } catch (err) {
+            showToast('Verbindungsfehler zum Server', 'error');
+        }
+    });
 
     // =======================
     // State
     // =======================
     let positions = [];
     let positionIdCounter = 0;
+
+    // Initial Auth Check
+    checkAuth();
 
     // =======================
     // Utility
@@ -1353,33 +1415,42 @@
 
         const originalContent = btnUpdate.innerHTML;
         btnUpdate.disabled = true;
-        btnUpdate.innerHTML = `
-            <svg class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" style="margin-right: 8px;">
-                <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m15.364-7.364l-1.414 1.414M6.05 17.95l-1.414 1.414M17.95 17.95l1.414 1.414M6.05 6.05L4.636 4.636" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Update...
-        `;
+
+        // Show Overlay
+        updateOverlay.style.display = 'flex';
+        updateStatusText.textContent = 'Update wird geprüft...';
 
         try {
-            showToast('Update-Prozess gestartet...', 'info', 10000);
-
             const response = await fetch('/api/update', { method: 'POST' });
             const result = await response.json();
 
             if (result.success) {
-                showToast('Update erfolgreich! Seite lädt neu...', 'success', 5000);
-                // Kurze Pause, dann Reload
-                setTimeout(() => {
-                    window.location.reload();
-                }, 3000);
+                if (result.status === 'no_updates') {
+                    updateStatusText.textContent = 'Keine Updates verfügbar.';
+                    showToast('Deine App ist bereits auf dem neuesten Stand.', 'info');
+                    setTimeout(() => {
+                        updateOverlay.style.display = 'none';
+                        btnUpdate.disabled = false;
+                    }, 2000);
+                } else {
+                    updateStatusText.textContent = 'Update erfolgreich! Neustart...';
+                    showToast('Update abgeschlossen. App lädt neu.', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 3000);
+                }
             } else {
                 throw new Error(result.message || 'Update fehlgeschlagen');
             }
         } catch (err) {
             console.error('Update Error:', err);
-            showToast(`Update-Fehler: ${err.message}`, 'error', 10000);
-            btnUpdate.disabled = false;
-            btnUpdate.innerHTML = originalContent;
+            updateStatusText.textContent = 'Fehler beim Update :(';
+            showToast(`Fehler: ${err.message}`, 'error', 10000);
+            setTimeout(() => {
+                updateOverlay.style.display = 'none';
+                btnUpdate.disabled = false;
+                btnUpdate.innerHTML = originalContent;
+            }, 3000);
         }
     });
 
@@ -1411,8 +1482,6 @@
         updatePreview();
         updateNights();
     }
-
-    init();
 
     // Add spin animation for loading
     const style = document.createElement('style');
