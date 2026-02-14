@@ -86,6 +86,38 @@ app.post('/api/send-email', async (req, res) => {
     }
 });
 
+// API: Self-Update
+app.post('/api/update', (req, res) => {
+    const { exec } = require('child_process');
+    console.log('🔄 Update-Prozess gestartet...');
+
+    // 1. Git Pull
+    exec('git pull', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Git Pull Error: ${error.message}`);
+            return res.status(500).send(`Git Pull failed: ${error.message}`);
+        }
+        console.log(`Git Pull Success: ${stdout}`);
+
+        // 2. NPM Install
+        exec('npm install', (npmError, npmStdout, npmStderr) => {
+            if (npmError) {
+                console.error(`NPM Install Warning: ${npmError.message}`);
+            }
+            console.log(`NPM Install Success: ${npmStdout}`);
+
+            // 3. Erfolg melden und Neustart einleiten
+            res.send({ success: true, message: 'Update erfolgreich. Server startet neu...' });
+
+            // Kurze Verzögerung für den Response, dann Exit (PM2 startet neu)
+            setTimeout(() => {
+                console.log('🔄 Starte Server neu (PM2 auto-restart)...');
+                process.exit(0);
+            }, 1000);
+        });
+    });
+});
+
 // Error handling
 app.use((err, req, res, next) => {
     console.error(err.stack);

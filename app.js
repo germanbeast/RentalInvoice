@@ -31,6 +31,7 @@
     const btnCloseArchive = $('#btn-close-archive');
     const btnNukiPin = $('#btn-nuki-pin');
     const btnEmail = $('#btn-email');
+    const btnUpdate = $('#btn-update');
 
     const modalSettings = $('#modal-settings');
     const modalArchive = $('#modal-archive');
@@ -1340,6 +1341,46 @@
 
     btnArchiveSave.addEventListener('click', () => {
         archiveInvoice();
+    });
+
+    // =======================
+    // Self-Update
+    // =======================
+    btnUpdate.addEventListener('click', async () => {
+        if (!confirm('Möchtest du jetzt nach Updates suchen und diese installieren?\n\nDer Server startet dabei kurz neu.')) {
+            return;
+        }
+
+        const originalContent = btnUpdate.innerHTML;
+        btnUpdate.disabled = true;
+        btnUpdate.innerHTML = `
+            <svg class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" style="margin-right: 8px;">
+                <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m15.364-7.364l-1.414 1.414M6.05 17.95l-1.414 1.414M17.95 17.95l1.414 1.414M6.05 6.05L4.636 4.636" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Update...
+        `;
+
+        try {
+            showToast('Update-Prozess gestartet...', 'info', 10000);
+
+            const response = await fetch('/api/update', { method: 'POST' });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Update erfolgreich! Seite lädt neu...', 'success', 5000);
+                // Kurze Pause, dann Reload
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                throw new Error(result.message || 'Update fehlgeschlagen');
+            }
+        } catch (err) {
+            console.error('Update Error:', err);
+            showToast(`Update-Fehler: ${err.message}`, 'error', 10000);
+            btnUpdate.disabled = false;
+            btnUpdate.innerHTML = originalContent;
+        }
     });
 
     function init() {
