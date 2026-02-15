@@ -16,6 +16,7 @@ const axios = require('axios');
 const ical = require('node-ical');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cron = require('node-cron');
 const db = require('./db');
 require('dotenv').config();
 
@@ -27,6 +28,122 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 // 1. DATABASE INIT
 // =======================
 db.init();
+
+// =======================
+// 1b. WhatsApp via CallMeBot
+// =======================
+async function sendWhatsApp(phone, apiKey, message) {
+    if (!phone || !apiKey) {
+        console.warn('⚠️  WhatsApp nicht konfiguriert (Nummer oder API-Key fehlt)');
+        return false;
+    }
+    try {
+        const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(apiKey)}`;
+        const res = await axios.get(url, { timeout: 15000 });
+        console.log(`✉️  WhatsApp gesendet an ${phone}: ${message.substring(0, 50)}...`);
+        return true;
+    } catch (e) {
+        console.error('❌ WhatsApp-Fehler:', e.message);
+        return false;
+    }
+}
+
+// =======================
+// 1c. SCHEDULED JOBS (Cron)
+// =======================
+function formatDateDE(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// Job 1: iCal Polling (every 15 minutes)
+cron.schedule('*/15 * * * *', async () => {
+    try {
+        const allSettings = db.getAllSettings();
+        const icalUrl = allSettings.booking_ical;
+        const waPhone = allSettings.wa_phone;
+        const waApiKey = allSettings.wa_apikey;
+        const notifyEnabled = allSettings.notifications_enabled;
+
+        if (!icalUrl || notifyEnabled === 'false') return;
+
+        console.log('📅 iCal-Polling läuft...');
+        const response = await axios.get(icalUrl, {
+            timeout: 10000,
+            maxContentLength: 5 * 1024 * 1024,
+            headers: { 'User-Agent': 'RentalInvoice/1.0' }
+        });
+        const data = ical.parseICS(response.data);
+
+        let newCount = 0;
+        for (const k in data) {
+            if (!data.hasOwnProperty(k)) continue;
+            const ev = data[k];
+            if (ev.type !== 'VEVENT' || !ev.uid) continue;
+
+            const checkin = ev.start ? new Date(ev.start).toISOString().split('T')[0] : null;
+            const checkout = ev.end ? new Date(ev.end).toISOString().split('T')[0] : null;
+            const summary = String(ev.summary || 'Buchung').substring(0, 500);
+
+            const existing = db.getBookingByUid(ev.uid);
+            const result = db.upsertBooking({
+                uid: ev.uid,
+                summary,
+                checkin,
+                checkout,
+                description: String(ev.description || '').substring(0, 2000)
+            });
+
+            // Only notify for truly new bookings
+            if (result.inserted && !existing) {
+                newCount++;
+                const msg = `🏠 Neue Buchung!\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}`;
+                const sent = await sendWhatsApp(waPhone, waApiKey, msg);
+                db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
+            }
+        }
+
+        if (newCount > 0) {
+            console.log(`🎉 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
+        }
+    } catch (e) {
+        console.error('❌ iCal-Polling Fehler:', e.message);
+    }
+});
+
+// Job 2: Reminder Check (daily at 08:00)
+cron.schedule('0 8 * * *', async () => {
+    try {
+        const allSettings = db.getAllSettings();
+        const waPhone = allSettings.wa_phone;
+        const waApiKey = allSettings.wa_apikey;
+        const notifyEnabled = allSettings.notifications_enabled;
+        const reminderDays = parseInt(allSettings.reminder_days) || 2;
+
+        if (!waPhone || !waApiKey || notifyEnabled === 'false') return;
+
+        console.log('⏰ Erinnerungs-Check läuft...');
+        const upcoming = db.getUpcomingBookings(reminderDays);
+
+        for (const booking of upcoming) {
+            const msg = `⏰ Erinnerung: ${booking.summary || 'Gast'} reist bald an!\n📅 Anreise: ${formatDateDE(booking.checkin)}\n📅 Abreise: ${formatDateDE(booking.checkout)}`;
+            const sent = await sendWhatsApp(waPhone, waApiKey, msg);
+            if (sent) {
+                db.markReminderSent(booking.id);
+            }
+            db.logNotification('reminder', msg, sent ? 'sent' : 'failed');
+        }
+
+        if (upcoming.length > 0) {
+            console.log(`⏰ ${upcoming.length} Erinnerung(en) versendet.`);
+        }
+    } catch (e) {
+        console.error('❌ Reminder-Check Fehler:', e.message);
+    }
+});
+
+console.log('✅ Cron-Jobs registriert (iCal: alle 15 Min, Reminder: täglich 08:00)');
 
 // =======================
 // 2. SECURITY HEADERS (Helmet)
@@ -707,7 +824,51 @@ app.post('/api/update', apiLimiter, (req, res) => {
 });
 
 // =======================
-// 14. CATCH-ALL & ERROR HANDLING
+// 14b. NOTIFICATION API ROUTES
+// =======================
+app.get('/api/notifications/status', apiLimiter, (req, res) => {
+    try {
+        const logs = db.getRecentNotifications(20);
+        const allSettings = db.getAllSettings();
+        res.json({
+            success: true,
+            enabled: allSettings.notifications_enabled !== 'false',
+            configured: !!(allSettings.wa_phone && allSettings.wa_apikey),
+            logs
+        });
+    } catch (e) {
+        console.error('Notification Status Error:', e.message);
+        res.status(500).json({ error: 'Status konnte nicht geladen werden' });
+    }
+});
+
+app.post('/api/notifications/test-whatsapp', apiLimiter, async (req, res) => {
+    try {
+        const allSettings = db.getAllSettings();
+        const waPhone = allSettings.wa_phone;
+        const waApiKey = allSettings.wa_apikey;
+
+        if (!waPhone || !waApiKey) {
+            return res.status(400).json({ error: 'WhatsApp-Nummer und API-Key m\u00fcssen in den Einstellungen hinterlegt sein.' });
+        }
+
+        const msg = '\u2705 Test-Nachricht von Rental Invoice! WhatsApp-Benachrichtigungen funktionieren.';
+        const sent = await sendWhatsApp(waPhone, waApiKey, msg);
+        db.logNotification('test', msg, sent ? 'sent' : 'failed');
+
+        if (sent) {
+            res.json({ success: true, message: 'Test-Nachricht gesendet!' });
+        } else {
+            res.status(500).json({ error: 'Nachricht konnte nicht gesendet werden. Pr\u00fcfe Nummer und API-Key.' });
+        }
+    } catch (e) {
+        console.error('Test WhatsApp Error:', e.message);
+        res.status(500).json({ error: 'Fehler beim Senden' });
+    }
+});
+
+// =======================
+// 15. CATCH-ALL & ERROR HANDLING
 // =======================
 app.use((req, res) => {
     res.status(404).send('Not Found');

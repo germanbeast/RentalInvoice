@@ -874,6 +874,34 @@
                         <small>Export-Link findest du im Booking Extranet unter Rate &amp; Verfügbarkeit → Kalender
                             synchronisieren.</small>
                     </div>
+                    <hr>
+
+                    <!-- NOTIFICATIONS (WhatsApp) -->
+                    <div class="modal-subheader">
+                        <h4>Benachrichtigungen (WhatsApp)</h4>
+                    </div>
+                    <div class="form-group">
+                        <label for="wa-phone">WhatsApp-Nummer (mit Ländervorwahl)</label>
+                        <input type="text" id="wa-phone" placeholder="+4917612345678">
+                        <small>Nummer muss vorher bei CallMeBot registriert sein.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="wa-apikey">CallMeBot API-Key</label>
+                        <input type="text" id="wa-apikey" placeholder="123456">
+                        <small>Schreibe +34 644 71 81 48 auf WhatsApp: "I allow callmebot to send me messages"</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="reminder-days">Erinnerung (Tage vorher)</label>
+                            <input type="number" id="reminder-days" value="2" min="1" max="7">
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="notifications-enabled" checked>
+                                Benachrichtigungen aktiv
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" id="btn-save-settings" class="btn btn-primary">Einstellungen
@@ -883,6 +911,7 @@
                             speichern</button>
                         <button type="button" id="btn-test-connection" class="btn btn-outline">Paperless testen</button>
                         <button type="button" id="btn-nuki-test" class="btn btn-outline">Nuki testen</button>
+                        <button type="button" id="btn-test-whatsapp" class="btn btn-outline">WhatsApp testen</button>
                         <button type="button" id="btn-migrate-data" class="btn btn-outline"
                             title="Bestehende Browser-Daten in die Datenbank importieren">Daten importieren</button>
                     </div>

@@ -83,6 +83,26 @@ function initSchema() {
             paperless_id INTEGER UNIQUE,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uid TEXT UNIQUE NOT NULL,
+            summary TEXT,
+            checkin DATE,
+            checkout DATE,
+            description TEXT,
+            notified BOOLEAN DEFAULT 0,
+            reminder_sent BOOLEAN DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS notification_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            message TEXT,
+            status TEXT DEFAULT 'sent',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
     `);
     console.log('✅ Datenbank-Schema initialisiert.');
 }
@@ -419,6 +439,53 @@ function getStats() {
 }
 
 // =======================
+// Bookings & Notifications
+// =======================
+function getBookingByUid(uid) {
+    const db = getDb();
+    return db.prepare('SELECT * FROM bookings WHERE uid = ?').get(uid);
+}
+
+function upsertBooking(data) {
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM bookings WHERE uid = ?').get(data.uid);
+    if (existing) {
+        db.prepare('UPDATE bookings SET summary = ?, checkin = ?, checkout = ?, description = ? WHERE uid = ?')
+            .run(data.summary, data.checkin, data.checkout, data.description, data.uid);
+        return { updated: true, id: existing.id };
+    } else {
+        const result = db.prepare('INSERT INTO bookings (uid, summary, checkin, checkout, description) VALUES (?, ?, ?, ?, ?)')
+            .run(data.uid, data.summary, data.checkin, data.checkout, data.description);
+        return { inserted: true, id: result.lastInsertRowid };
+    }
+}
+
+function getUpcomingBookings(daysAhead = 2) {
+    const db = getDb();
+    return db.prepare(`
+        SELECT * FROM bookings
+        WHERE checkin BETWEEN date('now') AND date('now', '+' || ? || ' days')
+          AND reminder_sent = 0
+        ORDER BY checkin ASC
+    `).all(daysAhead);
+}
+
+function markReminderSent(id) {
+    const db = getDb();
+    db.prepare('UPDATE bookings SET reminder_sent = 1 WHERE id = ?').run(id);
+}
+
+function logNotification(type, message, status = 'sent') {
+    const db = getDb();
+    db.prepare('INSERT INTO notification_log (type, message, status) VALUES (?, ?, ?)').run(type, message, status);
+}
+
+function getRecentNotifications(limit = 20) {
+    const db = getDb();
+    return db.prepare('SELECT * FROM notification_log ORDER BY created_at DESC LIMIT ?').all(limit);
+}
+
+// =======================
 // Bulk Migration (from localStorage)
 // =======================
 function migrateFromLocalStorage(data) {
@@ -502,6 +569,13 @@ module.exports = {
     getExpenseByPaperlessId,
     // Stats
     getStats,
+    // Bookings & Notifications
+    getBookingByUid,
+    upsertBooking,
+    getUpcomingBookings,
+    markReminderSent,
+    logNotification,
+    getRecentNotifications,
     // Migration
     migrateFromLocalStorage
 };

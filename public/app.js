@@ -544,7 +544,11 @@
             },
             booking_ical: $('#booking-ical-url').value,
             paperless_expense_tag: $('#s-pl-expense-tag').value,
-            paperless_amount_field: $('#s-pl-amount-field').value
+            paperless_amount_field: $('#s-pl-amount-field').value,
+            wa_phone: $('#wa-phone').value,
+            wa_apikey: $('#wa-apikey').value,
+            reminder_days: $('#reminder-days').value || '2',
+            notifications_enabled: $('#notifications-enabled').checked ? 'true' : 'false'
         };
 
         try {
@@ -620,6 +624,13 @@
             }
             if (s.paperless_expense_tag) $('#s-pl-expense-tag').value = s.paperless_expense_tag;
             if (s.paperless_amount_field) $('#s-pl-amount-field').value = s.paperless_amount_field;
+            // Notifications
+            if (s.wa_phone) $('#wa-phone').value = s.wa_phone;
+            if (s.wa_apikey) $('#wa-apikey').value = s.wa_apikey;
+            if (s.reminder_days) $('#reminder-days').value = s.reminder_days;
+            if (s.notifications_enabled !== undefined) {
+                $('#notifications-enabled').checked = s.notifications_enabled !== 'false';
+            }
         } catch (e) {
             console.error('Settings load error:', e);
         }
@@ -636,6 +647,29 @@
     function loadSmtpSettings() { /* loaded via loadAllSettings */ }
     function saveNukiSettings() { /* saved via saveAllSettings */ }
     function loadNukiSettings() { /* loaded via loadAllSettings */ }
+
+    // WhatsApp test button
+    const btnTestWhatsApp = $('#btn-test-whatsapp');
+    if (btnTestWhatsApp) {
+        btnTestWhatsApp.addEventListener('click', async () => {
+            btnTestWhatsApp.disabled = true;
+            btnTestWhatsApp.textContent = 'Sende...';
+            try {
+                const res = await fetch('/api/notifications/test-whatsapp', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.error || 'Fehler', 'error');
+                }
+            } catch (e) {
+                showToast('Verbindungsfehler', 'error');
+            } finally {
+                btnTestWhatsApp.disabled = false;
+                btnTestWhatsApp.textContent = 'WhatsApp testen';
+            }
+        });
+    }
 
     function getNextRechnungsnr() {
         const currentYear = new Date().getFullYear();

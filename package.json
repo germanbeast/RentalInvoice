@@ -23,6 +23,7 @@
     "express-rate-limit": "^8.2.1",
     "express-session": "^1.19.0",
     "helmet": "^8.1.0",
+    "node-cron": "^4.2.1",
     "node-ical": "^0.25.1",
     "nodemailer": "^8.0.1",
     "puppeteer": "^24.37.3"
