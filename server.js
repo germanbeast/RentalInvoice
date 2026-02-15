@@ -38,15 +38,13 @@ app.use(helmet({
             frameSrc: ["'none'"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
-            formAction: ["'self'"]
+            formAction: ["'self'"],
+            upgradeInsecureRequests: null  // Server runs on HTTP, don't force HTTPS
         }
     },
     crossOriginEmbedderPolicy: false,
-    hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    },
+    // HSTS disabled: server has no SSL certificate
+    hsts: false,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
