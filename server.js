@@ -28,12 +28,30 @@ app.use(session({
     }
 }));
 
-// Initialisiere Users-Datei falls nicht vorhanden
+// Initialisiere Users-Datei falls nicht vorhanden oder Passwort-Update nötig
 function initUsers() {
-    if (!fs.existsSync(USERS_FILE)) {
-        const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    let users = {};
+    const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
+
+    if (fs.existsSync(USERS_FILE)) {
+        users = JSON.parse(fs.readFileSync(USERS_FILE));
+
+        // Passwort-Sync check: Wenn admin existiert, prüfe ob Bcrypt-Match mit .env
+        if (users["admin"]) {
+            const currentHash = users["admin"].password;
+            const needsUpdate = !bcrypt.compareSync(defaultPassword, currentHash);
+
+            if (needsUpdate) {
+                console.log('🔄 ADMIN_PASSWORD in .env hat sich geändert. Aktualisiere Datenbank...');
+                users["admin"].password = bcrypt.hashSync(defaultPassword, 10);
+                fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+                console.log('✅ Admin-Passwort erfolgreich synchronisiert.');
+            }
+        }
+    } else {
+        // Neuinstallation
         const hashedPassword = bcrypt.hashSync(defaultPassword, 10);
-        const users = {
+        users = {
             "admin": {
                 username: "admin",
                 password: hashedPassword,

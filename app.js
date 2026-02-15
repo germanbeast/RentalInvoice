@@ -77,28 +77,45 @@
         e.preventDefault();
         const username = $('#login-user').value;
         const password = $('#login-pass').value;
+        const loginBtn = loginForm.querySelector('button[type="submit"]');
+
         console.log(`🔑 Login-Versuch gestartet fÃ¼r: ${username}`);
 
+        // Disable button and show loading
+        const originalBtnText = loginBtn.innerHTML;
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<span class="update-spinner" style="width:16px; height:16px; border-width:2px; margin:0 8px 0 0; display:inline-block; vertical-align:middle;"></span> Anmelden...';
+
         try {
+            console.log('🌐 Sende Request an /api/login...');
             const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-            console.log(`🌐 Server-Antwort Status: ${response.status}`);
+
+            console.log(`🌐 Server-Antwort Status: ${response.status} ${response.statusText}`);
 
             const data = await response.json();
+            console.log('📦 Empfangene Daten:', data);
+
             if (data.success) {
                 console.log('✅ Login erfolgreich!');
                 showToast('Erfolgreich angemeldet!', 'success');
                 showApp();
             } else {
                 console.warn('❌ Login fehlgeschlagen:', data.message);
-                showToast(data.message || 'Login fehlgeschlagen', 'error');
+                const msg = data.message || 'Login fehlgeschlagen';
+                showToast(msg, 'error');
+                alert(`Login-Fehler: ${msg}`); // Fallback falls Toast nicht sichtbar
             }
         } catch (err) {
             console.error('🔥 Fetch-Fehler beim Login:', err);
             showToast('Verbindungsfehler zum Server', 'error');
+            alert(`Verbindungsfehler: ${err.message}`);
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = originalBtnText;
         }
     });
 
