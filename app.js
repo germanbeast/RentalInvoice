@@ -1011,10 +1011,11 @@
     function updatePreviewScale() {
         const previewColumn = $('#preview-panel');
         if (!previewColumn) return;
-        const availableWidth = previewColumn.clientWidth;
+        const availableWidth = previewColumn.clientWidth - 4; // 4px for border/padding
+        if (availableWidth <= 0) return;
         const pageWidthMm = 210; // A4 width in mm
-        const pageWidthPx = pageWidthMm * 3.7795; // mm to px
-        const scale = Math.min(availableWidth / pageWidthPx, 0.55);
+        const pageWidthPx = pageWidthMm * 3.7795; // mm to px (~793.7px)
+        const scale = Math.max(availableWidth / pageWidthPx, 0.15); // no max cap, just a minimum
         document.documentElement.style.setProperty('--preview-scale', scale);
     }
 

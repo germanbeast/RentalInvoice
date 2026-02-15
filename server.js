@@ -256,22 +256,31 @@ app.post('/api/update', (req, res) => {
 
             // 3. Wenn Updates da sind -> Pull & Install
             console.log('📥 Neue Updates gefunden. Starte Pull...');
-            // Force pull if needed or at least stay robust
-            exec('git pull origin main', (pullErr, pullStdout) => {
-                if (pullErr) {
-                    console.error('Git Pull Error:', pullErr);
-                    return res.status(500).json({ success: false, message: 'Git Pull failed' });
-                }
+            // Stash local changes first to avoid conflicts (e.g. users.json, .env)
+            exec('git stash', (stashErr) => {
+                if (stashErr) console.warn('Git Stash Warning:', stashErr.message);
 
-                exec('npm install', (npmErr) => {
-                    if (npmErr) console.warn('NPM Install Warning');
+                exec('git pull origin main', (pullErr, pullStdout) => {
+                    if (pullErr) {
+                        console.error('Git Pull Error:', pullErr);
+                        return res.status(500).json({ success: false, message: 'Git Pull failed: ' + pullErr.message });
+                    }
 
-                    res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
+                    // Restore stashed changes
+                    exec('git stash pop', (popErr) => {
+                        if (popErr) console.warn('Git Stash Pop Warning:', popErr.message);
 
-                    setTimeout(() => {
-                        console.log('🔄 Starte Server neu...');
-                        process.exit(0);
-                    }, 1500);
+                        exec('npm install', (npmErr) => {
+                            if (npmErr) console.warn('NPM Install Warning');
+
+                            res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
+
+                            setTimeout(() => {
+                                console.log('🔄 Starte Server neu...');
+                                process.exit(0);
+                            }, 1500);
+                        });
+                    });
                 });
             });
         });
