@@ -39,6 +39,9 @@
     const appWrapper = $('#app-wrapper');
     const loginScreen = $('#login-screen');
     const loginForm = $('#login-form');
+    const updateOverlay = $('#update-overlay');
+    const updateStatusText = $('#update-status-text');
+
     const STORAGE_KEYS = {
         vermieter: 'fw-rechnung-vermieter',
         bank: 'fw-rechnung-bank',
