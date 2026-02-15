@@ -941,7 +941,7 @@
         saveBookingSettings();
         modalSettings.style.display = 'none';
     });
-    破
+
     async function createNukiPin() {
         const token = $('#nuki-token').value;
         const lockId = $('#nuki-lock-id').value;
@@ -1337,20 +1337,49 @@
         $('#g-name').value = '';
         $('#g-adresse').value = '';
 
-        // =======================
-        // Booking.com Integration
-        // =======================
-        const btnBookingParse = $('#btn-booking-parse');
-        const btnBookingCalendar = $('#btn-booking-calendar');
-        const bookingPasteArea = $('#booking-smart-paste');
-        const calendarView = $('#booking-calendar-view');
-        const eventsList = $('#booking-events-list');
+        // Clear dates
+        $('#a-anreise').value = '';
+        $('#a-abreise').value = '';
+        $('#naechte-badge').style.display = 'none';
 
-        // iCal Fetching
+        // New invoice number
+        $('#r-nummer').value = getNextRechnungsnr();
+        $('#r-datum').value = new Date().toISOString().split('T')[0];
+
+        // Reset payment
+        $('#z-bezahlt').checked = true;
+        $('#z-methode').value = 'PayPal';
+        $('#z-datum').value = '';
+        $('#z-show-bank').checked = false;
+        $('#fieldset-bank').style.display = 'none';
+
+        // Clear positions
+        positions = [];
+        renderPositions();
+
+        // Clear draft
+        clearDraft();
+
+        updateSummary();
+        updatePreview();
+        showToast('Rechnungsdaten zurückgesetzt');
+    });
+
+    // =======================
+    // Booking.com Integration
+    // =======================
+    const btnBookingParse = $('#btn-booking-parse');
+    const btnBookingCalendar = $('#btn-booking-calendar');
+    const bookingPasteArea = $('#booking-smart-paste');
+    const calendarView = $('#booking-calendar-view');
+    const eventsList = $('#booking-events-list');
+
+    // iCal Fetching
+    if (btnBookingCalendar) {
         btnBookingCalendar.addEventListener('click', async () => {
-            const url = localStorage.getItem('booking-ical-url');
+            const url = localStorage.getItem(STORAGE_KEYS.booking_ical);
             if (!url) {
-                alert('Bitte hinterlege zuerst den iCal-Link in den Einstellungen.');
+                showToast('Bitte iCal-Link in den Einstellungen hinterlegen', 'error');
                 modalSettings.style.display = 'flex';
                 return;
             }
@@ -1390,34 +1419,24 @@
                         eventsList.appendChild(div);
                     });
                 } else {
-                    showToast('Keine Buchungen gefunden oder Link ungültig', 'error');
+                    showToast('Keine Buchungen gefunden', 'error');
                 }
             } catch (err) {
-                console.error('Calendar Fetch Error:', err);
-                showToast('Fehler beim Abrufen des Kalenders', 'error');
+                showToast('Fehler beim Kalender-Abruf', 'error');
             } finally {
                 btnBookingCalendar.disabled = false;
                 btnBookingCalendar.textContent = 'Kalender laden';
             }
         });
+    }
 
-        // Smart Parsing
+    // Smart Parsing
+    if (btnBookingParse) {
         btnBookingParse.addEventListener('click', () => {
             const text = bookingPasteArea.value.trim();
-            if (!text) {
-                alert('Bitte kopiere zuerst den Text aus dem Booking Extranet hier hinein.');
-                return;
-            }
+            if (!text) return;
 
-            console.log('🧐 Starte Parsing...');
-
-            // Guest Name
             let name = '';
-            const nameMatch = text.match(/Name des Gasts:\s*\n?\s*([^\n\r]+)/i) ||
-                text.match(/Manuel\s+Viertel/i); // Hardcoded fallback for the screenshot demo format
-
-            // In the screenshot it's Blue text under "Name des Gasts:"
-            // Let's try to find potential names (capitalized words)
             const lines = text.split('\n').map(l => l.trim()).filter(l => l);
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].includes('Name des Gasts')) {
@@ -1426,65 +1445,26 @@
                 }
             }
 
-            // Dates
-            const anreiseMatch = text.match(/Check-in\s*\n?\s*\w+\.,\s*(\d+\.\s*\w+\.\s*\d+)/i);
-            const abreiseMatch = text.match(/Check-out\s*\n?\s*\w+\.,\s*(\d+\.\s*\w+\.\s*\d+)/i);
-
-            // Price
             const priceMatch = text.match(/Gesamtpreis\s*€\s*(\d+)/i);
-
-            // Booking Number
             const nrMatch = text.match(/Buchungsnummer:\s*(\d+)/i);
-
-            // Address (heuristic: look for Zip and City)
             const addressMatch = text.match(/([^\n]*\d{5}\s+[^\n]*)/);
 
             if (name) $('#g-name').value = name;
             if (nrMatch) $('#r-hinweis').value = `Booking-Nr: ${nrMatch[1]}`;
             if (priceMatch) {
-                // Pre-fill first position?
-                positions = [{ id: 0, text: 'Übernachtung (Booking.com)', price: parseFloat(priceMatch[1]), qty: 1 }];
+                positions = [{ id: ++positionIdCounter, desc: 'Übernachtung (Booking.com)', qty: 1, price: parseFloat(priceMatch[1]) }];
                 renderPositions();
             }
             if (addressMatch) $('#g-adresse').value = addressMatch[0];
 
-            if (name || anreiseMatch || priceMatch) {
-                showToast('Daten erfolgreich extrahiert!', 'success');
-                bookingPasteArea.value = ''; // Clean up
+            if (name || priceMatch) {
+                showToast('Daten extrahiert!', 'success');
+                bookingPasteArea.value = '';
                 updateSummary();
                 updatePreview();
-            } else {
-                showToast('Konnte keine bekannten Daten finden. Bitte Text manuell kopieren.', 'info');
             }
         });
-
-        // Clear dates
-        $('#a-anreise').value = '';
-        $('#a-abreise').value = '';
-        $('#naechte-badge').style.display = 'none';
-
-        // New invoice number
-        $('#r-nummer').value = getNextRechnungsnr();
-        $('#r-datum').value = new Date().toISOString().split('T')[0];
-
-        // Reset payment
-        $('#z-bezahlt').checked = true;
-        $('#z-methode').value = 'PayPal';
-        $('#z-datum').value = '';
-        $('#z-show-bank').checked = false;
-        $('#fieldset-bank').style.display = 'none';
-
-        // Clear positions
-        positions = [];
-        renderPositions();
-
-        // Clear draft
-        clearDraft();
-
-        updateSummary();
-        updatePreview();
-        showToast('Rechnungsdaten zurückgesetzt');
-    });
+    }
 
     // =======================
     // Save Buttons
@@ -1614,7 +1594,7 @@
         loadSmtpSettings();
         loadNukiSettings();
         loadBookingSettings();
-        破
+
         // Try to restore draft first
         const draftLoaded = loadDraft();
 

@@ -246,14 +246,20 @@ app.post('/api/update', (req, res) => {
                 return res.status(500).json({ success: false, message: 'Git Status failed' });
             }
 
-            if (stdout.includes('Your branch is up to date')) {
+            // Check for both English and German "up to date" messages
+            const upToDate = stdout.includes('Your branch is up to date') ||
+                stdout.includes('Auf dem neuesten Stand');
+
+            if (upToDate) {
                 return res.json({ success: true, status: 'no_updates', message: 'Keine Updates verfügbar.' });
             }
 
             // 3. Wenn Updates da sind -> Pull & Install
             console.log('📥 Neue Updates gefunden. Starte Pull...');
+            // Force pull if needed or at least stay robust
             exec('git pull origin main', (pullErr, pullStdout) => {
                 if (pullErr) {
+                    console.error('Git Pull Error:', pullErr);
                     return res.status(500).json({ success: false, message: 'Git Pull failed' });
                 }
 
