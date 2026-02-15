@@ -1,0 +1,415 @@
+/* ===========================
+   Database Module (SQLite)
+   =========================== */
+
+const Database = require('better-sqlite3');
+const path = require('path');
+const fs = require('fs');
+const bcrypt = require('bcryptjs');
+
+const DB_PATH = path.join(__dirname, 'rental.db');
+
+let db;
+
+function getDb() {
+    if (!db) {
+        db = new Database(DB_PATH);
+        db.pragma('journal_mode = WAL');
+        db.pragma('foreign_keys = ON');
+        initSchema();
+    }
+    return db;
+}
+
+// =======================
+// Schema
+// =======================
+function initSchema() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'admin',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS guests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT,
+            address TEXT,
+            phone TEXT,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS invoices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_number TEXT UNIQUE NOT NULL,
+            guest_id INTEGER REFERENCES guests(id) ON DELETE SET NULL,
+            guest_name TEXT,
+            invoice_date DATE,
+            arrival DATE,
+            departure DATE,
+            total_amount REAL DEFAULT 0,
+            is_paid BOOLEAN DEFAULT 0,
+            payment_method TEXT,
+            payment_date DATE,
+            data JSON NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS branding (
+            id INTEGER PRIMARY KEY DEFAULT 1,
+            logo_base64 TEXT,
+            primary_color TEXT DEFAULT '#6366f1',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+    console.log('✅ Datenbank-Schema initialisiert.');
+}
+
+// =======================
+// Users
+// =======================
+function getUser(username) {
+    return getDb().prepare('SELECT * FROM users WHERE username = ?').get(username);
+}
+
+function createUser(username, hashedPassword, role = 'admin') {
+    return getDb().prepare(
+        'INSERT OR REPLACE INTO users (username, password, role) VALUES (?, ?, ?)'
+    ).run(username, hashedPassword, role);
+}
+
+function updateUserPassword(username, hashedPassword) {
+    return getDb().prepare(
+        'UPDATE users SET password = ? WHERE username = ?'
+    ).run(hashedPassword, username);
+}
+
+function initDefaultUser() {
+    const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const existing = getUser('admin');
+
+    if (!existing) {
+        const hashed = bcrypt.hashSync(defaultPassword, 12);
+        createUser('admin', hashed, 'admin');
+        console.log('✅ Standard-Benutzer "admin" erstellt.');
+    } else {
+        // Sync password if ADMIN_PASSWORD env var changed
+        if (!bcrypt.compareSync(defaultPassword, existing.password)) {
+            console.log('🔄 ADMIN_PASSWORD hat sich geändert. Aktualisiere...');
+            updateUserPassword('admin', bcrypt.hashSync(defaultPassword, 12));
+            console.log('✅ Admin-Passwort synchronisiert.');
+        }
+    }
+}
+
+// Migrate from users.json if it exists
+function migrateUsersJson() {
+    const usersFile = path.join(__dirname, 'users.json');
+    if (fs.existsSync(usersFile)) {
+        try {
+            const users = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
+            for (const [username, userData] of Object.entries(users)) {
+                const existing = getUser(username);
+                if (!existing) {
+                    createUser(username, userData.password, userData.role || 'admin');
+                    console.log(`📦 Migriert: Benutzer "${username}" aus users.json`);
+                }
+            }
+            // Rename old file
+            fs.renameSync(usersFile, usersFile + '.bak');
+            console.log('✅ users.json → users.json.bak (Migration abgeschlossen)');
+        } catch (e) {
+            console.error('⚠️ Migration von users.json fehlgeschlagen:', e.message);
+        }
+    }
+}
+
+// =======================
+// Settings
+// =======================
+function getSetting(key) {
+    const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key);
+    if (!row) return null;
+    try { return JSON.parse(row.value); } catch { return row.value; }
+}
+
+function setSetting(key, value) {
+    const val = typeof value === 'string' ? value : JSON.stringify(value);
+    return getDb().prepare(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
+    ).run(key, val);
+}
+
+function getAllSettings() {
+    const rows = getDb().prepare('SELECT key, value FROM settings').all();
+    const result = {};
+    for (const row of rows) {
+        try { result[row.key] = JSON.parse(row.value); } catch { result[row.key] = row.value; }
+    }
+    return result;
+}
+
+function setAllSettings(settings) {
+    const stmt = getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    const transaction = getDb().transaction((items) => {
+        for (const [key, value] of Object.entries(items)) {
+            const val = typeof value === 'string' ? value : JSON.stringify(value);
+            stmt.run(key, val);
+        }
+    });
+    transaction(settings);
+}
+
+// =======================
+// Guests
+// =======================
+function getAllGuests(search = '') {
+    if (search) {
+        const q = `%${search}%`;
+        return getDb().prepare(
+            `SELECT g.*, COUNT(i.id) as invoice_count 
+             FROM guests g LEFT JOIN invoices i ON i.guest_id = g.id 
+             WHERE g.name LIKE ? OR g.email LIKE ? OR g.phone LIKE ?
+             GROUP BY g.id ORDER BY g.updated_at DESC`
+        ).all(q, q, q);
+    }
+    return getDb().prepare(
+        `SELECT g.*, COUNT(i.id) as invoice_count 
+         FROM guests g LEFT JOIN invoices i ON i.guest_id = g.id 
+         GROUP BY g.id ORDER BY g.updated_at DESC`
+    ).all();
+}
+
+function getGuestById(id) {
+    return getDb().prepare('SELECT * FROM guests WHERE id = ?').get(id);
+}
+
+function createGuest(data) {
+    const result = getDb().prepare(
+        `INSERT INTO guests (name, email, address, phone, notes) 
+         VALUES (?, ?, ?, ?, ?)`
+    ).run(data.name, data.email || null, data.address || null, data.phone || null, data.notes || null);
+    return { id: result.lastInsertRowid, ...data };
+}
+
+function updateGuest(id, data) {
+    return getDb().prepare(
+        `UPDATE guests SET name = ?, email = ?, address = ?, phone = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`
+    ).run(data.name, data.email || null, data.address || null, data.phone || null, data.notes || null, id);
+}
+
+function deleteGuest(id) {
+    return getDb().prepare('DELETE FROM guests WHERE id = ?').run(id);
+}
+
+function findOrCreateGuest(name, email, address) {
+    // Try to find by email first, then by name
+    let guest = null;
+    if (email) {
+        guest = getDb().prepare('SELECT * FROM guests WHERE email = ?').get(email);
+    }
+    if (!guest && name) {
+        guest = getDb().prepare('SELECT * FROM guests WHERE name = ?').get(name);
+    }
+    if (guest) {
+        // Update if address changed
+        if (address && address !== guest.address) {
+            updateGuest(guest.id, { ...guest, address });
+        }
+        return guest;
+    }
+    // Create new guest
+    return createGuest({ name, email, address });
+}
+
+// =======================
+// Invoices
+// =======================
+function getAllInvoices(search = '') {
+    if (search) {
+        const q = `%${search}%`;
+        return getDb().prepare(
+            `SELECT i.*, g.name as guest_display_name 
+             FROM invoices i LEFT JOIN guests g ON i.guest_id = g.id 
+             WHERE i.invoice_number LIKE ? OR i.guest_name LIKE ? OR g.name LIKE ?
+             ORDER BY i.created_at DESC`
+        ).all(q, q, q);
+    }
+    return getDb().prepare(
+        `SELECT i.*, g.name as guest_display_name 
+         FROM invoices i LEFT JOIN guests g ON i.guest_id = g.id 
+         ORDER BY i.created_at DESC`
+    ).all();
+}
+
+function getInvoicesByGuestId(guestId) {
+    return getDb().prepare(
+        `SELECT * FROM invoices WHERE guest_id = ? ORDER BY created_at DESC`
+    ).all(guestId);
+}
+
+function saveInvoice(data) {
+    // Find or create guest
+    let guestId = data.guest_id || null;
+    const guestName = data.gName || data.guest_name || '';
+
+    if (!guestId && guestName) {
+        const guest = findOrCreateGuest(guestName, data.gEmail || null, data.gAdresse || null);
+        guestId = guest.id;
+    }
+
+    const jsonData = typeof data === 'string' ? data : JSON.stringify(data);
+
+    // Upsert by invoice_number
+    const existing = getDb().prepare('SELECT id FROM invoices WHERE invoice_number = ?').get(data.rNummer || data.invoice_number);
+
+    if (existing) {
+        getDb().prepare(
+            `UPDATE invoices SET guest_id = ?, guest_name = ?, invoice_date = ?, arrival = ?, departure = ?,
+             total_amount = ?, is_paid = ?, payment_method = ?, payment_date = ?, data = ?
+             WHERE id = ?`
+        ).run(
+            guestId, guestName, data.rDatum || data.invoice_date || null,
+            data.aAnreise || data.arrival || null, data.aAbreise || data.departure || null,
+            data.totalAmount || data.total_amount || 0,
+            data.zBezahlt || data.is_paid ? 1 : 0,
+            data.zMethode || data.payment_method || null,
+            data.zDatum || data.payment_date || null,
+            jsonData, existing.id
+        );
+        return { id: existing.id, updated: true };
+    } else {
+        const result = getDb().prepare(
+            `INSERT INTO invoices (invoice_number, guest_id, guest_name, invoice_date, arrival, departure,
+             total_amount, is_paid, payment_method, payment_date, data)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+            data.rNummer || data.invoice_number,
+            guestId, guestName, data.rDatum || data.invoice_date || null,
+            data.aAnreise || data.arrival || null, data.aAbreise || data.departure || null,
+            data.totalAmount || data.total_amount || 0,
+            data.zBezahlt || data.is_paid ? 1 : 0,
+            data.zMethode || data.payment_method || null,
+            data.zDatum || data.payment_date || null,
+            jsonData
+        );
+        return { id: result.lastInsertRowid, updated: false };
+    }
+}
+
+function deleteInvoice(id) {
+    return getDb().prepare('DELETE FROM invoices WHERE id = ?').run(id);
+}
+
+// =======================
+// Branding
+// =======================
+function getBranding() {
+    return getDb().prepare('SELECT * FROM branding WHERE id = 1').get() || { logo_base64: null, primary_color: '#6366f1' };
+}
+
+function saveBranding(data) {
+    const existing = getDb().prepare('SELECT id FROM branding WHERE id = 1').get();
+    if (existing) {
+        return getDb().prepare(
+            'UPDATE branding SET logo_base64 = ?, primary_color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
+        ).run(data.logo_base64 || null, data.primary_color || '#6366f1');
+    } else {
+        return getDb().prepare(
+            'INSERT INTO branding (id, logo_base64, primary_color) VALUES (1, ?, ?)'
+        ).run(data.logo_base64 || null, data.primary_color || '#6366f1');
+    }
+}
+
+// =======================
+// Bulk Migration (from localStorage)
+// =======================
+function migrateFromLocalStorage(data) {
+    const results = { settings: 0, invoices: 0, guests: 0 };
+
+    getDb().transaction(() => {
+        // Settings
+        const settingsKeys = ['vermieter', 'bank', 'paperless', 'smtp', 'nuki', 'booking_ical', 'rechnungsnr'];
+        for (const key of settingsKeys) {
+            if (data[key] !== undefined && data[key] !== null) {
+                setSetting(key, data[key]);
+                results.settings++;
+            }
+        }
+
+        // Archive → invoices
+        if (Array.isArray(data.archive)) {
+            for (const inv of data.archive) {
+                try {
+                    saveInvoice(inv);
+                    results.invoices++;
+                } catch (e) {
+                    console.warn(`⚠️ Migration: Rechnung ${inv.rNummer} übersprungen:`, e.message);
+                }
+            }
+        }
+    })();
+
+    return results;
+}
+
+// =======================
+// Init & Export
+// =======================
+function init() {
+    getDb();
+    migrateUsersJson();
+    initDefaultUser();
+    console.log(`📁 Datenbank: ${DB_PATH}`);
+}
+
+function close() {
+    if (db) {
+        db.close();
+        db = null;
+    }
+}
+
+module.exports = {
+    init,
+    close,
+    getDb,
+    // Users
+    getUser,
+    createUser,
+    updateUserPassword,
+    // Settings
+    getSetting,
+    setSetting,
+    getAllSettings,
+    setAllSettings,
+    // Guests
+    getAllGuests,
+    getGuestById,
+    createGuest,
+    updateGuest,
+    deleteGuest,
+    findOrCreateGuest,
+    // Invoices
+    getAllInvoices,
+    getInvoicesByGuestId,
+    saveInvoice,
+    deleteInvoice,
+    // Branding
+    getBranding,
+    saveBranding,
+    // Migration
+    migrateFromLocalStorage
+};

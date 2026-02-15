@@ -11,3 +11,7 @@ brain/
 !logo.png
 !favicon.ico
 users.json
+users.json.bak
+rental.db
+rental.db-wal
+rental.db-shm

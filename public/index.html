@@ -82,6 +82,15 @@
                     </svg>
                     <span>Archiv</span>
                 </button>
+                <button class="sidebar-item" id="nav-guests" title="Gäste-Verwaltung">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <circle cx="7" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M1 17c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        <circle cx="14" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M15 11c2.2 0 4 1.8 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span>Gäste</span>
+                </button>
                 <button class="sidebar-item" id="btn-settings" title="Einstellungen">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                         <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.5" />
@@ -186,9 +195,10 @@
                                 Gast
                             </div>
                             <div class="form-row">
-                                <div class="form-group">
+                                <div class="form-group" style="position:relative;">
                                     <label for="g-name">Name *</label>
-                                    <input type="text" id="g-name" required placeholder="Anna Beispiel">
+                                    <input type="text" id="g-name" required placeholder="Anna Beispiel" autocomplete="off">
+                                    <div class="guest-autocomplete" id="guest-autocomplete" style="display:none;"></div>
                                 </div>
                                 <div class="form-group">
                                     <label for="g-email">E-Mail</label>
@@ -623,6 +633,22 @@
                     </button>
                 </div>
                 <div class="modal-body">
+                    <!-- BRANDING / LOGO -->
+                    <div class="modal-subheader">
+                        <h4>Branding / Logo</h4>
+                        <p><small>Dein Logo erscheint auf jeder Rechnung.</small></p>
+                    </div>
+                    <div class="form-group">
+                        <label>Logo hochladen</label>
+                        <div class="logo-upload-area" id="logo-upload-area">
+                            <img id="logo-preview" src="" alt="Logo" style="display:none; max-width:200px; max-height:80px; margin-bottom:0.5rem;">
+                            <input type="file" id="logo-file-input" accept="image/*" style="display:none;">
+                            <button type="button" id="btn-upload-logo" class="btn btn-outline btn-sm">Logo auswählen</button>
+                            <button type="button" id="btn-remove-logo" class="btn btn-ghost btn-danger btn-sm" style="display:none;">Entfernen</button>
+                        </div>
+                    </div>
+                    <hr>
+
                     <!-- VERMIETER in Settings -->
                     <div class="modal-subheader">
                         <h4>Vermieter-Daten</h4>
@@ -747,6 +773,7 @@
                             speichern</button>
                         <button type="button" id="btn-test-connection" class="btn btn-outline">Paperless testen</button>
                         <button type="button" id="btn-nuki-test" class="btn btn-outline">Nuki testen</button>
+                        <button type="button" id="btn-migrate-data" class="btn btn-outline" title="Bestehende Browser-Daten in die Datenbank importieren">Daten importieren</button>
                     </div>
                 </div>
             </div>
@@ -784,6 +811,86 @@
                             </svg>
                             <p>Noch keine Rechnungen archiviert</p>
                             <small>Klicke "Archivieren" um eine Rechnung zu speichern</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GÄSTE MODAL -->
+        <div class="modal-overlay" id="modal-guests" style="display:none;">
+            <div class="modal modal-wide">
+                <div class="modal-header">
+                    <h3>Gäste-Verwaltung</h3>
+                    <button type="button" id="btn-close-guests" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="guests-toolbar">
+                        <div class="archive-search">
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M12.5 12.5L16 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            </svg>
+                            <input type="text" id="guests-search-input" placeholder="Gast suchen (Name, E-Mail, Telefon)...">
+                        </div>
+                        <button type="button" id="btn-add-guest" class="btn btn-primary btn-sm">+ Neuer Gast</button>
+                    </div>
+                    <div class="guests-content">
+                        <div class="guests-list" id="guests-list">
+                            <div class="archive-empty">
+                                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                    <circle cx="20" cy="18" r="7" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M6 42c0-7.7 6.3-14 14-14s14 6.3 14 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    <circle cx="35" cy="18" r="5" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M37 28c4.4 0 8 3.6 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                <p>Noch keine Gäste vorhanden</p>
+                                <small>Klicke "+ Neuer Gast" oder erstelle eine Rechnung</small>
+                            </div>
+                        </div>
+                        <div class="guest-detail" id="guest-detail" style="display:none;">
+                            <div class="guest-detail-header">
+                                <button type="button" id="btn-back-to-list" class="btn btn-ghost btn-sm">← Zurück</button>
+                                <button type="button" id="btn-delete-guest" class="btn btn-ghost btn-danger btn-sm">Gast löschen</button>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">Gast-Daten</div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="guest-edit-name">Name *</label>
+                                        <input type="text" id="guest-edit-name" placeholder="Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="guest-edit-email">E-Mail</label>
+                                        <input type="email" id="guest-edit-email" placeholder="E-Mail">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="guest-edit-phone">Telefon</label>
+                                        <input type="text" id="guest-edit-phone" placeholder="Telefon">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="guest-edit-address">Adresse</label>
+                                        <input type="text" id="guest-edit-address" placeholder="Adresse">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="guest-edit-notes">Notizen</label>
+                                    <textarea id="guest-edit-notes" rows="2" placeholder="Interne Notizen zum Gast..."></textarea>
+                                </div>
+                                <button type="button" id="btn-save-guest-edit" class="btn btn-primary btn-sm">Speichern</button>
+                            </div>
+                            <div class="card" style="margin-top:1rem;">
+                                <div class="card-title">Rechnungshistorie</div>
+                                <div id="guest-invoices-list" class="guest-invoices-list">
+                                    <p class="text-muted">Keine Rechnungen vorhanden</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

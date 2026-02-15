@@ -1,5 +1,5 @@
 /* ===========================
-   Ferienwohnung Rechnung – Server (Hardened)
+   Ferienwohnung Rechnung – Server (Hardened + SQLite)
    =========================== */
 
 const express = require('express');
@@ -16,15 +16,20 @@ const axios = require('axios');
 const ical = require('node-ical');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const db = require('./db');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const USERS_FILE = path.join(__dirname, 'users.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // =======================
-// 1. SECURITY HEADERS (Helmet)
+// 1. DATABASE INIT
+// =======================
+db.init();
+
+// =======================
+// 2. SECURITY HEADERS (Helmet)
 // =======================
 app.use(helmet({
     contentSecurityPolicy: {
@@ -39,19 +44,17 @@ app.use(helmet({
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
             formAction: ["'self'"],
-            upgradeInsecureRequests: null  // Server runs on HTTP, don't force HTTPS
+            upgradeInsecureRequests: null
         }
     },
     crossOriginEmbedderPolicy: false,
-    // HSTS disabled: server has no SSL certificate
     hsts: false,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
 // =======================
-// 2. RATE LIMITING
+// 3. RATE LIMITING
 // =======================
-// Global: 100 requests per minute
 const globalLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 100,
@@ -61,7 +64,6 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// Login: 5 attempts per 15 minutes per IP
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
@@ -71,7 +73,6 @@ const loginLimiter = rateLimit({
     skipSuccessfulRequests: true
 });
 
-// API: 30 requests per minute
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 30,
@@ -81,154 +82,80 @@ const apiLimiter = rateLimit({
 });
 
 // =======================
-// 3. MIDDLEWARE
+// 4. MIDDLEWARE
 // =======================
-app.use(bodyParser.json({ limit: '5mb' })); // Limit payload size
+app.use(bodyParser.json({ limit: '10mb' }));
 app.use(cookieParser());
 
-// Generate a strong session secret if not set
 const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.SESSION_SECRET) {
-    console.warn('⚠️  Kein SESSION_SECRET in .env gesetzt! Zufälliger Key wird verwendet (ändert sich bei Neustart).');
+    console.warn('⚠️  Kein SESSION_SECRET in .env gesetzt! Zufälliger Key wird verwendet.');
 }
 
 app.use(session({
     secret: sessionSecret,
-    name: '__sid', // Don't reveal framework
+    name: '__sid',
     resave: false,
     saveUninitialized: false,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         sameSite: 'strict',
-        maxAge: 8 * 60 * 60 * 1000 // 8 hours
+        maxAge: 8 * 60 * 60 * 1000
     }
 }));
 
-// Disable Express fingerprinting
 app.disable('x-powered-by');
-
-// =======================
-// 4. USER MANAGEMENT
-// =======================
-function initUsers() {
-    let users = {};
-    const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-    if (fs.existsSync(USERS_FILE)) {
-        try {
-            users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-        } catch (e) {
-            console.error('❌ users.json ist beschädigt. Erstelle neu...');
-            users = {};
-        }
-
-        if (users["admin"]) {
-            const currentHash = users["admin"].password;
-            const needsUpdate = !bcrypt.compareSync(defaultPassword, currentHash);
-
-            if (needsUpdate) {
-                console.log('🔄 ADMIN_PASSWORD in .env hat sich geändert. Aktualisiere...');
-                users["admin"].password = bcrypt.hashSync(defaultPassword, 12);
-                fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-                console.log('✅ Admin-Passwort synchronisiert.');
-            }
-        }
-    }
-
-    if (!users["admin"]) {
-        const hashedPassword = bcrypt.hashSync(defaultPassword, 12);
-        users["admin"] = {
-            username: "admin",
-            password: hashedPassword,
-            role: "admin"
-        };
-        fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-        console.log('✅ Standard-Benutzer "admin" erstellt.');
-    }
-}
-initUsers();
 
 // =======================
 // 5. AUTHENTICATION
 // =======================
-
-// Auth Middleware – STRICT: blocks ALL unauthenticated access except login page and login API
 function ensureAuthenticated(req, res, next) {
-    // Always allow login API
-    if (req.path === '/api/login') {
-        return next();
-    }
+    if (req.path === '/api/login') return next();
 
-    // Check if authenticated
-    if (req.session && req.session.user) {
-        return next();
-    }
+    if (req.session && req.session.user) return next();
 
-    // Unauthenticated: only allow the login page itself (index.html serves both login + app)
-    if (req.path === '/' || req.path === '/index.html') {
-        return next();
-    }
+    if (req.path === '/' || req.path === '/index.html') return next();
 
-    // Allow loading CSS/JS needed for the login page
     const allowedLoginAssets = ['/styles.css', '/app.js'];
-    if (allowedLoginAssets.includes(req.path)) {
-        return next();
-    }
+    if (allowedLoginAssets.includes(req.path)) return next();
 
-    // Everything else: DENIED
     if (req.path.startsWith('/api/')) {
         return res.status(401).json({ error: 'Nicht authentifiziert' });
     }
 
-    // Non-API requests: return 404 to not reveal file existence
     return res.status(404).send('Not Found');
 }
 
-// Apply auth middleware BEFORE static files
 app.use(ensureAuthenticated);
 
 // =======================
-// 6. STATIC FILE SERVING (public/ only)
+// 6. STATIC FILE SERVING
 // =======================
-// CRITICAL: Only serve from public/ directory, never the project root
 app.use(express.static(PUBLIC_DIR, {
-    dotfiles: 'deny',       // Block .env, .git, etc.
+    dotfiles: 'deny',
     index: 'index.html',
     extensions: ['html']
 }));
 
 // =======================
-// 7. API ROUTES
+// 7. AUTH API ROUTES
 // =======================
-
-// API: Login (with rate limiting)
 app.post('/api/login', loginLimiter, (req, res) => {
     const { username, password } = req.body;
 
-    // Input validation
     if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
         return res.status(400).json({ success: false, message: 'Ungültige Eingabe' });
     }
 
-    // Sanitize username (alphanumeric only, max 50 chars)
     const sanitizedUsername = username.trim().substring(0, 50);
     if (!/^[a-zA-Z0-9_-]+$/.test(sanitizedUsername)) {
         return res.status(400).json({ success: false, message: 'Ungültiger Benutzername' });
     }
 
-    let users;
-    try {
-        users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-    } catch (e) {
-        console.error('❌ Fehler beim Lesen der users.json');
-        return res.status(500).json({ success: false, message: 'Server-Fehler' });
-    }
-
-    const user = users[sanitizedUsername];
+    const user = db.getUser(sanitizedUsername);
 
     if (!user) {
-        // Timing-safe: still run bcrypt to prevent user enumeration
         bcrypt.compareSync('dummy', '$2a$12$invalidhashforsecuritypurposesonly.');
         return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' });
     }
@@ -236,7 +163,6 @@ app.post('/api/login', loginLimiter, (req, res) => {
     const isMatch = bcrypt.compareSync(password, user.password);
 
     if (isMatch) {
-        // Regenerate session to prevent session fixation
         req.session.regenerate((err) => {
             if (err) {
                 console.error('Session regeneration error:', err);
@@ -246,23 +172,18 @@ app.post('/api/login', loginLimiter, (req, res) => {
             res.json({ success: true, user: req.session.user });
         });
     } else {
-        // Generic error message to prevent user enumeration
         return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' });
     }
 });
 
-// API: Logout
 app.post('/api/logout', (req, res) => {
     req.session.destroy((err) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: 'Logout fehlgeschlagen' });
-        }
+        if (err) return res.status(500).json({ success: false, message: 'Logout fehlgeschlagen' });
         res.clearCookie('__sid');
         res.json({ success: true });
     });
 });
 
-// API: Me (Check auth status)
 app.get('/api/me', (req, res) => {
     if (req.session && req.session.user) {
         res.json({ authenticated: true, user: req.session.user });
@@ -272,7 +193,198 @@ app.get('/api/me', (req, res) => {
 });
 
 // =======================
-// 8. PROTECTED API ROUTES (all require auth via middleware above)
+// 8. SETTINGS API
+// =======================
+app.get('/api/settings', apiLimiter, (req, res) => {
+    try {
+        const settings = db.getAllSettings();
+        res.json({ success: true, settings });
+    } catch (e) {
+        console.error('Settings GET Error:', e.message);
+        res.status(500).json({ error: 'Einstellungen konnten nicht geladen werden' });
+    }
+});
+
+app.put('/api/settings', apiLimiter, (req, res) => {
+    try {
+        const { settings } = req.body;
+        if (!settings || typeof settings !== 'object') {
+            return res.status(400).json({ error: 'Ungültige Einstellungen' });
+        }
+        db.setAllSettings(settings);
+        res.json({ success: true, message: 'Einstellungen gespeichert' });
+    } catch (e) {
+        console.error('Settings PUT Error:', e.message);
+        res.status(500).json({ error: 'Einstellungen konnten nicht gespeichert werden' });
+    }
+});
+
+// =======================
+// 9. GUESTS API
+// =======================
+app.get('/api/guests', apiLimiter, (req, res) => {
+    try {
+        const search = req.query.search || '';
+        const guests = db.getAllGuests(search);
+        res.json({ success: true, guests });
+    } catch (e) {
+        console.error('Guests GET Error:', e.message);
+        res.status(500).json({ error: 'Gäste konnten nicht geladen werden' });
+    }
+});
+
+app.get('/api/guests/:id', apiLimiter, (req, res) => {
+    try {
+        const guest = db.getGuestById(parseInt(req.params.id));
+        if (!guest) return res.status(404).json({ error: 'Gast nicht gefunden' });
+        const invoices = db.getInvoicesByGuestId(guest.id);
+        res.json({ success: true, guest, invoices });
+    } catch (e) {
+        console.error('Guest GET Error:', e.message);
+        res.status(500).json({ error: 'Gast konnte nicht geladen werden' });
+    }
+});
+
+app.post('/api/guests', apiLimiter, (req, res) => {
+    try {
+        const { id, name, email, address, phone, notes } = req.body;
+        if (!name || typeof name !== 'string' || name.trim().length === 0) {
+            return res.status(400).json({ error: 'Name ist erforderlich' });
+        }
+
+        const data = { name: name.trim(), email, address, phone, notes };
+
+        if (id) {
+            db.updateGuest(parseInt(id), data);
+            res.json({ success: true, message: 'Gast aktualisiert', guest: { id: parseInt(id), ...data } });
+        } else {
+            const guest = db.createGuest(data);
+            res.json({ success: true, message: 'Gast erstellt', guest });
+        }
+    } catch (e) {
+        console.error('Guest POST Error:', e.message);
+        res.status(500).json({ error: 'Gast konnte nicht gespeichert werden' });
+    }
+});
+
+app.delete('/api/guests/:id', apiLimiter, (req, res) => {
+    try {
+        db.deleteGuest(parseInt(req.params.id));
+        res.json({ success: true, message: 'Gast gelöscht' });
+    } catch (e) {
+        console.error('Guest DELETE Error:', e.message);
+        res.status(500).json({ error: 'Gast konnte nicht gelöscht werden' });
+    }
+});
+
+// =======================
+// 10. INVOICES API
+// =======================
+app.get('/api/invoices', apiLimiter, (req, res) => {
+    try {
+        const search = req.query.search || '';
+        const invoices = db.getAllInvoices(search);
+        // Parse JSON data for each invoice
+        const parsed = invoices.map(inv => ({
+            ...inv,
+            data: typeof inv.data === 'string' ? JSON.parse(inv.data) : inv.data
+        }));
+        res.json({ success: true, invoices: parsed });
+    } catch (e) {
+        console.error('Invoices GET Error:', e.message);
+        res.status(500).json({ error: 'Rechnungen konnten nicht geladen werden' });
+    }
+});
+
+app.get('/api/invoices/guest/:guestId', apiLimiter, (req, res) => {
+    try {
+        const invoices = db.getInvoicesByGuestId(parseInt(req.params.guestId));
+        const parsed = invoices.map(inv => ({
+            ...inv,
+            data: typeof inv.data === 'string' ? JSON.parse(inv.data) : inv.data
+        }));
+        res.json({ success: true, invoices: parsed });
+    } catch (e) {
+        console.error('Guest Invoices GET Error:', e.message);
+        res.status(500).json({ error: 'Rechnungen konnten nicht geladen werden' });
+    }
+});
+
+app.post('/api/invoices', apiLimiter, (req, res) => {
+    try {
+        const data = req.body;
+        if (!data.rNummer && !data.invoice_number) {
+            return res.status(400).json({ error: 'Rechnungsnummer ist erforderlich' });
+        }
+        const result = db.saveInvoice(data);
+        const message = result.updated ? 'Rechnung aktualisiert' : 'Rechnung archiviert';
+        res.json({ success: true, message, id: result.id });
+    } catch (e) {
+        console.error('Invoice POST Error:', e.message);
+        res.status(500).json({ error: 'Rechnung konnte nicht gespeichert werden' });
+    }
+});
+
+app.delete('/api/invoices/:id', apiLimiter, (req, res) => {
+    try {
+        db.deleteInvoice(parseInt(req.params.id));
+        res.json({ success: true, message: 'Rechnung gelöscht' });
+    } catch (e) {
+        console.error('Invoice DELETE Error:', e.message);
+        res.status(500).json({ error: 'Rechnung konnte nicht gelöscht werden' });
+    }
+});
+
+// =======================
+// 11. BRANDING API
+// =======================
+app.get('/api/branding', apiLimiter, (req, res) => {
+    try {
+        const branding = db.getBranding();
+        res.json({ success: true, branding });
+    } catch (e) {
+        console.error('Branding GET Error:', e.message);
+        res.status(500).json({ error: 'Branding konnte nicht geladen werden' });
+    }
+});
+
+app.post('/api/branding', apiLimiter, (req, res) => {
+    try {
+        const { logo_base64, primary_color } = req.body;
+
+        // Validate base64 size (max 2MB)
+        if (logo_base64 && logo_base64.length > 2 * 1024 * 1024) {
+            return res.status(400).json({ error: 'Logo ist zu groß (max 2MB)' });
+        }
+
+        db.saveBranding({ logo_base64, primary_color });
+        res.json({ success: true, message: 'Branding gespeichert' });
+    } catch (e) {
+        console.error('Branding POST Error:', e.message);
+        res.status(500).json({ error: 'Branding konnte nicht gespeichert werden' });
+    }
+});
+
+// =======================
+// 12. MIGRATION API (localStorage → DB)
+// =======================
+app.post('/api/migrate', apiLimiter, (req, res) => {
+    try {
+        const data = req.body;
+        const results = db.migrateFromLocalStorage(data);
+        res.json({
+            success: true,
+            message: `Migration abgeschlossen: ${results.settings} Einstellungen, ${results.invoices} Rechnungen importiert`,
+            results
+        });
+    } catch (e) {
+        console.error('Migration Error:', e.message);
+        res.status(500).json({ error: 'Migration fehlgeschlagen' });
+    }
+});
+
+// =======================
+// 13. PROTECTED SERVICE API ROUTES
 // =======================
 
 // API: Generate PDF
@@ -281,7 +393,6 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
         const { html } = req.body;
         if (!html) return res.status(400).json({ error: 'HTML content is required' });
 
-        // Limit HTML size to prevent abuse (max 1MB)
         if (html.length > 1024 * 1024) {
             return res.status(400).json({ error: 'HTML content too large' });
         }
@@ -300,7 +411,6 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
         });
         const page = await browser.newPage();
 
-        // Block network requests from the rendered page (prevent SSRF via HTML)
         await page.setRequestInterception(true);
         page.on('request', (request) => {
             if (request.resourceType() === 'document') {
@@ -334,12 +444,10 @@ app.post('/api/send-email', apiLimiter, async (req, res) => {
     try {
         const { to, subject, body, pdfBuffer, fileName, smtpConfig } = req.body;
 
-        // Input validation
         if (!to || !subject || !smtpConfig || !smtpConfig.host) {
             return res.status(400).json({ error: 'Pflichtfelder fehlen' });
         }
 
-        // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(to)) {
             return res.status(400).json({ error: 'Ungültige E-Mail-Adresse' });
@@ -382,12 +490,10 @@ app.post('/api/send-email', apiLimiter, async (req, res) => {
 app.post('/api/calendar/fetch', apiLimiter, async (req, res) => {
     const { url } = req.body;
 
-    // Input validation
     if (!url || typeof url !== 'string') {
         return res.status(400).json({ error: 'URL is required' });
     }
 
-    // SSRF Protection: Only allow HTTPS URLs and block internal IPs
     try {
         const parsed = new URL(url);
 
@@ -395,20 +501,11 @@ app.post('/api/calendar/fetch', apiLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Nur HTTP(S)-URLs erlaubt' });
         }
 
-        // Block internal/private IPs
         const hostname = parsed.hostname.toLowerCase();
         const blockedPatterns = [
-            /^localhost$/i,
-            /^127\./,
-            /^10\./,
-            /^172\.(1[6-9]|2\d|3[01])\./,
-            /^192\.168\./,
-            /^0\./,
-            /^169\.254\./,
-            /^\[?::1\]?$/,
-            /^\[?fe80:/i,
-            /^\[?fc00:/i,
-            /^\[?fd/i
+            /^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./,
+            /^192\.168\./, /^0\./, /^169\.254\./, /^\[?::1\]?$/,
+            /^\[?fe80:/i, /^\[?fc00:/i, /^\[?fd/i
         ];
 
         for (const pattern of blockedPatterns) {
@@ -423,7 +520,7 @@ app.post('/api/calendar/fetch', apiLimiter, async (req, res) => {
     try {
         const response = await axios.get(url, {
             timeout: 10000,
-            maxContentLength: 5 * 1024 * 1024, // 5MB max
+            maxContentLength: 5 * 1024 * 1024,
             headers: { 'User-Agent': 'RentalInvoice/1.0' }
         });
         const data = ical.parseICS(response.data);
@@ -494,6 +591,7 @@ app.post('/api/update', apiLimiter, (req, res) => {
 
                             setTimeout(() => {
                                 console.log('🔄 Starte Server neu...');
+                                db.close();
                                 process.exit(0);
                             }, 1500);
                         });
@@ -505,24 +603,25 @@ app.post('/api/update', apiLimiter, (req, res) => {
 });
 
 // =======================
-// 9. CATCH-ALL & ERROR HANDLING
+// 14. CATCH-ALL & ERROR HANDLING
 // =======================
-
-// Catch-all: Return 404 for any unknown routes (don't reveal structure)
 app.use((req, res) => {
     res.status(404).send('Not Found');
 });
 
-// Global error handler: Never leak stack traces
 app.use((err, req, res, next) => {
     console.error('Server Error:', err.message);
     res.status(500).json({ error: 'Ein Fehler ist aufgetreten' });
 });
 
 // =======================
-// 10. START SERVER
+// 15. START SERVER
 // =======================
 app.listen(PORT, () => {
-    console.log(`🔒 Server (Hardened) running on http://localhost:${PORT}`);
+    console.log(`🔒 Server (Hardened + SQLite) running on http://localhost:${PORT}`);
     console.log(`   Static files: ${PUBLIC_DIR}`);
 });
+
+// Graceful shutdown
+process.on('SIGTERM', () => { db.close(); process.exit(0); });
+process.on('SIGINT', () => { db.close(); process.exit(0); });

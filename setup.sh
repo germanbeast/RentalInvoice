@@ -12,9 +12,9 @@ set -e
 echo "🚀 Starte All-in-One Setup für RentalInvoice..."
 
 # 1. System-Updates & Basis-Abhängigkeiten
-echo "📦 Aktualisiere Systempakete & installiere Git..."
+echo "📦 Aktualisiere Systempakete & installiere Abhängigkeiten..."
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl
+sudo apt install -y git curl build-essential python3
 
 # 2. Projekt herunterladen (falls noch nicht vorhanden)
 if [ -f "package.json" ]; then
@@ -88,34 +88,40 @@ sudo apt install -y \
     wget \
     xdg-utils
 
-# 5. App Abhängigkeiten installieren
-echo "📚 Installiere App-Abhängigkeiten..."
+# 5. App Abhängigkeiten installieren (inkl. better-sqlite3 native build)
+echo "📚 Installiere App-Abhängigkeiten (inkl. SQLite-Datenbank)..."
 npm install
 
-# 6. PM2 Setup
+# 6. Datenbank-Verzeichnis vorbereiten
+echo "🗄️  Datenbank wird beim ersten Serverstart automatisch erstellt."
+echo "   Speicherort: $(pwd)/rental.db"
+
+# 7. PM2 Setup
 if ! command -v pm2 &> /dev/null; then
     echo "⚡ Installiere PM2 global..."
     sudo npm install -g pm2
 fi
 
-# 7. .env Setup
+# 8. .env Setup
 if [ ! -f .env ]; then
     echo "📝 Erstelle .env Datei aus Vorlage..."
     cp .env.example .env
     echo "⚠️  HINWEIS: Bitte bearbeite jetzt die '.env' Datei (z.B. mit 'nano .env')."
 fi
 
-# 8. Start mit PM2
+# 9. Start mit PM2
 echo "▶️ Starte Server mit PM2..."
 pm2 start server.js --name "invoice-app" || pm2 restart "invoice-app"
 pm2 save
 
-# 9. Autostart bei Reboot
+# 10. Autostart bei Reboot
 echo "🔄 Konfiguriere Autostart..."
-# Generiert den systemd Startup-Befehl für den aktuellen User
 sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME || true
 
 echo "✅ Setup erfolgreich abgeschlossen!"
+echo "----------------------------------------------------------------"
+echo "ℹ️  Datenbank: SQLite wird automatisch eingerichtet (rental.db)"
+echo "   Keine manuelle DB-Konfiguration nötig!"
 echo "----------------------------------------------------------------"
 echo "1. WICHTIG: Bearbeite die Zugangsdaten in der .env Datei!"
 echo "   Befehl: nano .env"

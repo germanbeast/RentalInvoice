@@ -55,14 +55,11 @@
     };
 
     function saveBookingSettings() {
-        localStorage.setItem(STORAGE_KEYS.booking_ical, $('#booking-ical-url').value);
+        // Now saved as part of saveAllSettings()
     }
 
     function loadBookingSettings() {
-        const url = localStorage.getItem(STORAGE_KEYS.booking_ical);
-        if (url) {
-            $('#booking-ical-url').value = url;
-        }
+        // Now loaded as part of loadAllSettings()
     }
 
     async function checkAuth() {
@@ -497,125 +494,136 @@
     // Vermieter
     // =======================
 
-    function saveVermieter() {
-        const data = {
-            name: $('#v-name').value,
-            adresse: $('#v-adresse').value,
-            telefon: $('#v-telefon').value,
-            email: $('#v-email').value,
-            steuernr: $('#v-steuernr').value
+    // =======================
+    // Server-side Settings (API)
+    // =======================
+    async function saveAllSettings() {
+        const settings = {
+            vermieter: {
+                name: $('#v-name').value,
+                adresse: $('#v-adresse').value,
+                telefon: $('#v-telefon').value,
+                email: $('#v-email').value,
+                steuernr: $('#v-steuernr').value
+            },
+            bank: {
+                inhaber: $('#b-inhaber').value,
+                iban: $('#b-iban').value,
+                bic: $('#b-bic').value,
+                bank: $('#b-bank').value
+            },
+            paperless: {
+                url: $('#pl-url').value.replace(/\/+$/, ''),
+                token: $('#pl-token').value,
+                correspondent: $('#pl-correspondent').value,
+                doctype: $('#pl-doctype').value,
+                tags: $('#pl-tags').value
+            },
+            smtp: {
+                host: $('#smtp-host').value,
+                port: $('#smtp-port').value,
+                user: $('#smtp-user').value,
+                pass: $('#smtp-pass').value,
+                from: $('#smtp-from').value
+            },
+            nuki: {
+                token: $('#nuki-token').value,
+                lockId: $('#nuki-lock-id').value
+            },
+            booking_ical: $('#booking-ical-url').value
         };
-        localStorage.setItem(STORAGE_KEYS.vermieter, JSON.stringify(data));
-        showToast('Vermieter-Daten gespeichert');
-    }
 
-    function loadVermieter() {
-        const raw = localStorage.getItem(STORAGE_KEYS.vermieter);
-        if (!raw) return;
         try {
-            const data = JSON.parse(raw);
-            if (data.name) $('#v-name').value = data.name;
-            if (data.adresse) $('#v-adresse').value = data.adresse;
-            if (data.telefon) $('#v-telefon').value = data.telefon;
-            if (data.email) $('#v-email').value = data.email;
-            if (data.steuernr) $('#v-steuernr').value = data.steuernr;
-        } catch (e) { /* ignore */ }
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ settings })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Einstellungen gespeichert!', 'success');
+            } else {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        } catch (e) {
+            console.error('Settings save error:', e);
+            showToast('Server-Fehler beim Speichern', 'error');
+        }
     }
 
-    function saveBank() {
-        const data = {
-            inhaber: $('#b-inhaber').value,
-            iban: $('#b-iban').value,
-            bic: $('#b-bic').value,
-            bank: $('#b-bank').value
-        };
-        localStorage.setItem(STORAGE_KEYS.bank, JSON.stringify(data));
-        showToast('Bankdaten gespeichert');
-    }
-
-    function loadBank() {
-        const raw = localStorage.getItem(STORAGE_KEYS.bank);
-        if (!raw) return;
+    async function loadAllSettings() {
         try {
-            const data = JSON.parse(raw);
-            if (data.inhaber) $('#b-inhaber').value = data.inhaber;
-            if (data.iban) $('#b-iban').value = data.iban;
-            if (data.bic) $('#b-bic').value = data.bic;
-            if (data.bank) $('#b-bank').value = data.bank;
-        } catch (e) { /* ignore */ }
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            if (!data.success || !data.settings) return;
+            const s = data.settings;
+
+            // Vermieter
+            if (s.vermieter) {
+                const v = typeof s.vermieter === 'string' ? JSON.parse(s.vermieter) : s.vermieter;
+                if (v.name) $('#v-name').value = v.name;
+                if (v.adresse) $('#v-adresse').value = v.adresse;
+                if (v.telefon) $('#v-telefon').value = v.telefon;
+                if (v.email) $('#v-email').value = v.email;
+                if (v.steuernr) $('#v-steuernr').value = v.steuernr;
+            }
+            // Bank
+            if (s.bank) {
+                const b = typeof s.bank === 'string' ? JSON.parse(s.bank) : s.bank;
+                if (b.inhaber) $('#b-inhaber').value = b.inhaber;
+                if (b.iban) $('#b-iban').value = b.iban;
+                if (b.bic) $('#b-bic').value = b.bic;
+                if (b.bank) $('#b-bank').value = b.bank;
+            }
+            // Paperless
+            if (s.paperless) {
+                const p = typeof s.paperless === 'string' ? JSON.parse(s.paperless) : s.paperless;
+                if (p.url) $('#pl-url').value = p.url;
+                if (p.token) $('#pl-token').value = p.token;
+                if (p.correspondent) $('#pl-correspondent').value = p.correspondent;
+                if (p.doctype) $('#pl-doctype').value = p.doctype;
+                if (p.tags) $('#pl-tags').value = p.tags;
+            }
+            // SMTP
+            if (s.smtp) {
+                const m = typeof s.smtp === 'string' ? JSON.parse(s.smtp) : s.smtp;
+                if (m.host) $('#smtp-host').value = m.host;
+                if (m.port) $('#smtp-port').value = m.port;
+                if (m.user) $('#smtp-user').value = m.user;
+                if (m.pass) $('#smtp-pass').value = m.pass;
+                if (m.from) $('#smtp-from').value = m.from;
+            }
+            // Nuki
+            if (s.nuki) {
+                const n = typeof s.nuki === 'string' ? JSON.parse(s.nuki) : s.nuki;
+                if (n.token) $('#nuki-token').value = n.token;
+                if (n.lockId) $('#nuki-lock-id').value = n.lockId;
+            }
+            // Booking iCal
+            if (s.booking_ical) {
+                const url = typeof s.booking_ical === 'string' && s.booking_ical.startsWith('{') ? JSON.parse(s.booking_ical) : s.booking_ical;
+                if (typeof url === 'string') $('#booking-ical-url').value = url;
+            }
+        } catch (e) {
+            console.error('Settings load error:', e);
+        }
     }
 
-    function savePaperlessSettings() {
-        const data = {
-            url: $('#pl-url').value.replace(/\/+$/, ''),  // Remove trailing slashes
-            token: $('#pl-token').value,
-            correspondent: $('#pl-correspondent').value,
-            doctype: $('#pl-doctype').value,
-            tags: $('#pl-tags').value
-        };
-        localStorage.setItem(STORAGE_KEYS.paperless, JSON.stringify(data));
-        showToast('Paperless-Einstellungen gespeichert');
-    }
-
-    function loadPaperlessSettings() {
-        const raw = localStorage.getItem(STORAGE_KEYS.paperless);
-        if (!raw) return;
-        try {
-            const data = JSON.parse(raw);
-            if (data.url) $('#pl-url').value = data.url;
-            if (data.token) $('#pl-token').value = data.token;
-            if (data.correspondent) $('#pl-correspondent').value = data.correspondent;
-            if (data.doctype) $('#pl-doctype').value = data.doctype;
-            if (data.tags) $('#pl-tags').value = data.tags;
-        } catch (e) { /* ignore */ }
-    }
-
-    function saveSmtpSettings() {
-        const data = {
-            host: $('#smtp-host').value,
-            port: $('#smtp-port').value,
-            user: $('#smtp-user').value,
-            pass: $('#smtp-pass').value,
-            from: $('#smtp-from').value
-        };
-        localStorage.setItem(STORAGE_KEYS.smtp, JSON.stringify(data));
-        showToast('SMTP-Einstellungen gespeichert');
-    }
-
-    function loadSmtpSettings() {
-        const raw = localStorage.getItem(STORAGE_KEYS.smtp);
-        if (!raw) return;
-        try {
-            const data = JSON.parse(raw);
-            if (data.host) $('#smtp-host').value = data.host;
-            if (data.port) $('#smtp-port').value = data.port;
-            if (data.user) $('#smtp-user').value = data.user;
-            if (data.pass) $('#smtp-pass').value = data.pass;
-            if (data.from) $('#smtp-from').value = data.from;
-        } catch (e) { /* ignore */ }
-    }
-
-    function saveNukiSettings() {
-        const data = {
-            token: $('#nuki-token').value,
-            lockId: $('#nuki-lock-id').value
-        };
-        localStorage.setItem(STORAGE_KEYS.nuki, JSON.stringify(data));
-        showToast('Nuki-Einstellungen gespeichert');
-    }
-
-    function loadNukiSettings() {
-        const raw = localStorage.getItem(STORAGE_KEYS.nuki);
-        if (!raw) return;
-        try {
-            const data = JSON.parse(raw);
-            $('#nuki-token').value = data.token || '';
-            $('#nuki-lock-id').value = data.lockId || '';
-        } catch (e) { /* ignore */ }
-    }
+    // Legacy compatibility shims
+    function saveVermieter() { saveAllSettings(); }
+    function loadVermieter() { /* loaded via loadAllSettings */ }
+    function saveBank() { saveAllSettings(); }
+    function loadBank() { /* loaded via loadAllSettings */ }
+    function savePaperlessSettings() { /* saved via saveAllSettings */ }
+    function loadPaperlessSettings() { /* loaded via loadAllSettings */ }
+    function saveSmtpSettings() { /* saved via saveAllSettings */ }
+    function loadSmtpSettings() { /* loaded via loadAllSettings */ }
+    function saveNukiSettings() { /* saved via saveAllSettings */ }
+    function loadNukiSettings() { /* loaded via loadAllSettings */ }
 
     function getNextRechnungsnr() {
         const currentYear = new Date().getFullYear();
+        // Still use localStorage for invoice counter (local, sequential)
         const raw = localStorage.getItem(STORAGE_KEYS.rechnungsnr);
         let lastNr = 0;
         let lastYear = currentYear;
@@ -628,7 +636,6 @@
             } catch (e) { /* ignore */ }
         }
 
-        // Reset counter on new year
         if (lastYear !== currentYear) {
             lastNr = 0;
         }
@@ -729,19 +736,36 @@
     // =======================
     // Invoice Archive
     // =======================
-    function getArchive() {
+    // =======================
+    // Invoice Archive (Server API)
+    // =======================
+    let cachedArchive = [];
+
+    async function fetchArchive() {
         try {
-            return JSON.parse(localStorage.getItem(STORAGE_KEYS.archive)) || [];
+            const res = await fetch('/api/invoices');
+            const data = await res.json();
+            if (data.success) {
+                cachedArchive = data.invoices.map(inv => {
+                    const d = inv.data || {};
+                    return { ...d, _dbId: inv.id, guestId: inv.guest_id };
+                });
+            }
         } catch (e) {
-            return [];
+            console.error('Fetch archive error:', e);
         }
+        return cachedArchive;
+    }
+
+    function getArchive() {
+        return cachedArchive;
     }
 
     function saveArchive(archive) {
-        localStorage.setItem(STORAGE_KEYS.archive, JSON.stringify(archive));
+        cachedArchive = archive;
     }
 
-    function archiveInvoice() {
+    async function archiveInvoice() {
         const nummer = $('#r-nummer').value;
         const gastName = $('#g-name').value;
         if (!nummer) {
@@ -749,13 +773,8 @@
             return false;
         }
 
-        const archive = getArchive();
-
-        // Prevent duplicate archiving of same invoice number
-        const existingIdx = archive.findIndex(a => a.rNummer === nummer);
         const invoiceData = {
             ...collectFormData(),
-            // Also save vermieter for full snapshot
             vName: $('#v-name').value,
             vAdresse: $('#v-adresse').value,
             vTelefon: $('#v-telefon').value,
@@ -765,30 +784,46 @@
             bIban: $('#b-iban').value,
             bBic: $('#b-bic').value,
             bBank: $('#b-bank').value,
-            // Computed values for display
             totalAmount: getSubtotal() * (1 + getMwstRate() / 100),
             archivedAt: new Date().toISOString()
         };
 
-        if (existingIdx >= 0) {
-            archive[existingIdx] = invoiceData;
-            showToast(`Rechnung ${nummer} aktualisiert im Archiv ✓`);
-        } else {
-            archive.unshift(invoiceData);
-            showToast(`Rechnung ${nummer} archiviert ✓`);
+        try {
+            const res = await fetch('/api/invoices', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(invoiceData)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Rechnung ${nummer} ${data.message}`, 'success');
+                await fetchArchive();
+                return true;
+            } else {
+                showToast('Fehler beim Archivieren', 'error');
+                return false;
+            }
+        } catch (e) {
+            console.error('Archive error:', e);
+            showToast('Server-Fehler beim Archivieren', 'error');
+            return false;
         }
-
-        saveArchive(archive);
-        return true;
     }
 
-    function deleteArchivedInvoice(index) {
-        const archive = getArchive();
-        if (index >= 0 && index < archive.length) {
-            const removed = archive.splice(index, 1)[0];
-            saveArchive(archive);
-            showToast(`Rechnung ${removed.rNummer} gelöscht`);
-            renderArchiveList();
+    async function deleteArchivedInvoice(index) {
+        const inv = cachedArchive[index];
+        if (!inv || !inv._dbId) return;
+
+        try {
+            const res = await fetch(`/api/invoices/${inv._dbId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Rechnung ${inv.rNummer} gelöscht`);
+                await fetchArchive();
+                renderArchiveList();
+            }
+        } catch (e) {
+            showToast('Fehler beim Löschen', 'error');
         }
     }
 
@@ -850,8 +885,9 @@
         showToast(`Rechnung ${d.rNummer} geladen`);
     }
 
-    function renderArchiveList(filter = '') {
+    async function renderArchiveList(filter = '') {
         const list = $('#archive-list');
+        if (cachedArchive.length === 0) await fetchArchive();
         const archive = getArchive();
         const query = filter.toLowerCase().trim();
 
@@ -946,14 +982,10 @@
         }
     });
 
-    btnSaveSettings.addEventListener('click', () => {
-        saveVermieter();
-        savePaperlessSettings();
-        saveSmtpSettings();
-        saveNukiSettings();
-        saveBookingSettings();
+    btnSaveSettings.addEventListener('click', async () => {
+        await saveAllSettings();
+        await saveBranding();
         modalSettings.style.display = 'none';
-        showToast('Einstellungen gespeichert!', 'success');
     });
 
     // =======================
@@ -1667,27 +1699,18 @@
         }
     });
 
-    function init() {
-        // Load saved data
-        loadVermieter();
-        loadBank();
-        loadPaperlessSettings();
-        loadSmtpSettings();
-        loadNukiSettings();
-        loadBookingSettings();
+    async function init() {
+        // Load all settings from server
+        await loadAllSettings();
+        await loadBranding();
 
         // Try to restore draft first
         const draftLoaded = loadDraft();
 
         if (!draftLoaded) {
-            // Set today's date
             $('#r-datum').value = new Date().toISOString().split('T')[0];
             $('#z-datum').value = new Date().toISOString().split('T')[0];
-
-            // Set next invoice number
             $('#r-nummer').value = getNextRechnungsnr();
-
-            // Add one default position
             addPosition('Übernachtung', 1, 0);
         }
 
@@ -1695,6 +1718,333 @@
         updateSummary();
         updatePreview();
         updateNights();
+
+        // Pre-fetch archive
+        fetchArchive();
+    }
+
+    // =======================
+    // Guest Autocomplete
+    // =======================
+    const gNameInput = $('#g-name');
+    const acDropdown = $('#guest-autocomplete');
+    let acTimer = null;
+
+    if (gNameInput && acDropdown) {
+        gNameInput.addEventListener('input', () => {
+            clearTimeout(acTimer);
+            const q = gNameInput.value.trim();
+            if (q.length < 2) { acDropdown.style.display = 'none'; return; }
+            acTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/guests?search=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+                    if (data.success && data.guests.length > 0) {
+                        acDropdown.innerHTML = data.guests.map(g => `
+                            <div class="guest-autocomplete-item" data-id="${g.id}" data-name="${escapeHtml(g.name)}" data-email="${escapeHtml(g.email || '')}" data-address="${escapeHtml(g.address || '')}">
+                                <div class="guest-ac-name">${escapeHtml(g.name)}</div>
+                                <div class="guest-ac-meta">${escapeHtml(g.email || '')} ${g.phone ? '• ' + escapeHtml(g.phone) : ''}</div>
+                            </div>
+                        `).join('');
+                        acDropdown.style.display = 'block';
+                    } else {
+                        acDropdown.style.display = 'none';
+                    }
+                } catch (e) { acDropdown.style.display = 'none'; }
+            }, 250);
+        });
+
+        acDropdown.addEventListener('click', (e) => {
+            const item = e.target.closest('.guest-autocomplete-item');
+            if (item) {
+                gNameInput.value = item.dataset.name;
+                $('#g-email').value = item.dataset.email || '';
+                $('#g-adresse').value = item.dataset.address || '';
+                acDropdown.style.display = 'none';
+                updatePreview();
+                scheduleDraftSave();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#g-name') && !e.target.closest('#guest-autocomplete')) {
+                acDropdown.style.display = 'none';
+            }
+        });
+    }
+
+    // =======================
+    // Guests Modal
+    // =======================
+    const modalGuests = $('#modal-guests');
+    const navGuests = $('#nav-guests');
+    let currentGuestId = null;
+
+    if (navGuests && modalGuests) {
+        navGuests.addEventListener('click', () => {
+            modalGuests.style.display = 'flex';
+            loadGuestsList();
+        });
+
+        $('#btn-close-guests').addEventListener('click', () => {
+            modalGuests.style.display = 'none';
+        });
+
+        modalGuests.addEventListener('click', (e) => {
+            if (e.target === modalGuests) modalGuests.style.display = 'none';
+        });
+
+        $('#guests-search-input').addEventListener('input', (e) => {
+            loadGuestsList(e.target.value);
+        });
+
+        $('#btn-add-guest').addEventListener('click', () => {
+            currentGuestId = null;
+            $('#guest-edit-name').value = '';
+            $('#guest-edit-email').value = '';
+            $('#guest-edit-phone').value = '';
+            $('#guest-edit-address').value = '';
+            $('#guest-edit-notes').value = '';
+            $('#guests-list').style.display = 'none';
+            $('#guest-detail').style.display = 'block';
+            $('#guest-invoices-list').innerHTML = '<p class="text-muted">Keine Rechnungen vorhanden</p>';
+        });
+
+        $('#btn-back-to-list').addEventListener('click', () => {
+            $('#guest-detail').style.display = 'none';
+            $('#guests-list').style.display = 'grid';
+            loadGuestsList();
+        });
+
+        $('#btn-save-guest-edit').addEventListener('click', async () => {
+            const name = $('#guest-edit-name').value.trim();
+            if (!name) { showToast('Name ist erforderlich', 'error'); return; }
+
+            try {
+                const res = await fetch('/api/guests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: currentGuestId,
+                        name,
+                        email: $('#guest-edit-email').value,
+                        phone: $('#guest-edit-phone').value,
+                        address: $('#guest-edit-address').value,
+                        notes: $('#guest-edit-notes').value
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    if (!currentGuestId && data.guest) currentGuestId = data.guest.id;
+                }
+            } catch (e) {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        });
+
+        $('#btn-delete-guest').addEventListener('click', async () => {
+            if (!currentGuestId) return;
+            if (!confirm('Diesen Gast wirklich löschen?')) return;
+
+            try {
+                const res = await fetch(`/api/guests/${currentGuestId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Gast gelöscht', 'success');
+                    currentGuestId = null;
+                    $('#guest-detail').style.display = 'none';
+                    $('#guests-list').style.display = 'grid';
+                    loadGuestsList();
+                }
+            } catch (e) {
+                showToast('Fehler beim Löschen', 'error');
+            }
+        });
+    }
+
+    async function loadGuestsList(search = '') {
+        try {
+            const res = await fetch(`/api/guests?search=${encodeURIComponent(search)}`);
+            const data = await res.json();
+            const listEl = $('#guests-list');
+
+            if (!data.success || data.guests.length === 0) {
+                listEl.innerHTML = `
+                    <div class="archive-empty">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <circle cx="20" cy="18" r="7" stroke="currentColor" stroke-width="2"/>
+                            <path d="M6 42c0-7.7 6.3-14 14-14s14 6.3 14 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <p>${search ? 'Keine Treffer gefunden' : 'Noch keine Gäste vorhanden'}</p>
+                        <small>${search ? 'Versuche einen anderen Suchbegriff' : 'Klicke "+ Neuer Gast" um einen Gast anzulegen'}</small>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = data.guests.map(g => `
+                <div class="guest-card" data-id="${g.id}">
+                    <div class="guest-card-name">${escapeHtml(g.name)}</div>
+                    ${g.email ? `<div class="guest-card-email">${escapeHtml(g.email)}</div>` : ''}
+                    <div class="guest-card-meta">
+                        ${g.phone ? escapeHtml(g.phone) : ''}
+                        <span class="guest-card-badge">${g.invoice_count || 0} Rechnungen</span>
+                    </div>
+                </div>
+            `).join('');
+
+            listEl.querySelectorAll('.guest-card').forEach(card => {
+                card.addEventListener('click', () => showGuestDetail(parseInt(card.dataset.id)));
+            });
+        } catch (e) {
+            console.error('Load guests error:', e);
+        }
+    }
+
+    async function showGuestDetail(guestId) {
+        try {
+            const res = await fetch(`/api/guests/${guestId}`);
+            const data = await res.json();
+            if (!data.success) return;
+
+            currentGuestId = guestId;
+            const g = data.guest;
+            $('#guest-edit-name').value = g.name || '';
+            $('#guest-edit-email').value = g.email || '';
+            $('#guest-edit-phone').value = g.phone || '';
+            $('#guest-edit-address').value = g.address || '';
+            $('#guest-edit-notes').value = g.notes || '';
+
+            // Invoice history
+            const invList = $('#guest-invoices-list');
+            if (data.invoices && data.invoices.length > 0) {
+                invList.innerHTML = data.invoices.map(inv => {
+                    const d = typeof inv.data === 'string' ? JSON.parse(inv.data) : (inv.data || {});
+                    return `
+                        <div class="guest-invoice-item">
+                            <span class="guest-invoice-nr">${escapeHtml(inv.invoice_number || d.rNummer || '—')}</span>
+                            <span class="guest-invoice-date">${formatDate(inv.invoice_date || d.rDatum)}</span>
+                            <span class="guest-invoice-amount">${formatCurrency(inv.total_amount || d.totalAmount || 0)}</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                invList.innerHTML = '<p class="text-muted">Keine Rechnungen vorhanden</p>';
+            }
+
+            $('#guests-list').style.display = 'none';
+            $('#guest-detail').style.display = 'block';
+        } catch (e) {
+            console.error('Show guest detail error:', e);
+        }
+    }
+
+    // =======================
+    // Branding / Logo
+    // =======================
+    let currentLogoBase64 = null;
+
+    const logoPreview = $('#logo-preview');
+    const logoFileInput = $('#logo-file-input');
+    const btnUploadLogo = $('#btn-upload-logo');
+    const btnRemoveLogo = $('#btn-remove-logo');
+
+    if (btnUploadLogo && logoFileInput) {
+        btnUploadLogo.addEventListener('click', () => logoFileInput.click());
+
+        logoFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('Logo ist zu groß (max 2MB)', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                currentLogoBase64 = ev.target.result;
+                logoPreview.src = currentLogoBase64;
+                logoPreview.style.display = 'block';
+                btnRemoveLogo.style.display = 'inline-flex';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        btnRemoveLogo.addEventListener('click', () => {
+            currentLogoBase64 = null;
+            logoPreview.src = '';
+            logoPreview.style.display = 'none';
+            btnRemoveLogo.style.display = 'none';
+            logoFileInput.value = '';
+        });
+    }
+
+    async function saveBranding() {
+        try {
+            await fetch('/api/branding', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logo_base64: currentLogoBase64 })
+            });
+        } catch (e) {
+            console.error('Save branding error:', e);
+        }
+    }
+
+    async function loadBranding() {
+        try {
+            const res = await fetch('/api/branding');
+            const data = await res.json();
+            if (data.success && data.branding && data.branding.logo_base64) {
+                currentLogoBase64 = data.branding.logo_base64;
+                logoPreview.src = currentLogoBase64;
+                logoPreview.style.display = 'block';
+                btnRemoveLogo.style.display = 'inline-flex';
+            }
+        } catch (e) {
+            console.error('Load branding error:', e);
+        }
+    }
+
+    // =======================
+    // Data Migration (localStorage → DB)
+    // =======================
+    const btnMigrate = $('#btn-migrate-data');
+    if (btnMigrate) {
+        btnMigrate.addEventListener('click', async () => {
+            if (!confirm('Bestehende Browser-Daten (Einstellungen, Archiv) in die Datenbank importieren?\n\nDies überschreibt vorhandene Server-Daten nicht, sondern ergänzt sie.')) return;
+
+            const migrationData = {};
+            for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
+                const raw = localStorage.getItem(storageKey);
+                if (raw) migrationData[key] = raw;
+            }
+
+            if (Object.keys(migrationData).length === 0) {
+                showToast('Keine Browser-Daten zum Importieren gefunden', 'info');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/migrate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(migrationData)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    await loadAllSettings();
+                    await fetchArchive();
+                } else {
+                    showToast('Migration fehlgeschlagen', 'error');
+                }
+            } catch (e) {
+                showToast('Server-Fehler bei der Migration', 'error');
+            }
+        });
     }
 
     // Add spin animation for loading
@@ -1710,4 +2060,4 @@
     document.head.appendChild(style);
 
 })();
-// Version 2.4 - Booking.com Integration
+// Version 3.0 - SQLite Database Migration
