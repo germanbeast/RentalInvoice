@@ -8,6 +8,8 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
+const axios = require('axios');
+const ical = require('node-ical');
 require('dotenv').config();
 
 const app = express();
@@ -188,6 +190,42 @@ app.post('/api/send-email', async (req, res) => {
     } catch (error) {
         console.error('Email Sending Error:', error);
         res.status(500).send('Failed to send email: ' + error.message);
+    }
+});
+
+// API: Fetch iCal Calendar
+app.post('/api/calendar/fetch', async (req, res) => {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+
+    try {
+        console.log(`📅 Fetching Calendar: ${url}`);
+        const response = await axios.get(url);
+        const data = ical.parseICS(response.data);
+
+        const events = [];
+        for (let k in data) {
+            if (data.hasOwnProperty(k)) {
+                const ev = data[k];
+                if (ev.type === 'VEVENT') {
+                    events.push({
+                        summary: ev.summary,
+                        start: ev.start,
+                        end: ev.end,
+                        description: ev.description,
+                        uid: ev.uid
+                    });
+                }
+            }
+        }
+
+        // Sort by date (newest first)
+        events.sort((a, b) => new Date(b.start) - new Date(a.start));
+
+        res.json({ success: true, events });
+    } catch (error) {
+        console.error('iCal Fetch Error:', error);
+        res.status(500).json({ success: false, message: 'Fehler beim Laden des Kalenders: ' + error.message });
     }
 });
 
