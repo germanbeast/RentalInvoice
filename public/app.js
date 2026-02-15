@@ -543,8 +543,8 @@
                 lockId: $('#nuki-lock-id').value
             },
             booking_ical: $('#booking-ical-url').value,
-            paperless_expense_tag: $('#s-pl-expense-tag').value,
-            paperless_amount_field: $('#s-pl-amount-field').value,
+            paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
+            paperless_amount_field: $('#s-pl-amount-field')?.value || '',
             wa_phone: $('#wa-phone').value,
             reminder_days: $('#reminder-days').value || '2',
             notifications_enabled: $('#notifications-enabled').checked ? 'true' : 'false'
