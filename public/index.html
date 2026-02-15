@@ -876,19 +876,31 @@
                     </div>
                     <hr>
 
-                    <!-- NOTIFICATIONS (WhatsApp) -->
+                    <!-- NOTIFICATIONS (WhatsApp Web) -->
                     <div class="modal-subheader">
-                        <h4>Benachrichtigungen (WhatsApp)</h4>
+                        <h4>Benachrichtigungen (WhatsApp Web)</h4>
                     </div>
                     <div class="form-group">
-                        <label for="wa-phone">WhatsApp-Nummer (mit Ländervorwahl)</label>
+                        <label>WhatsApp-Status</label>
+                        <div id="wa-status-container"
+                            style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-radius: 8px; background: var(--bg-surface);">
+                            <span id="wa-status-dot"
+                                style="width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0;"></span>
+                            <span id="wa-status-text" style="font-size: 0.9rem;">Verbindung wird hergestellt...</span>
+                        </div>
+                    </div>
+                    <div class="form-group" id="wa-qr-group" style="display: none;">
+                        <label>QR-Code scannen</label>
+                        <div
+                            style="display: flex; justify-content: center; padding: 1rem; background: #fff; border-radius: 8px;">
+                            <img id="wa-qr-image" alt="WhatsApp QR Code" style="max-width: 260px; width: 100%;">
+                        </div>
+                        <small>Öffne WhatsApp → Verknüpfte Geräte → Gerät hinzufügen → QR-Code scannen</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="wa-phone">Empfänger-Nummer (mit Ländervorwahl)</label>
                         <input type="text" id="wa-phone" placeholder="+4917612345678">
-                        <small>Nummer muss vorher bei CallMeBot registriert sein.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="wa-apikey">CallMeBot API-Key</label>
-                        <input type="text" id="wa-apikey" placeholder="123456">
-                        <small>Schreibe +34 644 71 81 48 auf WhatsApp: "I allow callmebot to send me messages"</small>
+                        <small>Nummer an die Benachrichtigungen gesendet werden (z.B. Oma).</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -912,6 +924,7 @@
                         <button type="button" id="btn-test-connection" class="btn btn-outline">Paperless testen</button>
                         <button type="button" id="btn-nuki-test" class="btn btn-outline">Nuki testen</button>
                         <button type="button" id="btn-test-whatsapp" class="btn btn-outline">WhatsApp testen</button>
+                        <button type="button" id="btn-wa-logout" class="btn btn-outline">WhatsApp trennen</button>
                         <button type="button" id="btn-migrate-data" class="btn btn-outline"
                             title="Bestehende Browser-Daten in die Datenbank importieren">Daten importieren</button>
                     </div>

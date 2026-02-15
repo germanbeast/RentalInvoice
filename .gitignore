@@ -15,3 +15,4 @@ users.json.bak
 rental.db
 rental.db-wal
 rental.db-shm
+.wwebjs_auth/

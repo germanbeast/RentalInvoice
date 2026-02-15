@@ -17,6 +17,8 @@ const ical = require('node-ical');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode');
 const db = require('./db');
 require('dotenv').config();
 
@@ -30,29 +32,90 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 db.init();
 
 // =======================
-// 1b. WhatsApp via CallMeBot
+// 1b. WhatsApp Web Client
 // =======================
-async function sendWhatsApp(phone, apiKey, message) {
-    if (!phone || !apiKey) {
-        console.warn('⚠️  WhatsApp nicht konfiguriert (Nummer oder API-Key fehlt)');
+let waClient = null;
+let waQrCode = null;
+let waReady = false;
+let waStatus = 'disconnected'; // disconnected, qr_pending, connecting, ready
+
+function initWhatsApp() {
+    waClient = new Client({
+        authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
+        puppeteer: {
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+        }
+    });
+
+    waClient.on('qr', async (qr) => {
+        waStatus = 'qr_pending';
+        waQrCode = await qrcode.toDataURL(qr);
+        console.log('\ud83d\udcf1 WhatsApp QR-Code bereit. Bitte in der App scannen.');
+    });
+
+    waClient.on('ready', () => {
+        waReady = true;
+        waStatus = 'ready';
+        waQrCode = null;
+        console.log('\u2705 WhatsApp Web verbunden!');
+    });
+
+    waClient.on('authenticated', () => {
+        waStatus = 'connecting';
+        console.log('\ud83d\udd10 WhatsApp authentifiziert, lade Session...');
+    });
+
+    waClient.on('auth_failure', (msg) => {
+        waReady = false;
+        waStatus = 'disconnected';
+        console.error('\u274c WhatsApp Auth-Fehler:', msg);
+    });
+
+    waClient.on('disconnected', (reason) => {
+        waReady = false;
+        waStatus = 'disconnected';
+        waQrCode = null;
+        console.warn('\u26a0\ufe0f  WhatsApp getrennt:', reason);
+        // Auto-reconnect after 30s
+        setTimeout(() => {
+            console.log('\ud83d\udd04 WhatsApp Reconnect...');
+            waClient.initialize().catch(e => console.error('WA Reconnect Error:', e.message));
+        }, 30000);
+    });
+
+    waClient.initialize().catch(e => {
+        console.error('\u274c WhatsApp init fehlgeschlagen:', e.message);
+        waStatus = 'disconnected';
+    });
+}
+
+async function sendWhatsApp(phone, message) {
+    if (!waReady || !waClient) {
+        console.warn('\u26a0\ufe0f  WhatsApp nicht verbunden');
         return false;
     }
     try {
-        const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(apiKey)}`;
-        const res = await axios.get(url, { timeout: 15000 });
-        console.log(`✉️  WhatsApp gesendet an ${phone}: ${message.substring(0, 50)}...`);
+        // Normalize phone: remove +, spaces, dashes
+        const cleaned = phone.replace(/[^\d]/g, '');
+        const chatId = cleaned + '@c.us';
+        await waClient.sendMessage(chatId, message);
+        console.log(`\u2709\ufe0f  WhatsApp gesendet an ${phone}: ${message.substring(0, 50)}...`);
         return true;
     } catch (e) {
-        console.error('❌ WhatsApp-Fehler:', e.message);
+        console.error('\u274c WhatsApp-Fehler:', e.message);
         return false;
     }
 }
+
+// Initialize WhatsApp
+initWhatsApp();
 
 // =======================
 // 1c. SCHEDULED JOBS (Cron)
 // =======================
 function formatDateDE(dateStr) {
-    if (!dateStr) return '—';
+    if (!dateStr) return '\u2014';
     const d = new Date(dateStr);
     return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
@@ -63,12 +126,12 @@ cron.schedule('*/15 * * * *', async () => {
         const allSettings = db.getAllSettings();
         const icalUrl = allSettings.booking_ical;
         const waPhone = allSettings.wa_phone;
-        const waApiKey = allSettings.wa_apikey;
         const notifyEnabled = allSettings.notifications_enabled;
 
         if (!icalUrl || notifyEnabled === 'false') return;
+        if (!waReady) return;
 
-        console.log('📅 iCal-Polling läuft...');
+        console.log('\ud83d\udcc5 iCal-Polling l\u00e4uft...');
         const response = await axios.get(icalUrl, {
             timeout: 10000,
             maxContentLength: 5 * 1024 * 1024,
@@ -95,20 +158,19 @@ cron.schedule('*/15 * * * *', async () => {
                 description: String(ev.description || '').substring(0, 2000)
             });
 
-            // Only notify for truly new bookings
             if (result.inserted && !existing) {
                 newCount++;
-                const msg = `🏠 Neue Buchung!\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}`;
-                const sent = await sendWhatsApp(waPhone, waApiKey, msg);
+                const msg = `\ud83c\udfe0 Neue Buchung!\n${summary}\n\ud83d\udcc5 ${formatDateDE(checkin)} \u2013 ${formatDateDE(checkout)}`;
+                const sent = await sendWhatsApp(waPhone, msg);
                 db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
             }
         }
 
         if (newCount > 0) {
-            console.log(`🎉 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
+            console.log(`\ud83c\udf89 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
         }
     } catch (e) {
-        console.error('❌ iCal-Polling Fehler:', e.message);
+        console.error('\u274c iCal-Polling Fehler:', e.message);
     }
 });
 
@@ -117,18 +179,17 @@ cron.schedule('0 8 * * *', async () => {
     try {
         const allSettings = db.getAllSettings();
         const waPhone = allSettings.wa_phone;
-        const waApiKey = allSettings.wa_apikey;
         const notifyEnabled = allSettings.notifications_enabled;
         const reminderDays = parseInt(allSettings.reminder_days) || 2;
 
-        if (!waPhone || !waApiKey || notifyEnabled === 'false') return;
+        if (!waPhone || notifyEnabled === 'false' || !waReady) return;
 
-        console.log('⏰ Erinnerungs-Check läuft...');
+        console.log('\u23f0 Erinnerungs-Check l\u00e4uft...');
         const upcoming = db.getUpcomingBookings(reminderDays);
 
         for (const booking of upcoming) {
-            const msg = `⏰ Erinnerung: ${booking.summary || 'Gast'} reist bald an!\n📅 Anreise: ${formatDateDE(booking.checkin)}\n📅 Abreise: ${formatDateDE(booking.checkout)}`;
-            const sent = await sendWhatsApp(waPhone, waApiKey, msg);
+            const msg = `\u23f0 Erinnerung: ${booking.summary || 'Gast'} reist bald an!\n\ud83d\udcc5 Anreise: ${formatDateDE(booking.checkin)}\n\ud83d\udcc5 Abreise: ${formatDateDE(booking.checkout)}`;
+            const sent = await sendWhatsApp(waPhone, msg);
             if (sent) {
                 db.markReminderSent(booking.id);
             }
@@ -136,14 +197,14 @@ cron.schedule('0 8 * * *', async () => {
         }
 
         if (upcoming.length > 0) {
-            console.log(`⏰ ${upcoming.length} Erinnerung(en) versendet.`);
+            console.log(`\u23f0 ${upcoming.length} Erinnerung(en) versendet.`);
         }
     } catch (e) {
-        console.error('❌ Reminder-Check Fehler:', e.message);
+        console.error('\u274c Reminder-Check Fehler:', e.message);
     }
 });
 
-console.log('✅ Cron-Jobs registriert (iCal: alle 15 Min, Reminder: täglich 08:00)');
+console.log('\u2705 Cron-Jobs registriert (iCal: alle 15 Min, Reminder: t\u00e4glich 08:00)');
 
 // =======================
 // 2. SECURITY HEADERS (Helmet)
@@ -824,42 +885,79 @@ app.post('/api/update', apiLimiter, (req, res) => {
 });
 
 // =======================
-// 14b. NOTIFICATION API ROUTES
+// 14b. WHATSAPP & NOTIFICATION API ROUTES
 // =======================
-app.get('/api/notifications/status', apiLimiter, (req, res) => {
+
+// Get WhatsApp QR Code for scanning
+app.get('/api/whatsapp/qr', apiLimiter, (req, res) => {
+    if (waReady) {
+        return res.json({ success: true, status: 'ready', message: 'WhatsApp ist bereits verbunden.' });
+    }
+    if (waQrCode) {
+        return res.json({ success: true, status: 'qr_pending', qr: waQrCode });
+    }
+    res.json({ success: true, status: waStatus, message: 'Kein QR-Code verf\u00fcgbar. Bitte warten...' });
+});
+
+// Get WhatsApp connection status
+app.get('/api/whatsapp/status', apiLimiter, (req, res) => {
     try {
         const logs = db.getRecentNotifications(20);
         const allSettings = db.getAllSettings();
         res.json({
             success: true,
+            waStatus,
+            waReady,
             enabled: allSettings.notifications_enabled !== 'false',
-            configured: !!(allSettings.wa_phone && allSettings.wa_apikey),
+            configured: !!allSettings.wa_phone,
             logs
         });
     } catch (e) {
-        console.error('Notification Status Error:', e.message);
+        console.error('WA Status Error:', e.message);
         res.status(500).json({ error: 'Status konnte nicht geladen werden' });
     }
 });
 
+// Logout WhatsApp (to re-scan QR)
+app.post('/api/whatsapp/logout', apiLimiter, async (req, res) => {
+    try {
+        if (waClient) {
+            await waClient.logout();
+            waReady = false;
+            waStatus = 'disconnected';
+            waQrCode = null;
+            // Re-initialize for new QR
+            setTimeout(() => initWhatsApp(), 2000);
+        }
+        res.json({ success: true, message: 'WhatsApp abgemeldet. Neuer QR-Code wird generiert...' });
+    } catch (e) {
+        console.error('WA Logout Error:', e.message);
+        res.status(500).json({ error: 'Abmeldung fehlgeschlagen' });
+    }
+});
+
+// Test WhatsApp message
 app.post('/api/notifications/test-whatsapp', apiLimiter, async (req, res) => {
     try {
+        if (!waReady) {
+            return res.status(400).json({ error: 'WhatsApp ist nicht verbunden. Bitte zuerst QR-Code scannen.' });
+        }
+
         const allSettings = db.getAllSettings();
         const waPhone = allSettings.wa_phone;
-        const waApiKey = allSettings.wa_apikey;
 
-        if (!waPhone || !waApiKey) {
-            return res.status(400).json({ error: 'WhatsApp-Nummer und API-Key m\u00fcssen in den Einstellungen hinterlegt sein.' });
+        if (!waPhone) {
+            return res.status(400).json({ error: 'Empf\u00e4nger-Nummer muss in den Einstellungen hinterlegt sein.' });
         }
 
         const msg = '\u2705 Test-Nachricht von Rental Invoice! WhatsApp-Benachrichtigungen funktionieren.';
-        const sent = await sendWhatsApp(waPhone, waApiKey, msg);
+        const sent = await sendWhatsApp(waPhone, msg);
         db.logNotification('test', msg, sent ? 'sent' : 'failed');
 
         if (sent) {
             res.json({ success: true, message: 'Test-Nachricht gesendet!' });
         } else {
-            res.status(500).json({ error: 'Nachricht konnte nicht gesendet werden. Pr\u00fcfe Nummer und API-Key.' });
+            res.status(500).json({ error: 'Nachricht konnte nicht gesendet werden.' });
         }
     } catch (e) {
         console.error('Test WhatsApp Error:', e.message);

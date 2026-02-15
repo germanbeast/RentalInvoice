@@ -546,7 +546,6 @@
             paperless_expense_tag: $('#s-pl-expense-tag').value,
             paperless_amount_field: $('#s-pl-amount-field').value,
             wa_phone: $('#wa-phone').value,
-            wa_apikey: $('#wa-apikey').value,
             reminder_days: $('#reminder-days').value || '2',
             notifications_enabled: $('#notifications-enabled').checked ? 'true' : 'false'
         };
@@ -626,7 +625,6 @@
             if (s.paperless_amount_field) $('#s-pl-amount-field').value = s.paperless_amount_field;
             // Notifications
             if (s.wa_phone) $('#wa-phone').value = s.wa_phone;
-            if (s.wa_apikey) $('#wa-apikey').value = s.wa_apikey;
             if (s.reminder_days) $('#reminder-days').value = s.reminder_days;
             if (s.notifications_enabled !== undefined) {
                 $('#notifications-enabled').checked = s.notifications_enabled !== 'false';
@@ -648,6 +646,55 @@
     function saveNukiSettings() { /* saved via saveAllSettings */ }
     function loadNukiSettings() { /* loaded via loadAllSettings */ }
 
+    // WhatsApp Status Polling
+    let waStatusInterval = null;
+
+    async function pollWhatsAppStatus() {
+        try {
+            const res = await fetch('/api/whatsapp/qr');
+            const data = await res.json();
+            const dot = $('#wa-status-dot');
+            const text = $('#wa-status-text');
+            const qrGroup = $('#wa-qr-group');
+            const qrImage = $('#wa-qr-image');
+
+            if (data.status === 'ready') {
+                dot.style.background = '#22c55e';
+                text.textContent = '\u2705 Verbunden';
+                qrGroup.style.display = 'none';
+            } else if (data.status === 'qr_pending' && data.qr) {
+                dot.style.background = '#eab308';
+                text.textContent = '\ud83d\udcf1 QR-Code bereit \u2013 bitte scannen';
+                qrGroup.style.display = 'block';
+                qrImage.src = data.qr;
+            } else if (data.status === 'connecting') {
+                dot.style.background = '#3b82f6';
+                text.textContent = '\ud83d\udd04 Verbindung wird hergestellt...';
+                qrGroup.style.display = 'none';
+            } else {
+                dot.style.background = 'var(--text-muted)';
+                text.textContent = '\u26a0\ufe0f Nicht verbunden';
+                qrGroup.style.display = 'none';
+            }
+        } catch (e) {
+            console.error('WA Status Error:', e);
+        }
+    }
+
+    // Start polling when settings modal opens
+    const origOpenSettings = modalSettings ? modalSettings.style : null;
+    if (modalSettings) {
+        const observer = new MutationObserver(() => {
+            if (modalSettings.style.display !== 'none') {
+                pollWhatsAppStatus();
+                waStatusInterval = setInterval(pollWhatsAppStatus, 3000);
+            } else {
+                if (waStatusInterval) clearInterval(waStatusInterval);
+            }
+        });
+        observer.observe(modalSettings, { attributes: true, attributeFilter: ['style'] });
+    }
+
     // WhatsApp test button
     const btnTestWhatsApp = $('#btn-test-whatsapp');
     if (btnTestWhatsApp) {
@@ -667,6 +714,26 @@
             } finally {
                 btnTestWhatsApp.disabled = false;
                 btnTestWhatsApp.textContent = 'WhatsApp testen';
+            }
+        });
+    }
+
+    // WhatsApp logout button
+    const btnWaLogout = $('#btn-wa-logout');
+    if (btnWaLogout) {
+        btnWaLogout.addEventListener('click', async () => {
+            if (!confirm('WhatsApp-Verbindung trennen? Du musst danach den QR-Code erneut scannen.')) return;
+            btnWaLogout.disabled = true;
+            try {
+                const res = await fetch('/api/whatsapp/logout', { method: 'POST' });
+                const data = await res.json();
+                showToast(data.message || 'WhatsApp getrennt', 'success');
+                // Start polling for new QR
+                setTimeout(pollWhatsAppStatus, 3000);
+            } catch (e) {
+                showToast('Fehler beim Trennen', 'error');
+            } finally {
+                btnWaLogout.disabled = false;
             }
         });
     }
