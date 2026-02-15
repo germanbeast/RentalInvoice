@@ -127,30 +127,70 @@
                 body: JSON.stringify({ username, password })
             });
 
-            console.log(`🌐 Server-Antwort Status: ${response.status} ${response.statusText}`);
-
             const data = await response.json();
-            console.log('📦 Empfangene Daten:', data);
 
             if (data.success) {
-                console.log('✅ Login erfolgreich!');
-                showToast('Erfolgreich angemeldet!', 'success');
-                showApp();
+                if (data.requires2fa) {
+                    $('#2fa-group').style.display = 'block';
+                    $('#login-pass').parentElement.style.display = 'none'; // Hide password field
+                    $('#login-user').disabled = true;
+                    loginBtn.innerHTML = 'Code verifizieren';
+                    loginBtn.disabled = false;
+                    loginBtn.onclick = async (e) => {
+                        e.preventDefault();
+                        const code = $('#login-2fa').value;
+                        if (!code) return showToast('Bitte Code eingeben', 'error');
+
+                        loginBtn.disabled = true;
+                        loginBtn.innerHTML = 'Verifiziere...';
+
+                        try {
+                            const vRes = await fetch('/api/login/verify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ sessionId: data.sessionId, code })
+                            });
+                            const vData = await vRes.json();
+                            if (vData.success) {
+                                showAuthSuccess();
+                            } else {
+                                showToast(vData.message || 'Falscher Code', 'error');
+                                loginBtn.disabled = false;
+                                loginBtn.innerHTML = 'Code verifizieren';
+                            }
+                        } catch (e) {
+                            showToast('Verbindungsfehler', 'error');
+                            loginBtn.disabled = false;
+                        }
+                    };
+                    return;
+                }
+                showAuthSuccess();
             } else {
-                console.warn('❌ Login fehlgeschlagen:', data.message);
-                const msg = data.message || 'Login fehlgeschlagen';
-                showToast(msg, 'error');
-                alert(`Login-Fehler: ${msg}`); // Fallback falls Toast nicht sichtbar
+                showToast(data.message || 'Login fehlgeschlagen', 'error');
             }
         } catch (err) {
-            console.error('🔥 Fetch-Fehler beim Login:', err);
-            showToast('Verbindungsfehler zum Server', 'error');
-            alert(`Verbindungsfehler: ${err.message}`);
+            console.error('Login error:', err);
+            showToast('Server-Fehler beim Login', 'error');
         } finally {
-            loginBtn.disabled = false;
-            loginBtn.innerHTML = originalBtnText;
+            if (!loginBtn.onclick) { // Only reset if not in 2FA mode
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = originalBtnText;
+            }
         }
     });
+
+    function showAuthSuccess() {
+        showToast('Erfolgreich angemeldet!', 'success');
+        showApp();
+        // Reset login form for next time
+        $('#2fa-group').style.display = 'none';
+        $('#login-pass').parentElement.style.display = 'block';
+        $('#login-user').disabled = false;
+        $('#login-user').value = '';
+        $('#login-pass').value = '';
+        $('#login-2fa').value = '';
+    }
 
     // =======================
     // State
@@ -545,9 +585,10 @@
             booking_ical: $('#booking-ical-url').value,
             paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
             paperless_amount_field: $('#s-pl-amount-field')?.value || '',
-            wa_phone: $('#wa-phone').value,
+            wa_phones: JSON.stringify(Array.from(document.querySelectorAll('.wa-phone-input')).map(input => input.value)),
             reminder_days: $('#reminder-days').value || '2',
-            notifications_enabled: $('#notifications-enabled').checked ? 'true' : 'false'
+            notifications_enabled: $('#notifications-enabled').checked ? 'true' : 'false',
+            twofactor_enabled: $('#twofactor-enabled').checked ? 'true' : 'false'
         };
 
         try {
@@ -624,11 +665,22 @@
             if (s.paperless_expense_tag) $('#s-pl-expense-tag').value = s.paperless_expense_tag;
             if (s.paperless_amount_field) $('#s-pl-amount-field').value = s.paperless_amount_field;
             // Notifications
-            if (s.wa_phone) $('#wa-phone').value = s.wa_phone;
+            const container = $('#wa-phones-container');
+            container.innerHTML = '';
+            let phones = [];
+            try { phones = JSON.parse(s.wa_phones || '[]'); } catch (e) { if (s.wa_phone) phones = [s.wa_phone]; }
+            if (phones.length === 0) addWaPhoneRow('');
+            else phones.forEach(p => addWaPhoneRow(p));
+
             if (s.reminder_days) $('#reminder-days').value = s.reminder_days;
             if (s.notifications_enabled !== undefined) {
                 $('#notifications-enabled').checked = s.notifications_enabled !== 'false';
             }
+            if (s.twofactor_enabled !== undefined) {
+                $('#twofactor-enabled').checked = s.twofactor_enabled !== 'false';
+            }
+
+            loadUsers(); // Refresh user list
         } catch (e) {
             console.error('Settings load error:', e);
         }
@@ -693,6 +745,146 @@
             }
         });
         observer.observe(modalSettings, { attributes: true, attributeFilter: ['style'] });
+    }
+
+    // --- NEW: Multi-Number Support ---
+    function addWaPhoneRow(val = '') {
+        const container = $('#wa-phones-container');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '0.5rem';
+        row.style.alignItems = 'center';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'wa-phone-input';
+        input.placeholder = '+4917612345678';
+        input.value = val;
+        input.style.flex = '1';
+
+        const btnRemove = document.createElement('button');
+        btnRemove.type = 'button';
+        btnRemove.innerHTML = '🗑️';
+        btnRemove.className = 'btn btn-outline';
+        btnRemove.style.padding = '0.4rem';
+        btnRemove.onclick = () => {
+            if (container.querySelectorAll('.wa-phone-input').length > 1) {
+                row.remove();
+            } else {
+                input.value = '';
+            }
+        };
+
+        row.appendChild(input);
+        row.appendChild(btnRemove);
+        container.appendChild(row);
+    }
+
+    if ($('#btn-add-wa-phone')) {
+        $('#btn-add-wa-phone').addEventListener('click', () => addWaPhoneRow(''));
+    }
+
+    // --- NEW: User Management Support ---
+    async function loadUsers() {
+        const container = $('#users-list-container');
+        if (!container) return;
+
+        try {
+            const res = await fetch('/api/users');
+            const data = await res.json();
+            if (!data.success) {
+                container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;">Nur Admins können Benutzer verwalten.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            data.users.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.style.marginBottom = '0.5rem';
+                div.style.padding = '0.75rem';
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.alignItems = 'center';
+
+                div.innerHTML = `
+                    <div>
+                        <strong>${user.username}</strong> (${user.role})<br>
+                        <small>📱 2FA: ${user.phone || 'Nicht gesetzt'}</small>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline btn-sm edit-user-btn" data-id="${user.id}">Edit</button>
+                        <button class="btn btn-outline btn-sm delete-user-btn" data-id="${user.id}" style="color:red;">Del</button>
+                    </div>
+                `;
+
+                div.querySelector('.edit-user-btn').onclick = () => editUser(user);
+                div.querySelector('.delete-user-btn').onclick = () => deleteUser(user.id, user.username);
+
+                container.appendChild(div);
+            });
+        } catch (e) {
+            console.error('User list error:', e);
+            container.innerHTML = '<p>Fehler beim Laden der Benutzer.</p>';
+        }
+    }
+
+    async function editUser(user) {
+        const phone = prompt(`Handy-Nummer für 2FA ändern (Username: ${user.username}):`, user.phone || '');
+        if (phone === null) return;
+        const pass = prompt(`Neues Passwort (leer lassen um nicht zu ändern):`);
+        if (pass === null) return;
+
+        try {
+            const res = await fetch(`/api/users/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user.username, role: user.role, phone, password: pass || undefined })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Benutzer aktualisiert!', 'success');
+                loadUsers();
+            }
+        } catch (e) { showToast('Fehler', 'error'); }
+    }
+
+    async function deleteUser(id, username) {
+        if (username === 'admin') return showToast('Admin kann nicht gelöscht werden', 'error');
+        if (!confirm(`Benutzer "${username}" wirklich löschen?`)) return;
+        try {
+            const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+            if ((await res.json()).success) {
+                showToast('Benutzer gelöscht', 'success');
+                loadUsers();
+            }
+        } catch (e) { showToast('Fehler', 'error'); }
+    }
+
+    if ($('#btn-add-user-modal')) {
+        $('#btn-add-user-modal').addEventListener('click', async () => {
+            const username = prompt('Neuer Benutzername:');
+            if (!username) return;
+            const password = prompt('Passwort:');
+            if (!password) return;
+            const phone = prompt('Handy-Nummer für 2FA (+49...):', '');
+
+            try {
+                const res = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, role: 'admin', phone })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Benutzer erstellt!', 'success');
+                    loadUsers();
+                } else {
+                    showToast(data.error || 'Fehler', 'error');
+                }
+            } catch (e) { showToast('Fehler', 'error'); }
+        });
     }
 
     // WhatsApp test button

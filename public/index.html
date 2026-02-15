@@ -36,7 +36,13 @@
                     <label for="login-pass">Passwort</label>
                     <input type="password" id="login-pass" required placeholder="••••••••">
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
+                <div class="form-group" id="2fa-group" style="display: none;">
+                    <label for="login-2fa">WhatsApp 2FA Code</label>
+                    <input type="text" id="login-2fa" placeholder="123456" maxlength="6">
+                    <small id="2fa-message" style="color: var(--primary-color);">Code wurde per WhatsApp
+                        gesendet.</small>
+                </div>
+                <button type="submit" id="btn-login" class="btn btn-primary btn-block">Anmelden</button>
             </form>
         </div>
     </section>
@@ -876,6 +882,17 @@
                     </div>
                     <hr>
 
+                    <!-- USER MANAGEMENT -->
+                    <div class="modal-subheader">
+                        <h4>Benutzerverwaltung (2FA)</h4>
+                    </div>
+                    <div id="users-list-container" style="margin-bottom: 1rem;">
+                        <!-- User list populated via JS -->
+                    </div>
+                    <button type="button" id="btn-add-user-modal" class="btn btn-outline"
+                        style="width: 100%; margin-bottom: 1rem;">Neuen Benutzer hinzufügen</button>
+                    <hr>
+
                     <!-- NOTIFICATIONS (WhatsApp Web) -->
                     <div class="modal-subheader">
                         <h4>Benachrichtigungen (WhatsApp Web)</h4>
@@ -898,19 +915,28 @@
                         <small>Öffne WhatsApp → Verknüpfte Geräte → Gerät hinzufügen → QR-Code scannen</small>
                     </div>
                     <div class="form-group">
-                        <label for="wa-phone">Empfänger-Nummer (mit Ländervorwahl)</label>
-                        <input type="text" id="wa-phone" placeholder="+4917612345678">
-                        <small>Nummer an die Benachrichtigungen gesendet werden (z.B. Oma).</small>
+                        <label>Empfänger-Nummern (mit Ländervorwahl)</label>
+                        <div id="wa-phones-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <!-- Dynamic list of phone inputs -->
+                        </div>
+                        <button type="button" id="btn-add-wa-phone" class="btn btn-outline"
+                            style="margin-top: 0.5rem; width: 100%;">+ Nummer hinzufügen</button>
+                        <small>Nummern an die Benachrichtigungen gesendet werden (z.B. Oma, Du selbst).</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="reminder-days">Erinnerung (Tage vorher)</label>
                             <input type="number" id="reminder-days" value="2" min="1" max="7">
                         </div>
-                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                        <div class="form-group"
+                            style="display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5rem;">
                             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                                 <input type="checkbox" id="notifications-enabled" checked>
                                 Benachrichtigungen aktiv
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="twofactor-enabled" checked>
+                                WhatsApp 2FA Login aktiv
                             </label>
                         </div>
                     </div>

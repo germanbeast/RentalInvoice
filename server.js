@@ -96,7 +96,6 @@ async function sendWhatsApp(phone, message) {
         return false;
     }
     try {
-        // Normalize phone: remove +, spaces, dashes
         const cleaned = phone.replace(/[^\d]/g, '');
         const chatId = cleaned + '@c.us';
         await waClient.sendMessage(chatId, message);
@@ -107,6 +106,29 @@ async function sendWhatsApp(phone, message) {
         return false;
     }
 }
+
+// Send to all configured notification recipients
+async function sendToAllRecipients(message) {
+    const allSettings = db.getAllSettings();
+    let phones = [];
+    try {
+        phones = JSON.parse(allSettings.wa_phones || '[]');
+    } catch (e) {
+        if (allSettings.wa_phone) phones = [allSettings.wa_phone];
+    }
+    if (phones.length === 0) return false;
+    let anySent = false;
+    for (const phone of phones) {
+        if (phone && phone.trim()) {
+            const sent = await sendWhatsApp(phone.trim(), message);
+            if (sent) anySent = true;
+        }
+    }
+    return anySent;
+}
+
+// 2FA Code Storage (in-memory, short-lived)
+const pending2FA = new Map(); // sessionId -> { code, username, expiresAt }
 
 // Initialize WhatsApp
 initWhatsApp();
@@ -161,7 +183,7 @@ cron.schedule('*/15 * * * *', async () => {
             if (result.inserted && !existing) {
                 newCount++;
                 const msg = `\ud83c\udfe0 Neue Buchung!\n${summary}\n\ud83d\udcc5 ${formatDateDE(checkin)} \u2013 ${formatDateDE(checkout)}`;
-                const sent = await sendWhatsApp(waPhone, msg);
+                const sent = await sendToAllRecipients(msg);
                 db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
             }
         }
@@ -182,14 +204,14 @@ cron.schedule('0 8 * * *', async () => {
         const notifyEnabled = allSettings.notifications_enabled;
         const reminderDays = parseInt(allSettings.reminder_days) || 2;
 
-        if (!waPhone || notifyEnabled === 'false' || !waReady) return;
+        if (!waReady || notifyEnabled === 'false') return;
 
         console.log('\u23f0 Erinnerungs-Check l\u00e4uft...');
         const upcoming = db.getUpcomingBookings(reminderDays);
 
         for (const booking of upcoming) {
             const msg = `\u23f0 Erinnerung: ${booking.summary || 'Gast'} reist bald an!\n\ud83d\udcc5 Anreise: ${formatDateDE(booking.checkin)}\n\ud83d\udcc5 Abreise: ${formatDateDE(booking.checkout)}`;
-            const sent = await sendWhatsApp(waPhone, msg);
+            const sent = await sendToAllRecipients(msg);
             if (sent) {
                 db.markReminderSent(booking.id);
             }
@@ -289,7 +311,7 @@ app.disable('x-powered-by');
 // 5. AUTHENTICATION
 // =======================
 function ensureAuthenticated(req, res, next) {
-    if (req.path === '/api/login') return next();
+    if (req.path === '/api/login' || req.path === '/api/login/verify') return next();
 
     if (req.session && req.session.user) return next();
 
@@ -319,39 +341,116 @@ app.use(express.static(PUBLIC_DIR, {
 // =======================
 // 7. AUTH API ROUTES
 // =======================
-app.post('/api/login', loginLimiter, (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
-        return res.status(400).json({ success: false, message: 'Ungültige Eingabe' });
+        return res.status(400).json({ success: false, message: 'Ung\u00fcltige Eingabe' });
     }
 
     const sanitizedUsername = username.trim().substring(0, 50);
     if (!/^[a-zA-Z0-9_-]+$/.test(sanitizedUsername)) {
-        return res.status(400).json({ success: false, message: 'Ungültiger Benutzername' });
+        return res.status(400).json({ success: false, message: 'Ung\u00fcltiger Benutzername' });
     }
 
     const user = db.getUser(sanitizedUsername);
 
     if (!user) {
         bcrypt.compareSync('dummy', '$2a$12$invalidhashforsecuritypurposesonly.');
-        return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' });
+        return res.status(401).json({ success: false, message: 'Ung\u00fcltige Anmeldedaten' });
     }
 
     const isMatch = bcrypt.compareSync(password, user.password);
 
-    if (isMatch) {
-        req.session.regenerate((err) => {
-            if (err) {
-                console.error('Session regeneration error:', err);
-                return res.status(500).json({ success: false, message: 'Server-Fehler' });
-            }
-            req.session.user = { username: user.username, role: user.role };
-            res.json({ success: true, user: req.session.user });
-        });
-    } else {
-        return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' });
+    if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Ung\u00fcltige Anmeldedaten' });
     }
+
+    // Check if 2FA should be used (WhatsApp connected + user has phone)
+    const allSettings = db.getAllSettings();
+    const twoFaEnabled = allSettings.twofactor_enabled !== 'false';
+
+    if (waReady && twoFaEnabled && user.phone) {
+        // Generate 6-digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const sessionId = crypto.randomBytes(16).toString('hex');
+        pending2FA.set(sessionId, {
+            code,
+            username: user.username,
+            expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
+        });
+
+        // Clean expired codes
+        for (const [key, val] of pending2FA) {
+            if (val.expiresAt < Date.now()) pending2FA.delete(key);
+        }
+
+        // Send code via WhatsApp to user's phone
+        const msg = `\ud83d\udd10 Dein Login-Code: *${code}*\n\nG\u00fcltig f\u00fcr 5 Minuten.`;
+        const sent = await sendWhatsApp(user.phone, msg);
+
+        if (!sent) {
+            // Fallback: skip 2FA if WhatsApp send fails
+            return req.session.regenerate((err) => {
+                if (err) return res.status(500).json({ success: false, message: 'Server-Fehler' });
+                req.session.user = { username: user.username, role: user.role };
+                res.json({ success: true, user: req.session.user });
+            });
+        }
+
+        return res.json({
+            success: true,
+            requires2fa: true,
+            sessionId,
+            message: 'Code per WhatsApp gesendet'
+        });
+    }
+
+    // No 2FA — direct login
+    req.session.regenerate((err) => {
+        if (err) {
+            console.error('Session regeneration error:', err);
+            return res.status(500).json({ success: false, message: 'Server-Fehler' });
+        }
+        req.session.user = { username: user.username, role: user.role };
+        res.json({ success: true, user: req.session.user });
+    });
+});
+
+// 2FA Verify
+app.post('/api/login/verify', loginLimiter, (req, res) => {
+    const { sessionId, code } = req.body;
+
+    if (!sessionId || !code) {
+        return res.status(400).json({ success: false, message: 'Code und Session-ID erforderlich' });
+    }
+
+    const entry = pending2FA.get(sessionId);
+    if (!entry) {
+        return res.status(401).json({ success: false, message: 'Ung\u00fcltige oder abgelaufene Anfrage' });
+    }
+
+    if (entry.expiresAt < Date.now()) {
+        pending2FA.delete(sessionId);
+        return res.status(401).json({ success: false, message: 'Code abgelaufen. Bitte erneut anmelden.' });
+    }
+
+    if (entry.code !== code.trim()) {
+        return res.status(401).json({ success: false, message: 'Falscher Code' });
+    }
+
+    // Code correct — create session
+    pending2FA.delete(sessionId);
+    const user = db.getUser(entry.username);
+
+    req.session.regenerate((err) => {
+        if (err) {
+            console.error('Session regeneration error:', err);
+            return res.status(500).json({ success: false, message: 'Server-Fehler' });
+        }
+        req.session.user = { username: user.username, role: user.role };
+        res.json({ success: true, user: req.session.user });
+    });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -367,6 +466,61 @@ app.get('/api/me', (req, res) => {
         res.json({ authenticated: true, user: req.session.user });
     } else {
         res.json({ authenticated: false });
+    }
+});
+
+// =======================
+// 7b. USER MANAGEMENT API
+// =======================
+app.get('/api/users', (req, res) => {
+    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
+    try {
+        const users = db.getAllUsers();
+        res.json({ success: true, users });
+    } catch (e) {
+        res.status(500).json({ error: 'Fehler beim Laden der Benutzer' });
+    }
+});
+
+app.post('/api/users', loginLimiter, (req, res) => {
+    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
+    const { username, password, role, phone } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+
+    try {
+        const hashed = bcrypt.hashSync(password, 12);
+        db.createUser(username, hashed, role || 'admin', phone || '');
+        res.json({ success: true, message: 'Benutzer erstellt' });
+    } catch (e) {
+        res.status(500).json({ error: 'Benutzer konnte nicht erstellt werden' });
+    }
+});
+
+app.put('/api/users/:id', (req, res) => {
+    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
+    const { username, password, role, phone } = req.body;
+    const { id } = req.params;
+
+    try {
+        const data = { username, role, phone };
+        if (password) {
+            data.password = bcrypt.hashSync(password, 12);
+        }
+        db.updateUser(id, data);
+        res.json({ success: true, message: 'Benutzer aktualisiert' });
+    } catch (e) {
+        res.status(500).json({ error: 'Benutzer konnte nicht aktualisiert werden' });
+    }
+});
+
+app.delete('/api/users/:id', (req, res) => {
+    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
+    const { id } = req.params;
+    try {
+        db.deleteUser(id);
+        res.json({ success: true, message: 'Benutzer gelöscht' });
+    } catch (e) {
+        res.status(500).json({ error: 'Benutzer konnte nicht gelöscht werden' });
     }
 });
 

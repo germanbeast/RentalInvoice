@@ -31,6 +31,7 @@ function initSchema() {
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             role TEXT DEFAULT 'admin',
+            phone TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -114,16 +115,35 @@ function getUser(username) {
     return getDb().prepare('SELECT * FROM users WHERE username = ?').get(username);
 }
 
-function createUser(username, hashedPassword, role = 'admin') {
+function getAllUsers() {
+    return getDb().prepare('SELECT id, username, role, phone, created_at FROM users ORDER BY created_at').all();
+}
+
+function createUser(username, hashedPassword, role = 'admin', phone = '') {
     return getDb().prepare(
-        'INSERT OR REPLACE INTO users (username, password, role) VALUES (?, ?, ?)'
-    ).run(username, hashedPassword, role);
+        'INSERT OR REPLACE INTO users (username, password, role, phone) VALUES (?, ?, ?, ?)'
+    ).run(username, hashedPassword, role, phone);
 }
 
 function updateUserPassword(username, hashedPassword) {
     return getDb().prepare(
         'UPDATE users SET password = ? WHERE username = ?'
     ).run(hashedPassword, username);
+}
+
+function updateUser(id, data) {
+    const db = getDb();
+    if (data.password) {
+        db.prepare('UPDATE users SET username = ?, password = ?, role = ?, phone = ? WHERE id = ?')
+            .run(data.username, data.password, data.role || 'admin', data.phone || '', id);
+    } else {
+        db.prepare('UPDATE users SET username = ?, role = ?, phone = ? WHERE id = ?')
+            .run(data.username, data.role || 'admin', data.phone || '', id);
+    }
+}
+
+function deleteUser(id) {
+    return getDb().prepare('DELETE FROM users WHERE id = ?').run(id);
 }
 
 function initDefaultUser() {
@@ -141,6 +161,14 @@ function initDefaultUser() {
             updateUserPassword('admin', bcrypt.hashSync(defaultPassword, 12));
             console.log('✅ Admin-Passwort synchronisiert.');
         }
+    }
+
+    // Ensure phone column exists (for existing databases)
+    try {
+        getDb().prepare("SELECT phone FROM users LIMIT 1").get();
+    } catch (e) {
+        getDb().exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''");
+        console.log('🔄 Spalte "phone" zur User-Tabelle hinzugefügt.');
     }
 }
 
@@ -540,8 +568,11 @@ module.exports = {
     getDb,
     // Users
     getUser,
+    getAllUsers,
     createUser,
     updateUserPassword,
+    updateUser,
+    deleteUser,
     // Settings
     getSetting,
     setSetting,
