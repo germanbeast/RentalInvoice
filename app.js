@@ -89,7 +89,11 @@
     function showApp() {
         loginScreen.style.display = 'none';
         appWrapper.style.display = 'flex';
-        setTimeout(() => appWrapper.classList.add('authenticated'), 10);
+        setTimeout(() => {
+            appWrapper.classList.add('authenticated');
+            updatePreviewScale();
+            updatePreview();
+        }, 10);
         init(); // Start the app
     }
 
@@ -319,142 +323,147 @@
     // Live Preview
     // =======================
     function updatePreview() {
-        // Vermieter
-        $('#inv-v-name').textContent = $('#v-name').value || 'Vermieter Name';
-        $('#inv-v-adresse').innerHTML = nl2br($('#v-adresse').value || 'Adresse');
-        const tel = $('#v-telefon').value;
-        const email = $('#v-email').value;
-        $('#inv-v-telefon').textContent = tel;
-        $('#inv-v-email').textContent = email;
-        const steuernr = $('#v-steuernr').value;
-        $('#inv-v-steuernr').textContent = steuernr ? `St.-Nr.: ${steuernr}` : '';
+        console.log('🔄 Update Preview...');
+        try {
+            // Vermieter
+            $('#inv-v-name').textContent = $('#v-name').value || 'Vermieter Name';
+            $('#inv-v-adresse').innerHTML = nl2br($('#v-adresse').value || 'Adresse');
+            const tel = $('#v-telefon').value;
+            const email = $('#v-email').value;
+            $('#inv-v-telefon').textContent = tel;
+            $('#inv-v-email').textContent = email;
+            const steuernr = $('#v-steuernr').value;
+            $('#inv-v-steuernr').textContent = steuernr ? `St.-Nr.: ${steuernr}` : '';
 
-        // Gast
-        $('#inv-g-name').textContent = $('#g-name').value || 'Gast Name';
-        $('#inv-g-adresse').innerHTML = nl2br($('#g-adresse').value);
+            // Gast
+            $('#inv-g-name').textContent = $('#g-name').value || 'Gast Name';
+            $('#inv-g-adresse').innerHTML = nl2br($('#g-adresse').value);
 
-        // Meta
-        $('#inv-r-nummer').textContent = $('#r-nummer').value || '—';
-        $('#inv-r-datum').textContent = formatDate($('#r-datum').value);
+            // Meta
+            $('#inv-r-nummer').textContent = $('#r-nummer').value || '—';
+            $('#inv-r-datum').textContent = formatDate($('#r-datum').value);
 
-        const anreise = $('#a-anreise').value;
-        const abreise = $('#a-abreise').value;
-        const nights = calcNights(anreise, abreise);
-        let aufenthaltText = '—';
-        if (anreise && abreise) {
-            aufenthaltText = `${formatDate(anreise)} – ${formatDate(abreise)} (${nights} Nacht${nights !== 1 ? 'e' : ''})`;
-        }
-        $('#inv-aufenthalt').textContent = aufenthaltText;
+            const anreise = $('#a-anreise').value;
+            const abreise = $('#a-abreise').value;
+            const nights = calcNights(anreise, abreise);
+            let aufenthaltText = '—';
+            if (anreise && abreise) {
+                aufenthaltText = `${formatDate(anreise)} – ${formatDate(abreise)} (${nights} Nacht${nights !== 1 ? 'e' : ''})`;
+            }
+            $('#inv-aufenthalt').textContent = aufenthaltText;
 
-        // Positions
-        invPositionsBody.innerHTML = '';
-        if (positions.length === 0) {
-            invPositionsBody.innerHTML = '<tr class="inv-empty-row"><td colspan="5">Keine Positionen</td></tr>';
-        } else {
-            positions.forEach((pos, idx) => {
-                const total = pos.qty * pos.price;
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
+            // Positions
+            invPositionsBody.innerHTML = '';
+            if (positions.length === 0) {
+                invPositionsBody.innerHTML = '<tr class="inv-empty-row"><td colspan="5">Keine Positionen</td></tr>';
+            } else {
+                positions.forEach((pos, idx) => {
+                    const total = pos.qty * pos.price;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
                     <td>${idx + 1}</td>
                     <td>${escapeHtml(pos.desc) || '—'}</td>
                     <td class="text-right">${pos.qty}</td>
                     <td class="text-right">${formatCurrency(pos.price)}</td>
                     <td class="text-right">${formatCurrency(total)}</td>
                 `;
-                invPositionsBody.appendChild(tr);
-            });
-        }
-
-        // Summary
-        const netto = getSubtotal();
-        const rate = getMwstRate();
-        const mwst = netto * (rate / 100);
-        const total = netto + mwst;
-        const isKleinunternehmer = $('#kleinunternehmer').checked;
-
-        $('#inv-netto').textContent = formatCurrency(netto);
-        $('#inv-mwst').textContent = formatCurrency(mwst);
-        $('#inv-mwst-pct').textContent = rate;
-        $('#inv-total').textContent = formatCurrency(total);
-
-        // Hide/Show MWST row based on rate/Kleinunternehmer
-        const mwstRow = $('#inv-mwst').closest('.inv-summary-line');
-        const nettoRow = $('#inv-netto').closest('.inv-summary-line');
-        const kleinunternehmerNotice = $('#inv-kleinunternehmer-notice');
-
-        if (isKleinunternehmer) {
-            if (mwstRow) mwstRow.style.display = 'none';
-            if (nettoRow) nettoRow.style.display = 'none';
-            if (kleinunternehmerNotice) kleinunternehmerNotice.style.display = 'block';
-        } else {
-            if (mwstRow) mwstRow.style.display = 'flex';
-            if (nettoRow) nettoRow.style.display = 'flex';
-            if (kleinunternehmerNotice) kleinunternehmerNotice.style.display = 'none';
-        }
-
-        // Payment status
-        const isBezahlt = $('#z-bezahlt').checked;
-        const methode = $('#z-methode').value;
-        const zahlDatum = $('#z-datum').value;
-        const showBank = $('#z-show-bank').checked;
-
-        // Payment status badge in preview
-        const paymentStatus = $('#inv-payment-status');
-        const paidBadge = $('#inv-paid-badge');
-        const paidText = $('#inv-paid-text');
-
-        if (isBezahlt) {
-            paymentStatus.style.display = 'block';
-            let badgeText = `Bezahlt via ${methode}`;
-            if (zahlDatum) {
-                badgeText += ` am ${formatDate(zahlDatum)}`;
+                    invPositionsBody.appendChild(tr);
+                });
             }
-            paidText.textContent = badgeText;
-            paidBadge.className = 'inv-paid-badge paid';
-        } else {
-            paymentStatus.style.display = 'block';
-            paidText.textContent = 'Offen – noch nicht bezahlt';
-            paidBadge.className = 'inv-paid-badge unpaid';
-        }
 
-        // Bank section visibility
-        const invPayment = $('#inv-payment');
-        if (showBank) {
-            invPayment.style.display = 'block';
-            $('#inv-b-inhaber').textContent = $('#b-inhaber').value || '–';
-            $('#inv-b-iban').textContent = $('#b-iban').value || '–';
-            $('#inv-b-bic').textContent = $('#b-bic').value || '–';
-            $('#inv-b-bank').textContent = $('#b-bank').value || '–';
-        } else {
-            invPayment.style.display = 'none';
-        }
+            // Summary
+            const netto = getSubtotal();
+            const rate = getMwstRate();
+            const mwst = netto * (rate / 100);
+            const total = netto + mwst;
+            const isKleinunternehmer = $('#kleinunternehmer').checked;
 
-        // Footer text
-        const footerTextElem = $('#inv-footer-text');
-        let footerText = '';
+            $('#inv-netto').textContent = formatCurrency(netto);
+            $('#inv-mwst').textContent = formatCurrency(mwst);
+            $('#inv-mwst-pct').textContent = rate;
+            $('#inv-total').textContent = formatCurrency(total);
 
-        if (isBezahlt) {
-            footerText = `Betrag wurde bezahlt via ${methode}. Vielen Dank!`;
-        } else if (showBank) {
-            footerText = 'Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf das angegebene Konto.';
-        } else {
-            footerText = 'Vielen Dank für Ihren Aufenthalt!';
-        }
+            // Hide/Show MWST row based on rate/Kleinunternehmer
+            const mwstRow = $('#inv-mwst').closest('.inv-summary-line');
+            const nettoRow = $('#inv-netto').closest('.inv-summary-line');
+            const kleinunternehmerNotice = $('#inv-kleinunternehmer-notice');
 
-        if (footerTextElem) footerTextElem.textContent = footerText;
+            if (isKleinunternehmer) {
+                if (mwstRow) mwstRow.style.display = 'none';
+                if (nettoRow) nettoRow.style.display = 'none';
+                if (kleinunternehmerNotice) kleinunternehmerNotice.style.display = 'block';
+            } else {
+                if (mwstRow) mwstRow.style.display = 'flex';
+                if (nettoRow) nettoRow.style.display = 'flex';
+                if (kleinunternehmerNotice) kleinunternehmerNotice.style.display = 'none';
+            }
 
-        // Nuki PIN Info in Preview
-        const nukiInfo = $('#inv-nuki-pin');
-        const nukiPinCode = $('#nuki-pin-code').textContent;
-        const nukiPinResult = $('#nuki-pin-result');
+            // Payment status
+            const isBezahlt = $('#z-bezahlt').checked;
+            const methode = $('#z-methode').value;
+            const zahlDatum = $('#z-datum').value;
+            const showBank = $('#z-show-bank').checked;
 
-        if (nukiPinResult.style.display !== 'none' && nukiPinCode !== '——-') {
-            nukiInfo.style.display = 'block';
-            $('#inv-nuki-pin-code').textContent = nukiPinCode;
-            $('#inv-nuki-from').textContent = formatDate($('#a-anreise').value);
-            $('#inv-nuki-to').textContent = formatDate($('#a-abreise').value);
-        } else {
-            nukiInfo.style.display = 'none';
+            // Payment status badge in preview
+            const paymentStatus = $('#inv-payment-status');
+            const paidBadge = $('#inv-paid-badge');
+            const paidText = $('#inv-paid-text');
+
+            if (isBezahlt) {
+                paymentStatus.style.display = 'block';
+                let badgeText = `Bezahlt via ${methode}`;
+                if (zahlDatum) {
+                    badgeText += ` am ${formatDate(zahlDatum)}`;
+                }
+                paidText.textContent = badgeText;
+                paidBadge.className = 'inv-paid-badge paid';
+            } else {
+                paymentStatus.style.display = 'block';
+                paidText.textContent = 'Offen – noch nicht bezahlt';
+                paidBadge.className = 'inv-paid-badge unpaid';
+            }
+
+            // Bank section visibility
+            const invPayment = $('#inv-payment');
+            if (showBank) {
+                invPayment.style.display = 'block';
+                $('#inv-b-inhaber').textContent = $('#b-inhaber').value || '–';
+                $('#inv-b-iban').textContent = $('#b-iban').value || '–';
+                $('#inv-b-bic').textContent = $('#b-bic').value || '–';
+                $('#inv-b-bank').textContent = $('#b-bank').value || '–';
+            } else {
+                invPayment.style.display = 'none';
+            }
+
+            // Footer text
+            const footerTextElem = $('#inv-footer-text');
+            let footerText = '';
+
+            if (isBezahlt) {
+                footerText = `Betrag wurde bezahlt via ${methode}. Vielen Dank!`;
+            } else if (showBank) {
+                footerText = 'Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf das angegebene Konto.';
+            } else {
+                footerText = 'Vielen Dank für Ihren Aufenthalt!';
+            }
+
+            if (footerTextElem) footerTextElem.textContent = footerText;
+
+            // Nuki PIN Info in Preview
+            const nukiInfo = $('#inv-nuki-pin');
+            const nukiPinCode = $('#nuki-pin-code').textContent;
+            const nukiPinResult = $('#nuki-pin-result');
+
+            if (nukiPinResult.style.display !== 'none' && nukiPinCode !== '——-') {
+                nukiInfo.style.display = 'block';
+                $('#inv-nuki-pin-code').textContent = nukiPinCode;
+                $('#inv-nuki-from').textContent = formatDate($('#a-anreise').value);
+                $('#inv-nuki-to').textContent = formatDate($('#a-abreise').value);
+            } else {
+                nukiInfo.style.display = 'none';
+            }
+        } catch (err) {
+            console.error('❌ updatePreview failed:', err);
         }
     }
 
@@ -467,7 +476,7 @@
         'r-nummer', 'r-datum', 'a-anreise', 'a-abreise',
         'mwst-satz', 'kleinunternehmer',
         'b-inhaber', 'b-iban', 'b-bic', 'b-bank',
-        'z-methode', 'z-datum'
+        'z-methode', 'z-datum', 'z-bezahlt', 'z-show-bank'
     ];
 
     formInputs.forEach(id => {
@@ -1000,7 +1009,7 @@
     // Preview Scale
     // =======================
     function updatePreviewScale() {
-        const previewColumn = document.querySelector('.preview-column');
+        const previewColumn = $('#preview-panel');
         if (!previewColumn) return;
         const availableWidth = previewColumn.clientWidth;
         const pageWidthMm = 210; // A4 width in mm
@@ -1009,6 +1018,7 @@
         document.documentElement.style.setProperty('--preview-scale', scale);
     }
 
+    // Initial scaling on load (will be 0 if hidden, but we catch it in showApp)
     updatePreviewScale();
     window.addEventListener('resize', updatePreviewScale);
 
