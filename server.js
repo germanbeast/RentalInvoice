@@ -384,6 +384,110 @@ app.post('/api/migrate', apiLimiter, (req, res) => {
 });
 
 // =======================
+// 12. EXPENSES API
+// =======================
+app.get('/api/expenses', apiLimiter, (req, res) => {
+    try {
+        const expenses = db.getAllExpenses();
+        res.json({ success: true, expenses });
+    } catch (e) {
+        console.error('Expenses GET Error:', e.message);
+        res.status(500).json({ error: 'Ausgaben konnten nicht geladen werden' });
+    }
+});
+
+app.post('/api/expenses', apiLimiter, (req, res) => {
+    try {
+        const expense = db.createExpense(req.body);
+        res.json({ success: true, message: 'Ausgabe gespeichert', expense });
+    } catch (e) {
+        console.error('Expense POST Error:', e.message);
+        res.status(500).json({ error: 'Ausgabe konnte nicht gespeichert werden' });
+    }
+});
+
+app.delete('/api/expenses/:id', apiLimiter, (req, res) => {
+    try {
+        db.deleteExpense(parseInt(req.params.id));
+        res.json({ success: true, message: 'Ausgabe gelöscht' });
+    } catch (e) {
+        console.error('Expense DELETE Error:', e.message);
+        res.status(500).json({ error: 'Ausgabe konnte nicht gelöscht werden' });
+    }
+});
+
+app.post('/api/expenses/sync', apiLimiter, async (req, res) => {
+    try {
+        const allSettings = db.getAllSettings();
+        const pl = allSettings.paperless || {};
+        const tag = allSettings.paperless_expense_tag || 'BeckhomeInvoice';
+        const amountFieldName = allSettings.paperless_amount_field || 'Betrag';
+
+        if (!pl.url || !pl.token) {
+            return res.status(400).json({ error: 'Paperless-Zugangsdaten nicht konfiguriert' });
+        }
+
+        // 1. Get Tag ID from Paperless
+        const tagsRes = await axios.get(`${pl.url}/api/tags/?name__icontains=${encodeURIComponent(tag)}`, {
+            headers: { 'Authorization': `Token ${pl.token}` }
+        });
+        const tagObj = tagsRes.data.results.find(t => t.name.toLowerCase() === tag.toLowerCase());
+        if (!tagObj) return res.json({ success: true, message: `Tag "${tag}" nicht in Paperless gefunden.`, count: 0 });
+
+        // 2. Search documents with this tag
+        const docsRes = await axios.get(`${pl.url}/api/documents/?tags__id__all=${tagObj.id}`, {
+            headers: { 'Authorization': `Token ${pl.token}` }
+        });
+
+        // 3. Get Custom Fields definitions to find the right ID
+        const fieldsRes = await axios.get(`${pl.url}/api/custom_fields/`, {
+            headers: { 'Authorization': `Token ${pl.token}` }
+        });
+        const amountFieldDef = fieldsRes.data.results.find(f => f.name.toLowerCase() === amountFieldName.toLowerCase());
+
+        let count = 0;
+        for (const doc of docsRes.data.results) {
+            // Check if already synced
+            if (db.getExpenseByPaperlessId(doc.id)) continue;
+
+            let amount = 0;
+            if (amountFieldDef && doc.custom_fields) {
+                const fieldVal = doc.custom_fields.find(cf => cf.field === amountFieldDef.id);
+                if (fieldVal && fieldVal.value) amount = parseFloat(fieldVal.value);
+            }
+
+            db.createExpense({
+                date: doc.created ? doc.created.split('T')[0] : (doc.added ? doc.added.split('T')[0] : new Date().toISOString().split('T')[0]),
+                amount: amount,
+                category: 'Paperless',
+                description: doc.title,
+                source: 'paperless',
+                paperless_id: doc.id
+            });
+            count++;
+        }
+
+        res.json({ success: true, message: `${count} neue Ausgaben synchronisiert`, count });
+    } catch (e) {
+        console.error('Expense Sync Error:', e.message);
+        res.status(500).json({ error: 'Synchronisierung fehlgeschlagen' });
+    }
+});
+
+// =======================
+// 13. STATS API
+// =======================
+app.get('/api/stats', apiLimiter, (req, res) => {
+    try {
+        const stats = db.getStats();
+        res.json({ success: true, stats });
+    } catch (e) {
+        console.error('Stats GET Error:', e.message);
+        res.status(500).json({ error: 'Statistiken konnten nicht geladen werden' });
+    }
+});
+
+// =======================
 // 13. PROTECTED SERVICE API ROUTES
 // =======================
 

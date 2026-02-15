@@ -72,6 +72,17 @@ function initSchema() {
             primary_color TEXT DEFAULT '#6366f1',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL,
+            amount REAL NOT NULL,
+            category TEXT,
+            description TEXT,
+            source TEXT DEFAULT 'local',
+            paperless_id INTEGER UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
     `);
     console.log('✅ Datenbank-Schema initialisiert.');
 }
@@ -334,6 +345,80 @@ function saveBranding(data) {
 }
 
 // =======================
+// Expenses
+// =======================
+function getAllExpenses() {
+    return getDb().prepare('SELECT * FROM expenses ORDER BY date DESC, created_at DESC').all();
+}
+
+function createExpense(data) {
+    const result = getDb().prepare(
+        `INSERT INTO expenses (date, amount, category, description, source, paperless_id) 
+         VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(data.date, data.amount, data.category || null, data.description || null, data.source || 'local', data.paperless_id || null);
+    return { id: result.lastInsertRowid, ...data };
+}
+
+function deleteExpense(id) {
+    return getDb().prepare('DELETE FROM expenses WHERE id = ?').run(id);
+}
+
+function getExpenseByPaperlessId(paperlessId) {
+    return getDb().prepare('SELECT * FROM expenses WHERE paperless_id = ?').get(paperlessId);
+}
+
+// =======================
+// Statistics
+// =======================
+function getStats() {
+    const db = getDb();
+
+    // Revenue by month (last 12 months)
+    const revenueByMonth = db.prepare(`
+        SELECT strftime('%Y-%m', invoice_date) as month, SUM(total_amount) as total
+        FROM invoices
+        WHERE invoice_date >= date('now', '-12 months')
+        GROUP BY month
+        ORDER BY month ASC
+    `).all();
+
+    // Expenses by month (last 12 months)
+    const expensesByMonth = db.prepare(`
+        SELECT strftime('%Y-%m', date) as month, SUM(amount) as total
+        FROM expenses
+        WHERE date >= date('now', '-12 months')
+        GROUP BY month
+        ORDER BY month ASC
+    `).all();
+
+    // Key metrics
+    const totals = db.prepare(`
+        SELECT 
+            (SELECT SUM(total_amount) FROM invoices) as total_revenue,
+            (SELECT SUM(amount) FROM expenses) as total_expenses,
+            (SELECT COUNT(*) FROM invoices) as invoice_count,
+            (SELECT COUNT(*) FROM guests) as guest_count
+    `).get();
+
+    // Top guests by revenue
+    const topGuests = db.prepare(`
+        SELECT guest_name, SUM(total_amount) as total, COUNT(*) as count
+        FROM invoices
+        WHERE guest_name IS NOT NULL AND guest_name != ''
+        GROUP BY guest_name
+        ORDER BY total DESC
+        LIMIT 5
+    `).all();
+
+    return {
+        revenueByMonth,
+        expensesByMonth,
+        totals,
+        topGuests
+    };
+}
+
+// =======================
 // Bulk Migration (from localStorage)
 // =======================
 function migrateFromLocalStorage(data) {
@@ -410,6 +495,13 @@ module.exports = {
     // Branding
     getBranding,
     saveBranding,
+    // Expenses
+    getAllExpenses,
+    createExpense,
+    deleteExpense,
+    getExpenseByPaperlessId,
+    // Stats
+    getStats,
     // Migration
     migrateFromLocalStorage
 };

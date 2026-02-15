@@ -32,6 +32,18 @@
     const btnNukiPin = $('#btn-nuki-pin');
     const btnEmail = $('#btn-email');
     const btnUpdate = $('#btn-update');
+    const btnSyncPaperless = $('#btn-sync-paperless');
+
+    // Navigation Items
+    const navDashboard = $('#nav-dashboard');
+    const navInvoice = $('#nav-invoice');
+    const navGuests = $('#nav-guests');
+    const navExpenses = $('#nav-expenses');
+
+    // View Panes
+    const viewDashboard = $('#view-dashboard');
+    const viewInvoiceForm = $('#view-invoice-form');
+    const viewExpenses = $('#view-expenses');
 
     const modalSettings = $('#modal-settings');
     const modalArchive = $('#modal-archive');
@@ -530,7 +542,9 @@
                 token: $('#nuki-token').value,
                 lockId: $('#nuki-lock-id').value
             },
-            booking_ical: $('#booking-ical-url').value
+            booking_ical: $('#booking-ical-url').value,
+            paperless_expense_tag: $('#s-pl-expense-tag').value,
+            paperless_amount_field: $('#s-pl-amount-field').value
         };
 
         try {
@@ -604,6 +618,8 @@
                 const url = typeof s.booking_ical === 'string' && s.booking_ical.startsWith('{') ? JSON.parse(s.booking_ical) : s.booking_ical;
                 if (typeof url === 'string') $('#booking-ical-url').value = url;
             }
+            if (s.paperless_expense_tag) $('#s-pl-expense-tag').value = s.paperless_expense_tag;
+            if (s.paperless_amount_field) $('#s-pl-amount-field').value = s.paperless_amount_field;
         } catch (e) {
             console.error('Settings load error:', e);
         }
@@ -809,6 +825,236 @@
             return false;
         }
     }
+
+    // =======================
+    // View Switcher
+    // =======================
+    function switchView(viewId) {
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses];
+
+        views.forEach(v => {
+            if (v) v.style.display = 'none';
+        });
+        navItems.forEach(n => {
+            if (n) n.classList.remove('active');
+        });
+
+        if (viewId === 'dashboard') {
+            viewDashboard.style.display = 'flex';
+            navDashboard.classList.add('active');
+            loadDashboard();
+        } else if (viewId === 'invoice') {
+            viewInvoiceForm.style.display = 'flex';
+            navInvoice.classList.add('active');
+            updatePreview();
+        } else if (viewId === 'expenses') {
+            viewExpenses.style.display = 'flex';
+            navExpenses.classList.add('active');
+            loadExpenses();
+        }
+
+        // Close mobile sidebar if open
+        if (window.innerWidth <= 768) {
+            appWrapper.classList.remove('sidebar-open');
+        }
+    }
+
+    navDashboard.addEventListener('click', () => switchView('dashboard'));
+    navInvoice.addEventListener('click', () => switchView('invoice'));
+    navExpenses.addEventListener('click', () => switchView('expenses'));
+
+    // =======================
+    // Dashboard Module
+    // =======================
+    let revenueChart = null;
+
+    async function loadDashboard() {
+        try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+            if (!data.success) return;
+
+            const s = data.stats;
+
+            // Totals
+            $('#stat-total-revenue').textContent = formatCurrency(s.totals.total_revenue || 0);
+            $('#stat-total-expenses').textContent = formatCurrency(s.totals.total_expenses || 0);
+            $('#stat-net-income').textContent = formatCurrency((s.totals.total_revenue || 0) - (s.totals.total_expenses || 0));
+            $('#stat-invoice-count').textContent = s.totals.invoice_count;
+
+            // Top Guests
+            const list = $('#top-guests-list');
+            list.innerHTML = '';
+            if (s.topGuests && s.topGuests.length > 0) {
+                s.topGuests.forEach(g => {
+                    const li = document.createElement('li');
+                    li.className = 'top-guest-item';
+                    li.innerHTML = `
+                        <span class="top-guest-name">${escapeHtml(g.guest_name)} (${g.count} Rechnungen)</span>
+                        <span class="top-guest-total">${formatCurrency(g.total)}</span>
+                    `;
+                    list.appendChild(li);
+                });
+            } else {
+                list.innerHTML = '<li class="text-muted">Noch keine Daten vorhanden</li>';
+            }
+
+            renderRevenueChart(s.revenueByMonth, s.expensesByMonth);
+
+        } catch (e) {
+            console.error('Stats load error:', e);
+        }
+    }
+
+    function renderRevenueChart(revenueData, expenseData) {
+        const ctx = $('#revenueChart').getContext('2d');
+
+        // Merge months to ensure alignment
+        const months = [...new Set([
+            ...revenueData.map(d => d.month),
+            ...expenseData.map(d => d.month)
+        ])].sort();
+
+        const revValues = months.map(m => {
+            const d = revenueData.find(x => x.month === m);
+            return d ? d.total : 0;
+        });
+
+        const expValues = months.map(m => {
+            const d = expenseData.find(x => x.month === m);
+            return d ? d.total : 0;
+        });
+
+        if (revenueChart) revenueChart.destroy();
+
+        revenueChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months.map(m => {
+                    const [y, mm] = m.split('-');
+                    const date = new Date(y, parseInt(mm) - 1, 1);
+                    return date.toLocaleString('de-DE', { month: 'short', year: '2-digit' });
+                }),
+                datasets: [
+                    {
+                        label: 'Umsatz',
+                        data: revValues,
+                        backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Ausgaben',
+                        data: expValues,
+                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (val) => val.toLocaleString('de-DE') + ' €'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { usePointStyle: true, boxWidth: 6 }
+                    }
+                }
+            }
+        });
+    }
+
+    // =======================
+    // Expenses Module
+    // =======================
+    async function loadExpenses() {
+        try {
+            const res = await fetch('/api/expenses');
+            const data = await res.json();
+            if (data.success) {
+                renderExpensesList(data.expenses);
+            }
+        } catch (e) {
+            console.error('Expenses load error:', e);
+        }
+    }
+
+    function renderExpensesList(expenses) {
+        const list = $('#expenses-list');
+        list.innerHTML = '';
+
+        if (expenses.length === 0) {
+            list.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Keine Ausgaben vorhanden.</td></tr>';
+            return;
+        }
+
+        expenses.forEach(ex => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${formatDate(ex.date)}</td>
+                <td>${escapeHtml(ex.description || '—')}</td>
+                <td>${escapeHtml(ex.category || '—')}</td>
+                <td><span class="source-badge source-${ex.source}">${ex.source === 'paperless' ? 'Paperless' : 'Manuell'}</span></td>
+                <td class="text-right expense-amount negative">${formatCurrency(ex.amount)}</td>
+                <td class="text-right">
+                    <button class="btn btn-ghost btn-danger btn-sm btn-delete-expense" data-id="${ex.id}" title="Löschen">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </button>
+                </td>
+            `;
+            list.appendChild(tr);
+        });
+
+        // Delete event listeners
+        $$('.btn-delete-expense').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Ausgabe wirklich löschen?')) return;
+                const id = btn.dataset.id;
+                try {
+                    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+                    const d = await res.json();
+                    if (d.success) {
+                        showToast('Ausgabe gelöscht');
+                        loadExpenses();
+                    }
+                } catch (e) { console.error(e); }
+            });
+        });
+    }
+
+    async function syncPaperlessExpenses() {
+        const btn = $('#btn-sync-paperless');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="update-spinner" style="width:14px; height:14px; border-width:2px;"></span> Sync läuft...';
+
+        try {
+            const res = await fetch('/api/expenses/sync', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message);
+                loadExpenses();
+            } else {
+                showToast(data.error || 'Sync fehlgeschlagen', 'error');
+            }
+        } catch (e) {
+            console.error('Sync error:', e);
+            showToast('Server-Fehler beim Sync', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
+    btnSyncPaperless.addEventListener('click', syncPaperlessExpenses);
 
     async function deleteArchivedInvoice(index) {
         const inv = cachedArchive[index];
@@ -1721,6 +1967,9 @@
 
         // Pre-fetch archive
         fetchArchive();
+
+        // Default to Dashboard view
+        switchView('dashboard');
     }
 
     // =======================
@@ -1777,7 +2026,6 @@
     // Guests Modal
     // =======================
     const modalGuests = $('#modal-guests');
-    const navGuests = $('#nav-guests');
     let currentGuestId = null;
 
     if (navGuests && modalGuests) {

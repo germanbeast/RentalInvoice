@@ -1794,3 +1794,154 @@ select {
     max-height: 60px;
     margin-bottom: 0.5rem;
 }
+
+/* ===========================
+   DASHBOARD & STATS
+   =========================== */
+.dashboard-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: var(--bg-surface);
+    border-left: 4px solid var(--accent);
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.dashboard-charts-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+@media (max-width: 992px) {
+    .dashboard-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.top-guests-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.top-guest-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.top-guest-item:last-child {
+    border-bottom: none;
+}
+
+.top-guest-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.top-guest-total {
+    font-weight: 600;
+    color: var(--accent);
+}
+
+/* ===========================
+   EXPENSES TABLE
+   =========================== */
+.expenses-table-wrapper {
+    overflow-x: auto;
+}
+
+.expenses-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.expenses-table th,
+.expenses-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.expenses-table th {
+    background: var(--bg-body);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.expenses-table tbody tr:hover {
+    background: rgba(99, 102, 241, 0.03);
+}
+
+.source-badge {
+    display: inline-flex;
+    padding: 0.2rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.source-local {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+.source-paperless {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.expense-amount {
+    font-family: inherit;
+    font-weight: 600;
+}
+
+.expense-amount.negative {
+    color: #ef4444;
+}
+
+.content-view {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    animation: fadeInView 0.3s ease-out;
+}
+
+@keyframes fadeInView {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
