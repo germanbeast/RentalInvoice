@@ -10,3 +10,4 @@ brain/
 *.png
 !logo.png
 !favicon.ico
+users.json
