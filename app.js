@@ -88,7 +88,7 @@
 
     function showApp() {
         loginScreen.style.display = 'none';
-        appWrapper.style.display = 'block';
+        appWrapper.style.display = 'flex';
         setTimeout(() => appWrapper.classList.add('authenticated'), 10);
         init(); // Start the app
     }
@@ -938,12 +938,79 @@
     });
 
     btnSaveSettings.addEventListener('click', () => {
+        saveVermieter();
         savePaperlessSettings();
         saveSmtpSettings();
         saveNukiSettings();
         saveBookingSettings();
         modalSettings.style.display = 'none';
+        showToast('Einstellungen gespeichert!', 'success');
     });
+
+    // =======================
+    // Sidebar Toggle (Mobile)
+    // =======================
+    const sidebar = $('#sidebar');
+    const btnHamburger = $('#btn-hamburger');
+
+    if (btnHamburger) {
+        btnHamburger.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            // Create/toggle overlay
+            let overlay = document.querySelector('.sidebar-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'sidebar-overlay';
+                document.body.appendChild(overlay);
+                overlay.addEventListener('click', () => {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                });
+            }
+            overlay.classList.toggle('active');
+        });
+    }
+
+    // Close sidebar when clicking a nav item on mobile
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('open');
+                const overlay = document.querySelector('.sidebar-overlay');
+                if (overlay) overlay.classList.remove('active');
+            }
+        });
+    });
+
+    // =======================
+    // Booking Toggle (collapsible)
+    // =======================
+    const bookingToggle = $('#booking-toggle');
+    const bookingBody = $('#booking-body');
+
+    if (bookingToggle && bookingBody) {
+        bookingToggle.addEventListener('click', () => {
+            const isOpen = bookingBody.style.display !== 'none';
+            bookingBody.style.display = isOpen ? 'none' : 'block';
+            bookingToggle.classList.toggle('open', !isOpen);
+        });
+    }
+
+    // =======================
+    // Preview Scale
+    // =======================
+    function updatePreviewScale() {
+        const previewColumn = document.querySelector('.preview-column');
+        if (!previewColumn) return;
+        const availableWidth = previewColumn.clientWidth;
+        const pageWidthMm = 210; // A4 width in mm
+        const pageWidthPx = pageWidthMm * 3.7795; // mm to px
+        const scale = Math.min(availableWidth / pageWidthPx, 0.55);
+        document.documentElement.style.setProperty('--preview-scale', scale);
+    }
+
+    updatePreviewScale();
+    window.addEventListener('resize', updatePreviewScale);
 
     async function createNukiPin() {
         const token = $('#nuki-token').value;

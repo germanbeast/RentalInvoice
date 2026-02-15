@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.1">
+    <link rel="stylesheet" href="styles.css?v=3.0">
 </head>
 
 <body>
@@ -49,150 +49,151 @@
         </div>
     </div>
 
-    <div id="app-wrapper">
-        <header class="app-header">
-            <div class="header-content">
-                <div class="logo">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+    <div id="app-wrapper" class="dashboard">
+        <!-- SIDEBAR -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
                         <rect x="2" y="4" width="28" height="24" rx="3" stroke="currentColor" stroke-width="2" />
                         <path d="M8 12h16M8 17h12M8 22h8" stroke="currentColor" stroke-width="2"
                             stroke-linecap="round" />
                         <circle cx="24" cy="22" r="1.5" fill="currentColor" />
                     </svg>
-                    <h1>Ferienwohnung Rechnung</h1>
+                    <span>Rental Invoice</span>
                 </div>
-                <div class="header-actions">
-                    <button type="button" id="btn-archive" class="btn btn-ghost" title="Rechnungsarchiv">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M3 5h14a1 1 0 011 1v1a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z"
-                                stroke="currentColor" stroke-width="1.5" />
-                            <path d="M4 8v7a2 2 0 002 2h8a2 2 0 002-2V8M8 12h4" stroke="currentColor" stroke-width="1.5"
-                                stroke-linecap="round" />
+            </div>
+            <div class="sidebar-nav">
+                <button class="sidebar-item active" id="nav-invoice" title="Neue Rechnung">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M4 3h8l4 4v10a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor"
+                            stroke-width="1.5" />
+                        <path d="M12 3v4h4M7 10h6M7 13h4" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" />
+                    </svg>
+                    <span>Neue Rechnung</span>
+                </button>
+                <button class="sidebar-item" id="btn-archive" title="Rechnungsarchiv">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M3 5h14a1 1 0 011 1v1a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" stroke="currentColor"
+                            stroke-width="1.5" />
+                        <path d="M4 8v7a2 2 0 002 2h8a2 2 0 002-2V8M8 12h4" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" />
+                    </svg>
+                    <span>Archiv</span>
+                </button>
+                <button class="sidebar-item" id="btn-settings" title="Einstellungen">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.5" />
+                        <path
+                            d="M17.73 12.02l-1.09-.63a6.07 6.07 0 000-2.78l1.09-.63a.5.5 0 00.18-.68l-1-1.73a.5.5 0 00-.68-.18l-1.09.63a6.07 6.07 0 00-2.4-1.39V3.5a.5.5 0 00-.5-.5h-2a.5.5 0 00-.5.5v1.26a6.07 6.07 0 00-2.4 1.39l-1.09-.63a.5.5 0 00-.68.18l-1 1.73a.5.5 0 00.18.68l1.09.63a6.07 6.07 0 000 2.78l-1.09.63a.5.5 0 00-.18.68l1 1.73a.5.5 0 00.68.18l1.09-.63c.71.6 1.52 1.05 2.4 1.39v1.26a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-1.26a6.07 6.07 0 002.4-1.39l1.09.63a.5.5 0 00.68-.18l1-1.73a.5.5 0 00-.18-.68z"
+                            stroke="currentColor" stroke-width="1.5" />
+                    </svg>
+                    <span>Einstellungen</span>
+                </button>
+            </div>
+            <div class="sidebar-footer">
+                <button class="sidebar-item" id="btn-update" title="Update suchen">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>Update</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- MOBILE HEADER -->
+        <header class="mobile-header" id="mobile-header">
+            <button class="hamburger" id="btn-hamburger" title="Menü">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+            </button>
+            <span class="mobile-title">Rental Invoice</span>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="content-area">
+            <!-- TOP BAR -->
+            <div class="content-header">
+                <div class="content-breadcrumb">
+                    <h2>Neue Rechnung</h2>
+                </div>
+                <div class="content-actions">
+                    <button type="button" id="btn-reset" class="btn btn-ghost btn-danger btn-sm">
+                        <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                            <path d="M3 5h12M6 5V3h6v2M7 8v5M11 8v5M4 5l1 10a1 1 0 001 1h6a1 1 0 001-1l1-10"
+                                stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                stroke-linejoin="round" />
                         </svg>
-                        Archiv
-                    </button>
-                    <button type="button" id="btn-update" class="btn btn-ghost" title="Update suchen">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                            <path
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        Update
-                    </button>
-                    <button type="button" id="btn-settings" class="btn btn-ghost" title="Einstellungen">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.5" />
-                            <path
-                                d="M17.73 12.02l-1.09-.63a6.07 6.07 0 000-2.78l1.09-.63a.5.5 0 00.18-.68l-1-1.73a.5.5 0 00-.68-.18l-1.09.63a6.07 6.07 0 00-2.4-1.39V3.5a.5.5 0 00-.5-.5h-2a.5.5 0 00-.5.5v1.26a6.07 6.07 0 00-2.4 1.39l-1.09-.63a.5.5 0 00-.68.18l-1 1.73a.5.5 0 00.18.68l1.09.63a6.07 6.07 0 000 2.78l-1.09.63a.5.5 0 00-.18.68l1 1.73a.5.5 0 00.68.18l1.09-.63c.71.6 1.52 1.05 2.4 1.39v1.26a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-1.26a6.07 6.07 0 002.4-1.39l1.09.63a.5.5 0 00.68-.18l1-1.73a.5.5 0 00-.18-.68z"
-                                stroke="currentColor" stroke-width="1.5" />
-                        </svg>
-                        Einstellungen
+                        Zurücksetzen
                     </button>
                 </div>
             </div>
-        </header>
 
-        <main class="app-main">
-            <!-- FORMULAR SEITE -->
-            <section class="form-panel" id="form-panel">
-                <div class="panel-header">
-                    <h2>Rechnungsdaten</h2>
-                </div>
+            <!-- MAIN GRID -->
+            <div class="main-grid">
+                <!-- FORM COLUMN -->
+                <section class="form-column">
+                    <form id="invoice-form" autocomplete="off">
 
-                <form id="invoice-form" autocomplete="off">
-                    <!-- VERMIETER -->
-                    <div class="card" id="fieldset-vermieter">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <path d="M9 2L2 7v9h5v-5h4v5h5V7L9 2z" stroke="currentColor" stroke-width="1.5"
-                                    stroke-linejoin="round" />
-                            </svg>
-                            Vermieter
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="v-name">Name / Firma *</label>
-                                <input type="text" id="v-name" required placeholder="Max Mustermann">
+                        <!-- BOOKING.COM QUICK IMPORT (collapsible) -->
+                        <div class="card card-accent" id="fieldset-booking">
+                            <div class="card-title card-title-toggle" id="booking-toggle">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 2L2 7l10 5l10-5l-10-5zM2 17l10 5l10-5M2 12l10 5l10-5"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                Booking.com Quick-Import
+                                <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" />
+                                </svg>
                             </div>
-                            <div class="form-group">
-                                <label for="v-steuernr">Steuernummer</label>
-                                <input type="text" id="v-steuernr" placeholder="12/345/67890">
+                            <div class="card-body collapsible" id="booking-body" style="display:none;">
+                                <div class="form-group">
+                                    <label for="booking-smart-paste">Text aus Booking.com Extranet einfügen:</label>
+                                    <textarea id="booking-smart-paste" rows="2"
+                                        placeholder="Ganze Seite markieren, kopieren und hier einfügen..."></textarea>
+                                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                                        <button type="button" id="btn-booking-parse"
+                                            class="btn btn-primary btn-sm">Daten extrahieren</button>
+                                        <button type="button" id="btn-booking-calendar"
+                                            class="btn btn-outline btn-sm">Kalender laden</button>
+                                    </div>
+                                </div>
+                                <div id="booking-calendar-view"
+                                    style="display:none; margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
+                                    <p><small>Aktuelle Buchungen aus deinem Kalender:</small></p>
+                                    <div id="booking-events-list"
+                                        style="max-height: 150px; overflow-y: auto; font-size: 0.85rem;">
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="v-adresse">Adresse *</label>
-                            <textarea id="v-adresse" rows="2" required
-                                placeholder="Musterstraße 1&#10;12345 Musterstadt"></textarea>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="v-telefon">Telefon</label>
-                                <input type="tel" id="v-telefon" placeholder="+49 123 456789">
-                            </div>
-                            <div class="form-group">
-                                <label for="v-email">E-Mail</label>
-                                <input type="email" id="v-email" placeholder="info@example.de">
-                            </div>
-                        </div>
-                        <button type="button" id="btn-save-vermieter" class="btn btn-sm btn-outline">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                <path d="M11 13H3a1 1 0 01-1-1V2a1 1 0 011-1h6l3 3v8a1 1 0 01-1 1z"
-                                    stroke="currentColor" stroke-width="1.2" />
-                                <path d="M8 1v3h3M5 8h4M5 10h4" stroke="currentColor" stroke-width="1.2"
-                                    stroke-linecap="round" />
-                            </svg>
-                            Vermieter-Daten speichern
-                        </button>
-                    </div>
 
-                    <!-- BOOKING.COM IMPORT -->
-                    <div class="card" id="fieldset-booking">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                <path d="M12 2L2 7l10 5l10-5l-10-5zM2 17l10 5l10-5M2 12l10 5l10-5" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                            Booking.com Smart-Import
-                        </div>
-                        <div class="form-group">
-                            <label for="booking-smart-paste">Text aus Booking.com (Extranet) hier einfÃ¼gen:</label>
-                            <textarea id="booking-smart-paste" rows="2"
-                                placeholder="Ganze Seite markieren, kopieren und hier einfÃ¼gen..."></textarea>
-                            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
-                                <button type="button" id="btn-booking-parse" class="btn btn-primary btn-sm">Daten
-                                    extrahieren</button>
-                                <button type="button" id="btn-booking-calendar" class="btn btn-outline btn-sm">Kalender
-                                    laden</button>
+                        <!-- GAST -->
+                        <div class="card" id="fieldset-gast">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                    <circle cx="9" cy="6" r="3" stroke="currentColor" stroke-width="1.5" />
+                                    <path d="M3 16c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" />
+                                </svg>
+                                Gast
                             </div>
-                        </div>
-                        <div id="booking-calendar-view"
-                            style="display:none; margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
-                            <p><small>Aktuelle Buchungen aus deinem Kalender:</small></p>
-                            <div id="booking-events-list"
-                                style="max-height: 150px; overflow-y: auto; font-size: 0.85rem;">
-                                <!-- Events listed here -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- GAST -->
-                    <div class="card" id="fieldset-gast">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <circle cx="9" cy="6" r="3" stroke="currentColor" stroke-width="1.5" />
-                                <path d="M3 16c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.5"
-                                    stroke-linecap="round" />
-                            </svg>
-                            Gast
-                        </div>
-                        <div class="form-row-flexible" style="display: grid; gap: 1rem;">
-                            <div class="form-group">
-                                <label for="g-name">Name *</label>
-                                <input type="text" id="g-name" required placeholder="Anna Beispiel">
-                            </div>
-                            <div class="form-group">
-                                <label for="g-email">E-Mail Adresse</label>
-                                <input type="email" id="g-email" placeholder="gast@beispiel.de">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="g-name">Name *</label>
+                                    <input type="text" id="g-name" required placeholder="Anna Beispiel">
+                                </div>
+                                <div class="form-group">
+                                    <label for="g-email">E-Mail</label>
+                                    <input type="email" id="g-email" placeholder="gast@beispiel.de">
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="g-adresse">Adresse</label>
@@ -200,424 +201,420 @@
                                     placeholder="Beispielweg 5, 54321 Beispielstadt"></textarea>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- AUFENTHALT & RECHNUNG -->
-                    <div class="card" id="fieldset-aufenthalt">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <rect x="2" y="3" width="14" height="13" rx="2" stroke="currentColor"
-                                    stroke-width="1.5" />
-                                <path d="M2 7h14M6 1v4M12 1v4" stroke="currentColor" stroke-width="1.5"
-                                    stroke-linecap="round" />
-                            </svg>
-                            Aufenthalt &amp; Rechnung
-                        </div>
-                        <div class="form-row form-row-3">
-                            <div class="form-group">
-                                <label for="r-nummer">Rechnungs-Nr. *</label>
-                                <input type="text" id="r-nummer" required placeholder="2026-001">
+                        <!-- AUFENTHALT & RECHNUNG -->
+                        <div class="card" id="fieldset-aufenthalt">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                    <rect x="2" y="3" width="14" height="13" rx="2" stroke="currentColor"
+                                        stroke-width="1.5" />
+                                    <path d="M2 7h14M6 1v4M12 1v4" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" />
+                                </svg>
+                                Aufenthalt &amp; Rechnung
                             </div>
-                            <div class="form-group">
-                                <label for="r-datum">Rechnungsdatum *</label>
-                                <input type="date" id="r-datum" required>
+                            <div class="form-row form-row-3">
+                                <div class="form-group">
+                                    <label for="r-nummer">Rechnungs-Nr. *</label>
+                                    <input type="text" id="r-nummer" required placeholder="2026-001">
+                                </div>
+                                <div class="form-group">
+                                    <label for="r-datum">Rechnungsdatum *</label>
+                                    <input type="date" id="r-datum" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="a-anreise">Anreise *</label>
+                                    <input type="date" id="a-anreise" required>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="a-anreise">Anreise *</label>
-                                <input type="date" id="a-anreise" required>
-                            </div>
-                        </div>
-                        <div class="form-row form-row-3">
-                            <div class="form-group">
-                                <label for="a-abreise">Abreise *</label>
-                                <input type="date" id="a-abreise" required>
-                            </div>
-                            <div class="form-group" style="display: flex; align-items: flex-end;">
-                                <div class="info-badge" id="naechte-badge"
-                                    style="display:none; margin-top: 0; margin-bottom: 0.25rem;">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                                        <path d="M13.4 10.4A6 6 0 115.6 2.6a7 7 0 007.8 7.8z" stroke="currentColor"
-                                            stroke-width="1.2" />
-                                    </svg>
-                                    <span id="naechte-text">0 Nächte</span>
+                            <div class="form-row form-row-3">
+                                <div class="form-group">
+                                    <label for="a-abreise">Abreise *</label>
+                                    <input type="date" id="a-abreise" required>
+                                </div>
+                                <div class="form-group" style="display: flex; align-items: flex-end;">
+                                    <div class="info-badge" id="naechte-badge"
+                                        style="display:none; margin-top: 0; margin-bottom: 0.25rem;">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                            <path d="M13.4 10.4A6 6 0 115.6 2.6a7 7 0 007.8 7.8z" stroke="currentColor"
+                                                stroke-width="1.2" />
+                                        </svg>
+                                        <span id="naechte-text">0 Nächte</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- STEUERN -->
-                    <div class="card" id="fieldset-steuer">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <path d="M2 14l14-10M5 4a2 2 0 100 4 2 2 0 000-4zM13 10a2 2 0 100 4 2 2 0 000-4z"
-                                    stroke="currentColor" stroke-width="1.5" />
-                            </svg>
-                            Steuern
-                        </div>
-                        <div class="toggle-row" style="margin-bottom: 0.75rem; font-size: 0.8rem;">
-                            <label class="toggle-label" for="kleinunternehmer">Kleinunternehmer (§ 19 UStG)</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="kleinunternehmer">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group" id="mwst-group">
-                                <label for="mwst-satz">MwSt-Satz (%)</label>
-                                <input type="number" id="mwst-satz" value="7" min="0" max="100" step="0.5">
+                        <!-- STEUERN -->
+                        <div class="card" id="fieldset-steuer">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                    <path d="M2 14l14-10M5 4a2 2 0 100 4 2 2 0 000-4zM13 10a2 2 0 100 4 2 2 0 000-4z"
+                                        stroke="currentColor" stroke-width="1.5" />
+                                </svg>
+                                Steuern
                             </div>
-                            <div class="form-group summary-group">
-                                <div class="summary-line"><span>Netto:</span><span id="sum-netto">0,00 €</span></div>
-                                <div class="summary-line"><span>MwSt (<span id="sum-mwst-label">7</span>%):</span><span
-                                        id="sum-mwst">0,00 €</span></div>
-                                <div class="summary-line summary-total"><span>Gesamt:</span><span id="sum-total">0,00
-                                        €</span></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POSITIONEN (Full Width) -->
-                    <div class="card" id="fieldset-positionen">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <path d="M3 5h12M3 9h12M3 13h8" stroke="currentColor" stroke-width="1.5"
-                                    stroke-linecap="round" />
-                            </svg>
-                            Positionen
-                        </div>
-                        <div class="positions-table-wrap">
-                            <table class="positions-table" id="positions-table">
-                                <thead>
-                                    <tr>
-                                        <th class="col-desc">Bezeichnung</th>
-                                        <th class="col-qty">Anzahl</th>
-                                        <th class="col-price">Einzelpreis</th>
-                                        <th class="col-total">Gesamt</th>
-                                        <th class="col-action"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="positions-body">
-                                    <!-- Wird dynamisch befüllt -->
-                                </tbody>
-                            </table>
-                        </div>
-                        <button type="button" id="btn-add-position" class="btn btn-sm btn-outline btn-add">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5"
-                                    stroke-linecap="round" />
-                            </svg>
-                            Position hinzufügen
-                        </button>
-                    </div>
-
-                    <!-- ZAHLUNG -->
-                    <div class="card" id="fieldset-zahlung">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <path d="M9 1l2.2 4.4L16 6.1l-3.5 3.4.8 4.9L9 12.2 4.7 14.4l.8-4.9L2 6.1l4.8-.7L9 1z"
-                                    stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-                            </svg>
-                            Zahlung
-                        </div>
-                        <div class="form-row form-row-3">
-                            <div class="form-group">
-                                <label class="toggle-label" for="z-bezahlt"
-                                    style="margin-bottom: 0.5rem; display: block;">Bezahlt</label>
+                            <div class="toggle-row" style="margin-bottom: 0.75rem; font-size: 0.8rem;">
+                                <label class="toggle-label" for="kleinunternehmer">Kleinunternehmer (§ 19
+                                    UStG)</label>
                                 <label class="toggle-switch">
-                                    <input type="checkbox" id="z-bezahlt" checked>
+                                    <input type="checkbox" id="kleinunternehmer">
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
-                            <div class="form-group">
-                                <label for="z-methode">Zahlungsart</label>
-                                <select id="z-methode">
-                                    <option value="PayPal" selected>PayPal</option>
-                                    <option value="Überweisung">Überweisung</option>
-                                    <option value="Bar">Bar</option>
-                                    <option value="Kreditkarte">Kreditkarte</option>
-                                    <option value="Sonstige">Sonstige</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="z-datum">Zahlungsdatum</label>
-                                <input type="date" id="z-datum">
+                            <div class="form-row">
+                                <div class="form-group" id="mwst-group">
+                                    <label for="mwst-satz">MwSt-Satz (%)</label>
+                                    <input type="number" id="mwst-satz" value="7" min="0" max="100" step="0.5">
+                                </div>
+                                <div class="form-group summary-group">
+                                    <div class="summary-line"><span>Netto:</span><span id="sum-netto">0,00 €</span>
+                                    </div>
+                                    <div class="summary-line"><span>MwSt (<span
+                                                id="sum-mwst-label">7</span>%):</span><span id="sum-mwst">0,00 €</span>
+                                    </div>
+                                    <div class="summary-line summary-total"><span>Gesamt:</span><span
+                                            id="sum-total">0,00
+                                            €</span></div>
+                                </div>
                             </div>
                         </div>
-                        <div class="toggle-row" style="margin-top: 0.75rem;">
-                            <label class="toggle-label" for="z-show-bank" style="font-size: 0.8rem;">Bank auf Rechnung
-                                anzeigen</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="z-show-bank">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
 
-                    <!-- BANKVERBINDUNG (collapsible) -->
-                    <div class="card card-collapsible" id="fieldset-bank" style="display:none;">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <path d="M2 7l7-4 7 4M4 7v7M8 7v7M14 7v7M2 14h14M3 16h12" stroke="currentColor"
-                                    stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                            Bankverbindung
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="b-inhaber">Kontoinhaber</label>
-                                <input type="text" id="b-inhaber" placeholder="Max Mustermann">
+                        <!-- POSITIONEN -->
+                        <div class="card" id="fieldset-positionen">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                    <path d="M3 5h12M3 9h12M3 13h8" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" />
+                                </svg>
+                                Positionen
                             </div>
-                            <div class="form-group">
-                                <label for="b-bank">Bankname</label>
-                                <input type="text" id="b-bank" placeholder="Musterbank AG">
+                            <div class="positions-table-wrap">
+                                <table class="positions-table" id="positions-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-desc">Bezeichnung</th>
+                                            <th class="col-qty">Anzahl</th>
+                                            <th class="col-price">Einzelpreis</th>
+                                            <th class="col-total">Gesamt</th>
+                                            <th class="col-action"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="positions-body">
+                                    </tbody>
+                                </table>
                             </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="b-iban">IBAN</label>
-                                <input type="text" id="b-iban" placeholder="DE00 0000 0000 0000 0000 00">
-                            </div>
-                            <div class="form-group">
-                                <label for="b-bic">BIC</label>
-                                <input type="text" id="b-bic" placeholder="ABCDEFGH123">
-                            </div>
-                        </div>
-                        <button type="button" id="btn-save-bank" class="btn btn-sm btn-outline">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                <path d="M11 13H3a1 1 0 01-1-1V2a1 1 0 011-1h6l3 3v8a1 1 0 01-1 1z"
-                                    stroke="currentColor" stroke-width="1.2" />
-                                <path d="M8 1v3h3M5 8h4M5 10h4" stroke="currentColor" stroke-width="1.2"
-                                    stroke-linecap="round" />
-                            </svg>
-                            Bankdaten speichern
-                        </button>
-                    </div>
-
-                    <!-- NUKI SMART LOCK -->
-                    <div class="card" id="fieldset-nuki">
-                        <div class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                <rect x="5" y="6" width="8" height="9" rx="1" stroke="currentColor"
-                                    stroke-width="1.5" />
-                                <path d="M6 6V4a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" />
-                                <circle cx="9" cy="11" r="1.5" fill="currentColor" />
-                            </svg>
-                            Nuki Smart Lock
-                        </div>
-                        <div class="nuki-actions">
-                            <button type="button" id="btn-nuki-pin" class="btn btn-outline btn-full">
-                                Keypad-PIN für Zeitraum generieren
+                            <button type="button" id="btn-add-position" class="btn btn-sm btn-outline btn-add">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                    <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" />
+                                </svg>
+                                Position hinzufügen
                             </button>
-                            <div class="nuki-pin-display" id="nuki-pin-result" style="display:none;">
-                                <label>Generierte PIN:</label>
-                                <div class="pin-box">
-                                    <span id="nuki-pin-code">——-</span>
+                        </div>
+
+                        <!-- ZAHLUNG -->
+                        <div class="card" id="fieldset-zahlung">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                    <path
+                                        d="M9 1l2.2 4.4L16 6.1l-3.5 3.4.8 4.9L9 12.2 4.7 14.4l.8-4.9L2 6.1l4.8-.7L9 1z"
+                                        stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+                                </svg>
+                                Zahlung
+                            </div>
+                            <div class="form-row form-row-3">
+                                <div class="form-group">
+                                    <label class="toggle-label" for="z-bezahlt"
+                                        style="margin-bottom: 0.5rem; display: block;">Bezahlt</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="z-bezahlt" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="z-methode">Zahlungsart</label>
+                                    <select id="z-methode">
+                                        <option value="PayPal" selected>PayPal</option>
+                                        <option value="Überweisung">Überweisung</option>
+                                        <option value="Bar">Bar</option>
+                                        <option value="Kreditkarte">Kreditkarte</option>
+                                        <option value="Sonstige">Sonstige</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="z-datum">Zahlungsdatum</label>
+                                    <input type="date" id="z-datum">
+                                </div>
+                            </div>
+                            <div class="toggle-row" style="margin-top: 0.75rem;">
+                                <label class="toggle-label" for="z-show-bank" style="font-size: 0.8rem;">Bank auf
+                                    Rechnung anzeigen</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="z-show-bank">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- BANKVERBINDUNG -->
+                        <div class="card card-collapsible" id="fieldset-bank" style="display:none;">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                    <path d="M2 7l7-4 7 4M4 7v7M8 7v7M14 7v7M2 14h14M3 16h12" stroke="currentColor"
+                                        stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                Bankverbindung
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="b-inhaber">Kontoinhaber</label>
+                                    <input type="text" id="b-inhaber" placeholder="Max Mustermann">
+                                </div>
+                                <div class="form-group">
+                                    <label for="b-bank">Bankname</label>
+                                    <input type="text" id="b-bank" placeholder="Musterbank AG">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="b-iban">IBAN</label>
+                                    <input type="text" id="b-iban" placeholder="DE00 0000 0000 0000 0000 00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="b-bic">BIC</label>
+                                    <input type="text" id="b-bic" placeholder="ABCDEFGH123">
+                                </div>
+                            </div>
+                            <button type="button" id="btn-save-bank" class="btn btn-sm btn-outline">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                    <path d="M11 13H3a1 1 0 01-1-1V2a1 1 0 011-1h6l3 3v8a1 1 0 01-1 1z"
+                                        stroke="currentColor" stroke-width="1.2" />
+                                    <path d="M8 1v3h3M5 8h4M5 10h4" stroke="currentColor" stroke-width="1.2"
+                                        stroke-linecap="round" />
+                                </svg>
+                                Bankdaten speichern
+                            </button>
+                        </div>
+
+                        <!-- NUKI -->
+                        <div class="card" id="fieldset-nuki">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                    <rect x="5" y="6" width="8" height="9" rx="1" stroke="currentColor"
+                                        stroke-width="1.5" />
+                                    <path d="M6 6V4a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" />
+                                    <circle cx="9" cy="11" r="1.5" fill="currentColor" />
+                                </svg>
+                                Nuki Smart Lock
+                            </div>
+                            <div class="nuki-actions">
+                                <button type="button" id="btn-nuki-pin" class="btn btn-outline btn-full">
+                                    Keypad-PIN für Zeitraum generieren
+                                </button>
+                                <div class="nuki-pin-display" id="nuki-pin-result" style="display:none;">
+                                    <label>Generierte PIN:</label>
+                                    <div class="pin-box">
+                                        <span id="nuki-pin-code">———</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AKTIONEN -->
+                        <div class="actions-bar">
+                            <div class="actions-left">
+                                <!-- empty, reset moved to top bar -->
+                            </div>
+                            <div class="actions-right">
+                                <button type="button" id="btn-archive-save" class="btn btn-outline">
+                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                        <path d="M2 5h14a1 1 0 011 1v1a1 1 0 01-1 1H2a1 1 0 01-1-1V6a1 1 0 011-1z"
+                                            stroke="currentColor" stroke-width="1.5" />
+                                        <path d="M3 8v6a2 2 0 002 2h8a2 2 0 002-2V8M7 12h4" stroke="currentColor"
+                                            stroke-width="1.5" stroke-linecap="round" />
+                                    </svg>
+                                    Archivieren
+                                </button>
+                                <button type="button" id="btn-email" class="btn btn-outline">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                        <path d="M3 6l7 5 7-5M3 15h14V5H3v10z" stroke="currentColor" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    Check-in E-Mail
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- PREVIEW COLUMN -->
+                <section class="preview-column" id="preview-panel">
+                    <div class="preview-sticky">
+                        <div class="panel-header">
+                            <h2>Vorschau</h2>
+                            <div class="preview-actions">
+                                <button type="button" id="btn-paperless" class="btn btn-sm btn-accent">
+                                    <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                                        <path d="M14 10v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4M9 3v8M6 6l3-3 3 3"
+                                            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                    </svg>
+                                    Paperless
+                                </button>
+                                <button type="button" id="btn-print" class="btn btn-sm btn-primary">
+                                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                                        <path
+                                            d="M5 6V4a2 2 0 012-2h6a2 2 0 012 2v2M5 14H4a2 2 0 012-2V9a2 2 0 012-2h8a2 2 0 012 2v3a2 2 0 01-2 2h-1"
+                                            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                        <path d="M15 11h-1M5 14h10v4H5v-4z" stroke="currentColor" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    PDF exportieren
+                                </button>
+                            </div>
+                        </div>
+                        <div class="invoice-preview" id="invoice-preview">
+                            <div class="invoice-page" id="invoice-page">
+                                <!-- FALTMARKEN -->
+                                <div class="inv-markers">
+                                    <div class="inv-marker inv-marker-fold-1"></div>
+                                    <div class="inv-marker inv-marker-fold-2"></div>
+                                </div>
+                                <!-- VERMIETER HEADER -->
+                                <div class="inv-header">
+                                    <div class="inv-sender" id="inv-sender">
+                                        <strong id="inv-v-name">Vermieter Name</strong>
+                                        <div id="inv-v-adresse" class="inv-addr">Adresse</div>
+                                        <div class="inv-contact">
+                                            <span id="inv-v-telefon"></span>
+                                            <span id="inv-v-email"></span>
+                                        </div>
+                                        <div id="inv-v-steuernr" class="inv-tax"></div>
+                                    </div>
+                                </div>
+
+                                <!-- GAST -->
+                                <div class="inv-recipient">
+                                    <div class="inv-label">Rechnung an</div>
+                                    <strong id="inv-g-name">Gast Name</strong>
+                                    <div id="inv-g-adresse" class="inv-addr"></div>
+                                </div>
+
+                                <!-- RECHNUNGSINFO -->
+                                <div class="inv-meta">
+                                    <div class="inv-meta-item">
+                                        <span class="inv-label">Rechnungs-Nr.</span>
+                                        <span id="inv-r-nummer">—</span>
+                                    </div>
+                                    <div class="inv-meta-item">
+                                        <span class="inv-label">Datum</span>
+                                        <span id="inv-r-datum">—</span>
+                                    </div>
+                                    <div class="inv-meta-item">
+                                        <span class="inv-label">Aufenthalt</span>
+                                        <span id="inv-aufenthalt">—</span>
+                                    </div>
+                                </div>
+
+                                <h2 class="inv-title">Rechnung</h2>
+
+                                <!-- POSITIONEN -->
+                                <table class="inv-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Pos.</th>
+                                            <th>Bezeichnung</th>
+                                            <th class="text-right">Anzahl</th>
+                                            <th class="text-right">Einzelpreis</th>
+                                            <th class="text-right">Gesamt</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inv-positions-body">
+                                        <tr class="inv-empty-row">
+                                            <td colspan="5">Keine Positionen</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <!-- SUMMEN -->
+                                <div class="inv-summary">
+                                    <div class="inv-summary-line">
+                                        <span>Nettobetrag</span>
+                                        <span id="inv-netto">0,00 €</span>
+                                    </div>
+                                    <div class="inv-summary-line">
+                                        <span>MwSt. <span id="inv-mwst-pct">7</span>%</span>
+                                        <span id="inv-mwst">0,00 €</span>
+                                    </div>
+                                    <div class="inv-summary-line inv-summary-total">
+                                        <span>Gesamtbetrag</span>
+                                        <span id="inv-total">0,00 €</span>
+                                    </div>
+                                </div>
+
+                                <!-- ZAHLUNGSSTATUS -->
+                                <div class="inv-payment-status" id="inv-payment-status">
+                                    <div class="inv-paid-badge" id="inv-paid-badge">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                            <path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                        <span id="inv-paid-text">Bezahlt via PayPal</span>
+                                    </div>
+                                </div>
+
+                                <!-- NUKI PIN -->
+                                <div class="inv-nuki-pin" id="inv-nuki-pin" style="display:none;">
+                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="inv-nuki-icon">
+                                        <path d="M6.5 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor"
+                                            stroke-width="1.5" />
+                                        <path d="M8.5 7.5L14 7.5V9.5M11.5 7.5V9.5" stroke="currentColor"
+                                            stroke-width="1.5" stroke-linecap="round" />
+                                    </svg>
+                                    <div class="inv-nuki-content">
+                                        <span class="inv-nuki-label">Ihr Zugangscode:</span>
+                                        <span class="inv-nuki-code" id="inv-nuki-pin-code">000000</span>
+                                        <span class="inv-nuki-period">Gültig: <span id="inv-nuki-from"></span> bis
+                                            <span id="inv-nuki-to"></span></span>
+                                    </div>
+                                </div>
+
+                                <!-- BANK (optional) -->
+                                <div class="inv-payment" id="inv-payment" style="display:none;">
+                                    <div class="inv-label">Bankverbindung</div>
+                                    <div class="inv-bank-grid">
+                                        <span>Kontoinhaber:</span><span id="inv-b-inhaber">–</span>
+                                        <span>IBAN:</span><span id="inv-b-iban">–</span>
+                                        <span>BIC:</span><span id="inv-b-bic">–</span>
+                                        <span>Bank:</span><span id="inv-b-bank">–</span>
+                                    </div>
+                                </div>
+
+                                <!-- FOOTER -->
+                                <div class="inv-footer" id="inv-footer">
+                                    <div id="inv-kleinunternehmer-notice" class="inv-legal-notice"
+                                        style="display:none;">
+                                        Kleinunternehmer (MwSt.-Befreiung nach § 19 UStG) — Der Rechnungsbetrag
+                                        enthält gemäß § 19 UStG keine Umsatzsteuer.
+                                    </div>
+                                    <div id="inv-footer-text">
+                                        Betrag wurde bezahlt via PayPal. Vielen Dank!
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- AKTIONEN -->
-                    <!-- AKTIONEN -->
-                    <div class="actions-bar">
-                        <div class="actions-left">
-                            <button type="button" id="btn-reset" class="btn btn-ghost btn-danger">
-                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                    <path d="M3 5h12M6 5V3h6v2M7 8v5M11 8v5M4 5l1 10a1 1 0 001 1h6a1 1 0 001-1l1-10"
-                                        stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                        stroke-linejoin="round" />
-                                </svg>
-                                Zurücksetzen
-                            </button>
-                        </div>
-                        <div class="actions-right">
-                            <button type="button" id="btn-archive-save" class="btn btn-outline">
-                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                    <path d="M2 5h14a1 1 0 011 1v1a1 1 0 01-1 1H2a1 1 0 01-1-1V6a1 1 0 011-1z"
-                                        stroke="currentColor" stroke-width="1.5" />
-                                    <path d="M3 8v6a2 2 0 002 2h8a2 2 0 002-2V8M7 12h4" stroke="currentColor"
-                                        stroke-width="1.5" stroke-linecap="round" />
-                                </svg>
-                                Archivieren
-                            </button>
-                            <button type="button" id="btn-email" class="btn btn-outline">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                    <path d="M3 6l7 5 7-5M3 15h14V5H3v10z" stroke="currentColor" stroke-width="1.5"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                                Check-in E-Mail
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </section>
-
-            <!-- RECHNUNGS-VORSCHAU -->
-            <section class="preview-panel" id="preview-panel">
-                <div class="panel-header">
-                    <h2>Vorschau</h2>
-                    <div class="preview-actions">
-                        <button type="button" id="btn-paperless" class="btn btn-sm btn-accent">
-                            <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
-                                <path d="M14 10v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4M9 3v8M6 6l3-3 3 3"
-                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                            </svg>
-                            Paperless
-                        </button>
-                        <button type="button" id="btn-print" class="btn btn-sm btn-primary">
-                            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                                <path
-                                    d="M5 6V4a2 2 0 012-2h6a2 2 0 012 2v2M5 14H4a2 2 0 012-2V9a2 2 0 012-2h8a2 2 0 012 2v3a2 2 0 01-2 2h-1"
-                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                                <path d="M15 11h-1M5 14h10v4H5v-4z" stroke="currentColor" stroke-width="1.5"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                            PDF exportieren
-                        </button>
-                    </div>
-                </div>
-                <div class="invoice-preview" id="invoice-preview">
-                    <div class="invoice-page" id="invoice-page">
-                        <!-- FALTMARKEN DIN 5008 -->
-                        <div class="inv-markers">
-                            <div class="inv-marker inv-marker-fold-1"></div>
-                            <div class="inv-marker inv-marker-fold-2"></div>
-                        </div>
-                        <!-- VERMIETER HEADER -->
-                        <div class="inv-header">
-                            <div class="inv-sender" id="inv-sender">
-                                <strong id="inv-v-name">Vermieter Name</strong>
-                                <div id="inv-v-adresse" class="inv-addr">Adresse</div>
-                                <div class="inv-contact">
-                                    <span id="inv-v-telefon"></span>
-                                    <span id="inv-v-email"></span>
-                                </div>
-                                <div id="inv-v-steuernr" class="inv-tax"></div>
-                            </div>
-                        </div>
-
-                        <!-- GAST -->
-                        <div class="inv-recipient">
-                            <div class="inv-label">Rechnung an</div>
-                            <strong id="inv-g-name">Gast Name</strong>
-                            <div id="inv-g-adresse" class="inv-addr"></div>
-                        </div>
-
-                        <!-- RECHNUNGSINFO -->
-                        <div class="inv-meta">
-                            <div class="inv-meta-item">
-                                <span class="inv-label">Rechnungs-Nr.</span>
-                                <span id="inv-r-nummer">—</span>
-                            </div>
-                            <div class="inv-meta-item">
-                                <span class="inv-label">Datum</span>
-                                <span id="inv-r-datum">—</span>
-                            </div>
-                            <div class="inv-meta-item">
-                                <span class="inv-label">Aufenthalt</span>
-                                <span id="inv-aufenthalt">—</span>
-                            </div>
-                        </div>
-
-                        <!-- TITEL -->
-                        <h2 class="inv-title">Rechnung</h2>
-
-                        <!-- POSITIONEN TABELLE -->
-                        <table class="inv-table">
-                            <thead>
-                                <tr>
-                                    <th>Pos.</th>
-                                    <th>Bezeichnung</th>
-                                    <th class="text-right">Anzahl</th>
-                                    <th class="text-right">Einzelpreis</th>
-                                    <th class="text-right">Gesamt</th>
-                                </tr>
-                            </thead>
-                            <tbody id="inv-positions-body">
-                                <tr class="inv-empty-row">
-                                    <td colspan="5">Keine Positionen</td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <!-- SUMMEN -->
-                        <div class="inv-summary">
-                            <div class="inv-summary-line">
-                                <span>Nettobetrag</span>
-                                <span id="inv-netto">0,00 €</span>
-                            </div>
-                            <div class="inv-summary-line">
-                                <span>MwSt. <span id="inv-mwst-pct">7</span>%</span>
-                                <span id="inv-mwst">0,00 €</span>
-                            </div>
-                            <div class="inv-summary-line inv-summary-total">
-                                <span>Gesamtbetrag</span>
-                                <span id="inv-total">0,00 €</span>
-                            </div>
-                        </div>
-
-                        <!-- ZAHLUNGSSTATUS -->
-                        <div class="inv-payment-status" id="inv-payment-status">
-                            <div class="inv-paid-badge" id="inv-paid-badge">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                                    <path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                                <span id="inv-paid-text">Bezahlt via PayPal</span>
-                            </div>
-                        </div>
-
-                        <!-- NUKI PIN INFO -->
-                        <div class="inv-nuki-pin" id="inv-nuki-pin" style="display:none;">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="inv-nuki-icon">
-                                <path d="M6.5 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor"
-                                    stroke-width="1.5" />
-                                <path d="M8.5 7.5L14 7.5V9.5M11.5 7.5V9.5" stroke="currentColor" stroke-width="1.5"
-                                    stroke-linecap="round" />
-                            </svg>
-                            <div class="inv-nuki-content">
-                                <span class="inv-nuki-label">Ihr Zugangscode:</span>
-                                <span class="inv-nuki-code" id="inv-nuki-pin-code">000000</span>
-                                <span class="inv-nuki-period">Gültig: <span id="inv-nuki-from"></span> bis <span
-                                        id="inv-nuki-to"></span></span>
-                            </div>
-                        </div>
-
-                        <!-- BANKVERBINDUNG (optional) -->
-                        <div class="inv-payment" id="inv-payment" style="display:none;">
-                            <div class="inv-label">Bankverbindung</div>
-                            <div class="inv-bank-grid">
-                                <span>Kontoinhaber:</span><span id="inv-b-inhaber">–</span>
-                                <span>IBAN:</span><span id="inv-b-iban">–</span>
-                                <span>BIC:</span><span id="inv-b-bic">–</span>
-                                <span>Bank:</span><span id="inv-b-bank">–</span>
-                            </div>
-                        </div>
-
-                        <!-- FOOTER -->
-                        <div class="inv-footer" id="inv-footer">
-                            <div id="inv-kleinunternehmer-notice" class="inv-legal-notice" style="display:none;">
-                                Kleinunternehmer (MwSt.-Befreiung nach § 19 UStG) — Der Rechnungsbetrag enthält gemäß §
-                                19
-                                UStG
-                                keine Umsatzsteuer.
-                            </div>
-                            <div id="inv-footer-text">
-                                Betrag wurde bezahlt via PayPal. Vielen Dank!
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </main>
 
         <!-- EINSTELLUNGEN MODAL -->
         <div class="modal-overlay" id="modal-settings" style="display:none;">
             <div class="modal">
                 <div class="modal-header">
-                    <h3>Einstellungen — Paperless NGX</h3>
+                    <h3>Einstellungen</h3>
                     <button type="button" id="btn-close-settings" class="btn btn-ghost btn-icon" title="Schließen">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2"
@@ -626,6 +623,42 @@
                     </button>
                 </div>
                 <div class="modal-body">
+                    <!-- VERMIETER in Settings -->
+                    <div class="modal-subheader">
+                        <h4>Vermieter-Daten</h4>
+                        <p><small>Diese Daten erscheinen auf jeder Rechnung.</small></p>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="v-name">Name / Firma *</label>
+                            <input type="text" id="v-name" required placeholder="Max Mustermann">
+                        </div>
+                        <div class="form-group">
+                            <label for="v-steuernr">Steuernummer</label>
+                            <input type="text" id="v-steuernr" placeholder="12/345/67890">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="v-adresse">Adresse *</label>
+                        <textarea id="v-adresse" rows="2" required
+                            placeholder="Musterstraße 1&#10;12345 Musterstadt"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="v-telefon">Telefon</label>
+                            <input type="tel" id="v-telefon" placeholder="+49 123 456789">
+                        </div>
+                        <div class="form-group">
+                            <label for="v-email">E-Mail</label>
+                            <input type="email" id="v-email" placeholder="info@example.de">
+                        </div>
+                    </div>
+                    <hr>
+
+                    <!-- PAPERLESS -->
+                    <div class="modal-subheader">
+                        <h4>Paperless NGX</h4>
+                    </div>
                     <div class="form-group">
                         <label for="pl-url">Paperless URL *</label>
                         <input type="url" id="pl-url" placeholder="https://paperless.example.com">
@@ -634,9 +667,7 @@
                     <div class="form-group">
                         <label for="pl-token">API Token *</label>
                         <input type="password" id="pl-token" placeholder="Token aus Benutzerprofil">
-                        <small>Findest du unter Profil → Token in Paperless</small>
                     </div>
-                    <hr>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="pl-correspondent">Correspondent ID</label>
@@ -652,9 +683,10 @@
                         <input type="text" id="pl-tags" placeholder="z.B. 3,7,12">
                     </div>
                     <hr>
+
+                    <!-- SMTP -->
                     <div class="modal-subheader">
                         <h4>E-Mail Versand (SMTP)</h4>
-                        <p><small>Konfiguration für den automatischen Rechnungsversand.</small></p>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -681,9 +713,10 @@
                         <input type="text" id="smtp-from" placeholder="Dein Ferienhaus">
                     </div>
                     <hr>
+
+                    <!-- NUKI -->
                     <div class="modal-subheader">
-                        <h4>Nuki Smart Lock Integration</h4>
-                        <p><small>Automatische Erstellung von Keypad-PINs für Gäste.</small></p>
+                        <h4>Nuki Smart Lock</h4>
                     </div>
                     <div class="form-group">
                         <label for="nuki-token">Nuki API Token</label>
@@ -694,20 +727,24 @@
                         <input type="text" id="nuki-lock-id" placeholder="ID deines Schlosses">
                     </div>
                     <hr>
+
+                    <!-- BOOKING.COM -->
                     <div class="modal-subheader">
                         <h4>Booking.com Integration</h4>
                     </div>
                     <div class="form-group">
                         <label for="booking-ical-url">Booking.com iCal URL (Export-Link)</label>
                         <input type="url" id="booking-ical-url" placeholder="https://ical.booking.com/v1/export/...">
-                        <small>Deinen Export-Link findest du im Booking Extranet unter Rate & VerfÃ¼gbarkeit â†’
-                            Kalender synchronisieren.</small>
+                        <small>Export-Link findest du im Booking Extranet unter Rate &amp; Verfügbarkeit → Kalender
+                            synchronisieren.</small>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" id="btn-save-settings" class="btn btn-primary">Einstellungen
                         speichern</button>
                     <div class="btn-group">
+                        <button type="button" id="btn-save-vermieter" class="btn btn-outline">Vermieter
+                            speichern</button>
                         <button type="button" id="btn-test-connection" class="btn btn-outline">Paperless testen</button>
                         <button type="button" id="btn-nuki-test" class="btn btn-outline">Nuki testen</button>
                     </div>
@@ -752,17 +789,14 @@
                 </div>
             </div>
         </div>
-
-        <!-- (Moved toast container) -->
-
-        <!-- html2pdf.js via CDN -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
     </div><!-- /app-wrapper -->
 
     <!-- TOAST -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="app.js?v=2.5"></script>
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+    <script src="app.js?v=3.0"></script>
 </body>
 
 </html>
