@@ -168,6 +168,10 @@ function isTelegramIdAuthorized(tgId) {
     const settings = getAllSettings();
     if (settings.tg_ids) {
         try {
+            if (!settings.tg_ids || typeof settings.tg_ids !== 'string' || !settings.tg_ids.trim()) {
+                // Empty or invalid setting is fine, just ignore
+                return false;
+            }
             const allowedIds = JSON.parse(settings.tg_ids);
             const isMatch = Array.isArray(allowedIds) && allowedIds.map(String).includes(strId);
             if (isMatch) {
@@ -175,7 +179,7 @@ function isTelegramIdAuthorized(tgId) {
                 return true;
             }
         } catch (e) {
-            console.error('[DB] Fehler beim Parsen von tg_ids Settings:', e.message);
+            console.error('[DB] Fehler beim Parsen von tg_ids Settings:', e.message, 'Input:', settings.tg_ids);
         }
     }
 

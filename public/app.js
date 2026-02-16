@@ -2336,16 +2336,16 @@
     // =======================
     // Self-Update
     // =======================
-    // Re-check if missing (defensive)
-    const activeUpdateBtn = btnUpdate || $('#btn-update-check');
-    if (activeUpdateBtn) {
-        activeUpdateBtn.addEventListener('click', async () => {
+    // Re-check if missing (defensive) - DELEGATED EVENT LISTENER
+    document.body.addEventListener('click', async (e) => {
+        if (e.target && (e.target.id === 'btn-update' || e.target.id === 'btn-update-check')) {
+            const btn = e.target;
             if (!confirm('Möchtest du jetzt nach Updates suchen und diese installieren?\n\nDer Server startet dabei kurz neu.')) {
                 return;
             }
 
-            const originalContent = btnUpdate.innerHTML;
-            btnUpdate.disabled = true;
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
 
             // Show Overlay
             updateOverlay.style.display = 'flex';
@@ -2361,7 +2361,7 @@
                         showToast('Deine App ist bereits auf dem neuesten Stand.', 'info');
                         setTimeout(() => {
                             updateOverlay.style.display = 'none';
-                            activeUpdateBtn.disabled = false;
+                            btn.disabled = false;
                         }, 2000);
                     } else {
                         updateStatusText.textContent = 'Update erfolgreich! Neustart...';
@@ -2379,12 +2379,12 @@
                 showToast(`Fehler: ${err.message}`, 'error', 10000);
                 setTimeout(() => {
                     updateOverlay.style.display = 'none';
-                    activeUpdateBtn.disabled = false;
-                    activeUpdateBtn.innerHTML = originalContent;
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent;
                 }, 3000);
             }
-        });
-    }
+        }
+    });
 
     async function init() {
         // Load all settings from server
