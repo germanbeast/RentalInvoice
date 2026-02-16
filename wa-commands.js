@@ -22,12 +22,13 @@ async function processMessage(msg, waClient, MessageMedia) {
 
     const user = db.getUserByPhone(from);
 
-    console.log(`[WA] Nachricht von ${from}: "${body}"`);
+    console.log(`[WA] Nachricht von [${from}]: "${body}"`);
     if (!user) {
-        console.warn(`[WA] Zugriff verweigert für ${from}. Diese ID/Nummer ist nicht als Admin-Benutzer in der Datenbank registriert.`);
+        console.warn(`[WA] Zugriff verweigert für ID: ${from}. Diese ID/Nummer ist nicht als Admin-Benutzer in der Datenbank registriert.`);
+        console.log(`[WA] Tipp: Prüfe ob die Nummer in der DB mit der Absender-ID übereinstimmt.`);
         return; // Ignore unauthorized numbers
     }
-    console.log(`[WA] Authentifizierter User: ${user.username}`);
+    console.log(`[WA] Authentifizierter User: ${user.username} (ID: ${from})`);
 
     // Check if we are in a follow-up session
     if (sessions.has(from)) {
