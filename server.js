@@ -63,10 +63,11 @@ function initWhatsApp() {
     });
 
     waClient.on('message', async (msg) => {
+        console.log(`📩 WhatsApp Nachricht von ${msg.from}: ${msg.body.substring(0, 50)}...`);
         try {
             await waCommands.processMessage(msg, waClient, MessageMedia);
         } catch (e) {
-            console.error('Error processing WhatsApp message:', e);
+            console.error('❌ Fehler in waCommands.processMessage:', e);
         }
     });
 

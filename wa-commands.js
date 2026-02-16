@@ -15,10 +15,12 @@ async function processMessage(msg, waClient, MessageMedia) {
     const body = msg.body.trim();
     const user = db.getUserByPhone(from);
 
+    console.log(`[WA] Nachricht von ${from}: "${body}"`);
     if (!user) {
-        console.warn(`Unbefugter Zugriff von ${from}`);
+        console.warn(`[WA] Unbefugter Zugriff von ${from}. Kein User in DB gefunden.`);
         return; // Ignore unauthorized numbers
     }
+    console.log(`[WA] Authentifizierter User: ${user.username}`);
 
     // Check if we are in a follow-up session
     if (sessions.has(from)) {
@@ -114,6 +116,7 @@ async function handleFollowUp(msg, waClient, MessageMedia, session) {
 }
 
 async function finalizeInvoice(msg, waClient, MessageMedia, data) {
+    console.log(`[WA] Finalisiere Rechnung für ${data.gName}...`);
     try {
         await msg.reply('⏳ Erstelle Rechnung und generiere Nuki-PIN...');
 
@@ -200,11 +203,12 @@ async function finalizeInvoice(msg, waClient, MessageMedia, data) {
         const media = MessageMedia.fromFilePath(filePath);
         await waClient.sendMessage(msg.from, media, { caption: `✅ Rechnung ${invoiceData.rNummer} erstellt.\n🔑 Nuki-PIN: ${invoiceData.nukiPin || 'Fehlgeschlagen'}` });
 
-        // Cleanup
+        //Cleanup
+        console.log(`[WA] Rechnung ${invoiceData.rNummer} erfolgreich gesendet.`);
         fs.unlinkSync(filePath);
 
     } catch (e) {
-        console.error('Finalize Invoice Error:', e);
+        console.error('[WA] Finalize Invoice Error:', e);
         await msg.reply('❌ Fehler bei der Rechnungsstellung: ' + e.message);
     }
 }

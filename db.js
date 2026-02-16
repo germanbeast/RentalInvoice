@@ -125,9 +125,16 @@ function getAllUsers() {
 
 function getUserByPhone(phone) {
     if (!phone) return null;
+    // Normalize: remove all non-digits
     const cleaned = phone.replace(/[^\d]/g, '');
-    // Try both absolute and relative formats if needed, but usually we store cleaned
-    return getDb().prepare("SELECT * FROM users WHERE REPLACE(phone, ' ', '') LIKE ?").get(`%${cleaned}`);
+    if (cleaned.length < 5) return null;
+
+    // We compare the last 9 digits which are unique for German mobile numbers
+    const suffix = cleaned.slice(-10);
+
+    // In SQL: match if the stored phone number (cleaned) ends with the same 10 digits
+    // This handles +49..., 49..., 0049..., 01... etc.
+    return getDb().prepare("SELECT * FROM users WHERE phone LIKE ?").get(`%${suffix}`);
 }
 
 function createUser(username, hashedPassword, role = 'admin', phone = '') {
