@@ -21,6 +21,8 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const db = require('./db');
 const waCommands = require('./wa-commands');
+const tgCommands = require('./tg-commands');
+const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 
 const app = express();
@@ -127,23 +129,86 @@ async function sendWhatsApp(phone, message) {
     }
 }
 
+// =======================
+// 1c. Telegram Bot
+// =======================
+let tgBot = null;
+
+function initTelegram() {
+    const allSettings = db.getAllSettings();
+    const token = allSettings.tg_token;
+
+    if (!token) {
+        console.warn('⚠️ Telegram Token nicht konfiguriert. Telegram Bot wird nicht gestartet.');
+        return;
+    }
+
+    try {
+        tgBot = new TelegramBot(token, { polling: true });
+        console.log('✅ Telegram Bot initialisiert (Polling).');
+
+        tgBot.on('message', (msg) => {
+            tgCommands.processMessage(tgBot, msg).catch(e => {
+                console.error('❌ Fehler in tgCommands.processMessage:', e);
+            });
+        });
+
+        tgBot.on('polling_error', (error) => {
+            if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
+                console.error('❌ Telegram Token ungültig (401). Polling gestoppt.');
+                tgBot.stopPolling();
+            } else {
+                console.error('⚠️ Telegram Polling Fehler:', error.message);
+            }
+        });
+    } catch (e) {
+        console.error('❌ Telegram Bot konnte nicht gestartet werden:', e.message);
+    }
+}
+
+async function sendTelegram(chatId, message) {
+    if (!tgBot) return false;
+    try {
+        await tgBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        console.log(`✉️ Telegram gesendet an ${chatId}`);
+        return true;
+    } catch (e) {
+        console.error('❌ Telegram Fehler:', e.message);
+        return false;
+    }
+}
+
 // Send to all configured notification recipients
 async function sendToAllRecipients(message) {
     const allSettings = db.getAllSettings();
+    let anySent = false;
+
+    // WhatsApp Notifications
     let phones = [];
     try {
         phones = JSON.parse(allSettings.wa_phones || '[]');
     } catch (e) {
         if (allSettings.wa_phone) phones = [allSettings.wa_phone];
     }
-    if (phones.length === 0) return false;
-    let anySent = false;
     for (const phone of phones) {
         if (phone && phone.trim()) {
-            const sent = await sendWhatsApp(phone.trim(), message);
-            if (sent) anySent = true;
+            if (await sendWhatsApp(phone.trim(), message)) anySent = true;
         }
     }
+
+    // Telegram Notifications
+    let tgIds = [];
+    try {
+        tgIds = JSON.parse(allSettings.tg_ids || '[]');
+    } catch (e) {
+        if (allSettings.tg_id) tgIds = [allSettings.tg_id];
+    }
+    for (const id of tgIds) {
+        if (id && String(id).trim()) {
+            if (await sendTelegram(String(id).trim(), message)) anySent = true;
+        }
+    }
+
     return anySent;
 }
 

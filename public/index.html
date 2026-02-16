@@ -746,258 +746,302 @@
 
         <!-- EINSTELLUNGEN MODAL -->
         <div class="modal-overlay" id="modal-settings" style="display:none;">
-            <div class="modal">
-                <div class="modal-header">
-                    <h3>Einstellungen</h3>
-                    <button type="button" id="btn-close-settings" class="btn btn-ghost btn-icon" title="Schließen">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" />
-                        </svg>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <!-- BRANDING / LOGO -->
-                    <div class="modal-subheader">
-                        <h4>Branding / Logo</h4>
-                        <p><small>Dein Logo erscheint auf jeder Rechnung.</small></p>
-                    </div>
-                    <div class="form-group">
-                        <label>Logo hochladen</label>
-                        <div class="logo-upload-area" id="logo-upload-area">
-                            <img id="logo-preview" src="" alt="Logo"
-                                style="display:none; max-width:200px; max-height:80px; margin-bottom:0.5rem;">
-                            <input type="file" id="logo-file-input" accept="image/*" style="display:none;">
-                            <button type="button" id="btn-upload-logo" class="btn btn-outline btn-sm">Logo
-                                auswählen</button>
-                            <button type="button" id="btn-remove-logo" class="btn btn-ghost btn-danger btn-sm"
-                                style="display:none;">Entfernen</button>
+            <div class="modal modal-lg settings-modal">
+                <div class="settings-layout">
+                    <!-- SIDEBAR -->
+                    <aside class="settings-sidebar">
+                        <div class="sidebar-header">
+                            <h3>Einstellungen</h3>
                         </div>
-                    </div>
-                    <hr>
+                        <nav class="sidebar-nav">
+                            <div class="nav-section">BASIC SETTINGS</div>
+                            <a href="#" class="nav-item active" data-target="settings-branding">Branding / Logo</a>
+                            <a href="#" class="nav-item" data-target="settings-v-data">Vermieter-Daten</a>
+                            <a href="#" class="nav-item" data-target="settings-pricing">Preise & Gebühren</a>
+                            <a href="#" class="nav-item" data-target="settings-smtp">E-Mail (SMTP)</a>
 
-                    <!-- VERMIETER in Settings -->
-                    <div class="modal-subheader">
-                        <h4>Vermieter-Daten</h4>
-                        <p><small>Diese Daten erscheinen auf jeder Rechnung.</small></p>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="v-name">Name / Firma *</label>
-                            <input type="text" id="v-name" required placeholder="Max Mustermann">
-                        </div>
-                        <div class="form-group">
-                            <label for="v-steuernr">Steuernummer</label>
-                            <input type="text" id="v-steuernr" placeholder="12/345/67890">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="v-adresse">Adresse *</label>
-                        <textarea id="v-adresse" rows="2" required
-                            placeholder="Musterstraße 1&#10;12345 Musterstadt"></textarea>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="v-telefon">Telefon</label>
-                            <input type="tel" id="v-telefon" placeholder="+49 123 456789">
-                        </div>
-                        <div class="form-group">
-                            <label for="v-email">E-Mail</label>
-                            <input type="email" id="v-email" placeholder="info@example.de">
-                        </div>
-                    </div>
-                    <hr>
+                            <div class="nav-section">ADVANCED SETTINGS</div>
+                            <a href="#" class="nav-item" data-target="settings-nuki">Nuki Smart Lock</a>
+                            <a href="#" class="nav-item" data-target="settings-paperless">Paperless NGX</a>
+                            <a href="#" class="nav-item" data-target="settings-booking">Booking.com</a>
+                            <a href="#" class="nav-item" data-target="settings-whatsapp">WhatsApp Web</a>
+                            <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot</a>
+                            <a href="#" class="nav-item" data-target="settings-users">Benutzer (2FA)</a>
+                            <a href="#" class="nav-item" data-target="settings-system">System & Update</a>
+                        </nav>
+                    </aside>
 
-                    <!-- PAPERLESS -->
-                    <div class="modal-subheader">
-                        <h4>Paperless NGX</h4>
-                    </div>
-                    <div class="form-group">
-                        <label for="pl-url">Paperless URL *</label>
-                        <input type="url" id="pl-url" placeholder="https://paperless.example.com">
-                        <small>Basis-URL deiner Paperless-NGX Instanz (ohne /api)</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="pl-token">API Token *</label>
-                        <input type="password" id="pl-token" placeholder="Token aus Benutzerprofil">
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="pl-correspondent">Correspondent ID</label>
-                            <input type="number" id="pl-correspondent" placeholder="Optional">
-                        </div>
-                        <div class="form-group">
-                            <label for="pl-doctype">Document Type ID</label>
-                            <input type="number" id="pl-doctype" placeholder="Optional">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="pl-tags">Tag IDs (kommagetrennt)</label>
-                        <input type="text" id="pl-tags" placeholder="z.B. 3,7,12">
-                    </div>
-                    <hr>
+                    <!-- CONTENT AREA -->
+                    <main class="settings-content">
+                        <header class="content-header">
+                            <div class="breadcrumbs">
+                                <span class="bc-home">🏠</span>
+                                <span class="bc-sep">></span>
+                                <span class="bc-module">Settings</span>
+                                <span class="bc-sep">></span>
+                                <span class="bc-page" id="settings-current-page">Branding</span>
+                            </div>
+                            <button type="button" id="btn-close-settings" class="btn btn-ghost btn-icon">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" />
+                                </svg>
+                            </button>
+                        </header>
 
-                    <!-- PREISE -->
-                    <div class="modal-subheader">
-                        <h4>Preise & Gebühren</h4>
-                        <p><small>Standardwerte für WhatsApp-Buchungen.</small></p>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="p-night">Preis pro Nacht (€)</label>
-                            <input type="number" id="p-night" step="0.01" placeholder="85.00">
-                        </div>
-                        <div class="form-group">
-                            <label for="p-cleaning">Endreinigung (€)</label>
-                            <input type="number" id="p-cleaning" step="0.01" placeholder="50.00">
-                        </div>
-                    </div>
-                    <hr>
+                        <div class="content-scrollable">
+                            <!-- BRANDING -->
+                            <section id="settings-branding" class="settings-page active">
+                                <h2>Branding / Logo</h2>
+                                <p class="text-muted">Dein Logo erscheint auf jeder Rechnung.</p>
+                                <div class="form-group" style="margin-top: 2rem;">
+                                    <label>Logo hochladen</label>
+                                    <div class="logo-upload-area" id="logo-upload-area">
+                                        <img id="logo-preview" src="" alt="Logo"
+                                            style="display:none; max-width:200px; max-height:80px; margin-bottom:0.5rem;">
+                                        <input type="file" id="logo-file-input" accept="image/*" style="display:none;">
+                                        <div class="btn-group">
+                                            <button type="button" id="btn-upload-logo"
+                                                class="btn btn-primary btn-sm">Logo wählen</button>
+                                            <button type="button" id="btn-remove-logo"
+                                                class="btn btn-ghost btn-danger btn-sm"
+                                                style="display:none;">Entfernen</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
 
-                    <!-- SMTP -->
-                    <div class="modal-subheader">
-                        <h4>E-Mail Versand (SMTP)</h4>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="smtp-host">SMTP Host</label>
-                            <input type="text" id="smtp-host" placeholder="z.B. smtp.gmail.com">
-                        </div>
-                        <div class="form-group">
-                            <label for="smtp-port">Port</label>
-                            <input type="number" id="smtp-port" placeholder="587">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="smtp-user">Benutzer / E-Mail</label>
-                            <input type="text" id="smtp-user" placeholder="deine@e-mail.de">
-                        </div>
-                        <div class="form-group">
-                            <label for="smtp-pass">Passwort</label>
-                            <input type="password" id="smtp-pass" placeholder="E-Mail Passwort">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="smtp-from">Absender Name (optional)</label>
-                        <input type="text" id="smtp-from" placeholder="Dein Ferienhaus">
-                    </div>
-                    <hr>
+                            <!-- VERMIETER -->
+                            <section id="settings-v-data" class="settings-page">
+                                <h2>Vermieter-Daten</h2>
+                                <p class="text-muted">Diese Daten erscheinen im Kopf jeder Rechnung.</p>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="v-name">Name / Firma *</label>
+                                            <input type="text" id="v-name" required placeholder="Max Mustermann">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="v-steuernr">Steuernummer</label>
+                                            <input type="text" id="v-steuernr" placeholder="12/345/67890">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="v-adresse">Adresse *</label>
+                                        <textarea id="v-adresse" rows="3" required
+                                            placeholder="Musterstraße 1&#10;12345 Musterstadt"></textarea>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="v-telefon">Telefon</label>
+                                            <input type="tel" id="v-telefon" placeholder="+49 123 456789">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="v-email">E-Mail</label>
+                                            <input type="email" id="v-email" placeholder="info@example.de">
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
 
-                    <!-- NUKI -->
-                    <div class="modal-subheader">
-                        <h4>Nuki Smart Lock</h4>
-                    </div>
-                    <div class="form-group">
-                        <label for="nuki-token">Nuki API Token</label>
-                        <input type="password" id="nuki-token" placeholder="Dein API Token">
-                    </div>
-                    <div class="form-group">
-                        <label for="nuki-lock-id">Smart Lock ID</label>
-                        <input type="text" id="nuki-lock-id" placeholder="ID deines Schlosses">
-                    </div>
-                    <hr>
+                            <!-- PREISE -->
+                            <section id="settings-pricing" class="settings-page">
+                                <h2>Preise & Gebühren</h2>
+                                <p class="text-muted">Standardwerte für WhatsApp/Telegram Buchungen.</p>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="p-night">Preis pro Nacht (€)</label>
+                                            <input type="number" id="p-night" step="0.01" placeholder="85.00">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="p-cleaning">Endreinigung (€)</label>
+                                            <input type="number" id="p-cleaning" step="0.01" placeholder="50.00">
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
 
-                    <!-- BOOKING.COM -->
-                    <div class="modal-subheader">
-                        <h4>Booking.com Integration</h4>
-                    </div>
-                    <div class="form-group">
-                        <label for="booking-ical-url">Booking.com iCal URL (Export-Link)</label>
-                        <input type="url" id="booking-ical-url" placeholder="https://ical.booking.com/v1/export/...">
-                        <small>Export-Link findest du im Booking Extranet unter Rate &amp; Verfügbarkeit → Kalender
-                            synchronisieren.</small>
-                    </div>
-                    <hr>
+                            <!-- SMTP -->
+                            <section id="settings-smtp" class="settings-page">
+                                <h2>E-Mail Versand (SMTP)</h2>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="smtp-host">SMTP Host</label>
+                                            <input type="text" id="smtp-host" placeholder="z.B. smtp.gmail.com">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="smtp-port">Port</label>
+                                            <input type="number" id="smtp-port" placeholder="587">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="smtp-user">Benutzer / E-Mail</label>
+                                            <input type="text" id="smtp-user" placeholder="deine@e-mail.de">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="smtp-pass">Passwort</label>
+                                            <input type="password" id="smtp-pass" placeholder="E-Mail Passwort">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="smtp-from">Absender Name (optional)</label>
+                                        <input type="text" id="smtp-from" placeholder="Dein Ferienhaus">
+                                    </div>
+                                </div>
+                            </section>
 
-                    <!-- USER MANAGEMENT -->
-                    <div class="modal-subheader">
-                        <h4>Benutzerverwaltung (2FA)</h4>
-                    </div>
-                    <div id="users-list-container" style="margin-bottom: 1rem;">
-                        <!-- User list populated via JS -->
-                    </div>
-                    <button type="button" id="btn-add-user-modal" class="btn btn-outline"
-                        style="width: 100%; margin-bottom: 1rem;">Neuen Benutzer hinzufügen</button>
-                    <hr>
+                            <!-- NUKI -->
+                            <section id="settings-nuki" class="settings-page">
+                                <h2>Nuki Smart Lock</h2>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-group">
+                                        <label for="nuki-token">Nuki API Token</label>
+                                        <input type="password" id="nuki-token" placeholder="Dein API Token">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="nuki-lock-id">Smart Lock ID</label>
+                                        <input type="text" id="nuki-lock-id" placeholder="ID deines Schlosses">
+                                    </div>
+                                    <button type="button" id="btn-nuki-test" class="btn btn-outline"
+                                        style="width:100%">Verbindung testen</button>
+                                </div>
+                            </section>
 
-                    <!-- NOTIFICATIONS (WhatsApp Web) -->
-                    <div class="modal-subheader">
-                        <h4>Benachrichtigungen (WhatsApp Web)</h4>
-                    </div>
-                    <div class="form-group">
-                        <label>WhatsApp-Status</label>
-                        <div id="wa-status-container"
-                            style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-radius: 8px; background: var(--bg-surface);">
-                            <span id="wa-status-dot"
-                                style="width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0;"></span>
-                            <span id="wa-status-text" style="font-size: 0.9rem;">Verbindung wird hergestellt...</span>
-                        </div>
-                    </div>
-                    <div class="form-group" id="wa-qr-group" style="display: none;">
-                        <label>QR-Code scannen</label>
-                        <div
-                            style="display: flex; justify-content: center; padding: 1rem; background: #fff; border-radius: 8px;">
-                            <img id="wa-qr-image" alt="WhatsApp QR Code" style="max-width: 260px; width: 100%;">
-                        </div>
-                        <small>Öffne WhatsApp → Verknüpfte Geräte → Gerät hinzufügen → QR-Code scannen</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Empfänger-Nummern (mit Ländervorwahl)</label>
-                        <div id="wa-phones-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                            <!-- Dynamic list of phone inputs -->
-                        </div>
-                        <button type="button" id="btn-add-wa-phone" class="btn btn-outline"
-                            style="margin-top: 0.5rem; width: 100%;">+ Nummer hinzufügen</button>
-                        <small>Nummern an die Benachrichtigungen gesendet werden (z.B. Oma, Du selbst).</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="reminder-days">Erinnerung (Tage vorher)</label>
-                            <input type="number" id="reminder-days" value="2" min="1" max="7">
-                        </div>
-                        <div class="form-group"
-                            style="display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5rem;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" id="notifications-enabled" checked>
-                                Benachrichtigungen aktiv
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" id="twofactor-enabled" checked>
-                                WhatsApp 2FA Login aktiv
-                            </label>
-                        </div>
-                    </div>
-                    <hr>
+                            <!-- PAPERLESS -->
+                            <section id="settings-paperless" class="settings-page">
+                                <h2>Paperless NGX</h2>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-group">
+                                        <label for="pl-url">Paperless URL *</label>
+                                        <input type="url" id="pl-url" placeholder="https://paperless.example.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="pl-token">API Token *</label>
+                                        <input type="password" id="pl-token" placeholder="Token aus Benutzerprofil">
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="pl-correspondent">Correspondent ID</label>
+                                            <input type="number" id="pl-correspondent" placeholder="Optional">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pl-doctype">Document Type ID</label>
+                                            <input type="number" id="pl-doctype" placeholder="Optional">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="pl-tags">Tag IDs (kommagetrennt)</label>
+                                        <input type="text" id="pl-tags" placeholder="z.B. 3,7,12">
+                                    </div>
+                                    <button type="button" id="btn-test-connection" class="btn btn-outline"
+                                        style="width:100%">Paperless testen</button>
+                                </div>
+                            </section>
 
-                    <!-- UPDATE & CHANGELOG -->
-                    <div class="modal-subheader">
-                        <h4>Update & Changelog</h4>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                        <span id="current-version" style="font-size: 0.9rem; color: var(--text-muted);">Version:
-                            ---</span>
-                        <button type="button" id="btn-update" class="btn btn-outline" style="flex-shrink: 0;">🔄 Nach
-                            Updates suchen</button>
-                    </div>
-                    <div id="changelog-container"
-                        style="max-height: 300px; overflow-y: auto; border-radius: 8px; background: var(--bg-surface); padding: 1rem; font-size: 0.85rem;">
-                        <p style="color: var(--text-muted);">Changelog wird geladen...</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" id="btn-save-settings" class="btn btn-primary">Einstellungen
-                        speichern</button>
-                    <div class="btn-group">
-                        <button type="button" id="btn-save-vermieter" class="btn btn-outline">Vermieter
-                            speichern</button>
-                        <button type="button" id="btn-test-connection" class="btn btn-outline">Paperless testen</button>
-                        <button type="button" id="btn-nuki-test" class="btn btn-outline">Nuki testen</button>
-                        <button type="button" id="btn-test-whatsapp" class="btn btn-outline">WhatsApp testen</button>
-                        <button type="button" id="btn-wa-logout" class="btn btn-outline">WhatsApp trennen</button>
-                        <button type="button" id="btn-migrate-data" class="btn btn-outline"
-                            title="Bestehende Browser-Daten in die Datenbank importieren">Daten importieren</button>
-                    </div>
+                            <!-- BOOKING -->
+                            <section id="settings-booking" class="settings-page">
+                                <h2>Booking.com Integration</h2>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-group">
+                                        <label for="booking-ical-url">Booking.com iCal URL</label>
+                                        <input type="url" id="booking-ical-url"
+                                            placeholder="https://ical.booking.com/...">
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- WHATSAPP -->
+                            <section id="settings-whatsapp" class="settings-page">
+                                <div class="section-header-flex">
+                                    <h2>WhatsApp Web</h2>
+                                    <div id="wa-status-badge" class="badge">Offline</div>
+                                </div>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div id="wa-qr-group"
+                                        style="display: none; text-align: center; margin-bottom: 1.5rem;">
+                                        <img id="wa-qr-image" alt="QR Code"
+                                            style="max-width: 200px; border: 1px solid var(--border-color); padding: 5px;">
+                                        <p><small>Scannen zum Verbinden</small></p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Benachrichtigungs-Nummern (JSON)</label>
+                                        <div id="wa-phones-container" class="dynamic-inputs"></div>
+                                        <button type="button" id="btn-add-wa-phone" class="btn btn-ghost btn-sm">+
+                                            Nummer hinzufügen</button>
+                                    </div>
+                                    <div class="form-row">
+                                        <label
+                                            style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                            <input type="checkbox" id="twofactor-enabled"> 2FA Login aktiv
+                                        </label>
+                                    </div>
+                                    <div class="btn-group" style="margin-top: 1rem;">
+                                        <button type="button" id="btn-test-whatsapp"
+                                            class="btn btn-outline btn-sm">Test-WA senden</button>
+                                        <button type="button" id="btn-wa-logout"
+                                            class="btn btn-ghost btn-danger btn-sm">Trennen</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- TELEGRAM -->
+                            <section id="settings-telegram" class="settings-page">
+                                <h2>Telegram Bot</h2>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-group">
+                                        <label for="tg-token">Bot Token (@BotFather)</label>
+                                        <input type="password" id="tg-token" placeholder="123456:ABC-DEF...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Benachrichtigungs-IDs (JSON)</label>
+                                        <div id="tg-ids-container" class="dynamic-inputs"></div>
+                                        <button type="button" id="btn-add-tg-id" class="btn btn-ghost btn-sm">+ ID
+                                            hinzufügen</button>
+                                    </div>
+                                    <p><small>Tipp: Sende <code>ping</code> an deinen Bot für deine ID.</small></p>
+                                </div>
+                            </section>
+
+                            <!-- USERS -->
+                            <section id="settings-users" class="settings-page">
+                                <h2>Benutzerverwaltung</h2>
+                                <div id="users-list-container" style="margin-top: 1.5rem;"></div>
+                                <button type="button" id="btn-add-user-modal" class="btn btn-primary"
+                                    style="width:100%; margin-top:1rem;">Neuen Benutzer hinzufügen</button>
+                            </section>
+
+                            <!-- SYSTEM -->
+                            <section id="settings-system" class="settings-page">
+                                <h2>System & Update</h2>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="info-row">
+                                        <span>Version:</span>
+                                        <strong id="current-version">---</strong>
+                                    </div>
+                                    <button type="button" id="btn-update" class="btn btn-outline"
+                                        style="width:100%; margin: 1rem 0;">Update suchen</button>
+                                    <div id="changelog-container" class="changelog-box"></div>
+
+                                    <hr style="margin: 1.5rem 0;">
+                                    <div class="form-group">
+                                        <label>Datenbank-Import (Bestehende Browser-Daten)</label>
+                                        <button type="button" id="btn-migrate-data" class="btn btn-ghost btn-sm"
+                                            style="width:100%">Import starten</button>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <!-- STICKY FOOTER FOR CONTENT -->
+                        <footer class="content-footer">
+                            <div class="status-indicator">Änderungen werden nicht automatisch gespeichert.</div>
+                            <button type="button" id="btn-save-settings" class="btn btn-primary btn-lg">Einstellungen
+                                speichern</button>
+                        </footer>
+                    </main>
                 </div>
             </div>
         </div>

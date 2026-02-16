@@ -26,6 +26,8 @@
     const btnCloseSettings = $('#btn-close-settings');
     const btnSaveSettings = $('#btn-save-settings');
     const btnTestConnection = $('#btn-test-connection');
+    const btnAddTgId = $('#btn-add-tg-id');
+    const btnAddWaPhone = $('#btn-add-wa-phone');
     const btnArchive = $('#btn-archive');
     const btnArchiveSave = $('#btn-archive-save');
     const btnCloseArchive = $('#btn-close-archive');
@@ -612,8 +614,10 @@
             paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
             paperless_amount_field: $('#s-pl-amount-field')?.value || '',
             wa_phones: JSON.stringify(Array.from(document.querySelectorAll('.wa-phone-input')).map(input => input.value)),
+            tg_token: $('#tg-token').value,
+            tg_ids: JSON.stringify(Array.from(document.querySelectorAll('.tg-id-input')).map(input => input.value)),
             reminder_days: $('#reminder-days').value || '2',
-            notifications_enabled: $('#notifications-enabled').checked ? 'true' : 'false',
+            notifications_enabled: $('#notifications-enabled')?.checked !== false ? 'true' : 'false',
             twofactor_enabled: $('#twofactor-enabled').checked ? 'true' : 'false'
         };
 
@@ -708,8 +712,20 @@
             else phones.forEach(p => addWaPhoneRow(p));
 
             if (s.reminder_days) $('#reminder-days').value = s.reminder_days;
+
+            // Telegram
+            if (s.tg_token) $('#tg-token').value = s.tg_token;
+            const tgContainer = $('#tg-ids-container');
+            if (tgContainer) {
+                tgContainer.innerHTML = '';
+                let tgIds = [];
+                try { tgIds = JSON.parse(s.tg_ids || '[]'); } catch (e) { if (s.tg_id) tgIds = [s.tg_id]; }
+                if (tgIds.length === 0) addTgIdRow('');
+                else tgIds.forEach(id => addTgIdRow(id));
+            }
+
             if (s.notifications_enabled !== undefined) {
-                $('#notifications-enabled').checked = s.notifications_enabled !== 'false';
+                if ($('#notifications-enabled')) $('#notifications-enabled').checked = s.notifications_enabled !== 'false';
             }
             if (s.twofactor_enabled !== undefined) {
                 $('#twofactor-enabled').checked = s.twofactor_enabled !== 'false';
@@ -740,28 +756,19 @@
         try {
             const res = await fetch('/api/whatsapp/qr');
             const data = await res.json();
-            const dot = $('#wa-status-dot');
-            const text = $('#wa-status-text');
-            const qrGroup = $('#wa-qr-group');
-            const qrImage = $('#wa-qr-image');
-
             if (data.status === 'ready') {
-                dot.style.background = '#22c55e';
-                text.textContent = '\u2705 Verbunden';
-                qrGroup.style.display = 'none';
+                if (dot) dot.className = 'badge online';
+                if (text) text.textContent = 'Verbunden';
+                if (qrGroup) qrGroup.style.display = 'none';
             } else if (data.status === 'qr_pending' && data.qr) {
-                dot.style.background = '#eab308';
-                text.textContent = '\ud83d\udcf1 QR-Code bereit \u2013 bitte scannen';
-                qrGroup.style.display = 'block';
-                qrImage.src = data.qr;
-            } else if (data.status === 'connecting') {
-                dot.style.background = '#3b82f6';
-                text.textContent = '\ud83d\udd04 Verbindung wird hergestellt...';
-                qrGroup.style.display = 'none';
+                if (dot) dot.className = 'badge';
+                if (text) text.textContent = 'QR-Code scannen';
+                if (qrGroup) qrGroup.style.display = 'block';
+                if (qrImage) qrImage.src = data.qr;
             } else {
-                dot.style.background = 'var(--text-muted)';
-                text.textContent = '\u26a0\ufe0f Nicht verbunden';
-                qrGroup.style.display = 'none';
+                if (dot) dot.className = 'badge';
+                if (text) text.textContent = 'Offline';
+                if (qrGroup) qrGroup.style.display = 'none';
             }
         } catch (e) {
             console.error('WA Status Error:', e);
@@ -797,28 +804,44 @@
         input.placeholder = '+4917612345678';
         input.value = val;
         input.style.flex = '1';
-
-        const btnRemove = document.createElement('button');
-        btnRemove.type = 'button';
-        btnRemove.innerHTML = '🗑️';
-        btnRemove.className = 'btn btn-outline';
-        btnRemove.style.padding = '0.4rem';
-        btnRemove.onclick = () => {
-            if (container.querySelectorAll('.wa-phone-input').length > 1) {
-                row.remove();
-            } else {
-                input.value = '';
-            }
-        };
-
-        row.appendChild(input);
-        row.appendChild(btnRemove);
         container.appendChild(row);
+        row.appendChild(input);
+
+        const btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.className = 'btn btn-ghost btn-danger btn-sm';
+        btnDel.innerHTML = '\u2715';
+        btnDel.onclick = () => row.remove();
+        row.appendChild(btnDel);
     }
 
-    if ($('#btn-add-wa-phone')) {
-        $('#btn-add-wa-phone').addEventListener('click', () => addWaPhoneRow(''));
+    function addTgIdRow(val = '') {
+        const container = $('#tg-ids-container');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '0.5rem';
+        row.style.alignItems = 'center';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'tg-id-input';
+        input.placeholder = '123456789';
+        input.value = val;
+        input.style.flex = '1';
+        container.appendChild(row);
+        row.appendChild(input);
+
+        const btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.className = 'btn btn-ghost btn-danger btn-sm';
+        btnDel.innerHTML = '\u2715';
+        btnDel.onclick = () => row.remove();
+        row.appendChild(btnDel);
     }
+
+    if (btnAddWaPhone) btnAddWaPhone.addEventListener('click', () => addWaPhoneRow(''));
+    if (btnAddTgId) btnAddTgId.addEventListener('click', () => addTgIdRow(''));
 
     // --- NEW: User Management Support ---
     async function loadUsers() {
@@ -1563,6 +1586,36 @@
         await saveBranding();
         modalSettings.style.display = 'none';
     });
+
+    // Settings Sidebar Navigation
+    document.querySelectorAll('.settings-sidebar .nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = item.dataset.target;
+            const targetPage = $('#' + targetId);
+            const pageTitle = item.textContent;
+
+            if (targetPage) {
+                // Update Sidebar
+                item.closest('.sidebar-nav').querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+
+                // Update Content
+                document.querySelectorAll('.settings-page').forEach(page => page.classList.remove('active'));
+                targetPage.classList.add('active');
+
+                // Update Breadcrumbs
+                const bcPage = $('#settings-current-page');
+                if (bcPage) bcPage.textContent = pageTitle;
+            }
+        });
+    });
+
+    // Helper to switch to a specific settings page
+    function openSettingsPage(pageId) {
+        const item = $(`.nav-item[data-target="settings-${pageId}"]`);
+        if (item) item.click();
+    }
 
     // =======================
     // Sidebar Toggle (Mobile)

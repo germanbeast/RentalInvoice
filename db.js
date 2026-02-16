@@ -32,6 +32,7 @@ function initSchema() {
             password TEXT NOT NULL,
             role TEXT DEFAULT 'admin',
             phone TEXT DEFAULT '',
+            telegram_id TEXT DEFAULT '',
             recovery_key TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -139,11 +140,16 @@ function getUserByPhone(phone) {
     `).get(`%${suffix}`);
 }
 
-function createUser(username, hashedPassword, role = 'admin', phone = '') {
+function getUserByTelegramId(tgId) {
+    if (!tgId) return null;
+    return getDb().prepare("SELECT * FROM users WHERE telegram_id = ?").get(String(tgId));
+}
+
+function createUser(username, hashedPassword, role = 'admin', phone = '', telegramId = '') {
     const recoveryKey = require('crypto').randomBytes(8).toString('hex'); // 16 chars
     return getDb().prepare(
-        'INSERT OR REPLACE INTO users (username, password, role, phone, recovery_key) VALUES (?, ?, ?, ?, ?)'
-    ).run(username, hashedPassword, role, phone, recoveryKey);
+        'INSERT OR REPLACE INTO users (username, password, role, phone, telegram_id, recovery_key) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(username, hashedPassword, role, phone, telegramId, recoveryKey);
 }
 
 function verifyRecoveryKey(username, key) {
@@ -665,6 +671,7 @@ module.exports = {
     getUser,
     getAllUsers,
     getUserByPhone,
+    getUserByTelegramId,
     createUser,
     updateUserPassword,
     updateUser,
