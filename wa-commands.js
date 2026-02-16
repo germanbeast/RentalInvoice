@@ -13,11 +13,18 @@ const sessions = new Map();
 async function processMessage(msg, waClient, MessageMedia) {
     const from = msg.from;
     const body = msg.body.trim();
+
+    // Ignore Groups and Newsletters/Channels
+    if (from.includes('@g.us') || from.includes('@newsletter')) {
+        console.log(`[WA] Ignoriere Nachricht von Gruppe/Channel: ${from}`);
+        return;
+    }
+
     const user = db.getUserByPhone(from);
 
     console.log(`[WA] Nachricht von ${from}: "${body}"`);
     if (!user) {
-        console.warn(`[WA] Unbefugter Zugriff von ${from}. Kein User in DB gefunden.`);
+        console.warn(`[WA] Zugriff verweigert für ${from}. Diese ID/Nummer ist nicht als Admin-Benutzer in der Datenbank registriert.`);
         return; // Ignore unauthorized numbers
     }
     console.log(`[WA] Authentifizierter User: ${user.username}`);
