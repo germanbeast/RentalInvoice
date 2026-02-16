@@ -153,6 +153,27 @@ function getUserByTelegramId(tgId) {
     return getDb().prepare("SELECT * FROM users WHERE telegram_id = ?").get(String(tgId));
 }
 
+function isTelegramIdAuthorized(tgId) {
+    if (!tgId) return false;
+    const strId = String(tgId);
+
+    // 1. Check users table
+    const user = getUserByTelegramId(strId);
+    if (user) return true;
+
+    // 2. Check settings (global tg_ids list)
+    const settings = getAllSettings();
+    if (settings.tg_ids) {
+        try {
+            const allowedIds = JSON.parse(settings.tg_ids);
+            if (Array.isArray(allowedIds) && allowedIds.map(String).includes(strId)) {
+                return true;
+            }
+        } catch (e) { }
+    }
+    return false;
+}
+
 function createUser(username, hashedPassword, role = 'admin', phone = '', telegramId = '') {
     const recoveryKey = require('crypto').randomBytes(8).toString('hex'); // 16 chars
     return getDb().prepare(
@@ -724,6 +745,7 @@ module.exports = {
     getExpiredNukiAuths,
     clearNukiAuth,
     findBookingForStay,
+    isTelegramIdAuthorized,
     // Migration
     migrateFromLocalStorage
 };

@@ -15,15 +15,16 @@ async function processMessage(bot, msg) {
     if (!body) return;
 
     // Authorization
-    const user = db.getUserByTelegramId(chatId);
+    const isAuthorized = db.isTelegramIdAuthorized(chatId);
     console.log(`[TG] Nachricht von [${chatId}]: "${body}"`);
 
-    if (!user) {
+    if (!isAuthorized) {
         // Simple "Ping" to show ID for new users
         if (body.toLowerCase() === 'ping' || body.toLowerCase() === '/start') {
             return bot.sendMessage(chatId, `Deine Telegram-ID ist: \`${chatId}\`\nBitte trage diese in den Einstellungen deines Benutzerprofils ein.`);
         }
-        return console.warn(`[TG] Zugriff verweigert für ID: ${chatId}.`);
+        console.warn(`[TG] Zugriff verweigert für ID: ${chatId}.`);
+        return;
     }
 
     // Follow-up sessions

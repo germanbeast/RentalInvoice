@@ -2336,8 +2336,10 @@
     // =======================
     // Self-Update
     // =======================
-    if (btnUpdate) {
-        btnUpdate.addEventListener('click', async () => {
+    // Re-check if missing (defensive)
+    const activeUpdateBtn = btnUpdate || $('#btn-update-check');
+    if (activeUpdateBtn) {
+        activeUpdateBtn.addEventListener('click', async () => {
             if (!confirm('Möchtest du jetzt nach Updates suchen und diese installieren?\n\nDer Server startet dabei kurz neu.')) {
                 return;
             }

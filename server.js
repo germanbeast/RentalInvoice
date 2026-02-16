@@ -132,23 +132,38 @@ async function sendWhatsApp(phone, message) {
 // =======================
 // 1c. Telegram Bot
 // =======================
-let tgBot = null;
+let currentTgToken = null;
+let tgBot = null; // Define tgBot here
 
-function initTelegram() {
+async function initTelegram() {
     const allSettings = db.getAllSettings();
     const token = allSettings.tg_token;
 
     if (!token) {
+        if (tgBot) {
+            try { await tgBot.stopPolling(); } catch (e) { }
+            tgBot = null;
+            currentTgToken = null;
+        }
         console.warn('⚠️ Telegram Token nicht konfiguriert. Telegram Bot wird nicht gestartet.');
+        return;
+    }
+
+    // Skip if already running with same token
+    if (tgBot && token === currentTgToken) {
         return;
     }
 
     // Stop existing bot if running
     if (tgBot) {
-        try { tgBot.stopPolling(); } catch (e) { }
+        try {
+            console.log('⏳ Stoppe alte Telegram Bot Instanz...');
+            await tgBot.stopPolling();
+        } catch (e) { }
     }
 
     try {
+        currentTgToken = token;
         tgBot = new TelegramBot(token, { polling: true });
         console.log('✅ Telegram Bot initialisiert (Polling).');
 
@@ -772,7 +787,7 @@ app.put('/api/settings', apiLimiter, (req, res) => {
 
         // Re-init Telegram if token changed
         if (settings.tg_token) {
-            initTelegram();
+            initTelegram().catch(e => console.error('Error re-init Telegram:', e));
         }
 
         res.json({ success: true, message: 'Einstellungen gespeichert' });
