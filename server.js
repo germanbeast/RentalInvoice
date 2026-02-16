@@ -768,7 +768,7 @@ app.put('/api/settings', apiLimiter, (req, res) => {
         if (!settings || typeof settings !== 'object') {
             return res.status(400).json({ error: 'Ungültige Einstellungen' });
         }
-        db.updateSettings(settings);
+        db.setAllSettings(settings);
 
         // Re-init Telegram if token changed
         if (settings.tg_token) {

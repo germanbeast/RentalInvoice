@@ -841,6 +841,27 @@
                                             <input type="email" id="v-email" placeholder="info@example.de">
                                         </div>
                                     </div>
+                                    <hr style="margin: 1.5rem 0;">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="b-inhaber">Kontoinhaber</label>
+                                            <input type="text" id="b-inhaber" placeholder="Max Mustermann">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="b-bank">Bank</label>
+                                            <input type="text" id="b-bank" placeholder="Musterbank">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="b-iban">IBAN</label>
+                                            <input type="text" id="b-iban" placeholder="DE12 3456 ...">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="b-bic">BIC</label>
+                                            <input type="text" id="b-bic" placeholder="ABCDEFXXX">
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
 
@@ -857,6 +878,19 @@
                                         <div class="form-group">
                                             <label for="p-cleaning">Endreinigung (€)</label>
                                             <input type="number" id="p-cleaning" step="0.01" placeholder="50.00">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="mwst-satz">MwSt. Satz (%)</label>
+                                            <input type="number" id="mwst-satz" step="0.1" placeholder="7.0">
+                                        </div>
+                                        <div class="form-group">
+                                            <label
+                                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; height: 100%; margin-top: 1rem;">
+                                                <input type="checkbox" id="kleinunternehmer"> Kleinunternehmer (keine
+                                                MwSt.)
+                                            </label>
                                         </div>
                                     </div>
                                 </div>
@@ -936,8 +970,20 @@
                                         <label for="pl-tags">Tag IDs (kommagetrennt)</label>
                                         <input type="text" id="pl-tags" placeholder="z.B. 3,7,12">
                                     </div>
-                                    <button type="button" id="btn-test-connection" class="btn btn-outline"
-                                        style="width:100%">Paperless testen</button>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="s-pl-expense-tag">Expense Tag ID (Paperless)</label>
+                                            <input type="number" id="s-pl-expense-tag" placeholder="z.B. 12">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="s-pl-amount-field">Custom Field ID für Betrag</label>
+                                            <input type="number" id="s-pl-amount-field" placeholder="z.B. 1">
+                                        </div>
+                                    </div>
+                                    <div class="btn-group" style="margin-top: 1rem;">
+                                        <button type="button" id="btn-paperless-test" class="btn btn-outline"
+                                            style="flex:1">Paperless testen</button>
+                                    </div>
                                 </div>
                             </section>
 
@@ -1024,6 +1070,22 @@
                                     <button type="button" id="btn-update" class="btn btn-outline"
                                         style="width:100%; margin: 1rem 0;">Update suchen</button>
                                     <div id="changelog-container" class="changelog-box"></div>
+
+                                    <hr style="margin: 1.5rem 0;">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="reminder-days">Vorlaufzeit für Erinnerungen (Tage)</label>
+                                            <input type="number" id="reminder-days" placeholder="2">
+                                        </div>
+                                        <div class="form-group">
+                                            <label
+                                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; height: 100%; margin-top: 1rem;">
+                                                <input type="checkbox" id="notifications-enabled"> Autom.
+                                                Benachrichtigungen aktiv
+                                            </label>
+                                        </div>
+                                    </div>
+
 
                                     <hr style="margin: 1.5rem 0;">
                                     <div class="form-group">
