@@ -33,6 +33,14 @@ async function processMessage(bot, msg) {
         return bot.sendMessage(chatId, `⛔ Zugriff verweigert.\nSende \`/register\` um eine Anfrage zu stellen.`);
     }
 
+    // ALREADY AUTHORIZED: Handle /register and /start
+    if (body.toLowerCase() === '/register') {
+        return bot.sendMessage(chatId, `✅ *Du bist bereits registriert.*\nDein Zugriff ist aktiv.`, { parse_mode: 'Markdown' });
+    }
+    if (body.toLowerCase() === '/start') {
+        return handleHelpCommand(bot, msg);
+    }
+
     // Follow-up sessions
     if (sessions.has(chatId)) {
         return handleFollowUp(bot, msg, sessions.get(chatId));
