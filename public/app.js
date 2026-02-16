@@ -2361,7 +2361,7 @@
                         showToast('Deine App ist bereits auf dem neuesten Stand.', 'info');
                         setTimeout(() => {
                             updateOverlay.style.display = 'none';
-                            btnUpdate.disabled = false;
+                            activeUpdateBtn.disabled = false;
                         }, 2000);
                     } else {
                         updateStatusText.textContent = 'Update erfolgreich! Neustart...';
@@ -2379,8 +2379,8 @@
                 showToast(`Fehler: ${err.message}`, 'error', 10000);
                 setTimeout(() => {
                     updateOverlay.style.display = 'none';
-                    btnUpdate.disabled = false;
-                    btnUpdate.innerHTML = originalContent;
+                    activeUpdateBtn.disabled = false;
+                    activeUpdateBtn.innerHTML = originalContent;
                 }, 3000);
             }
         });

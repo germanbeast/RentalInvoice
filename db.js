@@ -159,18 +159,27 @@ function isTelegramIdAuthorized(tgId) {
 
     // 1. Check users table
     const user = getUserByTelegramId(strId);
-    if (user) return true;
+    if (user) {
+        console.log(`[DB] TG-Autorisierung (Tabelle): ID ${strId} erlaubt.`);
+        return true;
+    }
 
     // 2. Check settings (global tg_ids list)
     const settings = getAllSettings();
     if (settings.tg_ids) {
         try {
             const allowedIds = JSON.parse(settings.tg_ids);
-            if (Array.isArray(allowedIds) && allowedIds.map(String).includes(strId)) {
+            const isMatch = Array.isArray(allowedIds) && allowedIds.map(String).includes(strId);
+            if (isMatch) {
+                console.log(`[DB] TG-Autorisierung (Einstellungen): ID ${strId} erlaubt.`);
                 return true;
             }
-        } catch (e) { }
+        } catch (e) {
+            console.error('[DB] Fehler beim Parsen von tg_ids Settings:', e.message);
+        }
     }
+
+    console.warn(`[DB] TG-Autorisierung FEHLGESCHLAGEN: ID ${strId} nicht gefunden.`);
     return false;
 }
 
