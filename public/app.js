@@ -106,90 +106,113 @@
         init(); // Start the app
     }
 
+    let loginStep = 'credentials'; // 'credentials', '2fa', 'recovery'
+    let currentSessionId = null;
+
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = $('#login-user').value;
         const password = $('#login-pass').value;
-        const loginBtn = loginForm.querySelector('button[type="submit"]');
+        const code = $('#login-2fa').value;
+        const recoveryKey = $('#login-recovery').value;
+        const loginBtn = $('#btn-login');
 
-        console.log(`🔑 Login-Versuch gestartet fÃ¼r: ${username}`);
-
-        // Disable button and show loading
         const originalBtnText = loginBtn.innerHTML;
         loginBtn.disabled = true;
-        loginBtn.innerHTML = '<span class="update-spinner" style="width:16px; height:16px; border-width:2px; margin:0 8px 0 0; display:inline-block; vertical-align:middle;"></span> Anmelden...';
 
         try {
-            console.log('🌐 Sende Request an /api/login...');
-            const response = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
+            if (loginStep === 'credentials') {
+                loginBtn.innerHTML = 'Anmelden...';
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
 
-            const data = await response.json();
-
-            if (data.success) {
-                if (data.requires2fa) {
-                    $('#2fa-group').style.display = 'block';
-                    $('#login-pass').parentElement.style.display = 'none'; // Hide password field
-                    $('#login-user').disabled = true;
-                    loginBtn.innerHTML = 'Code verifizieren';
-                    loginBtn.disabled = false;
-                    loginBtn.onclick = async (e) => {
-                        e.preventDefault();
-                        const code = $('#login-2fa').value;
-                        if (!code) return showToast('Bitte Code eingeben', 'error');
-
-                        loginBtn.disabled = true;
-                        loginBtn.innerHTML = 'Verifiziere...';
-
-                        try {
-                            const vRes = await fetch('/api/login/verify', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ sessionId: data.sessionId, code })
-                            });
-                            const vData = await vRes.json();
-                            if (vData.success) {
-                                showAuthSuccess();
-                            } else {
-                                showToast(vData.message || 'Falscher Code', 'error');
-                                loginBtn.disabled = false;
-                                loginBtn.innerHTML = 'Code verifizieren';
-                            }
-                        } catch (e) {
-                            showToast('Verbindungsfehler', 'error');
-                            loginBtn.disabled = false;
-                        }
-                    };
-                    return;
+                if (data.success) {
+                    if (data.requires2fa) {
+                        loginStep = '2fa';
+                        currentSessionId = data.sessionId;
+                        $('#group-2fa').style.display = 'block';
+                        $('#login-pass').parentElement.style.display = 'none';
+                        $('#login-user').disabled = true;
+                        loginBtn.innerHTML = 'Code verifizieren';
+                        loginBtn.disabled = false;
+                    } else {
+                        showAuthSuccess();
+                    }
+                } else {
+                    showToast(data.message || 'Login fehlgeschlagen', 'error');
                 }
-                showAuthSuccess();
-            } else {
-                showToast(data.message || 'Login fehlgeschlagen', 'error');
+            } else if (loginStep === '2fa') {
+                loginBtn.innerHTML = 'Verifiziere...';
+                const vRes = await fetch('/api/login/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSessionId, code })
+                });
+                const vData = await vRes.json();
+                if (vData.success) {
+                    showAuthSuccess();
+                } else {
+                    showToast(vData.message || 'Falscher Code', 'error');
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = 'Code verifizieren';
+                }
+            } else if (loginStep === 'recovery') {
+                loginBtn.innerHTML = 'Wiederherstellen...';
+                const rRes = await fetch('/api/login/recover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, recoveryKey })
+                });
+                const rData = await rRes.json();
+                if (rData.success) {
+                    showAuthSuccess();
+                } else {
+                    showToast(rData.message || 'Ungültiger Key', 'error');
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = 'Account wiederherstellen';
+                }
             }
         } catch (err) {
             console.error('Login error:', err);
             showToast('Server-Fehler beim Login', 'error');
         } finally {
-            if (!loginBtn.onclick) { // Only reset if not in 2FA mode
+            if (loginBtn.disabled) {
                 loginBtn.disabled = false;
                 loginBtn.innerHTML = originalBtnText;
             }
         }
     });
 
+    $('#link-show-recovery').addEventListener('click', (e) => {
+        e.preventDefault();
+        loginStep = 'recovery';
+        $('#group-2fa').style.display = 'none';
+        $('#login-pass').parentElement.style.display = 'none';
+        $('#group-recovery').style.display = 'block';
+        $('#btn-login').innerHTML = 'Account wiederherstellen';
+        if ($('#link-show-recovery')) $('#link-show-recovery').style.display = 'none';
+    });
+
+
     function showAuthSuccess() {
         showToast('Erfolgreich angemeldet!', 'success');
         showApp();
-        // Reset login form for next time
-        $('#2fa-group').style.display = 'none';
-        $('#login-pass').parentElement.style.display = 'block';
+        // Reset login form
+        loginStep = 'credentials';
+        $('#group-2fa').style.display = 'none';
+        $('#group-recovery').style.display = 'none';
+        $('#login-pass')?.parentElement?.style.setProperty('display', 'block');
         $('#login-user').disabled = false;
         $('#login-user').value = '';
         $('#login-pass').value = '';
         $('#login-2fa').value = '';
+        $('#login-recovery').value = '';
+        $('#btn-login').innerHTML = 'Anmelden';
+        if ($('#link-show-recovery')) $('#link-show-recovery').style.display = 'block';
     }
 
     // =======================
@@ -809,9 +832,10 @@
                 div.style.alignItems = 'center';
 
                 div.innerHTML = `
-                    <div>
+                    <div style="flex:1">
                         <strong>${user.username}</strong> (${user.role})<br>
-                        <small>📱 2FA: ${user.phone || 'Nicht gesetzt'}</small>
+                        <small>📱 2FA: ${user.phone || 'Nicht gesetzt'}</small><br>
+                        <small style="color:var(--primary-color);">🔑 Recovery: <code>${user.recovery_key || '---'}</code></small>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
                         <button class="btn btn-outline btn-sm edit-user-btn" data-id="${user.id}">Edit</button>

@@ -32,6 +32,7 @@ function initSchema() {
             password TEXT NOT NULL,
             role TEXT DEFAULT 'admin',
             phone TEXT DEFAULT '',
+            recovery_key TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -116,13 +117,20 @@ function getUser(username) {
 }
 
 function getAllUsers() {
-    return getDb().prepare('SELECT id, username, role, phone, created_at FROM users ORDER BY created_at').all();
+    return getDb().prepare('SELECT id, username, role, phone, recovery_key, created_at FROM users ORDER BY created_at').all();
 }
 
 function createUser(username, hashedPassword, role = 'admin', phone = '') {
+    const recoveryKey = require('crypto').randomBytes(8).toString('hex'); // 16 chars
     return getDb().prepare(
-        'INSERT OR REPLACE INTO users (username, password, role, phone) VALUES (?, ?, ?, ?)'
-    ).run(username, hashedPassword, role, phone);
+        'INSERT OR REPLACE INTO users (username, password, role, phone, recovery_key) VALUES (?, ?, ?, ?, ?)'
+    ).run(username, hashedPassword, role, phone, recoveryKey);
+}
+
+function verifyRecoveryKey(username, key) {
+    const user = getUser(username);
+    if (!user || !user.recovery_key) return false;
+    return user.recovery_key.toLowerCase() === key.trim().toLowerCase();
 }
 
 function updateUserPassword(username, hashedPassword) {
@@ -163,12 +171,24 @@ function initDefaultUser() {
         }
     }
 
-    // Ensure phone column exists (for existing databases)
+    // Ensure columns exist (for existing databases)
     try {
         getDb().prepare("SELECT phone FROM users LIMIT 1").get();
     } catch (e) {
         getDb().exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''");
         console.log('🔄 Spalte "phone" zur User-Tabelle hinzugefügt.');
+    }
+    try {
+        getDb().prepare("SELECT recovery_key FROM users LIMIT 1").get();
+    } catch (e) {
+        getDb().exec("ALTER TABLE users ADD COLUMN recovery_key TEXT");
+        console.log('🔄 Spalte "recovery_key" zur User-Tabelle hinzugefügt.');
+        // Generate keys for existing users
+        const users = getAllUsers();
+        for (const u of users) {
+            const k = require('crypto').randomBytes(8).toString('hex');
+            getDb().prepare("UPDATE users SET recovery_key = ? WHERE id = ?").run(k, u.id);
+        }
     }
 }
 
@@ -573,6 +593,7 @@ module.exports = {
     updateUserPassword,
     updateUser,
     deleteUser,
+    verifyRecoveryKey,
     // Settings
     getSetting,
     setSetting,

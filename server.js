@@ -311,7 +311,8 @@ app.disable('x-powered-by');
 // 5. AUTHENTICATION
 // =======================
 function ensureAuthenticated(req, res, next) {
-    if (req.path === '/api/login' || req.path === '/api/login/verify') return next();
+    const whitelist = ['/api/login', '/api/login/verify', '/api/login/recover', '/api/whatsapp/qr'];
+    if (whitelist.includes(req.path)) return next();
 
     if (req.session && req.session.user) return next();
 
@@ -448,9 +449,29 @@ app.post('/api/login/verify', loginLimiter, (req, res) => {
             console.error('Session regeneration error:', err);
             return res.status(500).json({ success: false, message: 'Server-Fehler' });
         }
-        req.session.user = { username: user.username, role: user.role };
+        req.session.user = { id: user.id, username: user.username, role: user.role };
         res.json({ success: true, user: req.session.user });
     });
+});
+
+// Recovery Key Login
+app.post('/api/login/recover', loginLimiter, (req, res) => {
+    const { username, recoveryKey } = req.body;
+
+    if (!username || !recoveryKey) {
+        return res.status(400).json({ success: false, message: 'Benutzername und Recovery-Key erforderlich' });
+    }
+
+    if (db.verifyRecoveryKey(username, recoveryKey)) {
+        const user = db.getUser(username);
+        req.session.regenerate((err) => {
+            if (err) return res.status(500).json({ success: false, message: 'Server-Fehler' });
+            req.session.user = { id: user.id, username: user.username, role: user.role };
+            res.json({ success: true, message: 'Wiederherstellung erfolgreich', user: req.session.user });
+        });
+    } else {
+        res.status(401).json({ success: false, message: 'Ungültiger Recovery-Key' });
+    }
 });
 
 app.post('/api/logout', (req, res) => {
@@ -458,6 +479,13 @@ app.post('/api/logout', (req, res) => {
         if (err) return res.status(500).json({ success: false, message: 'Logout fehlgeschlagen' });
         res.clearCookie('__sid');
         res.json({ success: true });
+    });
+});
+
+app.get('/api/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.clearCookie('__sid');
+        res.redirect('/');
     });
 });
 
