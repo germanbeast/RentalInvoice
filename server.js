@@ -17,9 +17,10 @@ const ical = require('node-ical');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const db = require('./db');
+const waCommands = require('./wa-commands');
 require('dotenv').config();
 
 const app = express();
@@ -59,6 +60,14 @@ function initWhatsApp() {
         waStatus = 'ready';
         waQrCode = null;
         console.log('\u2705 WhatsApp Web verbunden!');
+    });
+
+    waClient.on('message', async (msg) => {
+        try {
+            await waCommands.processMessage(msg, waClient, MessageMedia);
+        } catch (e) {
+            console.error('Error processing WhatsApp message:', e);
+        }
     });
 
     waClient.on('authenticated', () => {
@@ -900,6 +909,65 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
     } catch (error) {
         console.error('PDF Generation Error:', error.message);
         res.status(500).json({ error: 'PDF-Generierung fehlgeschlagen' });
+    }
+});
+
+// API: Nuki Create PIN (Server-side)
+app.post('/api/nuki/create-pin', apiLimiter, async (req, res) => {
+    try {
+        const { arrival, departure, guestName } = req.body;
+        const allSettings = db.getAllSettings();
+        const nuki = allSettings.nuki;
+
+        if (!nuki || !nuki.token || !nuki.lockId) {
+            return res.status(400).json({ error: 'Nuki-Zugangsdaten fehlen' });
+        }
+
+        if (!arrival || !departure) {
+            return res.status(400).json({ error: 'Anreise/Abreise fehlt' });
+        }
+
+        // Generate a random 6-digit PIN (1-9 only, no 0 allowed!)
+        const generateValidPin = () => {
+            let pin;
+            do {
+                pin = Array.from({ length: 6 }, () => Math.floor(Math.random() * 9) + 1).join('');
+            } while (pin.startsWith('12')); // Nuki PINs cannot start with 12
+            return pin;
+        };
+        const generatedCode = generateValidPin();
+
+        const allowedFrom = `${arrival}T15:00:00.000Z`;
+        const allowedUntil = `${departure}T11:00:00.000Z`;
+        const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
+
+        const axios = require('axios');
+        const response = await axios.put('https://api.nuki.io/smartlock/auth', {
+            name: safeName,
+            allowedFromDate: allowedFrom,
+            allowedUntilDate: allowedUntil,
+            allowedWeekDays: 127,
+            allowedFromTime: 0,
+            allowedUntilTime: 0,
+            type: 13, // Keypad code
+            code: generatedCode,
+            smartlockIds: [nuki.lockId]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${nuki.token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        });
+
+        if (response.status === 204 || response.status === 200 || response.status === 201) {
+            res.json({ success: true, pin: generatedCode });
+        } else {
+            res.status(response.status).json({ error: 'Nuki API Fehler', message: response.data });
+        }
+    } catch (error) {
+        console.error('Nuki Server API Error:', error.message);
+        res.status(500).json({ error: 'Nuki PIN-Generierung fehlgeschlagen', details: error.message });
     }
 });
 

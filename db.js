@@ -120,6 +120,13 @@ function getAllUsers() {
     return getDb().prepare('SELECT id, username, role, phone, recovery_key, created_at FROM users ORDER BY created_at').all();
 }
 
+function getUserByPhone(phone) {
+    if (!phone) return null;
+    const cleaned = phone.replace(/[^\d]/g, '');
+    // Try both absolute and relative formats if needed, but usually we store cleaned
+    return getDb().prepare("SELECT * FROM users WHERE REPLACE(phone, ' ', '') LIKE ?").get(`%${cleaned}`);
+}
+
 function createUser(username, hashedPassword, role = 'admin', phone = '') {
     const recoveryKey = require('crypto').randomBytes(8).toString('hex'); // 16 chars
     return getDb().prepare(
@@ -337,6 +344,31 @@ function getInvoicesByGuestId(guestId) {
     return getDb().prepare(
         `SELECT * FROM invoices WHERE guest_id = ? ORDER BY created_at DESC`
     ).all(guestId);
+}
+
+function getOpenInvoices() {
+    return getDb().prepare(`
+        SELECT i.*, g.name as guest_display_name 
+        FROM invoices i 
+        LEFT JOIN guests g ON i.guest_id = g.id 
+        WHERE i.is_paid = 0 
+        ORDER BY i.invoice_date DESC
+    `).all();
+}
+
+function getNextInvoiceNumber() {
+    const currentYear = new Date().getFullYear();
+    const prefix = `${currentYear}-`;
+    const lastInvoice = getDb().prepare("SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY invoice_number DESC LIMIT 1").get(`${prefix}%`);
+
+    let nextNr = 1;
+    if (lastInvoice) {
+        const parts = lastInvoice.invoice_number.split('-');
+        if (parts.length === 2 && parts[0] === String(currentYear)) {
+            nextNr = parseInt(parts[1]) + 1;
+        }
+    }
+    return `${prefix}${String(nextNr).padStart(3, '0')}`;
 }
 
 function saveInvoice(data) {
@@ -589,6 +621,7 @@ module.exports = {
     // Users
     getUser,
     getAllUsers,
+    getUserByPhone,
     createUser,
     updateUserPassword,
     updateUser,
@@ -609,6 +642,8 @@ module.exports = {
     // Invoices
     getAllInvoices,
     getInvoicesByGuestId,
+    getOpenInvoices,
+    getNextInvoiceNumber,
     saveInvoice,
     deleteInvoice,
     // Branding

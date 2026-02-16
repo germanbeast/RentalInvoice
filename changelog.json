@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.5.0",
+    "currentVersion": "1.6.0",
     "releases": [
+        {
+            "version": "1.6.0",
+            "date": "2026-02-16",
+            "title": "WhatsApp Command Interface",
+            "features": [
+                "WhatsApp Steuerung: Rechnungen per Chat erstellen",
+                "KI-gestützte Parsing von unformatierten Nachrichten",
+                "Automatisierte Nuki-PIN Generierung server-seitig",
+                "1:1 identische PDF-Rechnungen via WhatsApp",
+                "Preise & Gebühren in den Einstellungen konfigurierbar",
+                "Status-Abfrage offener Rechnungen via WhatsApp"
+            ]
+        },
         {
             "version": "1.5.0",
             "date": "2026-02-16",

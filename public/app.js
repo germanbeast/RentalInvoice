@@ -602,9 +602,11 @@
                 pass: $('#smtp-pass').value,
                 from: $('#smtp-from').value
             },
-            nuki: {
-                token: $('#nuki-token').value,
-                lockId: $('#nuki-lock-id').value
+            pricing: {
+                price_per_night: parseFloat($('#p-night').value) || 0,
+                cleaning_fee: parseFloat($('#p-cleaning').value) || 0,
+                mwst_rate: parseFloat($('#mwst-satz').value) || 0,
+                kleinunternehmer: $('#kleinunternehmer').checked
             },
             booking_ical: $('#booking-ical-url').value,
             paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
@@ -680,6 +682,15 @@
                 const n = typeof s.nuki === 'string' ? JSON.parse(s.nuki) : s.nuki;
                 if (n.token) $('#nuki-token').value = n.token;
                 if (n.lockId) $('#nuki-lock-id').value = n.lockId;
+            }
+
+            // Pricing
+            if (s.pricing) {
+                const p = typeof s.pricing === 'string' ? JSON.parse(s.pricing) : s.pricing;
+                if (p.price_per_night) $('#p-night').value = p.price_per_night;
+                if (p.cleaning_fee) $('#p-cleaning').value = p.cleaning_fee;
+                if (p.mwst_rate) $('#mwst-satz').value = p.mwst_rate;
+                if (p.kleinunternehmer) $('#kleinunternehmer').checked = p.kleinunternehmer;
             }
             // Booking iCal
             if (s.booking_ical) {
