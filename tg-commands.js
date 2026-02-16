@@ -19,12 +19,18 @@ async function processMessage(bot, msg) {
     console.log(`[TG] Nachricht von [${chatId}]: "${body}"`);
 
     if (!isAuthorized) {
-        // Simple "Ping" to show ID for new users
-        if (body.toLowerCase() === 'ping' || body.toLowerCase() === '/start') {
-            return bot.sendMessage(chatId, `Deine Telegram-ID ist: \`${chatId}\`\nBitte trage diese in den Einstellungen deines Benutzerprofils ein.`);
+        // Registration Flow
+        if (body.toLowerCase() === '/register' || body.toLowerCase() === '/start') {
+            const firstName = msg.from ? msg.from.first_name : 'Unbekannt';
+            const username = msg.from ? msg.from.username : '';
+
+            db.addPendingTelegramRequest(chatId, firstName, username);
+
+            return bot.sendMessage(chatId, `🔒 *Zugriff angefragt*\n\nDeine ID \`${chatId}\` wurde an den Administrator gesendet.\nBitte schalte den Zugriff im Web-Interface (Einstellungen -> Telegram) frei.`, { parse_mode: 'Markdown' });
         }
+
         console.warn(`[TG] Zugriff verweigert für ID: ${chatId}.`);
-        return;
+        return bot.sendMessage(chatId, `⛔ Zugriff verweigert.\nSende \`/register\` um eine Anfrage zu stellen.`);
     }
 
     // Follow-up sessions

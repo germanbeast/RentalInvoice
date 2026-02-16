@@ -1574,6 +1574,7 @@
     btnSettings.addEventListener('click', () => {
         modalSettings.style.display = 'flex';
         loadChangelog();
+        loadTelegramRequests();
     });
 
     btnCloseSettings.addEventListener('click', () => {
@@ -2386,9 +2387,98 @@
         }
     });
 
+    // =======================
+    // Telegram Requests
+    // =======================
+    async function loadTelegramRequests() {
+        const container = $('#tg-requests-container');
+        const group = $('#tg-requests-group');
+        if (!container || !group) return;
+
+        try {
+            const res = await fetch('/api/settings/telegram/requests');
+            const data = await res.json();
+
+            if (data.success && data.requests.length > 0) {
+                group.style.display = 'block';
+                container.innerHTML = data.requests.map(req => `
+                    <div class="tg-request-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color);">
+                        <div>
+                            <strong>${escapeHtml(req.name)}</strong>
+                            ${req.username ? `<small class="text-muted">(@${escapeHtml(req.username)})</small>` : ''}
+                            <br>
+                            <small class="text-muted">ID: ${req.id}</small>
+                        </div>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-success btn-approve-tg" data-id="${req.id}">Genehmigen</button>
+                            <button type="button" class="btn btn-sm btn-danger btn-deny-tg" data-id="${req.id}">Ablehnen</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                container.querySelectorAll('.btn-approve-tg').forEach(btn => {
+                    btn.addEventListener('click', () => approveTelegramRequest(btn.dataset.id));
+                });
+
+                container.querySelectorAll('.btn-deny-tg').forEach(btn => {
+                    btn.addEventListener('click', () => denyTelegramRequest(btn.dataset.id));
+                });
+
+            } else {
+                group.style.display = 'none';
+                container.innerHTML = '';
+            }
+        } catch (e) {
+            console.error('Failed to load TG requests', e);
+        }
+    }
+
+    async function approveTelegramRequest(id) {
+        if (!confirm('Zugriff genehmigen?')) return;
+        try {
+            const res = await fetch('/api/settings/telegram/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                await loadTelegramRequests();
+                await loadAllSettings(); // Refresh IDs list
+            } else {
+                showToast(data.error, 'error');
+            }
+        } catch (e) {
+            showToast('Fehler bei Genehmigung', 'error');
+        }
+    }
+
+    async function denyTelegramRequest(id) {
+        if (!confirm('Anfrage ablehnen und löschen?')) return;
+        try {
+            const res = await fetch('/api/settings/telegram/deny', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Anfrage abgelehnt', 'success');
+                await loadTelegramRequests();
+            } else {
+                showToast(data.error, 'error');
+            }
+        } catch (e) {
+            showToast('Fehler beim Ablehnen', 'error');
+        }
+    }
+
     async function init() {
         // Load all settings from server
         await loadAllSettings();
+        await loadTelegramRequests();
+
         await loadBranding();
 
         // Try to restore draft first

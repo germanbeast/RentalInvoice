@@ -806,6 +806,40 @@ app.put('/api/settings', apiLimiter, (req, res) => {
     }
 });
 
+// Telegram Requests API
+app.get('/api/settings/telegram/requests', apiLimiter, (req, res) => {
+    try {
+        const requests = db.getPendingTelegramRequests();
+        res.json({ success: true, requests });
+    } catch (e) {
+        res.status(500).json({ error: 'Anfragen konnten nicht geladen werden' });
+    }
+});
+
+app.post('/api/settings/telegram/approve', apiLimiter, (req, res) => {
+    try {
+        const { id } = req.body;
+        const success = db.approveTelegramRequest(id);
+        if (success) {
+            res.json({ success: true, message: 'Anfrage genehmigt' });
+        } else {
+            res.status(400).json({ error: 'Konnte nicht genehmigt werden (evtl. schon genehmigt)' });
+        }
+    } catch (e) {
+        res.status(500).json({ error: 'Fehler beim Genehmigen' });
+    }
+});
+
+app.post('/api/settings/telegram/deny', apiLimiter, (req, res) => {
+    try {
+        const { id } = req.body;
+        db.denyTelegramRequest(id);
+        res.json({ success: true, message: 'Anfrage abgelehnt' });
+    } catch (e) {
+        res.status(500).json({ error: 'Fehler beim Ablehnen' });
+    }
+});
+
 // =======================
 // 9. GUESTS API
 // =======================

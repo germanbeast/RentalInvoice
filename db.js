@@ -184,7 +184,74 @@ function isTelegramIdAuthorized(tgId) {
     }
 
     console.warn(`[DB] TG-Autorisierung FEHLGESCHLAGEN: ID ${strId} nicht gefunden.`);
+    console.warn(`[DB] TG-Autorisierung FEHLGESCHLAGEN: ID ${strId} nicht gefunden.`);
     return false;
+}
+
+// =======================
+// Telegram Registration Flow
+// =======================
+function getPendingTelegramRequests() {
+    const settings = getAllSettings();
+    try {
+        return settings.tg_requests ? JSON.parse(settings.tg_requests) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function addPendingTelegramRequest(tgId, firstName, username) {
+    const requests = getPendingTelegramRequests();
+    const strId = String(tgId);
+
+    // Check if already pending
+    if (requests.some(r => r.id === strId)) return;
+
+    // Check if already authorized
+    if (isTelegramIdAuthorized(strId)) return;
+
+    requests.push({
+        id: strId,
+        name: firstName || 'Unbekannt',
+        username: username || '',
+        date: new Date().toISOString()
+    });
+
+    setSetting('tg_requests', JSON.stringify(requests));
+    console.log(`[DB] Neue Telegram-Anfrage gespeichert: ${strId} (${firstName})`);
+}
+
+function approveTelegramRequest(tgId) {
+    const strId = String(tgId);
+
+    // 1. Remove from requests
+    let requests = getPendingTelegramRequests();
+    requests = requests.filter(r => r.id !== strId);
+    setSetting('tg_requests', JSON.stringify(requests));
+
+    // 2. Add to authorized IDs
+    const settings = getAllSettings();
+    let approvedIds = [];
+    try {
+        approvedIds = settings.tg_ids ? JSON.parse(settings.tg_ids) : [];
+    } catch (e) { }
+
+    if (!approvedIds.map(String).includes(strId)) {
+        approvedIds.push(strId);
+        setSetting('tg_ids', JSON.stringify(approvedIds));
+        console.log(`[DB] Telegram-ID ${strId} genehmigt.`);
+        return true;
+    }
+    return false;
+}
+
+function denyTelegramRequest(tgId) {
+    const strId = String(tgId);
+    let requests = getPendingTelegramRequests();
+    requests = requests.filter(r => r.id !== strId);
+    setSetting('tg_requests', JSON.stringify(requests));
+    console.log(`[DB] Telegram-Anfrage ${strId} abgelehnt.`);
+    return true;
 }
 
 function createUser(username, hashedPassword, role = 'admin', phone = '', telegramId = '') {
@@ -758,7 +825,13 @@ module.exports = {
     getExpiredNukiAuths,
     clearNukiAuth,
     findBookingForStay,
+    findBookingForStay,
     isTelegramIdAuthorized,
+    // TG Registration
+    getPendingTelegramRequests,
+    addPendingTelegramRequest,
+    approveTelegramRequest,
+    denyTelegramRequest,
     // Migration
     migrateFromLocalStorage
 };
