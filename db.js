@@ -110,6 +110,14 @@ function initSchema() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     `);
+    // Migrations
+    const tableInfo = db.prepare("PRAGMA table_info(users)").all();
+    const hasTgId = tableInfo.some(col => col.name === 'telegram_id');
+    if (!hasTgId) {
+        db.exec("ALTER TABLE users ADD COLUMN telegram_id TEXT DEFAULT ''");
+        console.log('✅ Migration: telegram_id Spalte zu users Tabelle hinzugefügt.');
+    }
+
     console.log('✅ Datenbank-Schema initialisiert.');
 }
 
@@ -230,7 +238,6 @@ function migrateUsersJson() {
                     console.log(`📦 Migriert: Benutzer "${username}" aus users.json`);
                 }
             }
-            // Rename old file
             fs.renameSync(usersFile, usersFile + '.bak');
             console.log('✅ users.json → users.json.bak (Migration abgeschlossen)');
         } catch (e) {

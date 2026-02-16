@@ -34,7 +34,7 @@
     const btnNukiPin = $('#btn-nuki-pin');
     const btnEmail = $('#btn-email');
     const btnLogout = $('#btn-logout');
-    const btnUpdate = $('#btn-update');
+    const btnUpdate = $('#btn-update-check');
     const btnSyncPaperless = $('#btn-sync-paperless');
 
     // Navigation Items
@@ -756,6 +756,11 @@
         try {
             const res = await fetch('/api/whatsapp/qr');
             const data = await res.json();
+            const dot = $('#wa-status-dot');
+            const text = $('#wa-status-text');
+            const qrGroup = $('#wa-qr-group');
+            const qrImage = $('#wa-qr-image');
+
             if (data.status === 'ready') {
                 if (dot) dot.className = 'badge online';
                 if (text) text.textContent = 'Verbunden';
@@ -2331,51 +2336,53 @@
     // =======================
     // Self-Update
     // =======================
-    btnUpdate.addEventListener('click', async () => {
-        if (!confirm('Möchtest du jetzt nach Updates suchen und diese installieren?\n\nDer Server startet dabei kurz neu.')) {
-            return;
-        }
-
-        const originalContent = btnUpdate.innerHTML;
-        btnUpdate.disabled = true;
-
-        // Show Overlay
-        updateOverlay.style.display = 'flex';
-        updateStatusText.textContent = 'Update wird geprüft...';
-
-        try {
-            const response = await fetch('/api/update', { method: 'POST' });
-            const result = await response.json();
-
-            if (result.success) {
-                if (result.status === 'no_updates') {
-                    updateStatusText.textContent = 'Keine Updates verfügbar.';
-                    showToast('Deine App ist bereits auf dem neuesten Stand.', 'info');
-                    setTimeout(() => {
-                        updateOverlay.style.display = 'none';
-                        btnUpdate.disabled = false;
-                    }, 2000);
-                } else {
-                    updateStatusText.textContent = 'Update erfolgreich! Neustart...';
-                    showToast('Update abgeschlossen. App lädt neu.', 'success');
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 3000);
-                }
-            } else {
-                throw new Error(result.message || 'Update fehlgeschlagen');
+    if (btnUpdate) {
+        btnUpdate.addEventListener('click', async () => {
+            if (!confirm('Möchtest du jetzt nach Updates suchen und diese installieren?\n\nDer Server startet dabei kurz neu.')) {
+                return;
             }
-        } catch (err) {
-            console.error('Update Error:', err);
-            updateStatusText.textContent = 'Fehler beim Update :(';
-            showToast(`Fehler: ${err.message}`, 'error', 10000);
-            setTimeout(() => {
-                updateOverlay.style.display = 'none';
-                btnUpdate.disabled = false;
-                btnUpdate.innerHTML = originalContent;
-            }, 3000);
-        }
-    });
+
+            const originalContent = btnUpdate.innerHTML;
+            btnUpdate.disabled = true;
+
+            // Show Overlay
+            updateOverlay.style.display = 'flex';
+            updateStatusText.textContent = 'Update wird geprüft...';
+
+            try {
+                const response = await fetch('/api/update', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    if (result.status === 'no_updates') {
+                        updateStatusText.textContent = 'Keine Updates verfügbar.';
+                        showToast('Deine App ist bereits auf dem neuesten Stand.', 'info');
+                        setTimeout(() => {
+                            updateOverlay.style.display = 'none';
+                            btnUpdate.disabled = false;
+                        }, 2000);
+                    } else {
+                        updateStatusText.textContent = 'Update erfolgreich! Neustart...';
+                        showToast('Update abgeschlossen. App lädt neu.', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 3000);
+                    }
+                } else {
+                    throw new Error(result.message || 'Update fehlgeschlagen');
+                }
+            } catch (err) {
+                console.error('Update Error:', err);
+                updateStatusText.textContent = 'Fehler beim Update :(';
+                showToast(`Fehler: ${err.message}`, 'error', 10000);
+                setTimeout(() => {
+                    updateOverlay.style.display = 'none';
+                    btnUpdate.disabled = false;
+                    btnUpdate.innerHTML = originalContent;
+                }, 3000);
+            }
+        });
+    }
 
     async function init() {
         // Load all settings from server
