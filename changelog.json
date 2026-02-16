@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.6.0",
+    "currentVersion": "1.7.0",
     "releases": [
+        {
+            "version": "1.7.0",
+            "date": "2026-02-16",
+            "title": "Automatisierte Nuki- & iCal-Steuerung",
+            "features": [
+                "Vollautomatische Tür-Code Erstellung bei neuen iCal-Buchungen",
+                "Automatisches Löschen abgelaufener PINs (Cleanup-Job)",
+                "Neuer WhatsApp-Befehl: 'Pin' für manuelle Code-Generierung",
+                "Intelligente Verknüpfung von Tür-Codes mit Gästen und Rechnungen",
+                "iCal-Parsing erkennt nun Gästenamen für personalisierte PINs"
+            ]
+        },
         {
             "version": "1.6.0",
             "date": "2026-02-16",

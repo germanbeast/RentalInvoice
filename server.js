@@ -191,7 +191,32 @@ cron.schedule('*/15 * * * *', async () => {
 
             if (result.inserted && !existing) {
                 newCount++;
-                const msg = `\ud83c\udfe0 Neue Buchung!\n${summary}\n\ud83d\udcc5 ${formatDateDE(checkin)} \u2013 ${formatDateDE(checkout)}`;
+
+                // --- Brand New: Auto-Nuki PIN for iCal ---
+                let pinMsg = '';
+                try {
+                    // Try to guess guest name from summary (e.g., "Mustermann, Max (12345)")
+                    const guestName = summary.split('(')[0].trim().replace('Buchung:', '').trim() || 'Gast';
+
+                    // Create Nuki PIN
+                    const nukiResult = await createNukiPin(checkin, checkout, guestName);
+
+                    if (nukiResult.success) {
+                        // Find or create guest to link them
+                        const guest = db.findOrCreateGuest(guestName, null, null);
+
+                        // Update booking with PIN and GuestID
+                        db.updateBookingNukiData(result.id, nukiResult.pin, nukiResult.authId);
+                        // Also link guest_id
+                        db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, result.id);
+
+                        pinMsg = `\n🔑 Tür-Code: *${nukiResult.pin}*`;
+                    }
+                } catch (ne) {
+                    console.warn('⚠️ Auto-Nuki PIN fehlgeschlagen:', ne.message);
+                }
+
+                const msg = `🏠 *Neue Buchung!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}`;
                 const sent = await sendToAllRecipients(msg);
                 db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
             }
@@ -208,32 +233,114 @@ cron.schedule('*/15 * * * *', async () => {
 // Job 2: Reminder Check (daily at 08:00)
 cron.schedule('0 8 * * *', async () => {
     try {
-        const allSettings = db.getAllSettings();
-        const waPhone = allSettings.wa_phone;
-        const notifyEnabled = allSettings.notifications_enabled;
-        const reminderDays = parseInt(allSettings.reminder_days) || 2;
+        console.log('🧹 Nuki-Cleanup & Reminder Job läuft...');
 
-        if (!waReady || notifyEnabled === 'false') return;
-
-        console.log('\u23f0 Erinnerungs-Check l\u00e4uft...');
-        const upcoming = db.getUpcomingBookings(reminderDays);
-
-        for (const booking of upcoming) {
-            const msg = `\u23f0 Erinnerung: ${booking.summary || 'Gast'} reist bald an!\n\ud83d\udcc5 Anreise: ${formatDateDE(booking.checkin)}\n\ud83d\udcc5 Abreise: ${formatDateDE(booking.checkout)}`;
-            const sent = await sendToAllRecipients(msg);
-            if (sent) {
-                db.markReminderSent(booking.id);
+        // 1. Delete Expired Nuki PINs
+        const expired = db.getExpiredNukiAuths();
+        for (const booking of expired) {
+            try {
+                await deleteNukiPin(booking.nuki_auth_id);
+                db.clearNukiAuth(booking.id);
+                console.log(`✅ Nuki-PIN für Buchung ${booking.id} gelöscht.`);
+            } catch (e) {
+                console.warn(`⚠️ Nuki-Cleanup für ${booking.id} fehlgeschlagen:`, e.message);
             }
-            db.logNotification('reminder', msg, sent ? 'sent' : 'failed');
         }
 
-        if (upcoming.length > 0) {
-            console.log(`\u23f0 ${upcoming.length} Erinnerung(en) versendet.`);
+        // 2. Reminders (existing logic)
+        // ...
+        try {
+            const allSettings = db.getAllSettings();
+            const waPhone = allSettings.wa_phone;
+            const notifyEnabled = allSettings.notifications_enabled;
+            const reminderDays = parseInt(allSettings.reminder_days) || 2;
+
+            if (!waReady || notifyEnabled === 'false') return;
+
+            console.log('\u23f0 Erinnerungs-Check l\u00e4uft...');
+            const upcoming = db.getUpcomingBookings(reminderDays);
+
+            for (const booking of upcoming) {
+                const msg = `\u23f0 Erinnerung: ${booking.summary || 'Gast'} reist bald an!\n\ud83d\udcc5 Anreise: ${formatDateDE(booking.checkin)}\n\ud83d\udcc5 Abreise: ${formatDateDE(booking.checkout)}`;
+                const sent = await sendToAllRecipients(msg);
+                if (sent) {
+                    db.markReminderSent(booking.id);
+                }
+                db.logNotification('reminder', msg, sent ? 'sent' : 'failed');
+            }
+
+            if (upcoming.length > 0) {
+                console.log(`\u23f0 ${upcoming.length} Erinnerung(en) versendet.`);
+            }
+        } catch (e) {
+            console.error('\u274c Reminder-Check Fehler:', e.message);
         }
     } catch (e) {
-        console.error('\u274c Reminder-Check Fehler:', e.message);
+        console.error('\u274c Cron Job 2 Fehler:', e.message);
     }
 });
+
+// =======================
+// Nuki Helpers
+// =======================
+async function createNukiPin(arrival, departure, guestName) {
+    const allSettings = db.getAllSettings();
+    const nuki = allSettings.nuki;
+
+    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+
+    // Generate a random 6-digit PIN (1-9 only, no 0 allowed!)
+    const generateValidPin = () => {
+        let pin;
+        do {
+            pin = Array.from({ length: 6 }, () => Math.floor(Math.random() * 9) + 1).join('');
+        } while (pin.startsWith('12'));
+        return pin;
+    };
+    const generatedCode = generateValidPin();
+
+    const allowedFrom = `${arrival}T15:00:00.000Z`;
+    const allowedUntil = `${departure}T11:00:00.000Z`;
+    const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
+
+    const axios = require('axios');
+    const response = await axios.put('https://api.nuki.io/smartlock/auth', {
+        name: safeName,
+        allowedFromDate: allowedFrom,
+        allowedUntilDate: allowedUntil,
+        allowedWeekDays: 127,
+        allowedFromTime: 0,
+        allowedUntilTime: 0,
+        type: 13, // Keypad code
+        code: generatedCode,
+        smartlockIds: [nuki.lockId]
+    }, {
+        headers: {
+            'Authorization': `Bearer ${nuki.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    });
+
+    const authId = response.data ? response.data.id : null;
+    return { success: true, pin: generatedCode, authId };
+}
+
+async function deleteNukiPin(authId) {
+    const allSettings = db.getAllSettings();
+    const nuki = allSettings.nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+
+    const axios = require('axios');
+    await axios.delete(`https://api.nuki.io/smartlock/${nuki.lockId}/auth/${authId}`, {
+        headers: {
+            'Authorization': `Bearer ${nuki.token}`,
+            'Accept': 'application/json'
+        }
+    });
+    return { success: true };
+}
+
 
 console.log('\u2705 Cron-Jobs registriert (iCal: alle 15 Min, Reminder: t\u00e4glich 08:00)');
 
@@ -916,55 +1023,8 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
 app.post('/api/nuki/create-pin', apiLimiter, async (req, res) => {
     try {
         const { arrival, departure, guestName } = req.body;
-        const allSettings = db.getAllSettings();
-        const nuki = allSettings.nuki;
-
-        if (!nuki || !nuki.token || !nuki.lockId) {
-            return res.status(400).json({ error: 'Nuki-Zugangsdaten fehlen' });
-        }
-
-        if (!arrival || !departure) {
-            return res.status(400).json({ error: 'Anreise/Abreise fehlt' });
-        }
-
-        // Generate a random 6-digit PIN (1-9 only, no 0 allowed!)
-        const generateValidPin = () => {
-            let pin;
-            do {
-                pin = Array.from({ length: 6 }, () => Math.floor(Math.random() * 9) + 1).join('');
-            } while (pin.startsWith('12')); // Nuki PINs cannot start with 12
-            return pin;
-        };
-        const generatedCode = generateValidPin();
-
-        const allowedFrom = `${arrival}T15:00:00.000Z`;
-        const allowedUntil = `${departure}T11:00:00.000Z`;
-        const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
-
-        const axios = require('axios');
-        const response = await axios.put('https://api.nuki.io/smartlock/auth', {
-            name: safeName,
-            allowedFromDate: allowedFrom,
-            allowedUntilDate: allowedUntil,
-            allowedWeekDays: 127,
-            allowedFromTime: 0,
-            allowedUntilTime: 0,
-            type: 13, // Keypad code
-            code: generatedCode,
-            smartlockIds: [nuki.lockId]
-        }, {
-            headers: {
-                'Authorization': `Bearer ${nuki.token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        });
-
-        if (response.status === 204 || response.status === 200 || response.status === 201) {
-            res.json({ success: true, pin: generatedCode });
-        } else {
-            res.status(response.status).json({ error: 'Nuki API Fehler', message: response.data });
-        }
+        const result = await createNukiPin(arrival, departure, guestName);
+        res.json(result);
     } catch (error) {
         console.error('Nuki Server API Error:', error.message);
         res.status(500).json({ error: 'Nuki PIN-Generierung fehlgeschlagen', details: error.message });

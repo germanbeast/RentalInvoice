@@ -95,6 +95,9 @@ function initSchema() {
             description TEXT,
             notified BOOLEAN DEFAULT 0,
             reminder_sent BOOLEAN DEFAULT 0,
+            nuki_pin TEXT,
+            nuki_auth_id TEXT,
+            guest_id INTEGER REFERENCES guests(id) ON DELETE SET NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -597,6 +600,37 @@ function migrateFromLocalStorage(data) {
     return results;
 }
 
+function updateBookingNukiData(id, pin, authId) {
+    return getDb().prepare('UPDATE bookings SET nuki_pin = ?, nuki_auth_id = ? WHERE id = ?').run(pin, authId, id);
+}
+
+function getExpiredNukiAuths() {
+    // Yesterday's date
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateStr = yesterday.toISOString().split('T')[0];
+
+    return getDb().prepare(`
+        SELECT id, nuki_auth_id 
+        FROM bookings 
+        WHERE checkout <= ? AND nuki_auth_id IS NOT NULL AND nuki_auth_id != ''
+    `).all(dateStr);
+}
+
+function clearNukiAuth(id) {
+    return getDb().prepare('UPDATE bookings SET nuki_auth_id = NULL WHERE id = ?').run(id);
+}
+
+function findBookingForStay(guestName, arrival, departure) {
+    // Helper to link manual invoices to iCal bookings
+    return getDb().prepare(`
+        SELECT * FROM bookings 
+        WHERE (summary LIKE ? OR description LIKE ?) 
+        AND checkin = ? AND checkout = ?
+        LIMIT 1
+    `).get(`%${guestName}%`, `%${guestName}%`, arrival, departure);
+}
+
 // =======================
 // Init & Export
 // =======================
@@ -663,6 +697,10 @@ module.exports = {
     markReminderSent,
     logNotification,
     getRecentNotifications,
+    updateBookingNukiData,
+    getExpiredNukiAuths,
+    clearNukiAuth,
+    findBookingForStay,
     // Migration
     migrateFromLocalStorage
 };

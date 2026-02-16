@@ -31,6 +31,8 @@ async function processMessage(msg, waClient, MessageMedia) {
         return handleInvoiceCommand(msg, waClient, MessageMedia);
     } else if (command.includes('status')) {
         return handleStatusCommand(msg);
+    } else if (command.includes('pin')) {
+        return handlePinCommand(msg, waClient);
     } else if (command.includes('hilfe') || command === '?') {
         return handleHelpCommand(msg);
     } else {
@@ -74,15 +76,20 @@ async function handleFollowUp(msg, waClient, MessageMedia, session) {
         return msg.reply('Vorgang abgebrochen.');
     }
 
-    if (session.type === 'awaiting_name') {
+    if (session.type === 'awaiting_name' || session.type === 'awaiting_pin_name') {
         session.data.gName = body;
-        session.type = 'awaiting_address';
-        return msg.reply('Wie lautet die Adresse?');
+        if (session.type === 'awaiting_pin_name') {
+            session.type = 'awaiting_pin_dates';
+            return msg.reply('Für welchen Zeitraum? (z.B. 15.03. - 20.03.)');
+        } else {
+            session.type = 'awaiting_address';
+            return msg.reply('Wie lautet die Adresse?');
+        }
     } else if (session.type === 'awaiting_address') {
         session.data.gAdresse = body;
         session.type = 'awaiting_dates';
         return msg.reply('Für welchen Zeitraum? (z.B. 15.03. - 20.03.2026)');
-    } else if (session.type === 'awaiting_dates') {
+    } else if (session.type === 'awaiting_dates' || session.type === 'awaiting_pin_dates') {
         const dates = parseDates(body);
         if (!dates.arrival || !dates.departure) {
             return msg.reply('Ich konnte den Zeitraum nicht erkennen. Bitte im Format DD.MM. - DD.MM.YYYY angeben.');
@@ -93,9 +100,16 @@ async function handleFollowUp(msg, waClient, MessageMedia, session) {
 
     // If we reach here, we might have everything
     const data = session.data;
-    if (data.gName && data.gAdresse && data.arrival && data.departure) {
-        sessions.delete(from);
-        return finalizeInvoice(msg, waClient, MessageMedia, data);
+    if (session.type.startsWith('awaiting_pin')) {
+        if (data.gName && data.arrival && data.departure) {
+            sessions.delete(from);
+            return finalizePinOnly(msg, waClient, data);
+        }
+    } else {
+        if (data.gName && data.gAdresse && data.arrival && data.departure) {
+            sessions.delete(from);
+            return finalizeInvoice(msg, waClient, MessageMedia, data);
+        }
     }
 }
 
@@ -140,20 +154,33 @@ async function finalizeInvoice(msg, waClient, MessageMedia, data) {
             branding: db.getBranding()
         };
 
-        // 1. Create Nuki PIN
-        try {
-            const nukiUrl = `http://localhost:${process.env.PORT || 3000}/api/nuki/create-pin`;
-            const nukiRes = await axios.post(nukiUrl, {
-                arrival: data.arrival,
-                departure: data.departure,
-                guestName: data.gName
-            });
-            if (nukiRes.data.success) {
-                invoiceData.nukiPin = nukiRes.data.pin;
+        // 0. Check if there's already a Nuki PIN in bookings for this stay
+        const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
+        if (existingBooking && existingBooking.nuki_pin) {
+            invoiceData.nukiPin = existingBooking.nuki_pin;
+            console.log(`ℹ️ Bestehender Nuki-PIN für ${data.gName} gefunden: ${invoiceData.nukiPin}`);
+        }
+
+        // 1. Create Nuki PIN (if not found in booking)
+        if (!invoiceData.nukiPin) {
+            try {
+                const nukiUrl = `http://localhost:${process.env.PORT || 3000}/api/nuki/create-pin`;
+                const nukiRes = await axios.post(nukiUrl, {
+                    arrival: data.arrival,
+                    departure: data.departure,
+                    guestName: data.gName
+                });
+                if (nukiRes.data.success) {
+                    invoiceData.nukiPin = nukiRes.data.pin;
+                    // If we found a booking but it had no PIN, update it
+                    if (existingBooking) {
+                        db.updateBookingNukiData(existingBooking.id, nukiRes.data.pin, nukiRes.data.authId);
+                    }
+                }
+            } catch (e) {
+                console.error('Nuki PIN failed in WhatsApp flow:', e.message);
+                // Continue even without Nuki PIN
             }
-        } catch (e) {
-            console.error('Nuki PIN failed in WhatsApp flow:', e.message);
-            // Continue even without Nuki PIN
         }
 
         // 2. Save to DB
@@ -247,14 +274,67 @@ async function handleStatusCommand(msg) {
     await msg.reply(text);
 }
 
+async function handlePinCommand(msg, waClient) {
+    const from = msg.from;
+    const body = msg.body;
+
+    // Check if session exists (re-use invoice parsing logic)
+    const data = parseInvoiceText(body.replace(/pin/i, '').trim());
+
+    if (!data.gName) {
+        sessions.set(from, { type: 'awaiting_pin_name', data });
+        return msg.reply('Für wen soll der Tür-Code erstellt werden?');
+    }
+    if (!data.arrival || !data.departure) {
+        sessions.set(from, { type: 'awaiting_pin_dates', data });
+        return msg.reply('Für welchen Zeitraum? (z.B. 15.03. - 20.03.)');
+    }
+
+    return finalizePinOnly(msg, waClient, data);
+}
+
+async function finalizePinOnly(msg, waClient, data) {
+    try {
+        await msg.reply('⏳ Generiere Nuki-PIN...');
+        const nukiUrl = `http://localhost:${process.env.PORT || 3000}/api/nuki/create-pin`;
+        const nukiRes = await axios.post(nukiUrl, {
+            arrival: data.arrival,
+            departure: data.departure,
+            guestName: data.gName
+        });
+
+        if (nukiRes.data.success) {
+            const pin = nukiRes.data.pin;
+            const authId = nukiRes.data.authId;
+
+            // Try to link to a guest
+            const guest = db.findOrCreateGuest(data.gName, null, null);
+
+            // Try to link to a booking if exists
+            const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
+            if (existingBooking) {
+                db.updateBookingNukiData(existingBooking.id, pin, authId);
+                db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, existingBooking.id);
+            }
+
+            await msg.reply(`✅ Nuki-PIN erstellt!\n\n🔑 Code: *${pin}*\n👤 Gast: ${data.gName}\n📅 Zeitraum: ${data.arrival} bis ${data.departure}\n\n(Der Code wird automatisch nach dem Aufenthalt gelöscht.)`);
+        } else {
+            await msg.reply('❌ Nuki Fehler: ' + (nukiRes.data.error || 'Unbekannt'));
+        }
+    } catch (e) {
+        await msg.reply('❌ Fehler: ' + e.message);
+    }
+}
+
 async function handleHelpCommand(msg) {
     const text = `*WhatsApp Buchungs-Assistent* 🏠\n\n` +
         `*Befehle:*\n` +
-        `• *Rechnung* - Erstellt eine neue Rechnung. Sende einfach Name, Adresse und Zeitraum.\n` +
-        `• *Status* - Zeigt alle unbezahlten Rechnungen an.\n` +
+        `• *Rechnung* - Erstellt eine Rechnung inkl. Tür-Code.\n` +
+        `• *Pin* - Erstellt *nur* einen Tür-Code (ohne Rechnung).\n` +
+        `• *Status* - Zeigt offene Rechnungen.\n` +
         `• *Hilfe* - Zeigt diese Übersicht.\n\n` +
-        `*Beispiel:*\n` +
-        `Max Mustermann\nMusterweg 1, 12345 Berlin\n15.03. - 20.03.`;
+        `*Beispiel Pin:*\n` +
+        `Pin Max Mustermann 15.03. - 20.03.`;
     await msg.reply(text);
 }
 
