@@ -465,6 +465,15 @@ app.use(helmet({
 }));
 
 // =======================
+// 0. Init & Config
+// =======================
+console.log('\n\n');
+console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+console.log('!!!       SERVER VERSION 3.2 LOADED            !!!');
+console.log('!!!    (Testing Update & Telegram Auth Fix)    !!!');
+console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n');
+
+// =======================
 // 3. RATE LIMITING
 // =======================
 const globalLimiter = rateLimit({
