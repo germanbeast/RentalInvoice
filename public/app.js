@@ -2425,8 +2425,8 @@
                 });
 
             } else {
-                group.style.display = 'none';
-                container.innerHTML = '';
+                group.style.display = 'block';
+                container.innerHTML = '<div class="text-muted" style="padding: 10px; text-align: center; font-style: italic;">Keine offenen Anfragen.</div>';
             }
         } catch (e) {
             console.error('Failed to load TG requests', e);
