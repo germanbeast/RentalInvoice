@@ -62,17 +62,16 @@ function initWhatsApp() {
         console.log('\u2705 WhatsApp Web verbunden!');
     });
 
-    const handleMessage = async (msg) => {
-        // Log incoming message for debugging
+    waClient.on('message', async (msg) => {
+        // Log incoming message
         if (msg.body) {
-            console.log(`📩 [WA] Nachricht von ${msg.from} an ${msg.to}: "${msg.body.substring(0, 50)}..." (fromMe: ${msg.fromMe})`);
+            console.log(`📩 [WA] Nachricht von ${msg.from}: "${msg.body.substring(0, 50)}..."`);
         }
 
         try {
-            // Avoid Infinite Loops: Don't process messages sent by the bot UNLESS it's a self-chat (Du-Chat)
-            // msg.fromMe is true if the bot sender is the same account.
-            // In a self-chat, from === to.
-            if (msg.fromMe && msg.from !== msg.to) {
+            // STRICT LOOP PROTECTION: Never process messages sent by the bot account itself.
+            // This prevents the bot from responding to its own messages (Spam Loop).
+            if (msg.fromMe) {
                 return;
             }
 
@@ -80,10 +79,7 @@ function initWhatsApp() {
         } catch (e) {
             console.error('❌ Fehler in waCommands.processMessage:', e);
         }
-    };
-
-    waClient.on('message', handleMessage);
-    waClient.on('message_create', handleMessage);
+    });
 
     waClient.on('authenticated', () => {
         waStatus = 'connecting';
