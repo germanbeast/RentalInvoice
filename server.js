@@ -143,6 +143,11 @@ function initTelegram() {
         return;
     }
 
+    // Stop existing bot if running
+    if (tgBot) {
+        try { tgBot.stopPolling(); } catch (e) { }
+    }
+
     try {
         tgBot = new TelegramBot(token, { polling: true });
         console.log('✅ Telegram Bot initialisiert (Polling).');
@@ -763,7 +768,13 @@ app.put('/api/settings', apiLimiter, (req, res) => {
         if (!settings || typeof settings !== 'object') {
             return res.status(400).json({ error: 'Ungültige Einstellungen' });
         }
-        db.setAllSettings(settings);
+        db.updateSettings(settings);
+
+        // Re-init Telegram if token changed
+        if (settings.tg_token) {
+            initTelegram();
+        }
+
         res.json({ success: true, message: 'Einstellungen gespeichert' });
     } catch (e) {
         console.error('Settings PUT Error:', e.message);
@@ -1385,6 +1396,10 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
     console.log(`🔒 Server (Hardened + SQLite) running on http://localhost:${PORT}`);
     console.log(`   Static files: ${PUBLIC_DIR}`);
+
+    // Initialize bots
+    initWhatsApp();
+    initTelegram();
 });
 
 // Graceful shutdown
