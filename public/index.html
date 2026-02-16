@@ -136,13 +136,16 @@
                 </button>
             </div>
             <div class="sidebar-footer">
-                <button class="sidebar-item" id="btn-update" title="Update suchen">
+                <button class="sidebar-item" id="btn-logout" title="Abmelden">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
-                    <span>Update</span>
+                    <span>Abmelden</span>
                 </button>
             </div>
         </nav>
@@ -947,6 +950,22 @@
                                 WhatsApp 2FA Login aktiv
                             </label>
                         </div>
+                    </div>
+                    <hr>
+
+                    <!-- UPDATE & CHANGELOG -->
+                    <div class="modal-subheader">
+                        <h4>Update & Changelog</h4>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <span id="current-version" style="font-size: 0.9rem; color: var(--text-muted);">Version:
+                            ---</span>
+                        <button type="button" id="btn-update" class="btn btn-outline" style="flex-shrink: 0;">🔄 Nach
+                            Updates suchen</button>
+                    </div>
+                    <div id="changelog-container"
+                        style="max-height: 300px; overflow-y: auto; border-radius: 8px; background: var(--bg-surface); padding: 1rem; font-size: 0.85rem;">
+                        <p style="color: var(--text-muted);">Changelog wird geladen...</p>
                     </div>
                 </div>
                 <div class="modal-footer">

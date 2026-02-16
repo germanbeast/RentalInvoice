@@ -1,0 +1,70 @@
+{
+    "currentVersion": "1.5.0",
+    "releases": [
+        {
+            "version": "1.5.0",
+            "date": "2026-02-16",
+            "title": "2FA Fix & Recovery Keys",
+            "features": [
+                "2FA-Eingabefeld erscheint jetzt korrekt nach Login",
+                "Recovery Key für Account-Wiederherstellung bei WhatsApp-Verlust",
+                "Logout-Button in der Sidebar",
+                "Changelog-Anzeige in den Einstellungen",
+                "Update-Funktion in die Einstellungen verschoben"
+            ]
+        },
+        {
+            "version": "1.4.0",
+            "date": "2026-02-15",
+            "title": "WhatsApp 2FA & Benutzerverwaltung",
+            "features": [
+                "Zwei-Faktor-Authentifizierung via WhatsApp",
+                "Benutzerverwaltung mit Rollen (Admin)",
+                "Multi-Empfänger Benachrichtigungen",
+                "Erinnerung vor Check-In per WhatsApp"
+            ]
+        },
+        {
+            "version": "1.3.0",
+            "date": "2026-02-14",
+            "title": "Dashboard & Statistiken",
+            "features": [
+                "Dashboard mit Umsatz-Übersicht und Statistiken",
+                "Ausgaben-Verwaltung mit Paperless-Sync",
+                "Nuki Smart Lock Integration",
+                "E-Mail Rechnungsversand via SMTP"
+            ]
+        },
+        {
+            "version": "1.2.0",
+            "date": "2026-02-14",
+            "title": "WhatsApp Benachrichtigungen",
+            "features": [
+                "WhatsApp Web Integration (QR-Code)",
+                "Automatische Booking.com Kalender-Synchronisation",
+                "Benachrichtigungen bei neuen Buchungen"
+            ]
+        },
+        {
+            "version": "1.1.0",
+            "date": "2026-02-14",
+            "title": "Paperless NGX & Gäste-Verwaltung",
+            "features": [
+                "Paperless NGX Integration für Rechnungsarchivierung",
+                "Gäste-Verwaltung mit Suchfunktion",
+                "Rechnungsarchiv mit Wiederherstellung"
+            ]
+        },
+        {
+            "version": "1.0.0",
+            "date": "2026-02-14",
+            "title": "Erste Version",
+            "features": [
+                "Rechnungserstellung für Ferienwohnungen",
+                "PDF-Export und Druckfunktion",
+                "Vermieter-Daten Verwaltung",
+                "Responsive Design"
+            ]
+        }
+    ]
+}

@@ -1013,6 +1013,22 @@ app.post('/api/calendar/fetch', apiLimiter, async (req, res) => {
     }
 });
 
+// API: Changelog
+app.get('/api/changelog', (req, res) => {
+    try {
+        const fs = require('fs');
+        const changelogPath = path.join(__dirname, 'changelog.json');
+        if (!fs.existsSync(changelogPath)) {
+            return res.json({ success: true, currentVersion: 'unbekannt', releases: [] });
+        }
+        const changelog = JSON.parse(fs.readFileSync(changelogPath, 'utf8'));
+        res.json({ success: true, currentVersion: changelog.currentVersion, releases: changelog.releases });
+    } catch (e) {
+        console.error('Changelog Error:', e.message);
+        res.status(500).json({ success: false, error: 'Changelog konnte nicht geladen werden' });
+    }
+});
+
 // API: Self-Update
 app.post('/api/update', apiLimiter, (req, res) => {
     const { exec } = require('child_process');

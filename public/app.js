@@ -31,6 +31,7 @@
     const btnCloseArchive = $('#btn-close-archive');
     const btnNukiPin = $('#btn-nuki-pin');
     const btnEmail = $('#btn-email');
+    const btnLogout = $('#btn-logout');
     const btnUpdate = $('#btn-update');
     const btnSyncPaperless = $('#btn-sync-paperless');
 
@@ -1533,6 +1534,7 @@
     // =======================
     btnSettings.addEventListener('click', () => {
         modalSettings.style.display = 'flex';
+        loadChangelog();
     });
 
     btnCloseSettings.addEventListener('click', () => {
@@ -2212,6 +2214,55 @@
     btnArchiveSave.addEventListener('click', () => {
         archiveInvoice();
     });
+
+    // =======================
+    // Logout
+    // =======================
+    btnLogout.addEventListener('click', async () => {
+        if (!confirm('Möchtest du dich wirklich abmelden?')) return;
+        try {
+            await fetch('/api/logout', { method: 'POST' });
+        } catch (e) { /* ignore */ }
+        loginScreen.style.display = 'flex';
+        appWrapper.style.display = 'none';
+        showToast('Erfolgreich abgemeldet', 'info');
+    });
+
+    // =======================
+    // Changelog
+    // =======================
+    async function loadChangelog() {
+        const container = $('#changelog-container');
+        const versionLabel = $('#current-version');
+        if (!container) return;
+
+        try {
+            const res = await fetch('/api/changelog');
+            const data = await res.json();
+            if (!data.success) throw new Error();
+
+            if (versionLabel) versionLabel.textContent = `Version: ${data.currentVersion}`;
+
+            container.innerHTML = '';
+            data.releases.forEach((release, i) => {
+                const div = document.createElement('div');
+                div.style.cssText = `margin-bottom: 1rem; padding-bottom: 1rem; ${i < data.releases.length - 1 ? 'border-bottom: 1px solid var(--border-color);' : ''}`;
+                div.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <strong style="color: var(--primary-color);">${release.version}</strong>
+                        <small style="color: var(--text-muted);">${release.date}</small>
+                    </div>
+                    <div style="font-weight: 600; margin-bottom: 0.4rem;">${release.title}</div>
+                    <ul style="margin: 0; padding-left: 1.2rem; color: var(--text-secondary);">
+                        ${release.features.map(f => `<li style="margin-bottom: 0.2rem;">${f}</li>`).join('')}
+                    </ul>
+                `;
+                container.appendChild(div);
+            });
+        } catch (e) {
+            container.innerHTML = '<p style="color: var(--text-muted);">Changelog konnte nicht geladen werden.</p>';
+        }
+    }
 
     // =======================
     // Self-Update
