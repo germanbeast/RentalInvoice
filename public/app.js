@@ -614,6 +614,10 @@
             paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
             paperless_amount_field: $('#s-pl-amount-field')?.value || '',
             wa_phones: JSON.stringify(Array.from(document.querySelectorAll('.wa-phone-input')).map(input => input.value)),
+            nuki: {
+                token: $('#nuki-token').value,
+                lockId: $('#nuki-lock-id').value
+            },
             tg_token: $('#tg-token').value,
             tg_ids: JSON.stringify(Array.from(document.querySelectorAll('.tg-id-input')).map(input => input.value)),
             reminder_days: $('#reminder-days').value || '2',

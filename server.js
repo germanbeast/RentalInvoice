@@ -832,7 +832,8 @@ app.post('/api/settings/telegram/approve', apiLimiter, (req, res) => {
             res.status(400).json({ error: 'Konnte nicht genehmigt werden (evtl. schon genehmigt)' });
         }
     } catch (e) {
-        res.status(500).json({ error: 'Fehler beim Genehmigen' });
+        console.error('Telegram Approve Error:', e.message);
+        res.status(500).json({ error: 'Fehler beim Genehmigen: ' + e.message });
     }
 });
 
@@ -1335,22 +1336,26 @@ app.get('/api/changelog', (req, res) => {
 });
 
 app.post('/api/update', apiLimiter, (req, res) => {
+    const execOpts = { timeout: 10000, cwd: __dirname };
 
-    console.log('📥 Neue Updates gefunden. Starte Pull...');
-    exec('git stash', { timeout: 10000 }, (stashErr) => {
+    console.log('📥 Update gestartet. Arbeitsverzeichnis:', __dirname);
+    exec('git stash', execOpts, (stashErr) => {
         if (stashErr) console.warn('Git Stash Warning:', stashErr.message);
 
-        exec('git pull origin main', { timeout: 60000 }, (pullErr) => {
+        exec('git pull origin main', { ...execOpts, timeout: 60000 }, (pullErr, stdout, stderr) => {
             if (pullErr) {
-                console.error('Git Pull Error:', pullErr);
-                return res.status(500).json({ success: false, message: 'Git Pull fehlgeschlagen' });
+                const detail = stderr || pullErr.message || 'Unbekannter Fehler';
+                console.error('Git Pull Error:', detail);
+                return res.status(500).json({ success: false, message: `Git Pull fehlgeschlagen: ${detail}` });
             }
 
-            exec('git stash pop', { timeout: 10000 }, (popErr) => {
+            console.log('Git Pull:', stdout.trim());
+
+            exec('git stash pop', execOpts, (popErr) => {
                 if (popErr) console.warn('Git Stash Pop Warning:', popErr.message);
 
-                exec('npm install', { timeout: 120000 }, (npmErr) => {
-                    if (npmErr) console.warn('NPM Install Warning');
+                exec('npm install', { ...execOpts, timeout: 120000 }, (npmErr) => {
+                    if (npmErr) console.warn('NPM Install Warning:', npmErr.message);
 
                     res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
 

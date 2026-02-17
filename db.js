@@ -802,11 +802,15 @@ function approveTelegramRequest(id) {
     if (!req) return false;
 
     // Add to allowed IDs
+    // getAllSettings() already parses JSON, so tg_ids may already be an array
     const settings = getAllSettings();
     let ids = [];
-    try {
-        ids = JSON.parse(settings.tg_ids || '[]');
-    } catch (e) { ids = []; }
+    const rawIds = settings.tg_ids;
+    if (Array.isArray(rawIds)) {
+        ids = rawIds.map(String);
+    } else if (typeof rawIds === 'string' && rawIds.trim()) {
+        try { ids = JSON.parse(rawIds); } catch (e) { ids = []; }
+    }
 
     if (!ids.includes(req.chat_id)) {
         ids.push(req.chat_id);
