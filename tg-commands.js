@@ -163,25 +163,16 @@ async function finalizePinOnlyTG(bot, msg, data) {
     const chatId = msg.chat.id;
     try {
         bot.sendMessage(chatId, '⏳ Generiere Nuki-PIN...');
-        const axios = require('axios');
-        const nukiRes = await axios.post(`http://localhost:${process.env.PORT || 3000}/api/nuki/create-pin`, {
-            arrival: data.arrival,
-            departure: data.departure,
-            guestName: data.gName
-        });
+        const nukiResult = await botLogic.createNukiPinDirect(data.arrival, data.departure, data.gName);
 
-        if (nukiRes.data.success) {
-            const pin = nukiRes.data.pin;
-            const authId = nukiRes.data.authId;
-            db.findOrCreateGuest(data.gName, null, null);
-            const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
-            if (existingBooking) {
-                db.updateBookingNukiData(existingBooking.id, pin, authId);
-            }
-            bot.sendMessage(chatId, `✅ Tür-Code: *${pin}*\nGast: ${data.gName}\nZeit: ${data.arrival} bis ${data.departure}`, { parse_mode: 'Markdown' });
-        } else {
-            bot.sendMessage(chatId, '❌ Nuki Fehler: ' + (nukiRes.data.error || 'Unbekannt'));
+        const pin = nukiResult.pin;
+        const authId = nukiResult.authId;
+        db.findOrCreateGuest(data.gName, null, null);
+        const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
+        if (existingBooking) {
+            db.updateBookingNukiData(existingBooking.id, pin, authId);
         }
+        bot.sendMessage(chatId, `✅ Tür-Code: *${pin}*\nGast: ${data.gName}\nZeit: ${data.arrival} bis ${data.departure}`, { parse_mode: 'Markdown' });
     } catch (e) {
         bot.sendMessage(chatId, '❌ Fehler: ' + e.message);
     }

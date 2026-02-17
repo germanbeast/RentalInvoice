@@ -175,93 +175,30 @@ function isTelegramIdAuthorized(tgId) {
     }
 
     // 2. Check settings (global tg_ids list)
+    // getAllSettings() auto-parses JSON, so tg_ids may already be an Array
     const settings = getAllSettings();
     if (settings.tg_ids) {
         try {
-            if (!settings.tg_ids || typeof settings.tg_ids !== 'string' || !settings.tg_ids.trim()) {
-                // Empty or invalid setting is fine, just ignore
-                return false;
+            const rawIds = settings.tg_ids;
+            let allowedIds;
+            if (Array.isArray(rawIds)) {
+                allowedIds = rawIds.map(String);
+            } else if (typeof rawIds === 'string' && rawIds.trim()) {
+                allowedIds = JSON.parse(rawIds).map(String);
+            } else {
+                allowedIds = [];
             }
-            const allowedIds = JSON.parse(settings.tg_ids);
-            const isMatch = Array.isArray(allowedIds) && allowedIds.map(String).includes(strId);
-            if (isMatch) {
+            if (allowedIds.includes(strId)) {
                 console.log(`[DB] TG-Autorisierung (Einstellungen): ID ${strId} erlaubt.`);
                 return true;
             }
         } catch (e) {
-            console.error('[DB] Fehler beim Parsen von tg_ids Settings:', e.message, 'Input:', settings.tg_ids);
+            console.error('[DB] Fehler beim Parsen von tg_ids Settings:', e.message);
         }
     }
 
     console.warn(`[DB] TG-Autorisierung FEHLGESCHLAGEN: ID ${strId} nicht gefunden.`);
-    console.warn(`[DB] TG-Autorisierung FEHLGESCHLAGEN: ID ${strId} nicht gefunden.`);
     return false;
-}
-
-// =======================
-// Telegram Registration Flow
-// =======================
-function getPendingTelegramRequests() {
-    const settings = getAllSettings();
-    try {
-        return settings.tg_requests ? JSON.parse(settings.tg_requests) : [];
-    } catch (e) {
-        return [];
-    }
-}
-
-function addPendingTelegramRequest(tgId, firstName, username) {
-    const requests = getPendingTelegramRequests();
-    const strId = String(tgId);
-
-    // Check if already pending
-    if (requests.some(r => r.id === strId)) return;
-
-    // Check if already authorized
-    if (isTelegramIdAuthorized(strId)) return;
-
-    requests.push({
-        id: strId,
-        name: firstName || 'Unbekannt',
-        username: username || '',
-        date: new Date().toISOString()
-    });
-
-    setSetting('tg_requests', JSON.stringify(requests));
-    console.log(`[DB] Neue Telegram-Anfrage gespeichert: ${strId} (${firstName})`);
-}
-
-function approveTelegramRequest(tgId) {
-    const strId = String(tgId);
-
-    // 1. Remove from requests
-    let requests = getPendingTelegramRequests();
-    requests = requests.filter(r => r.id !== strId);
-    setSetting('tg_requests', JSON.stringify(requests));
-
-    // 2. Add to authorized IDs
-    const settings = getAllSettings();
-    let approvedIds = [];
-    try {
-        approvedIds = settings.tg_ids ? JSON.parse(settings.tg_ids) : [];
-    } catch (e) { }
-
-    if (!approvedIds.map(String).includes(strId)) {
-        approvedIds.push(strId);
-        setSetting('tg_ids', JSON.stringify(approvedIds));
-        console.log(`[DB] Telegram-ID ${strId} genehmigt.`);
-        return true;
-    }
-    return false;
-}
-
-function denyTelegramRequest(tgId) {
-    const strId = String(tgId);
-    let requests = getPendingTelegramRequests();
-    requests = requests.filter(r => r.id !== strId);
-    setSetting('tg_requests', JSON.stringify(requests));
-    console.log(`[DB] Telegram-Anfrage ${strId} abgelehnt.`);
-    return true;
 }
 
 function createUser(username, hashedPassword, role = 'admin', phone = '', telegramId = '') {
@@ -767,22 +704,6 @@ function findBookingForStay(guestName, arrival, departure) {
 // =======================
 // Telegram Helper
 // =======================
-function isTelegramIdAuthorized(chatId) {
-    const settings = getAllSettings();
-    if (!settings.tg_ids) return false;
-    // getAllSettings() already parses JSON, so tg_ids may be an array already
-    const rawIds = settings.tg_ids;
-    let ids;
-    if (Array.isArray(rawIds)) {
-        ids = rawIds.map(String);
-    } else if (typeof rawIds === 'string' && rawIds.trim()) {
-        try { ids = JSON.parse(rawIds); } catch (e) { return false; }
-    } else {
-        return false;
-    }
-    return Array.isArray(ids) && ids.map(String).includes(String(chatId));
-}
-
 function getPendingTelegramRequests() {
     const db = getDb();
     return db.prepare('SELECT * FROM telegram_requests ORDER BY created_at DESC').all();
@@ -903,7 +824,6 @@ module.exports = {
     updateBookingNukiData,
     getExpiredNukiAuths,
     clearNukiAuth,
-    findBookingForStay,
     findBookingForStay,
     isTelegramIdAuthorized,
     // TG Registration

@@ -3,6 +3,7 @@ const { renderInvoiceHtml } = require('./invoice-template');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const puppeteer = require('puppeteer');
 
 /**
  * Shared logic for both WhatsApp and Telegram bots.
@@ -71,6 +72,46 @@ async function getStatusText() {
     return text;
 }
 
+async function createNukiPinDirect(arrival, departure, guestName) {
+    const allSettings = db.getAllSettings();
+    const nuki = allSettings.nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+
+    const generateValidPin = () => {
+        let pin;
+        do {
+            pin = Array.from({ length: 6 }, () => Math.floor(Math.random() * 9) + 1).join('');
+        } while (pin.startsWith('12'));
+        return pin;
+    };
+    const generatedCode = generateValidPin();
+
+    const allowedFrom = `${arrival}T15:00:00.000Z`;
+    const allowedUntil = `${departure}T11:00:00.000Z`;
+    const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
+
+    const response = await axios.put('https://api.nuki.io/smartlock/auth', {
+        name: safeName,
+        allowedFromDate: allowedFrom,
+        allowedUntilDate: allowedUntil,
+        allowedWeekDays: 127,
+        allowedFromTime: 0,
+        allowedUntilTime: 0,
+        type: 13,
+        code: generatedCode,
+        smartlockIds: [parseInt(nuki.lockId, 10) || nuki.lockId]
+    }, {
+        headers: {
+            'Authorization': `Bearer ${nuki.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    });
+
+    const authId = response.data ? response.data.id : null;
+    return { success: true, pin: generatedCode, authId };
+}
+
 async function finalizeInvoiceData(data) {
     const allSettings = db.getAllSettings();
     const vermieter = allSettings.vermieter || {};
@@ -114,16 +155,11 @@ async function finalizeInvoiceData(data) {
         invoiceData.nukiPin = existingBooking.nuki_pin;
     } else {
         try {
-            // Internal call to server.js endpoint (relative would be better but let's stick to current pattern)
-            const nukiRes = await axios.post(`http://localhost:${process.env.PORT || 3000}/api/nuki/create-pin`, {
-                arrival: data.arrival,
-                departure: data.departure,
-                guestName: data.gName
-            });
-            if (nukiRes.data.success) {
-                invoiceData.nukiPin = nukiRes.data.pin;
+            const nukiResult = await createNukiPinDirect(data.arrival, data.departure, data.gName);
+            if (nukiResult.success) {
+                invoiceData.nukiPin = nukiResult.pin;
                 if (existingBooking) {
-                    db.updateBookingNukiData(existingBooking.id, nukiRes.data.pin, nukiRes.data.authId);
+                    db.updateBookingNukiData(existingBooking.id, nukiResult.pin, nukiResult.authId);
                 }
             }
         } catch (e) {
@@ -136,13 +172,47 @@ async function finalizeInvoiceData(data) {
 
 async function generateInvoicePdf(invoiceData) {
     const html = renderInvoiceHtml(invoiceData);
-    const pdfRes = await axios.post(`http://localhost:${process.env.PORT || 3000}/api/generate-pdf`, { html }, { responseType: 'arraybuffer' });
+
+    const browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process'
+        ]
+    });
+
+    let pdfBuffer;
+    try {
+        const page = await browser.newPage();
+        await page.setRequestInterception(true);
+        page.on('request', (request) => {
+            if (request.resourceType() === 'document') {
+                request.continue();
+            } else {
+                request.abort();
+            }
+        });
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+        pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '0', right: '0', bottom: '0', left: '0' },
+            preferCSSPageSize: true
+        });
+    } finally {
+        await browser.close();
+    }
 
     const fileName = `Rechnung_${invoiceData.rNummer}.pdf`;
     const tempDir = path.join(__dirname, 'temp');
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
     const filePath = path.join(tempDir, fileName);
-    fs.writeFileSync(filePath, pdfRes.data);
+    fs.writeFileSync(filePath, pdfBuffer);
 
     return { filePath, fileName };
 }
@@ -153,5 +223,6 @@ module.exports = {
     parseInvoiceText,
     getStatusText,
     finalizeInvoiceData,
-    generateInvoicePdf
+    generateInvoicePdf,
+    createNukiPinDirect
 };

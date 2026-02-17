@@ -1274,17 +1274,16 @@
         // Merge months to ensure alignment
         const months = [...new Set([
             ...revenueData.map(d => d.month),
-            ...stats.revenueByMonth.map(d => d.month),
-            ...stats.expensesByMonth.map(d => d.month)
+            ...expenseData.map(d => d.month)
         ])].sort();
 
         const revValues = months.map(m => {
-            const d = stats.revenueByMonth.find(x => x.month === m);
+            const d = revenueData.find(x => x.month === m);
             return d ? d.total : 0;
         });
 
         const expValues = months.map(m => {
-            const d = stats.expensesByMonth.find(x => x.month === m);
+            const d = expenseData.find(x => x.month === m);
             return d ? d.total : 0;
         });
 
@@ -1542,23 +1541,7 @@
                             <span class="archive-badge ${paidClass}">${paidLabel}</span>
                         </div>
                     </div>
-                    <div class="dashboard-charts-grid">
-                    <div class="card chart-card">
-                        <div class="card-title">Umsatz & Ausgaben (12 Monate)</div>
-                        <div class="card-body">
-                            <canvas id="revenueChart" height="100"></canvas>
-                        </div>
-                    </div>
-                    <div class="card chart-card">
-                        <div class="card-title">Top Gäste</div>
-                        <div class="card-body">
-                            <ul class="top-guests-list" id="top-guests-list">
-                                <!-- Top guesses filled by JS -->
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div> class="archive-item-actions">
+                    <div class="archive-item-actions">
                         <button type="button" class="btn btn-sm btn-outline btn-archive-load" data-idx="${realIdx}" title="Laden">
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10v2h10v-2M7 2v7M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Laden
