@@ -797,6 +797,14 @@ app.put('/api/settings', apiLimiter, (req, res) => {
         // Re-init Telegram if token changed
         if (settings.tg_token) {
             initTelegram().catch(e => console.error('Error re-init Telegram:', e));
+        } else if (currentTgToken && !settings.tg_token) {
+            // If token was removed, stop polling
+            if (tgBot) {
+                tgBot.stopPolling();
+                console.log('🛑 Telegram Bot Polling gestoppt (Token entfernt).');
+                tgBot = null;
+                currentTgToken = null;
+            }
         }
 
         res.json({ success: true, message: 'Einstellungen gespeichert' });
@@ -901,6 +909,63 @@ app.delete('/api/guests/:id', apiLimiter, (req, res) => {
 // =======================
 // 10. INVOICES API
 // =======================
+// 14c. NUKI PROXY
+app.post('/api/nuki/create-pin', apiLimiter, async (req, res) => {
+    const { token, lockId, name, allowedFromDate, allowedUntilDate, code } = req.body;
+    if (!token || !lockId || !code) return res.status(400).json({ error: 'Fehlende Daten' });
+
+    try {
+        const ax = require('axios');
+        const response = await ax.put('https://api.nuki.io/smartlock/auth', {
+            name,
+            allowedFromDate,
+            allowedUntilDate,
+            allowedWeekDays: 127,
+            allowedFromTime: 0,
+            allowedUntilTime: 0,
+            type: 13,
+            code,
+            smartlockIds: [lockId]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            timeout: 10000
+        });
+
+        res.json({ success: true, data: response.data });
+    } catch (e) {
+        console.error('Nuki Create PIN Error:', e.message);
+        res.status(500).json({
+            error: e.response && e.response.data ? (e.response.data.message || 'API Error') : e.message
+        });
+    }
+});
+
+app.post('/api/nuki/test', apiLimiter, async (req, res) => {
+    const { token, lockId } = req.body;
+    if (!token || !lockId) return res.status(400).json({ error: 'Token und LockID benötigt' });
+
+    try {
+        const ax = require('axios');
+        const response = await ax.get(`https://api.nuki.io/smartlock/${lockId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            },
+            timeout: 5000
+        });
+        res.json({ success: true, name: response.data.name });
+    } catch (e) {
+        console.error('Nuki Test Error:', e.message);
+        res.status(500).json({
+            error: e.response && e.response.data ? (e.response.data.message || 'API Error') : e.message
+        });
+    }
+});
+
 app.get('/api/invoices', apiLimiter, (req, res) => {
     try {
         const search = req.query.search || '';
