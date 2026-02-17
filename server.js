@@ -1286,74 +1286,56 @@ app.post('/api/calendar/fetch', apiLimiter, async (req, res) => {
     }
 });
 
-// API: Changelog
+// =======================
+// System & Updates
+// =======================
 app.get('/api/changelog', (req, res) => {
     try {
         const fs = require('fs');
         const changelogPath = path.join(__dirname, 'changelog.json');
-        if (!fs.existsSync(changelogPath)) {
-            return res.json({ success: true, currentVersion: 'unbekannt', releases: [] });
+        if (fs.existsSync(changelogPath)) {
+            const data = JSON.parse(fs.readFileSync(changelogPath, 'utf8'));
+            const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+            res.json({ success: true, currentVersion: packageJson.version, releases: data.releases || [] });
+        } else {
+            res.json({ success: false, message: 'Changelog nicht gefunden' });
         }
-        const changelog = JSON.parse(fs.readFileSync(changelogPath, 'utf8'));
-        res.json({ success: true, currentVersion: changelog.currentVersion, releases: changelog.releases });
     } catch (e) {
-        console.error('Changelog Error:', e.message);
-        res.status(500).json({ success: false, error: 'Changelog konnte nicht geladen werden' });
+        res.json({ success: false, message: e.message });
     }
 });
 
-// API: Self-Update
 app.post('/api/update', apiLimiter, (req, res) => {
-    const { exec } = require('child_process');
-    console.log('🔄 Update-Check gestartet...');
 
-    exec('git fetch origin main', { timeout: 30000 }, (fetchErr) => {
-        if (fetchErr) {
-            return res.status(500).json({ success: false, message: 'Git Fetch fehlgeschlagen' });
-        }
+    console.log('📥 Neue Updates gefunden. Starte Pull...');
+    exec('git stash', { timeout: 10000 }, (stashErr) => {
+        if (stashErr) console.warn('Git Stash Warning:', stashErr.message);
 
-        exec('git status -uno', { timeout: 10000 }, (statusErr, stdout) => {
-            if (statusErr) {
-                return res.status(500).json({ success: false, message: 'Git Status fehlgeschlagen' });
+        exec('git pull origin main', { timeout: 60000 }, (pullErr) => {
+            if (pullErr) {
+                console.error('Git Pull Error:', pullErr);
+                return res.status(500).json({ success: false, message: 'Git Pull fehlgeschlagen' });
             }
 
-            const upToDate = stdout.includes('Your branch is up to date') ||
-                stdout.includes('Auf dem neuesten Stand');
+            exec('git stash pop', { timeout: 10000 }, (popErr) => {
+                if (popErr) console.warn('Git Stash Pop Warning:', popErr.message);
 
-            if (upToDate) {
-                return res.json({ success: true, status: 'no_updates', message: 'Keine Updates verfügbar.' });
-            }
+                exec('npm install', { timeout: 120000 }, (npmErr) => {
+                    if (npmErr) console.warn('NPM Install Warning');
 
-            console.log('📥 Neue Updates gefunden. Starte Pull...');
-            exec('git stash', { timeout: 10000 }, (stashErr) => {
-                if (stashErr) console.warn('Git Stash Warning:', stashErr.message);
+                    res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
 
-                exec('git pull origin main', { timeout: 60000 }, (pullErr) => {
-                    if (pullErr) {
-                        console.error('Git Pull Error:', pullErr);
-                        return res.status(500).json({ success: false, message: 'Git Pull fehlgeschlagen' });
-                    }
-
-                    exec('git stash pop', { timeout: 10000 }, (popErr) => {
-                        if (popErr) console.warn('Git Stash Pop Warning:', popErr.message);
-
-                        exec('npm install', { timeout: 120000 }, (npmErr) => {
-                            if (npmErr) console.warn('NPM Install Warning');
-
-                            res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
-
-                            setTimeout(() => {
-                                console.log('🔄 Starte Server neu...');
-                                db.close();
-                                process.exit(0);
-                            }, 1500);
-                        });
-                    });
+                    setTimeout(() => {
+                        console.log('🔄 Starte Server neu...');
+                        db.close();
+                        process.exit(0);
+                    }, 1500);
                 });
             });
         });
     });
 });
+
 
 // =======================
 // 14b. WHATSAPP & NOTIFICATION API ROUTES

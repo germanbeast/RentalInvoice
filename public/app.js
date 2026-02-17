@@ -1270,22 +1270,21 @@
         // Merge months to ensure alignment
         const months = [...new Set([
             ...revenueData.map(d => d.month),
-            ...expenseData.map(d => d.month)
+            ...stats.revenueByMonth.map(d => d.month),
+            ...stats.expensesByMonth.map(d => d.month)
         ])].sort();
 
         const revValues = months.map(m => {
-            const d = revenueData.find(x => x.month === m);
+            const d = stats.revenueByMonth.find(x => x.month === m);
             return d ? d.total : 0;
         });
 
         const expValues = months.map(m => {
-            const d = expenseData.find(x => x.month === m);
+            const d = stats.expensesByMonth.find(x => x.month === m);
             return d ? d.total : 0;
         });
 
-        if (revenueChart) revenueChart.destroy();
-
-        revenueChart = new Chart(ctx, {
+        window.myRevenueChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: months.map(m => {
@@ -1539,7 +1538,23 @@
                             <span class="archive-badge ${paidClass}">${paidLabel}</span>
                         </div>
                     </div>
-                    <div class="archive-item-actions">
+                    <div class="dashboard-charts-grid">
+                    <div class="card chart-card">
+                        <div class="card-title">Umsatz & Ausgaben (12 Monate)</div>
+                        <div class="card-body">
+                            <canvas id="revenueChart" height="100"></canvas>
+                        </div>
+                    </div>
+                    <div class="card chart-card">
+                        <div class="card-title">Top Gäste</div>
+                        <div class="card-body">
+                            <ul class="top-guests-list" id="top-guests-list">
+                                <!-- Top guesses filled by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div> class="archive-item-actions">
                         <button type="button" class="btn btn-sm btn-outline btn-archive-load" data-idx="${realIdx}" title="Laden">
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10v2h10v-2M7 2v7M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Laden
@@ -1821,15 +1836,11 @@
         btnNukiTest.textContent = 'Teste…';
 
         try {
-            const apiUrl = `https://api.nuki.io/smartlock/${lockId}`;
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-
-            const response = await fetch(proxyUrl, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json'
-                }
+            // Updated: Use server-side proxy route instead of CORS proxy
+            const response = await fetch('/api/nuki/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, lockId })
             });
 
             if (response.ok) {
@@ -1837,13 +1848,13 @@
                 showToast(`Nuki-Verbindung erfolgreich! Lock: ${data.name} ✓`, 'success');
             } else {
                 const err = await response.json();
-                showToast(`Nuki-Fehler: ${err.message || response.statusText}`, 'error');
+                showToast(`Nuki-Fehler: ${err.error || response.statusText}`, 'error');
             }
         } catch (err) {
             showToast(`Nuki-Verbindungsfehler: ${err.message}`, 'error');
         } finally {
             btnNukiTest.disabled = false;
-            btnNukiTest.textContent = 'Nuki testen';
+            btnNukiTest.textContent = 'Verbindung testen';
         }
     });
 
@@ -2339,8 +2350,10 @@
     // =======================
     // Re-check if missing (defensive) - DELEGATED EVENT LISTENER
     document.body.addEventListener('click', async (e) => {
-        if (e.target && (e.target.id === 'btn-update' || e.target.id === 'btn-update-check')) {
-            const btn = e.target;
+        // Handle click on button or its children
+        const btn = e.target.closest('#btn-update-check') || e.target.closest('#btn-update');
+
+        if (btn) {
             if (!confirm('Möchtest du jetzt nach Updates suchen und diese installieren?\n\nDer Server startet dabei kurz neu.')) {
                 return;
             }
