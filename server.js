@@ -2,6 +2,7 @@
    Ferienwohnung Rechnung – Server (Hardened + SQLite)
    =========================== */
 
+const { exec } = require('child_process');
 const express = require('express');
 const puppeteer = require('puppeteer');
 const nodemailer = require('nodemailer');
@@ -235,9 +236,6 @@ async function sendToAllRecipients(message) {
 // 2FA Code Storage (in-memory, short-lived)
 const pending2FA = new Map(); // sessionId -> { code, username, expiresAt }
 
-// Initialize WhatsApp
-initWhatsApp();
-
 // =======================
 // 1c. SCHEDULED JOBS (Cron)
 // =======================
@@ -409,7 +407,7 @@ async function createNukiPin(arrival, departure, guestName) {
         allowedUntilTime: 0,
         type: 13, // Keypad code
         code: generatedCode,
-        smartlockIds: [nuki.lockId]
+        smartlockIds: [parseInt(nuki.lockId, 10) || nuki.lockId]
     }, {
         headers: {
             'Authorization': `Bearer ${nuki.token}`,
@@ -909,40 +907,6 @@ app.delete('/api/guests/:id', apiLimiter, (req, res) => {
 // =======================
 // 10. INVOICES API
 // =======================
-// 14c. NUKI PROXY
-app.post('/api/nuki/create-pin', apiLimiter, async (req, res) => {
-    const { token, lockId, name, allowedFromDate, allowedUntilDate, code } = req.body;
-    if (!token || !lockId || !code) return res.status(400).json({ error: 'Fehlende Daten' });
-
-    try {
-        const ax = require('axios');
-        const response = await ax.put('https://api.nuki.io/smartlock/auth', {
-            name,
-            allowedFromDate,
-            allowedUntilDate,
-            allowedWeekDays: 127,
-            allowedFromTime: 0,
-            allowedUntilTime: 0,
-            type: 13,
-            code,
-            smartlockIds: [lockId]
-        }, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            timeout: 10000
-        });
-
-        res.json({ success: true, data: response.data });
-    } catch (e) {
-        console.error('Nuki Create PIN Error:', e.message);
-        res.status(500).json({
-            error: e.response && e.response.data ? (e.response.data.message || 'API Error') : e.message
-        });
-    }
-});
 
 app.post('/api/nuki/test', apiLimiter, async (req, res) => {
     const { token, lockId } = req.body;

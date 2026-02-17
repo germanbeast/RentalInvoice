@@ -1706,16 +1706,9 @@
     window.addEventListener('resize', updatePreviewScale);
 
     async function createNukiPin() {
-        const token = $('#nuki-token').value;
-        const lockId = $('#nuki-lock-id').value;
         const fromDate = $('#a-anreise').value;
         const toDate = $('#a-abreise').value;
         const guestName = $('#g-name').value || 'Gast';
-
-        if (!token || !lockId) {
-            showToast('Nuki API-Token und Lock-ID fehlen in den Einstellungen!', 'error');
-            return;
-        }
 
         if (!fromDate || !toDate) {
             showToast('Bitte Anreise- und Abreisedatum wählen!', 'error');
@@ -1726,57 +1719,22 @@
         btnNukiPin.textContent = 'Generiere PIN...';
 
         try {
-            // Nuki API uses from/until dates. Keypad PINs are 6 digits.
-            // Documentation: PUT /smartlock/{smartlockId}/auth
-            const allowedFrom = `${fromDate}T15:00:00.000Z`; // Check-in time
-            const allowedUntil = `${toDate}T11:00:00.000Z`;   // Check-out time
-
-            // Generate a random 6-digit PIN (1-9 only, no 0 allowed!)
-            const generateValidPin = () => {
-                let pin;
-                do {
-                    pin = Array.from({ length: 6 }, () => Math.floor(Math.random() * 9) + 1).join('');
-                } while (pin.startsWith('12')); // Nuki PINs cannot start with 12
-                return pin;
-            };
-            const generatedCode = generateValidPin();
-
-            // Name must be max 20 characters
-            const safeName = `Gast: ${guestName}`.substring(0, 20);
-
-            const apiUrl = `https://api.nuki.io/smartlock/auth`;
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-
-            const response = await fetch(proxyUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: safeName,
-                    allowedFromDate: allowedFrom,
-                    allowedUntilDate: allowedUntil,
-                    allowedWeekDays: 127, // All days
-                    allowedFromTime: 0,    // 00:00
-                    allowedUntilTime: 0,   // 00:00 (Nuki docs say 0 for both means all day)
-                    type: 13, // 13 is Keypad code
-                    code: generatedCode,
-                    smartlockIds: [lockId]
-                })
+            const response = await fetch('/api/nuki/create-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ arrival: fromDate, departure: toDate, guestName })
             });
 
-            if (response.ok) {
+            const data = await response.json();
+
+            if (data.success) {
                 $('#nuki-pin-result').style.display = 'block';
-                $('#nuki-pin-code').textContent = generatedCode;
+                $('#nuki-pin-code').textContent = data.pin;
                 showToast('Keypad-PIN erfolgreich generiert! 🔑', 'success');
                 updatePreview();
                 scheduleDraftSave();
             } else {
-                const err = await response.json().catch(() => ({}));
-                const errMsg = err.message || response.statusText || 'Ungültige Anfrage';
-                showToast(`Nuki Fehler: ${errMsg}`, 'error');
+                showToast(`Nuki Fehler: ${data.details || data.error || 'Unbekannt'}`, 'error');
             }
         } catch (error) {
             console.error('Nuki API Error:', error);

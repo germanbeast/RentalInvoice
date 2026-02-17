@@ -111,6 +111,14 @@ function initSchema() {
             status TEXT DEFAULT 'sent',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS telegram_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id TEXT UNIQUE NOT NULL,
+            name TEXT DEFAULT '',
+            username TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
     `);
     // Migrations
     const tableInfo = db.prepare("PRAGMA table_info(users)").all();
