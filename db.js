@@ -25,7 +25,7 @@ function getDb() {
 // Schema
 // =======================
 function initSchema() {
-    db.exec(`
+    db.prepare(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -35,8 +35,10 @@ function initSchema() {
             telegram_id TEXT DEFAULT '',
             recovery_key TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
+        )
+    `).run();
 
+    db.prepare(`
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -752,6 +754,67 @@ function findBookingForStay(guestName, arrival, departure) {
         AND checkin = ? AND checkout = ?
         LIMIT 1
     `).get(`%${guestName}%`, `%${guestName}%`, arrival, departure);
+}
+
+// =======================
+// Telegram Helper
+// =======================
+function isTelegramIdAuthorized(chatId) {
+    const settings = getAllSettings();
+    // Frontend uses 'tg_ids' which is a JSON string of IDs
+    if (!settings.tg_ids) return false;
+    try {
+        const ids = JSON.parse(settings.tg_ids);
+        return ids.includes(String(chatId));
+    } catch (e) {
+        return false;
+    }
+}
+
+function getPendingTelegramRequests() {
+    const db = getDb();
+    return db.prepare('SELECT * FROM telegram_requests ORDER BY created_at DESC').all();
+}
+
+function addPendingTelegramRequest(chatId, name, username) {
+    const db = getDb();
+    try {
+        db.prepare('INSERT INTO telegram_requests (chat_id, name, username) VALUES (?, ?, ?)')
+            .run(String(chatId), name, username);
+        return true; // Return true so we don't treat it as error
+    } catch (e) {
+        // Likely already exists
+        return true; // Return true so we don't treat it as error
+    }
+}
+
+function approveTelegramRequest(id) {
+    const db = getDb();
+    const req = db.prepare('SELECT * FROM telegram_requests WHERE id = ?').get(id);
+    if (!req) return false;
+
+    // Add to allowed IDs
+    const settings = getAllSettings();
+    let ids = [];
+    try {
+        ids = JSON.parse(settings.tg_ids || '[]');
+    } catch (e) { ids = []; }
+
+    if (!ids.includes(req.chat_id)) {
+        ids.push(req.chat_id);
+    }
+
+    setSetting('tg_ids', JSON.stringify(ids));
+
+    // Remove request
+    db.prepare('DELETE FROM telegram_requests WHERE id = ?').run(id);
+    return true;
+}
+
+function denyTelegramRequest(id) {
+    const db = getDb();
+    db.prepare('DELETE FROM telegram_requests WHERE id = ?').run(id);
+    return true;
 }
 
 // =======================
