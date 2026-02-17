@@ -769,14 +769,18 @@ function findBookingForStay(guestName, arrival, departure) {
 // =======================
 function isTelegramIdAuthorized(chatId) {
     const settings = getAllSettings();
-    // Frontend uses 'tg_ids' which is a JSON string of IDs
     if (!settings.tg_ids) return false;
-    try {
-        const ids = JSON.parse(settings.tg_ids);
-        return ids.includes(String(chatId));
-    } catch (e) {
+    // getAllSettings() already parses JSON, so tg_ids may be an array already
+    const rawIds = settings.tg_ids;
+    let ids;
+    if (Array.isArray(rawIds)) {
+        ids = rawIds.map(String);
+    } else if (typeof rawIds === 'string' && rawIds.trim()) {
+        try { ids = JSON.parse(rawIds); } catch (e) { return false; }
+    } else {
         return false;
     }
+    return Array.isArray(ids) && ids.map(String).includes(String(chatId));
 }
 
 function getPendingTelegramRequests() {
