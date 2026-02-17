@@ -25,7 +25,7 @@ function getDb() {
 // Schema
 // =======================
 function initSchema() {
-    db.prepare(`
+    db.exec(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -35,10 +35,10 @@ function initSchema() {
             telegram_id TEXT DEFAULT '',
             recovery_key TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `).run();
+        );
+    `);
 
-    db.prepare(`
+    db.exec(`
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
