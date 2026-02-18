@@ -128,6 +128,17 @@ function initSchema() {
         console.log('✅ Migration: telegram_id Spalte zu users Tabelle hinzugefügt.');
     }
 
+    // Migration: add status + updated_at to telegram_requests
+    const tgReqInfo = db.prepare("PRAGMA table_info(telegram_requests)").all();
+    if (!tgReqInfo.some(col => col.name === 'status')) {
+        db.exec("ALTER TABLE telegram_requests ADD COLUMN status TEXT DEFAULT 'pending'");
+        console.log('✅ Migration: status Spalte zu telegram_requests hinzugefügt.');
+    }
+    if (!tgReqInfo.some(col => col.name === 'updated_at')) {
+        db.exec("ALTER TABLE telegram_requests ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+        console.log('✅ Migration: updated_at Spalte zu telegram_requests hinzugefügt.');
+    }
+
     console.log('✅ Datenbank-Schema initialisiert.');
 }
 
@@ -706,7 +717,12 @@ function findBookingForStay(guestName, arrival, departure) {
 // =======================
 function getPendingTelegramRequests() {
     const db = getDb();
-    return db.prepare('SELECT * FROM telegram_requests ORDER BY created_at DESC').all();
+    return db.prepare("SELECT * FROM telegram_requests WHERE status = 'pending' ORDER BY created_at DESC").all();
+}
+
+function getTelegramRequestHistory() {
+    const db = getDb();
+    return db.prepare("SELECT * FROM telegram_requests WHERE status != 'pending' ORDER BY updated_at DESC LIMIT 50").all();
 }
 
 function addPendingTelegramRequest(chatId, name, username) {
@@ -743,14 +759,14 @@ function approveTelegramRequest(id) {
 
     setSetting('tg_ids', JSON.stringify(ids));
 
-    // Remove request
-    db.prepare('DELETE FROM telegram_requests WHERE id = ?').run(id);
+    // Keep record, just mark as approved
+    db.prepare("UPDATE telegram_requests SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
     return true;
 }
 
 function denyTelegramRequest(id) {
     const db = getDb();
-    db.prepare('DELETE FROM telegram_requests WHERE id = ?').run(id);
+    db.prepare("UPDATE telegram_requests SET status = 'denied', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
     return true;
 }
 
@@ -828,6 +844,7 @@ module.exports = {
     isTelegramIdAuthorized,
     // TG Registration
     getPendingTelegramRequests,
+    getTelegramRequestHistory,
     addPendingTelegramRequest,
     approveTelegramRequest,
     denyTelegramRequest,

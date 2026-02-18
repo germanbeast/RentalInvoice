@@ -2324,9 +2324,43 @@
             updateOverlay.style.display = 'flex';
             updateStatusText.textContent = 'Update wird geprüft...';
 
+            const waitForServerAndReload = async () => {
+                updateStatusText.textContent = 'Server startet neu, bitte warten...';
+                let attempts = 0;
+                const maxAttempts = 30; // 30 × 2s = 60s max
+                const poll = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const ping = await fetch('/api/health', { cache: 'no-store' });
+                        if (ping.ok) {
+                            clearInterval(poll);
+                            updateStatusText.textContent = 'Update abgeschlossen! Seite wird neu geladen...';
+                            setTimeout(() => window.location.reload(), 800);
+                        }
+                    } catch (_) {
+                        // Server not yet back
+                        if (attempts >= maxAttempts) {
+                            clearInterval(poll);
+                            updateStatusText.textContent = 'Server antwortet nicht. Bitte manuell neu laden.';
+                            btn.disabled = false;
+                        }
+                    }
+                }, 2000);
+            };
+
             try {
-                const response = await fetch('/api/update', { method: 'POST' });
-                const result = await response.json();
+                let result;
+                try {
+                    const response = await fetch('/api/update', { method: 'POST' });
+                    result = await response.json();
+                } catch (networkErr) {
+                    // fetch threw = server closed connection during restart (response sent but TCP closed)
+                    // Treat as successful update in progress
+                    updateStatusText.textContent = 'Update läuft, Server startet neu...';
+                    showToast('Update gestartet. Warte auf Server...', 'success');
+                    await waitForServerAndReload();
+                    return;
+                }
 
                 if (result.success) {
                     if (result.status === 'no_updates') {
@@ -2337,24 +2371,22 @@
                             btn.disabled = false;
                         }, 2000);
                     } else {
-                        updateStatusText.textContent = 'Update erfolgreich! Neustart...';
+                        updateStatusText.textContent = 'Update erfolgreich! Neustart läuft...';
                         showToast('Update abgeschlossen. App lädt neu.', 'success');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 3000);
+                        await waitForServerAndReload();
                     }
                 } else {
                     throw new Error(result.message || 'Update fehlgeschlagen');
                 }
             } catch (err) {
                 console.error('Update Error:', err);
-                updateStatusText.textContent = 'Fehler beim Update :(';
-                showToast(`Fehler: ${err.message}`, 'error', 10000);
+                updateStatusText.textContent = `Fehler: ${err.message}`;
+                showToast(`Update Fehler: ${err.message}`, 'error', 10000);
                 setTimeout(() => {
                     updateOverlay.style.display = 'none';
                     btn.disabled = false;
                     btn.innerHTML = originalContent;
-                }, 3000);
+                }, 4000);
             }
         }
     });
@@ -2368,18 +2400,28 @@
         if (!container || !group) return;
 
         try {
-            const res = await fetch('/api/settings/telegram/requests');
-            const data = await res.json();
+            const [pendingRes, historyRes] = await Promise.all([
+                fetch('/api/settings/telegram/requests'),
+                fetch('/api/settings/telegram/history')
+            ]);
+            const pendingData = await pendingRes.json();
+            const historyData = await historyRes.json();
 
-            if (data.success && data.requests.length > 0) {
-                group.style.display = 'block';
-                container.innerHTML = data.requests.map(req => `
-                    <div class="tg-request-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color);">
+            group.style.display = 'block';
+
+            const pending = (pendingData.success && pendingData.requests) ? pendingData.requests : [];
+            const history = (historyData.success && historyData.history) ? historyData.history : [];
+
+            let html = '';
+
+            if (pending.length > 0) {
+                html += `<div style="font-weight:600; margin-bottom:6px; color:var(--primary-color);">Offene Anfragen</div>`;
+                html += pending.map(req => `
+                    <div class="tg-request-item" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid var(--border-color);">
                         <div>
                             <strong>${escapeHtml(req.name)}</strong>
-                            ${req.username ? `<small class="text-muted">(@${escapeHtml(req.username)})</small>` : ''}
-                            <br>
-                            <small class="text-muted">ID: ${req.id}</small>
+                            ${req.username ? `<small class="text-muted"> (@${escapeHtml(req.username)})</small>` : ''}
+                            <br><small class="text-muted">Chat-ID: ${escapeHtml(String(req.chat_id))} &bull; ${new Date(req.created_at).toLocaleDateString('de-DE')}</small>
                         </div>
                         <div class="btn-group">
                             <button type="button" class="btn btn-sm btn-success btn-approve-tg" data-id="${req.id}">Genehmigen</button>
@@ -2387,19 +2429,38 @@
                         </div>
                     </div>
                 `).join('');
-
-                container.querySelectorAll('.btn-approve-tg').forEach(btn => {
-                    btn.addEventListener('click', () => approveTelegramRequest(btn.dataset.id));
-                });
-
-                container.querySelectorAll('.btn-deny-tg').forEach(btn => {
-                    btn.addEventListener('click', () => denyTelegramRequest(btn.dataset.id));
-                });
-
             } else {
-                group.style.display = 'block';
-                container.innerHTML = '<div class="text-muted" style="padding: 10px; text-align: center; font-style: italic;">Keine offenen Anfragen.</div>';
+                html += `<div class="text-muted" style="padding:8px 0; font-style:italic;">Keine offenen Anfragen.</div>`;
             }
+
+            if (history.length > 0) {
+                html += `<div style="font-weight:600; margin-top:14px; margin-bottom:6px; color:var(--text-muted, #666);">Verlauf</div>`;
+                html += history.map(req => {
+                    const isApproved = req.status === 'approved';
+                    const badge = isApproved
+                        ? `<span style="background:var(--success,#22c55e);color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">Genehmigt</span>`
+                        : `<span style="background:var(--danger,#ef4444);color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">Abgelehnt</span>`;
+                    return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 8px; border-bottom:1px solid var(--border-color); opacity:0.8;">
+                            <div>
+                                <strong>${escapeHtml(req.name)}</strong>
+                                ${req.username ? `<small class="text-muted"> (@${escapeHtml(req.username)})</small>` : ''}
+                                <br><small class="text-muted">Chat-ID: ${escapeHtml(String(req.chat_id))} &bull; ${new Date(req.updated_at || req.created_at).toLocaleDateString('de-DE')}</small>
+                            </div>
+                            <div>${badge}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            container.innerHTML = html;
+
+            container.querySelectorAll('.btn-approve-tg').forEach(btn => {
+                btn.addEventListener('click', () => approveTelegramRequest(btn.dataset.id));
+            });
+            container.querySelectorAll('.btn-deny-tg').forEach(btn => {
+                btn.addEventListener('click', () => denyTelegramRequest(btn.dataset.id));
+            });
         } catch (e) {
             console.error('Failed to load TG requests', e);
         }

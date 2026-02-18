@@ -206,23 +206,29 @@ async function sendToAllRecipients(message) {
 
     // WhatsApp Notifications
     let phones = [];
-    try {
-        phones = JSON.parse(allSettings.wa_phones || '[]');
-    } catch (e) {
-        if (allSettings.wa_phone) phones = [allSettings.wa_phone];
+    const rawPhones = allSettings.wa_phones;
+    if (Array.isArray(rawPhones)) {
+        phones = rawPhones;
+    } else {
+        try { phones = JSON.parse(rawPhones || '[]'); } catch (e) {
+            if (allSettings.wa_phone) phones = [allSettings.wa_phone];
+        }
     }
     for (const phone of phones) {
-        if (phone && phone.trim()) {
-            if (await sendWhatsApp(phone.trim(), message)) anySent = true;
+        if (phone && String(phone).trim()) {
+            if (await sendWhatsApp(String(phone).trim(), message)) anySent = true;
         }
     }
 
     // Telegram Notifications
     let tgIds = [];
-    try {
-        tgIds = JSON.parse(allSettings.tg_ids || '[]');
-    } catch (e) {
-        if (allSettings.tg_id) tgIds = [allSettings.tg_id];
+    const rawTgIds = allSettings.tg_ids;
+    if (Array.isArray(rawTgIds)) {
+        tgIds = rawTgIds.map(String);
+    } else {
+        try { tgIds = JSON.parse(rawTgIds || '[]'); } catch (e) {
+            if (allSettings.tg_id) tgIds = [allSettings.tg_id];
+        }
     }
     for (const id of tgIds) {
         if (id && String(id).trim()) {
@@ -254,7 +260,6 @@ cron.schedule('*/15 * * * *', async () => {
         const notifyEnabled = allSettings.notifications_enabled;
 
         if (!icalUrl || notifyEnabled === 'false') return;
-        if (!waReady) return;
 
         console.log('\ud83d\udcc5 iCal-Polling l\u00e4uft...');
         const response = await axios.get(icalUrl, {
@@ -349,7 +354,7 @@ cron.schedule('0 8 * * *', async () => {
             const notifyEnabled = allSettings.notifications_enabled;
             const reminderDays = parseInt(allSettings.reminder_days) || 2;
 
-            if (!waReady || notifyEnabled === 'false') return;
+            if (notifyEnabled === 'false') return;
 
             console.log('\u23f0 Erinnerungs-Check l\u00e4uft...');
             const upcoming = db.getUpcomingBookings(reminderDays);
@@ -530,7 +535,7 @@ app.disable('x-powered-by');
 // 5. AUTHENTICATION
 // =======================
 function ensureAuthenticated(req, res, next) {
-    const whitelist = ['/api/login', '/api/login/verify', '/api/login/recover', '/api/whatsapp/qr'];
+    const whitelist = ['/api/login', '/api/login/verify', '/api/login/recover', '/api/whatsapp/qr', '/api/health'];
     if (whitelist.includes(req.path)) return next();
 
     if (req.session && req.session.user) return next();
@@ -557,6 +562,13 @@ app.use(express.static(PUBLIC_DIR, {
     index: 'index.html',
     extensions: ['html']
 }));
+
+// =======================
+// 6b. HEALTH CHECK
+// =======================
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true });
+});
 
 // =======================
 // 7. AUTH API ROUTES
@@ -844,6 +856,15 @@ app.post('/api/settings/telegram/deny', apiLimiter, (req, res) => {
         res.json({ success: true, message: 'Anfrage abgelehnt' });
     } catch (e) {
         res.status(500).json({ error: 'Fehler beim Ablehnen' });
+    }
+});
+
+app.get('/api/settings/telegram/history', apiLimiter, (req, res) => {
+    try {
+        const history = db.getTelegramRequestHistory();
+        res.json({ success: true, history });
+    } catch (e) {
+        res.status(500).json({ error: 'Verlauf konnte nicht geladen werden' });
     }
 });
 
@@ -1363,7 +1384,7 @@ app.post('/api/update', apiLimiter, (req, res) => {
                         console.log('🔄 Starte Server neu...');
                         db.close();
                         process.exit(0);
-                    }, 1500);
+                    }, 3000);
                 });
             });
         });
