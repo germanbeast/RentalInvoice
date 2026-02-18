@@ -770,6 +770,29 @@ function denyTelegramRequest(id) {
     return true;
 }
 
+function revokeTelegramAccess(chatId) {
+    const db = getDb();
+    const strId = String(chatId);
+
+    // Remove from tg_ids setting
+    const settings = getAllSettings();
+    const rawIds = settings.tg_ids;
+    let ids = Array.isArray(rawIds) ? rawIds.map(String) : [];
+    if (!Array.isArray(rawIds)) {
+        try { ids = JSON.parse(rawIds || '[]').map(String); } catch (e) { ids = []; }
+    }
+    ids = ids.filter(id => id !== strId);
+    setSetting('tg_ids', JSON.stringify(ids));
+
+    // Mark request record as denied/revoked
+    db.prepare("UPDATE telegram_requests SET status = 'denied', updated_at = CURRENT_TIMESTAMP WHERE chat_id = ?").run(strId);
+
+    // Clear telegram_id on user record (if linked)
+    db.prepare("UPDATE users SET telegram_id = '' WHERE telegram_id = ?").run(strId);
+
+    return true;
+}
+
 // =======================
 // Init & Export
 // =======================
@@ -848,6 +871,7 @@ module.exports = {
     addPendingTelegramRequest,
     approveTelegramRequest,
     denyTelegramRequest,
+    revokeTelegramAccess,
     // Migration
     migrateFromLocalStorage
 };

@@ -868,6 +868,18 @@ app.get('/api/settings/telegram/history', apiLimiter, (req, res) => {
     }
 });
 
+app.post('/api/settings/telegram/revoke', apiLimiter, (req, res) => {
+    try {
+        const { chatId } = req.body;
+        if (!chatId) return res.status(400).json({ error: 'chatId fehlt' });
+        db.revokeTelegramAccess(chatId);
+        res.json({ success: true, message: 'Zugriff entzogen' });
+    } catch (e) {
+        console.error('Telegram Revoke Error:', e.message);
+        res.status(500).json({ error: 'Fehler beim Entziehen: ' + e.message });
+    }
+});
+
 // =======================
 // 9. GUESTS API
 // =======================

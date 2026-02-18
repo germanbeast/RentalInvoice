@@ -613,13 +613,13 @@
             booking_ical: $('#booking-ical-url').value,
             paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
             paperless_amount_field: $('#s-pl-amount-field')?.value || '',
-            wa_phones: JSON.stringify(Array.from(document.querySelectorAll('.wa-phone-input')).map(input => input.value)),
+            wa_phones: JSON.stringify(Array.from(document.querySelectorAll('.wa-phone-input')).map(i => i.value.trim()).filter(v => v)),
             nuki: {
                 token: $('#nuki-token').value,
                 lockId: $('#nuki-lock-id').value
             },
             tg_token: $('#tg-token').value,
-            tg_ids: JSON.stringify(Array.from(document.querySelectorAll('.tg-id-input')).map(input => input.value)),
+            tg_ids: JSON.stringify(Array.from(document.querySelectorAll('.tg-id-input')).map(i => i.value.trim()).filter(v => v)),
             reminder_days: $('#reminder-days').value || '2',
             notifications_enabled: $('#notifications-enabled')?.checked !== false ? 'true' : 'false',
             twofactor_enabled: $('#twofactor-enabled').checked ? 'true' : 'false'
@@ -711,7 +711,14 @@
             const container = $('#wa-phones-container');
             container.innerHTML = '';
             let phones = [];
-            try { phones = JSON.parse(s.wa_phones || '[]'); } catch (e) { if (s.wa_phone) phones = [s.wa_phone]; }
+            const rawPhones = s.wa_phones;
+            if (Array.isArray(rawPhones)) {
+                phones = rawPhones;
+            } else {
+                try { phones = JSON.parse(rawPhones || '[]'); } catch (e) {
+                    if (s.wa_phone) phones = [s.wa_phone];
+                }
+            }
             if (phones.length === 0) addWaPhoneRow('');
             else phones.forEach(p => addWaPhoneRow(p));
 
@@ -723,7 +730,14 @@
             if (tgContainer) {
                 tgContainer.innerHTML = '';
                 let tgIds = [];
-                try { tgIds = JSON.parse(s.tg_ids || '[]'); } catch (e) { if (s.tg_id) tgIds = [s.tg_id]; }
+                const rawTgIds = s.tg_ids;
+                if (Array.isArray(rawTgIds)) {
+                    tgIds = rawTgIds.map(String);
+                } else {
+                    try { tgIds = JSON.parse(rawTgIds || '[]'); } catch (e) {
+                        if (s.tg_id) tgIds = [s.tg_id];
+                    }
+                }
                 if (tgIds.length === 0) addTgIdRow('');
                 else tgIds.forEach(id => addTgIdRow(id));
             }
@@ -766,16 +780,16 @@
             const qrImage = $('#wa-qr-image');
 
             if (data.status === 'ready') {
-                if (dot) dot.className = 'badge online';
+                if (dot) { dot.className = 'badge online'; dot.textContent = 'Online'; }
                 if (text) text.textContent = 'Verbunden';
                 if (qrGroup) qrGroup.style.display = 'none';
             } else if (data.status === 'qr_pending' && data.qr) {
-                if (dot) dot.className = 'badge';
+                if (dot) { dot.className = 'badge'; dot.textContent = 'Verbinde...'; }
                 if (text) text.textContent = 'QR-Code scannen';
                 if (qrGroup) qrGroup.style.display = 'block';
                 if (qrImage) qrImage.src = data.qr;
             } else {
-                if (dot) dot.className = 'badge';
+                if (dot) { dot.className = 'badge'; dot.textContent = 'Offline'; }
                 if (text) text.textContent = 'Offline';
                 if (qrGroup) qrGroup.style.display = 'none';
             }
@@ -785,14 +799,24 @@
     }
 
     // Start polling when settings modal opens
-    const origOpenSettings = modalSettings ? modalSettings.style : null;
+    let tgRequestInterval = null;
     if (modalSettings) {
         const observer = new MutationObserver(() => {
             if (modalSettings.style.display !== 'none') {
+                // Clear any previous intervals before starting new ones
+                clearInterval(waStatusInterval);
+                clearInterval(tgRequestInterval);
+
                 pollWhatsAppStatus();
-                waStatusInterval = setInterval(pollWhatsAppStatus, 3000);
+                waStatusInterval = setInterval(pollWhatsAppStatus, 5000);
+
+                loadTelegramRequests();
+                tgRequestInterval = setInterval(loadTelegramRequests, 8000);
             } else {
-                if (waStatusInterval) clearInterval(waStatusInterval);
+                clearInterval(waStatusInterval);
+                clearInterval(tgRequestInterval);
+                waStatusInterval = null;
+                tgRequestInterval = null;
             }
         });
         observer.observe(modalSettings, { attributes: true, attributeFilter: ['style'] });
@@ -2438,16 +2462,19 @@
                 html += history.map(req => {
                     const isApproved = req.status === 'approved';
                     const badge = isApproved
-                        ? `<span style="background:var(--success,#22c55e);color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">Genehmigt</span>`
+                        ? `<span style="background:var(--accent-green,#22c55e);color:#000;padding:2px 8px;border-radius:12px;font-size:11px;">Aktiv</span>`
                         : `<span style="background:var(--danger,#ef4444);color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">Abgelehnt</span>`;
+                    const revokeBtn = isApproved
+                        ? `<button type="button" class="btn btn-sm btn-danger btn-revoke-tg" data-chatid="${escapeHtml(String(req.chat_id))}" style="margin-left:8px; font-size:11px; padding:2px 8px;">Entziehen</button>`
+                        : '';
                     return `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 8px; border-bottom:1px solid var(--border-color); opacity:0.8;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 8px; border-bottom:1px solid var(--border-color);">
                             <div>
                                 <strong>${escapeHtml(req.name)}</strong>
                                 ${req.username ? `<small class="text-muted"> (@${escapeHtml(req.username)})</small>` : ''}
                                 <br><small class="text-muted">Chat-ID: ${escapeHtml(String(req.chat_id))} &bull; ${new Date(req.updated_at || req.created_at).toLocaleDateString('de-DE')}</small>
                             </div>
-                            <div>${badge}</div>
+                            <div style="display:flex; align-items:center;">${badge}${revokeBtn}</div>
                         </div>
                     `;
                 }).join('');
@@ -2460,6 +2487,9 @@
             });
             container.querySelectorAll('.btn-deny-tg').forEach(btn => {
                 btn.addEventListener('click', () => denyTelegramRequest(btn.dataset.id));
+            });
+            container.querySelectorAll('.btn-revoke-tg').forEach(btn => {
+                btn.addEventListener('click', () => revokeTelegramAccess(btn.dataset.chatid));
             });
         } catch (e) {
             console.error('Failed to load TG requests', e);
@@ -2504,6 +2534,27 @@
             }
         } catch (e) {
             showToast('Fehler beim Ablehnen', 'error');
+        }
+    }
+
+    async function revokeTelegramAccess(chatId) {
+        if (!confirm(`Zugriff für Chat-ID ${chatId} wirklich entziehen?`)) return;
+        try {
+            const res = await fetch('/api/settings/telegram/revoke', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Zugriff entzogen', 'success');
+                await loadTelegramRequests();
+                await loadAllSettings(); // Refresh tg_ids list
+            } else {
+                showToast(data.error || 'Fehler', 'error');
+            }
+        } catch (e) {
+            showToast('Fehler beim Entziehen', 'error');
         }
     }
 
