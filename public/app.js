@@ -25,7 +25,7 @@
     const btnSettings = $('#btn-settings');
     const btnCloseSettings = $('#btn-close-settings');
     const btnSaveSettings = $('#btn-save-settings');
-    const btnTestConnection = $('#btn-test-connection');
+    const btnTestConnection = $('#btn-paperless-test');
     const btnAddTgId = $('#btn-add-tg-id');
     const btnAddWaPhone = $('#btn-add-wa-phone');
     const btnArchive = $('#btn-archive');
@@ -2173,8 +2173,8 @@
     // =======================
     // Save Buttons
     // =======================
-    btnSaveVermieter.addEventListener('click', saveVermieter);
-    btnSaveBank.addEventListener('click', saveBank);
+    if (btnSaveVermieter) btnSaveVermieter.addEventListener('click', saveVermieter);
+    if (btnSaveBank) btnSaveBank.addEventListener('click', saveBank);
 
     // =======================
     // Init
@@ -2212,6 +2212,20 @@
         updatePreview();
         scheduleDraftSave();
     });
+
+    // =======================
+    // Dashboard: Rechnungen stat card opens archive
+    // =======================
+    const statInvoiceCard = $('#stat-invoice-count') && $('#stat-invoice-count').closest('.stat-card');
+    if (statInvoiceCard) {
+        statInvoiceCard.style.cursor = 'pointer';
+        statInvoiceCard.title = 'Rechnungsarchiv öffnen';
+        statInvoiceCard.addEventListener('click', () => {
+            renderArchiveList();
+            modalArchive.style.display = 'flex';
+            $('#archive-search-input').value = '';
+        });
+    }
 
     // =======================
     // Archive Modal

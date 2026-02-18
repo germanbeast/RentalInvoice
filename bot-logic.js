@@ -32,18 +32,28 @@ function calcNights(anreise, abreise) {
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
+// Returns true if the string looks like a date, numeric, or is too short to be a real name
+function looksLikeDateOrInvalid(str) {
+    if (!str || str.trim().length < 2) return true;
+    // Matches date patterns like "15.03." or "15.03.2026" or "15.03. - 20.03."
+    if (/\d{1,2}\.\d{1,2}\./.test(str)) return true;
+    // Purely numeric
+    if (/^\d+$/.test(str.trim())) return true;
+    return false;
+}
+
 function parseInvoiceText(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
     const data = { gName: '', gAdresse: '', arrival: '', departure: '' };
 
     if (lines.length === 0) return data;
 
-    // Heuristics
-    if (lines[0] && !lines[0].toLowerCase().includes('rechnung')) {
-        data.gName = lines[0];
-    } else if (lines[1]) {
-        data.gName = lines[1];
-    }
+    // Find the first line that is not a date, not "rechnung", and not purely numeric
+    const nameLine = lines.find(l =>
+        !l.toLowerCase().includes('rechnung') &&
+        !looksLikeDateOrInvalid(l)
+    );
+    data.gName = nameLine || '';
 
     const fullText = text.replace(/\n/g, ' ');
     const dates = parseDates(fullText);
@@ -53,7 +63,7 @@ function parseInvoiceText(text) {
     const addressLines = lines.filter(l =>
         l !== data.gName &&
         !l.toLowerCase().includes('rechnung') &&
-        !l.match(/\d{1,2}\.\d{1,2}\./)
+        !looksLikeDateOrInvalid(l)
     );
     data.gAdresse = addressLines.join('\n');
 

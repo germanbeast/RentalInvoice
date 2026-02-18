@@ -1431,14 +1431,23 @@ app.post('/api/notifications/test-whatsapp', apiLimiter, async (req, res) => {
         }
 
         const allSettings = db.getAllSettings();
-        const waPhone = allSettings.wa_phone;
+        // Support both wa_phones (array) and legacy wa_phone (string)
+        let waPhone = null;
+        try {
+            const phones = Array.isArray(allSettings.wa_phones)
+                ? allSettings.wa_phones
+                : JSON.parse(allSettings.wa_phones || '[]');
+            waPhone = phones.find(p => p && p.trim()) || allSettings.wa_phone || null;
+        } catch (e) {
+            waPhone = allSettings.wa_phone || null;
+        }
 
         if (!waPhone) {
             return res.status(400).json({ error: 'Empf\u00e4nger-Nummer muss in den Einstellungen hinterlegt sein.' });
         }
 
         const msg = '\u2705 Test-Nachricht von Rental Invoice! WhatsApp-Benachrichtigungen funktionieren.';
-        const sent = await sendWhatsApp(waPhone, msg);
+        const sent = await sendWhatsApp(waPhone.trim(), msg);
         db.logNotification('test', msg, sent ? 'sent' : 'failed');
 
         if (sent) {
