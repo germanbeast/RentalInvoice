@@ -2464,9 +2464,10 @@
                     const badge = isApproved
                         ? `<span style="background:var(--accent-green,#22c55e);color:#000;padding:2px 8px;border-radius:12px;font-size:11px;">Aktiv</span>`
                         : `<span style="background:var(--danger,#ef4444);color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">Abgelehnt</span>`;
-                    const revokeBtn = isApproved
+                    // Approved: show Revoke button. Denied: show Delete button (enables re-registration)
+                    const actionBtn = isApproved
                         ? `<button type="button" class="btn btn-sm btn-danger btn-revoke-tg" data-chatid="${escapeHtml(String(req.chat_id))}" style="margin-left:8px; font-size:11px; padding:2px 8px;">Entziehen</button>`
-                        : '';
+                        : `<button type="button" class="btn btn-sm btn-ghost btn-delete-tg" data-id="${req.id}" style="margin-left:8px; font-size:11px; padding:2px 8px; opacity:0.7;">Löschen</button>`;
                     return `
                         <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 8px; border-bottom:1px solid var(--border-color);">
                             <div>
@@ -2474,7 +2475,7 @@
                                 ${req.username ? `<small class="text-muted"> (@${escapeHtml(req.username)})</small>` : ''}
                                 <br><small class="text-muted">Chat-ID: ${escapeHtml(String(req.chat_id))} &bull; ${new Date(req.updated_at || req.created_at).toLocaleDateString('de-DE')}</small>
                             </div>
-                            <div style="display:flex; align-items:center;">${badge}${revokeBtn}</div>
+                            <div style="display:flex; align-items:center;">${badge}${actionBtn}</div>
                         </div>
                     `;
                 }).join('');
@@ -2490,6 +2491,9 @@
             });
             container.querySelectorAll('.btn-revoke-tg').forEach(btn => {
                 btn.addEventListener('click', () => revokeTelegramAccess(btn.dataset.chatid));
+            });
+            container.querySelectorAll('.btn-delete-tg').forEach(btn => {
+                btn.addEventListener('click', () => deleteTgRequest(btn.dataset.id));
             });
         } catch (e) {
             console.error('Failed to load TG requests', e);
@@ -2555,6 +2559,26 @@
             }
         } catch (e) {
             showToast('Fehler beim Entziehen', 'error');
+        }
+    }
+
+    async function deleteTgRequest(id) {
+        if (!confirm('Eintrag vollständig löschen?\nDer User kann sich danach erneut registrieren.')) return;
+        try {
+            const res = await fetch('/api/settings/telegram/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Eintrag gelöscht', 'success');
+                await loadTelegramRequests();
+            } else {
+                showToast(data.error || 'Fehler', 'error');
+            }
+        } catch (e) {
+            showToast('Fehler beim Löschen', 'error');
         }
     }
 

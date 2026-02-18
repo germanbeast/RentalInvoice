@@ -727,14 +727,21 @@ function getTelegramRequestHistory() {
 
 function addPendingTelegramRequest(chatId, name, username) {
     const db = getDb();
-    try {
+    const strId = String(chatId);
+
+    const existing = db.prepare('SELECT * FROM telegram_requests WHERE chat_id = ?').get(strId);
+
+    if (!existing) {
+        // New registration
         db.prepare('INSERT INTO telegram_requests (chat_id, name, username) VALUES (?, ?, ?)')
-            .run(String(chatId), name, username);
-        return true; // Return true so we don't treat it as error
-    } catch (e) {
-        // Likely already exists
-        return true; // Return true so we don't treat it as error
+            .run(strId, name, username);
+    } else if (existing.status === 'denied') {
+        // Previously denied — reset to pending so admin can decide again
+        db.prepare("UPDATE telegram_requests SET status = 'pending', name = ?, username = ?, updated_at = CURRENT_TIMESTAMP WHERE chat_id = ?")
+            .run(name, username, strId);
     }
+    // If 'pending' or 'approved' → do nothing (already handled)
+    return true;
 }
 
 function approveTelegramRequest(id) {
@@ -767,6 +774,12 @@ function approveTelegramRequest(id) {
 function denyTelegramRequest(id) {
     const db = getDb();
     db.prepare("UPDATE telegram_requests SET status = 'denied', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+    return true;
+}
+
+function deleteTelegramRequest(id) {
+    const db = getDb();
+    db.prepare('DELETE FROM telegram_requests WHERE id = ?').run(id);
     return true;
 }
 
@@ -871,6 +884,7 @@ module.exports = {
     addPendingTelegramRequest,
     approveTelegramRequest,
     denyTelegramRequest,
+    deleteTelegramRequest,
     revokeTelegramAccess,
     // Migration
     migrateFromLocalStorage

@@ -868,6 +868,18 @@ app.get('/api/settings/telegram/history', apiLimiter, (req, res) => {
     }
 });
 
+app.post('/api/settings/telegram/delete', apiLimiter, (req, res) => {
+    try {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ error: 'id fehlt' });
+        db.deleteTelegramRequest(id);
+        res.json({ success: true, message: 'Eintrag gelöscht' });
+    } catch (e) {
+        console.error('Telegram Delete Error:', e.message);
+        res.status(500).json({ error: 'Fehler beim Löschen: ' + e.message });
+    }
+});
+
 app.post('/api/settings/telegram/revoke', apiLimiter, (req, res) => {
     try {
         const { chatId } = req.body;
