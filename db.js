@@ -711,11 +711,21 @@ function clearNukiAuth(id) {
 function findBookingForStay(guestName, arrival, departure) {
     // Helper to link manual invoices to iCal bookings
     return getDb().prepare(`
-        SELECT * FROM bookings 
-        WHERE (summary LIKE ? OR description LIKE ?) 
+        SELECT * FROM bookings
+        WHERE (summary LIKE ? OR description LIKE ?)
         AND checkin = ? AND checkout = ?
         LIMIT 1
     `).get(`%${guestName}%`, `%${guestName}%`, arrival, departure);
+}
+
+function createManualBooking(guestId, guestName, arrival, departure, pin, authId) {
+    // Creates a synthetic booking row for manually generated Nuki PINs (Telegram PIN-only flow)
+    const uid = `manual-${guestId}-${arrival}-${departure}-${Date.now()}`;
+    const result = getDb().prepare(
+        `INSERT INTO bookings (uid, summary, checkin, checkout, guest_id, nuki_pin, nuki_auth_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(uid, `Gast: ${guestName}`, arrival, departure, guestId, pin, authId);
+    return { id: result.lastInsertRowid };
 }
 
 // =======================
@@ -884,6 +894,7 @@ module.exports = {
     getExpiredNukiAuths,
     clearNukiAuth,
     findBookingForStay,
+    createManualBooking,
     isTelegramIdAuthorized,
     // TG Registration
     getPendingTelegramRequests,

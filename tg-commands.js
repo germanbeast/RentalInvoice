@@ -184,10 +184,17 @@ async function finalizePinOnlyTG(bot, msg, data) {
 
         const pin = nukiResult.pin;
         const authId = nukiResult.authId;
-        db.findOrCreateGuest(data.gName, null, null);
+        const guest = db.findOrCreateGuest(data.gName, null, null);
         const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
         if (existingBooking) {
             db.updateBookingNukiData(existingBooking.id, pin, authId);
+            // Also link guest_id if not already set
+            if (!existingBooking.guest_id) {
+                db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, existingBooking.id);
+            }
+        } else {
+            // No iCal booking exists — create a manual booking so the PIN is visible in the guest detail
+            db.createManualBooking(guest.id, data.gName, data.arrival, data.departure, pin, authId);
         }
         bot.sendMessage(chatId, `✅ Tür-Code: *${pin}*\nGast: ${data.gName}\nZeit: ${data.arrival} bis ${data.departure}`, { parse_mode: 'Markdown' });
     } catch (e) {

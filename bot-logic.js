@@ -162,14 +162,22 @@ async function finalizeInvoiceData(data) {
     // Nuki Logic
     const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
     if (existingBooking && existingBooking.nuki_pin) {
+        // Reuse the already-created PIN (e.g. from iCal or Telegram PIN-only flow)
         invoiceData.nukiPin = existingBooking.nuki_pin;
     } else {
         try {
             const nukiResult = await createNukiPinDirect(data.arrival, data.departure, data.gName);
             if (nukiResult.success) {
                 invoiceData.nukiPin = nukiResult.pin;
+                const guest = db.findOrCreateGuest(data.gName, data.gEmail || null, data.gAdresse || null);
                 if (existingBooking) {
                     db.updateBookingNukiData(existingBooking.id, nukiResult.pin, nukiResult.authId);
+                    if (!existingBooking.guest_id) {
+                        db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, existingBooking.id);
+                    }
+                } else {
+                    // No iCal booking — create a manual one so PIN appears in guest detail
+                    db.createManualBooking(guest.id, data.gName, data.arrival, data.departure, nukiResult.pin, nukiResult.authId);
                 }
             }
         } catch (e) {

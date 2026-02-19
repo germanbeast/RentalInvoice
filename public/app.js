@@ -822,6 +822,24 @@
         observer.observe(modalSettings, { attributes: true, attributeFilter: ['style'] });
     }
 
+    // Live polling for archive modal
+    let archivePollInterval = null;
+    if (modalArchive) {
+        const archiveObserver = new MutationObserver(() => {
+            if (modalArchive.style.display !== 'none') {
+                clearInterval(archivePollInterval);
+                archivePollInterval = setInterval(async () => {
+                    await fetchArchive();
+                    renderArchiveList($('#archive-search-input') ? $('#archive-search-input').value : '');
+                }, 20000);
+            } else {
+                clearInterval(archivePollInterval);
+                archivePollInterval = null;
+            }
+        });
+        archiveObserver.observe(modalArchive, { attributes: true, attributeFilter: ['style'] });
+    }
+
     // --- NEW: Multi-Number Support ---
     function addWaPhoneRow(val = '') {
         const container = $('#wa-phones-container');
@@ -1220,6 +1238,21 @@
     // =======================
     // View Switcher
     // =======================
+    let currentView = 'dashboard';
+    let viewPollInterval = null;
+
+    function startViewPolling(viewId) {
+        clearInterval(viewPollInterval);
+        viewPollInterval = null;
+        const POLL_MS = 20000;
+        if (viewId === 'dashboard') {
+            viewPollInterval = setInterval(loadDashboard, POLL_MS);
+        } else if (viewId === 'expenses') {
+            viewPollInterval = setInterval(loadExpenses, POLL_MS);
+        }
+        // 'invoice' view has no background data to poll
+    }
+
     function switchView(viewId) {
         const views = [viewDashboard, viewInvoiceForm, viewExpenses];
         const navItems = [navDashboard, navInvoice, navGuests, navExpenses];
@@ -1230,6 +1263,8 @@
         navItems.forEach(n => {
             if (n) n.classList.remove('active');
         });
+
+        currentView = viewId;
 
         if (viewId === 'dashboard') {
             viewDashboard.style.display = 'flex';
@@ -1244,6 +1279,8 @@
             navExpenses.classList.add('active');
             loadExpenses();
         }
+
+        startViewPolling(viewId);
 
         // Close mobile sidebar if open
         if (window.innerWidth <= 768) {
@@ -1512,8 +1549,17 @@
         }
         renderPositions();
         updateSummary();
-        updatePreview();
         updateNights();
+
+        // Restore Nuki PIN from archived data
+        if (d.nukiPin) {
+            $('#nuki-pin-result').style.display = 'block';
+            $('#nuki-pin-code').textContent = d.nukiPin;
+        } else {
+            $('#nuki-pin-result').style.display = 'none';
+        }
+
+        updatePreview();
         saveDraft();
 
         modalArchive.style.display = 'none';
@@ -2786,6 +2832,30 @@
                 showToast('Fehler beim Löschen', 'error');
             }
         });
+    }
+
+    // Live polling for guests modal
+    let guestsPollInterval = null;
+    if (modalGuests) {
+        const guestsObserver = new MutationObserver(() => {
+            if (modalGuests.style.display !== 'none') {
+                clearInterval(guestsPollInterval);
+                guestsPollInterval = setInterval(() => {
+                    const guestsList = $('#guests-list');
+                    const guestDetail = $('#guest-detail');
+                    if (guestsList && guestsList.style.display !== 'none') {
+                        const searchInput = $('#guests-search-input');
+                        loadGuestsList(searchInput ? searchInput.value : '');
+                    } else if (guestDetail && guestDetail.style.display !== 'none' && currentGuestId) {
+                        showGuestDetail(currentGuestId);
+                    }
+                }, 15000);
+            } else {
+                clearInterval(guestsPollInterval);
+                guestsPollInterval = null;
+            }
+        });
+        guestsObserver.observe(modalGuests, { attributes: true, attributeFilter: ['style'] });
     }
 
     async function loadGuestsList(search = '') {
