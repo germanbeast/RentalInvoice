@@ -336,10 +336,30 @@ cron.schedule('0 8 * * *', async () => {
 
         // 1. Delete Expired Nuki PINs
         const expired = db.getExpiredNukiAuths();
+        const allSettings = db.getAllSettings();
+        const nuki = allSettings.nuki;
         for (const booking of expired) {
             try {
-                await deleteNukiPin(booking.nuki_auth_id);
+                let authId = booking.nuki_auth_id;
+                // If no auth_id stored, look it up live by PIN code
+                if (!authId && booking.nuki_pin && nuki && nuki.token && nuki.lockId) {
+                    try {
+                        const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
+                        const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
+                            headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' }
+                        });
+                        const auths = Array.isArray(listRes.data) ? listRes.data : [];
+                        const match = auths.find(a => String(a.code) === String(booking.nuki_pin));
+                        if (match) authId = match.id;
+                    } catch (lookupErr) {
+                        console.warn(`⚠️ Nuki authId Lookup für Buchung ${booking.id} fehlgeschlagen:`, lookupErr.message);
+                    }
+                }
+                if (authId) {
+                    await deleteNukiPin(authId);
+                }
                 db.clearNukiAuth(booking.id);
+                db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(booking.id);
                 console.log(`✅ Nuki-PIN für Buchung ${booking.id} gelöscht.`);
             } catch (e) {
                 console.warn(`⚠️ Nuki-Cleanup für ${booking.id} fehlgeschlagen:`, e.message);

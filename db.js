@@ -699,9 +699,9 @@ function getExpiredNukiAuths() {
     const dateStr = yesterday.toISOString().split('T')[0];
 
     return getDb().prepare(`
-        SELECT id, nuki_auth_id 
-        FROM bookings 
-        WHERE checkout <= ? AND nuki_auth_id IS NOT NULL AND nuki_auth_id != ''
+        SELECT id, nuki_auth_id, nuki_pin
+        FROM bookings
+        WHERE checkout <= ? AND nuki_pin IS NOT NULL AND nuki_pin != ''
     `).all(dateStr);
 }
 
