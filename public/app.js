@@ -1148,8 +1148,14 @@
             const data = await res.json();
             if (data.success) {
                 cachedArchive = data.invoices.map(inv => {
-                    const d = inv.data || {};
-                    return { ...d, _dbId: inv.id, guestId: inv.guest_id };
+                    const d = (typeof inv.data === 'string' ? JSON.parse(inv.data || '{}') : inv.data) || {};
+                    return {
+                        ...d,
+                        _dbId: inv.id,
+                        guestId: inv.guest_id,
+                        // DB column is the authoritative total — always keep it as fallback
+                        totalAmount: d.totalAmount || inv.total_amount || 0
+                    };
                 });
             }
         } catch (e) {
@@ -1570,6 +1576,10 @@
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10v2h10v-2M7 2v7M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Laden
                         </button>
+                        <button type="button" class="btn btn-sm btn-outline btn-archive-pdf" data-dbid="${inv._dbId}" data-nr="${escapeHtml(inv.rNummer || '')}" title="PDF herunterladen">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2h7l3 3v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2"/><path d="M9 2v3h3M4.5 8h5M4.5 10.5h5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+                            PDF
+                        </button>
                         <button type="button" class="btn btn-sm btn-ghost btn-danger btn-archive-delete" data-idx="${realIdx}" title="Löschen">
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M4 4V3h6v1M5 6v4M9 6v4M3 4l.7 7.3a1 1 0 001 .7h4.6a1 1 0 001-.7L11 4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
                         </button>
@@ -1585,6 +1595,10 @@
             });
         });
 
+        list.querySelectorAll('.btn-archive-pdf').forEach(btn => {
+            btn.addEventListener('click', () => downloadArchivedPdf(btn.dataset.dbid, btn.dataset.nr));
+        });
+
         list.querySelectorAll('.btn-archive-delete').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (confirm('Diese Rechnung wirklich aus dem Archiv löschen?')) {
@@ -1592,6 +1606,30 @@
                 }
             });
         });
+    }
+
+    async function downloadArchivedPdf(dbId, rNummer) {
+        if (!dbId) { showToast('Keine Rechnungs-ID', 'error'); return; }
+        try {
+            showToast('PDF wird generiert...', 'info');
+            const res = await fetch(`/api/invoices/${dbId}/pdf`);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Unbekannter Fehler' }));
+                showToast('PDF Fehler: ' + (err.error || res.statusText), 'error');
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Rechnung-${rNummer || dbId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            showToast('Download fehlgeschlagen: ' + e.message, 'error');
+        }
     }
 
     // =======================
@@ -2808,22 +2846,77 @@
             if (data.invoices && data.invoices.length > 0) {
                 invList.innerHTML = data.invoices.map(inv => {
                     const d = typeof inv.data === 'string' ? JSON.parse(inv.data) : (inv.data || {});
+                    const amount = inv.total_amount || d.totalAmount || 0;
                     return `
-                        <div class="guest-invoice-item">
+                        <div class="guest-invoice-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
                             <span class="guest-invoice-nr">${escapeHtml(inv.invoice_number || d.rNummer || '—')}</span>
-                            <span class="guest-invoice-date">${formatDate(inv.invoice_date || d.rDatum)}</span>
-                            <span class="guest-invoice-amount">${formatCurrency(inv.total_amount || d.totalAmount || 0)}</span>
+                            <span class="guest-invoice-date" style="color:var(--text-muted); font-size:0.82rem;">${formatDate(inv.invoice_date || d.rDatum)}</span>
+                            <span class="guest-invoice-amount" style="font-weight:600;">${formatCurrency(amount)}</span>
+                            ${inv.id ? `<button type="button" class="btn btn-sm btn-ghost btn-download-inv-pdf" data-id="${inv.id}" data-nr="${escapeHtml(inv.invoice_number || '')}" title="PDF herunterladen" style="padding:2px 6px; font-size:11px;">PDF</button>` : ''}
                         </div>
                     `;
                 }).join('');
+                invList.querySelectorAll('.btn-download-inv-pdf').forEach(btn => {
+                    btn.addEventListener('click', () => downloadArchivedPdf(btn.dataset.id, btn.dataset.nr));
+                });
             } else {
                 invList.innerHTML = '<p class="text-muted">Keine Rechnungen vorhanden</p>';
+            }
+
+            // Nuki PINs
+            const nukiSection = $('#guest-nuki-section');
+            const nukiList = $('#guest-nuki-list');
+            if (nukiList) {
+                const activePins = (data.bookings || []).filter(b => b.nuki_pin || b.nuki_auth_id);
+                if (activePins.length > 0) {
+                    const now = new Date().toISOString().split('T')[0];
+                    nukiList.innerHTML = activePins.map(b => {
+                        const expired = b.checkout && b.checkout < now;
+                        const statusBadge = expired
+                            ? `<span style="background:var(--danger,#ef4444);color:#fff;padding:1px 7px;border-radius:12px;font-size:11px;">Abgelaufen</span>`
+                            : `<span style="background:var(--accent-green,#34d399);color:#000;padding:1px 7px;border-radius:12px;font-size:11px;">Aktiv</span>`;
+                        const deleteBtn = b.nuki_auth_id
+                            ? `<button type="button" class="btn btn-sm btn-danger btn-delete-nuki-pin" data-booking-id="${b.id}" style="font-size:11px;padding:2px 8px;">Löschen</button>`
+                            : '';
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--border); gap:8px;">
+                                <div>
+                                    <strong style="font-family:monospace; font-size:1.1em;">${escapeHtml(b.nuki_pin || '—')}</strong>
+                                    <br><small class="text-muted">${b.checkin ? formatDate(b.checkin) : '—'} – ${b.checkout ? formatDate(b.checkout) : '—'}</small>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:6px;">${statusBadge}${deleteBtn}</div>
+                            </div>`;
+                    }).join('');
+                    nukiList.querySelectorAll('.btn-delete-nuki-pin').forEach(btn => {
+                        btn.addEventListener('click', () => deleteGuestNukiPin(btn.dataset.bookingId, guestId));
+                    });
+                    if (nukiSection) nukiSection.style.display = 'block';
+                } else {
+                    nukiList.innerHTML = '<p class="text-muted" style="font-size:0.85rem;">Keine aktiven Nuki-PINs</p>';
+                    if (nukiSection) nukiSection.style.display = 'block';
+                }
             }
 
             $('#guests-list').style.display = 'none';
             $('#guest-detail').style.display = 'block';
         } catch (e) {
             console.error('Show guest detail error:', e);
+        }
+    }
+
+    async function deleteGuestNukiPin(bookingId, guestId) {
+        if (!confirm('Diesen Nuki-PIN wirklich löschen? Der Tür-Code wird sofort deaktiviert.')) return;
+        try {
+            const res = await fetch(`/api/nuki/pin/${bookingId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Nuki-PIN gelöscht', 'success');
+                showGuestDetail(guestId); // refresh
+            } else {
+                showToast(data.error || 'Fehler beim Löschen', 'error');
+            }
+        } catch (e) {
+            showToast('Fehler: ' + e.message, 'error');
         }
     }
 

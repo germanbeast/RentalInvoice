@@ -681,6 +681,12 @@ function migrateFromLocalStorage(data) {
     return results;
 }
 
+function getBookingsByGuestId(guestId) {
+    return getDb().prepare(
+        'SELECT * FROM bookings WHERE guest_id = ? ORDER BY checkin DESC'
+    ).all(guestId);
+}
+
 function updateBookingNukiData(id, pin, authId) {
     return getDb().prepare('UPDATE bookings SET nuki_pin = ?, nuki_auth_id = ? WHERE id = ?').run(pin, authId, id);
 }
@@ -873,6 +879,7 @@ module.exports = {
     markReminderSent,
     logNotification,
     getRecentNotifications,
+    getBookingsByGuestId,
     updateBookingNukiData,
     getExpiredNukiAuths,
     clearNukiAuth,

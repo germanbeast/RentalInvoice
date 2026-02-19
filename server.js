@@ -911,7 +911,8 @@ app.get('/api/guests/:id', apiLimiter, (req, res) => {
         const guest = db.getGuestById(parseInt(req.params.id));
         if (!guest) return res.status(404).json({ error: 'Gast nicht gefunden' });
         const invoices = db.getInvoicesByGuestId(guest.id);
-        res.json({ success: true, guest, invoices });
+        const bookings = db.getBookingsByGuestId(guest.id);
+        res.json({ success: true, guest, invoices, bookings });
     } catch (e) {
         console.error('Guest GET Error:', e.message);
         res.status(500).json({ error: 'Gast konnte nicht geladen werden' });
@@ -940,13 +941,44 @@ app.post('/api/guests', apiLimiter, (req, res) => {
     }
 });
 
-app.delete('/api/guests/:id', apiLimiter, (req, res) => {
+app.delete('/api/guests/:id', apiLimiter, async (req, res) => {
     try {
-        db.deleteGuest(parseInt(req.params.id));
+        const guestId = parseInt(req.params.id);
+        // Cascade: delete all active Nuki PINs for this guest before deleting
+        const bookings = db.getBookingsByGuestId(guestId);
+        for (const booking of bookings) {
+            if (booking.nuki_auth_id) {
+                try {
+                    await deleteNukiPin(booking.nuki_auth_id);
+                } catch (nukiErr) {
+                    console.warn(`Nuki PIN Löschen fehlgeschlagen für Booking ${booking.id}:`, nukiErr.message);
+                }
+                db.clearNukiAuth(booking.id);
+            }
+        }
+        db.deleteGuest(guestId);
         res.json({ success: true, message: 'Gast gelöscht' });
     } catch (e) {
         console.error('Guest DELETE Error:', e.message);
         res.status(500).json({ error: 'Gast konnte nicht gelöscht werden' });
+    }
+});
+
+// Delete a single Nuki PIN by booking ID
+app.delete('/api/nuki/pin/:bookingId', apiLimiter, async (req, res) => {
+    try {
+        const bookingId = parseInt(req.params.bookingId);
+        const booking = db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+        if (!booking || !booking.nuki_auth_id) {
+            return res.status(404).json({ error: 'Kein aktiver Nuki-PIN für diese Buchung' });
+        }
+        await deleteNukiPin(booking.nuki_auth_id);
+        db.clearNukiAuth(bookingId);
+        db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(bookingId);
+        res.json({ success: true, message: 'Nuki-PIN gelöscht' });
+    } catch (e) {
+        console.error('Nuki PIN Delete Error:', e.message);
+        res.status(500).json({ error: 'Nuki-PIN konnte nicht gelöscht werden: ' + e.message });
     }
 });
 
@@ -1018,6 +1050,29 @@ app.post('/api/invoices', apiLimiter, (req, res) => {
     } catch (e) {
         console.error('Invoice POST Error:', e.message);
         res.status(500).json({ error: 'Rechnung konnte nicht gespeichert werden' });
+    }
+});
+
+app.get('/api/invoices/:id/pdf', apiLimiter, async (req, res) => {
+    try {
+        const invoices = db.getAllInvoices();
+        const invoice = invoices.find(i => i.id === parseInt(req.params.id));
+        if (!invoice) return res.status(404).json({ error: 'Rechnung nicht gefunden' });
+
+        const data = typeof invoice.data === 'string' ? JSON.parse(invoice.data) : (invoice.data || {});
+        const botLogic = require('./bot-logic');
+        const { filePath } = await botLogic.generateInvoicePdf(data);
+
+        const filename = `Rechnung-${(data.rNummer || invoice.invoice_number || 'download').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
+        res.download(filePath, filename, (err) => {
+            require('fs').unlink(filePath, () => {});
+            if (err && !res.headersSent) {
+                res.status(500).json({ error: 'Download fehlgeschlagen' });
+            }
+        });
+    } catch (e) {
+        console.error('Invoice PDF Download Error:', e.message);
+        if (!res.headersSent) res.status(500).json({ error: 'PDF-Generierung fehlgeschlagen: ' + e.message });
     }
 });
 

@@ -72,6 +72,10 @@ async function handleInvoiceCommand(bot, msg) {
         sessions.set(chatId, { type: 'awaiting_address', data });
         return bot.sendMessage(chatId, 'Wie lautet die Adresse?');
     }
+    if (data.gEmail === undefined) {
+        sessions.set(chatId, { type: 'awaiting_email', data: { ...data, gEmail: null } });
+        return bot.sendMessage(chatId, 'E-Mail Adresse? (Eingabe oder "überspringen")');
+    }
     if (!data.arrival || !data.departure) {
         sessions.set(chatId, { type: 'awaiting_dates', data });
         return bot.sendMessage(chatId, 'Für welchen Zeitraum? (z.B. 15.03. - 20.03.2026)');
@@ -100,6 +104,19 @@ async function handleFollowUp(bot, msg, session) {
         }
     } else if (session.type === 'awaiting_address') {
         session.data.gAdresse = body;
+        session.type = 'awaiting_email';
+        session.data.gEmail = null; // mark as asked but not yet answered
+        return bot.sendMessage(chatId, 'E-Mail Adresse? (Eingabe oder "überspringen")');
+    } else if (session.type === 'awaiting_email') {
+        const skip = body.toLowerCase() === 'überspringen' || body.toLowerCase() === 'skip';
+        if (!skip) {
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(body)) {
+                return bot.sendMessage(chatId, '⚠️ Ungültige E-Mail. Bitte erneut eingeben oder "überspringen" senden.');
+            }
+            session.data.gEmail = body.trim();
+        }
         session.type = 'awaiting_dates';
         return bot.sendMessage(chatId, 'Für welchen Zeitraum? (z.B. 15.03. - 20.03.2026)');
     } else if (session.type === 'awaiting_dates' || session.type === 'awaiting_pin_dates') {
