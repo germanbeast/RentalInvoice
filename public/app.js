@@ -28,9 +28,6 @@
     const btnTestConnection = $('#btn-paperless-test');
     const btnAddTgId = $('#btn-add-tg-id');
     const btnAddWaPhone = $('#btn-add-wa-phone');
-    const btnArchive = $('#btn-archive');
-    const btnArchiveSave = $('#btn-archive-save');
-    const btnCloseArchive = $('#btn-close-archive');
     const btnNukiPin = $('#btn-nuki-pin');
     const btnEmail = $('#btn-email');
     const btnLogout = $('#btn-logout');
@@ -49,7 +46,6 @@
     const viewExpenses = $('#view-expenses');
 
     const modalSettings = $('#modal-settings');
-    const modalArchive = $('#modal-archive');
     const toastContainer = $('#toast-container');
     const appWrapper = $('#app-wrapper');
     const loginScreen = $('#login-screen');
@@ -822,23 +818,6 @@
         observer.observe(modalSettings, { attributes: true, attributeFilter: ['style'] });
     }
 
-    // Live polling for archive modal
-    let archivePollInterval = null;
-    if (modalArchive) {
-        const archiveObserver = new MutationObserver(() => {
-            if (modalArchive.style.display !== 'none') {
-                clearInterval(archivePollInterval);
-                archivePollInterval = setInterval(async () => {
-                    await fetchArchive();
-                    renderArchiveList($('#archive-search-input') ? $('#archive-search-input').value : '');
-                }, 20000);
-            } else {
-                clearInterval(archivePollInterval);
-                archivePollInterval = null;
-            }
-        });
-        archiveObserver.observe(modalArchive, { attributes: true, attributeFilter: ['style'] });
-    }
 
     // --- NEW: Multi-Number Support ---
     function addWaPhoneRow(val = '') {
@@ -1186,10 +1165,6 @@
         return cachedArchive;
     }
 
-    function saveArchive(archive) {
-        cachedArchive = archive;
-    }
-
     async function archiveInvoice() {
         const nummer = $('#r-nummer').value;
         const gastName = $('#g-name').value;
@@ -1482,22 +1457,6 @@
 
     btnSyncPaperless.addEventListener('click', syncPaperlessExpenses);
 
-    async function deleteArchivedInvoice(index) {
-        const inv = cachedArchive[index];
-        if (!inv || !inv._dbId) return;
-
-        try {
-            const res = await fetch(`/api/invoices/${inv._dbId}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.success) {
-                showToast(`Rechnung ${inv.rNummer} gelöscht`);
-                await fetchArchive();
-                renderArchiveList();
-            }
-        } catch (e) {
-            showToast('Fehler beim Löschen', 'error');
-        }
-    }
 
     async function loadArchivedInvoiceById(dbId) {
         if (!dbId) return;
@@ -1577,97 +1536,9 @@
         updatePreview();
         saveDraft();
 
-        modalArchive.style.display = 'none';
         showToast(`Rechnung ${d.rNummer} geladen`);
     }
 
-    async function renderArchiveList(filter = '') {
-        const list = $('#archive-list');
-        if (cachedArchive.length === 0) await fetchArchive();
-        const archive = getArchive();
-        const query = filter.toLowerCase().trim();
-
-        const filtered = query
-            ? archive.filter(a => {
-                const searchable = [
-                    a.rNummer, a.gName, a.rDatum,
-                    a.zMethode, a.gAdresse
-                ].join(' ').toLowerCase();
-                return searchable.includes(query);
-            })
-            : archive;
-
-        if (filtered.length === 0) {
-            list.innerHTML = `
-                <div class="archive-empty">
-                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                        <path d="M8 14h32a2 2 0 012 2v2a2 2 0 01-2 2H8a2 2 0 01-2-2v-2a2 2 0 012-2z" stroke="currentColor" stroke-width="2"/>
-                        <path d="M10 20v14a4 4 0 004 4h20a4 4 0 004-4V20M20 28h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                    <p>${query ? 'Keine Treffer gefunden' : 'Noch keine Rechnungen archiviert'}</p>
-                    <small>${query ? 'Versuche einen anderen Suchbegriff' : 'Klicke "Archivieren" um eine Rechnung zu speichern'}</small>
-                </div>
-            `;
-            return;
-        }
-
-        list.innerHTML = filtered.map((inv, displayIdx) => {
-            // Find actual index in full archive for actions
-            const realIdx = archive.indexOf(inv);
-            const total = inv.totalAmount || 0;
-            const paid = inv.zBezahlt;
-            const paidClass = paid ? 'archive-badge-paid' : 'archive-badge-unpaid';
-            const paidLabel = paid ? `Bezahlt (${inv.zMethode || 'PayPal'})` : 'Offen';
-
-            return `
-                <div class="archive-item">
-                    <div class="archive-item-main">
-                        <div class="archive-item-top">
-                            <span class="archive-nr">${escapeHtml(inv.rNummer || '—')}</span>
-                            <span class="archive-date">${formatDate(inv.rDatum)}</span>
-                        </div>
-                        <div class="archive-item-guest">${escapeHtml(inv.gName || 'Unbekannter Gast')}</div>
-                        <div class="archive-item-bottom">
-                            <span class="archive-total">${formatCurrency(total)}</span>
-                            <span class="archive-badge ${paidClass}">${paidLabel}</span>
-                        </div>
-                    </div>
-                    <div class="archive-item-actions">
-                        <button type="button" class="btn btn-sm btn-outline btn-archive-load" data-idx="${realIdx}" title="Laden">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10v2h10v-2M7 2v7M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            Laden
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline btn-archive-pdf" data-dbid="${inv._dbId}" data-nr="${escapeHtml(inv.rNummer || '')}" title="PDF herunterladen">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2h7l3 3v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2"/><path d="M9 2v3h3M4.5 8h5M4.5 10.5h5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
-                            PDF
-                        </button>
-                        <button type="button" class="btn btn-sm btn-ghost btn-danger btn-archive-delete" data-idx="${realIdx}" title="Löschen">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M4 4V3h6v1M5 6v4M9 6v4M3 4l.7 7.3a1 1 0 001 .7h4.6a1 1 0 001-.7L11 4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        // Event delegation for archive actions
-        list.querySelectorAll('.btn-archive-load').forEach(btn => {
-            btn.addEventListener('click', () => {
-                loadArchivedInvoice(parseInt(btn.dataset.idx));
-            });
-        });
-
-        list.querySelectorAll('.btn-archive-pdf').forEach(btn => {
-            btn.addEventListener('click', () => downloadArchivedPdf(btn.dataset.dbid, btn.dataset.nr));
-        });
-
-        list.querySelectorAll('.btn-archive-delete').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (confirm('Diese Rechnung wirklich aus dem Archiv löschen?')) {
-                    deleteArchivedInvoice(parseInt(btn.dataset.idx));
-                }
-            });
-        });
-    }
 
     async function downloadArchivedPdf(dbId, rNummer) {
         if (!dbId) { showToast('Keine Rechnungs-ID', 'error'); return; }
@@ -2337,46 +2208,6 @@
     });
 
     // =======================
-    // Dashboard: Rechnungen stat card opens archive
-    // =======================
-    const statInvoiceCard = $('#stat-invoice-count') && $('#stat-invoice-count').closest('.stat-card');
-    if (statInvoiceCard) {
-        statInvoiceCard.style.cursor = 'pointer';
-        statInvoiceCard.title = 'Rechnungsarchiv öffnen';
-        statInvoiceCard.addEventListener('click', () => {
-            renderArchiveList();
-            modalArchive.style.display = 'flex';
-            $('#archive-search-input').value = '';
-        });
-    }
-
-    // =======================
-    // Archive Modal
-    // =======================
-    btnArchive.addEventListener('click', () => {
-        renderArchiveList();
-        modalArchive.style.display = 'flex';
-        $('#archive-search-input').value = '';
-        $('#archive-search-input').focus();
-    });
-
-    btnCloseArchive.addEventListener('click', () => {
-        modalArchive.style.display = 'none';
-    });
-
-    modalArchive.addEventListener('click', (e) => {
-        if (e.target === modalArchive) {
-            modalArchive.style.display = 'none';
-        }
-    });
-
-    $('#archive-search-input').addEventListener('input', (e) => {
-        renderArchiveList(e.target.value);
-    });
-
-    btnArchiveSave.addEventListener('click', () => {
-        archiveInvoice();
-    });
 
     // =======================
     // Logout

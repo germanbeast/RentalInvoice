@@ -969,10 +969,17 @@ app.delete('/api/nuki/pin/:bookingId', apiLimiter, async (req, res) => {
     try {
         const bookingId = parseInt(req.params.bookingId);
         const booking = db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
-        if (!booking || !booking.nuki_auth_id) {
-            return res.status(404).json({ error: 'Kein aktiver Nuki-PIN für diese Buchung' });
+        if (!booking) {
+            return res.status(404).json({ error: 'Buchung nicht gefunden' });
         }
-        await deleteNukiPin(booking.nuki_auth_id);
+        // Try to revoke from Nuki API if we have an auth_id; if not, just clear locally
+        if (booking.nuki_auth_id) {
+            try {
+                await deleteNukiPin(booking.nuki_auth_id);
+            } catch (nukiErr) {
+                console.warn(`Nuki API Löschen fehlgeschlagen (lokal trotzdem gelöscht):`, nukiErr.message);
+            }
+        }
         db.clearNukiAuth(bookingId);
         db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(bookingId);
         res.json({ success: true, message: 'Nuki-PIN gelöscht' });
