@@ -982,6 +982,81 @@ app.delete('/api/nuki/pin/:bookingId', apiLimiter, async (req, res) => {
     }
 });
 
+// Create a new Nuki PIN for a guest (from the Guests UI)
+app.post('/api/nuki/pin/create-for-guest', apiLimiter, async (req, res) => {
+    try {
+        const { guestId, arrival, departure } = req.body;
+        if (!guestId || !arrival || !departure) {
+            return res.status(400).json({ error: 'guestId, arrival und departure erforderlich' });
+        }
+        const guest = db.getGuestById(parseInt(guestId));
+        if (!guest) return res.status(404).json({ error: 'Gast nicht gefunden' });
+
+        const nukiResult = await createNukiPin(arrival, departure, guest.name);
+        // Check if a booking for this stay already exists
+        const existingBooking = db.findBookingForStay(guest.name, arrival, departure);
+        if (existingBooking) {
+            db.updateBookingNukiData(existingBooking.id, nukiResult.pin, nukiResult.authId);
+            if (!existingBooking.guest_id) {
+                db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, existingBooking.id);
+            }
+        } else {
+            db.createManualBooking(guest.id, guest.name, arrival, departure, nukiResult.pin, nukiResult.authId);
+        }
+        res.json({ success: true, pin: nukiResult.pin, authId: nukiResult.authId });
+    } catch (e) {
+        console.error('Nuki PIN Create for Guest Error:', e.message);
+        res.status(500).json({ error: 'Nuki-PIN konnte nicht erstellt werden: ' + e.message });
+    }
+});
+
+// Extend (update dates of) an existing Nuki PIN by booking ID
+app.put('/api/nuki/pin/:bookingId/extend', apiLimiter, async (req, res) => {
+    try {
+        const bookingId = parseInt(req.params.bookingId);
+        const { arrival, departure } = req.body;
+        if (!arrival || !departure) return res.status(400).json({ error: 'arrival und departure erforderlich' });
+
+        const booking = db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+        if (!booking) return res.status(404).json({ error: 'Buchung nicht gefunden' });
+
+        const allSettings = db.getAllSettings();
+        const nuki = allSettings.nuki;
+        if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+
+        // If there is an existing auth entry, update it; otherwise create a new PIN
+        if (booking.nuki_auth_id) {
+            const ax = require('axios');
+            await ax.put(`https://api.nuki.io/smartlock/auth/${booking.nuki_auth_id}`, {
+                allowedFromDate: `${arrival}T15:00:00.000Z`,
+                allowedUntilDate: `${departure}T11:00:00.000Z`,
+                allowedWeekDays: 127,
+                allowedFromTime: 0,
+                allowedUntilTime: 0
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${nuki.token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            // Update local dates
+            db.getDb().prepare('UPDATE bookings SET checkin = ?, checkout = ? WHERE id = ?').run(arrival, departure, bookingId);
+            res.json({ success: true, pin: booking.nuki_pin });
+        } else {
+            // No auth_id stored — create a new PIN
+            const guestName = booking.summary ? booking.summary.replace('Gast: ', '') : 'Gast';
+            const nukiResult = await createNukiPin(arrival, departure, guestName);
+            db.updateBookingNukiData(bookingId, nukiResult.pin, nukiResult.authId);
+            db.getDb().prepare('UPDATE bookings SET checkin = ?, checkout = ? WHERE id = ?').run(arrival, departure, bookingId);
+            res.json({ success: true, pin: nukiResult.pin });
+        }
+    } catch (e) {
+        console.error('Nuki PIN Extend Error:', e.message);
+        res.status(500).json({ error: 'Nuki-PIN konnte nicht verlängert werden: ' + e.message });
+    }
+});
+
 // =======================
 // 10. INVOICES API
 // =======================

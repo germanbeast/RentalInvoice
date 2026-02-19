@@ -1499,6 +1499,21 @@
         }
     }
 
+    async function loadArchivedInvoiceById(dbId) {
+        if (!dbId) return;
+        if (cachedArchive.length === 0) await fetchArchive();
+        const index = cachedArchive.findIndex(inv => String(inv._dbId) === String(dbId));
+        if (index === -1) {
+            showToast('Rechnung nicht im Archiv gefunden', 'error');
+            return;
+        }
+        loadArchivedInvoice(index);
+        // Close guests modal and switch to invoice form
+        const modalGuests = $('#modal-guests');
+        if (modalGuests) modalGuests.style.display = 'none';
+        switchView('invoice');
+    }
+
     function loadArchivedInvoice(index) {
         const archive = getArchive();
         if (index < 0 || index >= archive.length) return;
@@ -2917,24 +2932,36 @@
                 invList.innerHTML = data.invoices.map(inv => {
                     const d = typeof inv.data === 'string' ? JSON.parse(inv.data) : (inv.data || {});
                     const amount = inv.total_amount || d.totalAmount || 0;
+                    const paid = inv.paid || d.zBezahlt;
+                    const paidBadge = paid
+                        ? `<span style="background:var(--accent-green,#34d399);color:#000;padding:1px 6px;border-radius:10px;font-size:10px;">Bezahlt</span>`
+                        : `<span style="background:var(--warning,#f59e0b);color:#000;padding:1px 6px;border-radius:10px;font-size:10px;">Offen</span>`;
                     return `
-                        <div class="guest-invoice-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
-                            <span class="guest-invoice-nr">${escapeHtml(inv.invoice_number || d.rNummer || '—')}</span>
-                            <span class="guest-invoice-date" style="color:var(--text-muted); font-size:0.82rem;">${formatDate(inv.invoice_date || d.rDatum)}</span>
-                            <span class="guest-invoice-amount" style="font-weight:600;">${formatCurrency(amount)}</span>
-                            ${inv.id ? `<button type="button" class="btn btn-sm btn-ghost btn-download-inv-pdf" data-id="${inv.id}" data-nr="${escapeHtml(inv.invoice_number || '')}" title="PDF herunterladen" style="padding:2px 6px; font-size:11px;">PDF</button>` : ''}
+                        <div class="guest-invoice-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); gap:6px; flex-wrap:wrap;">
+                            <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                                <span class="guest-invoice-nr" style="font-weight:600;">${escapeHtml(inv.invoice_number || d.rNummer || '—')}</span>
+                                <span style="color:var(--text-muted); font-size:0.82rem;">${formatDate(inv.invoice_date || d.rDatum)}</span>
+                                ${paidBadge}
+                            </div>
+                            <div style="display:flex;align-items:center;gap:4px;">
+                                <span style="font-weight:600;">${formatCurrency(amount)}</span>
+                                ${inv.id ? `<button type="button" class="btn btn-sm btn-outline btn-load-inv" data-id="${inv.id}" data-nr="${escapeHtml(inv.invoice_number || '')}" title="In Formular laden" style="padding:2px 7px; font-size:11px;">Laden</button>` : ''}
+                                ${inv.id ? `<button type="button" class="btn btn-sm btn-ghost btn-download-inv-pdf" data-id="${inv.id}" data-nr="${escapeHtml(inv.invoice_number || '')}" title="PDF herunterladen" style="padding:2px 6px; font-size:11px;">PDF</button>` : ''}
+                            </div>
                         </div>
                     `;
                 }).join('');
                 invList.querySelectorAll('.btn-download-inv-pdf').forEach(btn => {
                     btn.addEventListener('click', () => downloadArchivedPdf(btn.dataset.id, btn.dataset.nr));
                 });
+                invList.querySelectorAll('.btn-load-inv').forEach(btn => {
+                    btn.addEventListener('click', () => loadArchivedInvoiceById(btn.dataset.id));
+                });
             } else {
                 invList.innerHTML = '<p class="text-muted">Keine Rechnungen vorhanden</p>';
             }
 
             // Nuki PINs
-            const nukiSection = $('#guest-nuki-section');
             const nukiList = $('#guest-nuki-list');
             if (nukiList) {
                 const activePins = (data.bookings || []).filter(b => b.nuki_pin || b.nuki_auth_id);
@@ -2945,25 +2972,51 @@
                         const statusBadge = expired
                             ? `<span style="background:var(--danger,#ef4444);color:#fff;padding:1px 7px;border-radius:12px;font-size:11px;">Abgelaufen</span>`
                             : `<span style="background:var(--accent-green,#34d399);color:#000;padding:1px 7px;border-radius:12px;font-size:11px;">Aktiv</span>`;
-                        const deleteBtn = b.nuki_auth_id
-                            ? `<button type="button" class="btn btn-sm btn-danger btn-delete-nuki-pin" data-booking-id="${b.id}" style="font-size:11px;padding:2px 8px;">Löschen</button>`
-                            : '';
+                        const extendBtn = `<button type="button" class="btn btn-sm btn-outline btn-extend-nuki-pin" data-booking-id="${b.id}" data-checkin="${b.checkin || ''}" data-checkout="${b.checkout || ''}" style="font-size:11px;padding:2px 8px;">Verlängern</button>`;
+                        const deleteBtn = `<button type="button" class="btn btn-sm btn-danger btn-delete-nuki-pin" data-booking-id="${b.id}" style="font-size:11px;padding:2px 8px;">Löschen</button>`;
                         return `
                             <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--border); gap:8px;">
                                 <div>
                                     <strong style="font-family:monospace; font-size:1.1em;">${escapeHtml(b.nuki_pin || '—')}</strong>
                                     <br><small class="text-muted">${b.checkin ? formatDate(b.checkin) : '—'} – ${b.checkout ? formatDate(b.checkout) : '—'}</small>
                                 </div>
-                                <div style="display:flex; align-items:center; gap:6px;">${statusBadge}${deleteBtn}</div>
+                                <div style="display:flex; align-items:center; gap:6px;">${statusBadge}${extendBtn}${deleteBtn}</div>
                             </div>`;
                     }).join('');
                     nukiList.querySelectorAll('.btn-delete-nuki-pin').forEach(btn => {
                         btn.addEventListener('click', () => deleteGuestNukiPin(btn.dataset.bookingId, guestId));
                     });
-                    if (nukiSection) nukiSection.style.display = 'block';
+                    nukiList.querySelectorAll('.btn-extend-nuki-pin').forEach(btn => {
+                        btn.addEventListener('click', () => extendGuestNukiPin(btn.dataset.bookingId, btn.dataset.checkin, btn.dataset.checkout, guestId));
+                    });
                 } else {
                     nukiList.innerHTML = '<p class="text-muted" style="font-size:0.85rem;">Keine aktiven Nuki-PINs</p>';
-                    if (nukiSection) nukiSection.style.display = 'block';
+                }
+            }
+
+            // Wire up the "Neuer PIN" form for this guest
+            const btnToggleNewPin = $('#btn-toggle-new-pin-form');
+            const newPinForm = $('#guest-new-pin-form');
+            if (btnToggleNewPin && newPinForm) {
+                // Clone to remove old listeners
+                const freshToggle = btnToggleNewPin.cloneNode(true);
+                btnToggleNewPin.replaceWith(freshToggle);
+                freshToggle.addEventListener('click', () => {
+                    newPinForm.style.display = newPinForm.style.display === 'none' ? 'block' : 'none';
+                });
+
+                const btnCancel = $('#btn-cancel-new-pin');
+                const freshCancel = btnCancel ? btnCancel.cloneNode(true) : null;
+                if (btnCancel && freshCancel) {
+                    btnCancel.replaceWith(freshCancel);
+                    freshCancel.addEventListener('click', () => { newPinForm.style.display = 'none'; });
+                }
+
+                const btnCreate = $('#btn-create-guest-pin');
+                const freshCreate = btnCreate ? btnCreate.cloneNode(true) : null;
+                if (btnCreate && freshCreate) {
+                    btnCreate.replaceWith(freshCreate);
+                    freshCreate.addEventListener('click', () => createGuestNukiPin(guestId));
                 }
             }
 
@@ -2981,9 +3034,71 @@
             const data = await res.json();
             if (data.success) {
                 showToast('Nuki-PIN gelöscht', 'success');
-                showGuestDetail(guestId); // refresh
+                showGuestDetail(guestId);
             } else {
                 showToast(data.error || 'Fehler beim Löschen', 'error');
+            }
+        } catch (e) {
+            showToast('Fehler: ' + e.message, 'error');
+        }
+    }
+
+    async function createGuestNukiPin(guestId) {
+        const arrival = $('#new-pin-arrival').value;
+        const departure = $('#new-pin-departure').value;
+        if (!arrival || !departure) {
+            showToast('Bitte Anreise und Abreise angeben', 'error');
+            return;
+        }
+        if (departure <= arrival) {
+            showToast('Abreise muss nach der Anreise liegen', 'error');
+            return;
+        }
+        const btn = $('#btn-create-guest-pin');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await fetch('/api/nuki/pin/create-for-guest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guestId, arrival, departure })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Nuki-PIN erstellt: ${data.pin}`, 'success');
+                const form = $('#guest-new-pin-form');
+                if (form) form.style.display = 'none';
+                showGuestDetail(guestId);
+            } else {
+                showToast(data.error || 'Fehler beim Erstellen', 'error');
+            }
+        } catch (e) {
+            showToast('Fehler: ' + e.message, 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function extendGuestNukiPin(bookingId, currentCheckin, currentCheckout, guestId) {
+        const newArrival = prompt('Neues Anreisedatum (YYYY-MM-DD):', currentCheckin || '');
+        if (!newArrival) return;
+        const newDeparture = prompt('Neues Abreisedatum (YYYY-MM-DD):', currentCheckout || '');
+        if (!newDeparture) return;
+        if (newDeparture <= newArrival) {
+            showToast('Abreise muss nach der Anreise liegen', 'error');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/nuki/pin/${bookingId}/extend`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ arrival: newArrival, departure: newDeparture })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Nuki-PIN verlängert', 'success');
+                showGuestDetail(guestId);
+            } else {
+                showToast(data.error || 'Fehler beim Verlängern', 'error');
             }
         } catch (e) {
             showToast('Fehler: ' + e.message, 'error');
