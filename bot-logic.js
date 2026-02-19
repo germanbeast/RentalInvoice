@@ -100,7 +100,8 @@ async function createNukiPinDirect(arrival, departure, guestName) {
     const allowedUntil = `${departure}T11:00:00.000Z`;
     const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
 
-    const response = await axios.put('https://api.nuki.io/smartlock/auth', {
+    const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
+    await axios.put('https://api.nuki.io/smartlock/auth', {
         name: safeName,
         allowedFromDate: allowedFrom,
         allowedUntilDate: allowedUntil,
@@ -109,7 +110,7 @@ async function createNukiPinDirect(arrival, departure, guestName) {
         allowedUntilTime: 0,
         type: 13,
         code: generatedCode,
-        smartlockIds: [parseInt(nuki.lockId, 10) || nuki.lockId]
+        smartlockIds: [lockId]
     }, {
         headers: {
             'Authorization': `Bearer ${nuki.token}`,
@@ -118,7 +119,21 @@ async function createNukiPinDirect(arrival, departure, guestName) {
         }
     });
 
-    const authId = response.data ? response.data.id : null;
+    // Nuki API returns 204 No Content — no authId in response body.
+    // Wait briefly then fetch the auth list to find the newly created entry by PIN code.
+    let authId = null;
+    try {
+        await new Promise(r => setTimeout(r, 2000));
+        const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
+            headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' }
+        });
+        const auths = Array.isArray(listRes.data) ? listRes.data : [];
+        const match = auths.find(a => String(a.code) === String(generatedCode));
+        if (match) authId = match.id;
+    } catch (e) {
+        console.warn('Nuki authId lookup failed:', e.message);
+    }
+
     return { success: true, pin: generatedCode, authId };
 }
 
