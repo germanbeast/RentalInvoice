@@ -987,10 +987,29 @@ app.delete('/api/nuki/pin/:bookingId', apiLimiter, async (req, res) => {
         if (!booking) {
             return res.status(404).json({ error: 'Buchung nicht gefunden' });
         }
-        // Try to revoke from Nuki API if we have an auth_id; if not, just clear locally
-        if (booking.nuki_auth_id) {
+        // Try to revoke from Nuki API — find auth_id from DB or look it up live by PIN code
+        let nukiAuthId = booking.nuki_auth_id;
+        if (!nukiAuthId && booking.nuki_pin) {
             try {
-                await deleteNukiPin(booking.nuki_auth_id);
+                const allSettings = db.getAllSettings();
+                const nuki = allSettings.nuki;
+                if (nuki && nuki.token && nuki.lockId) {
+                    const axios = require('axios');
+                    const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
+                    const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
+                        headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' }
+                    });
+                    const auths = Array.isArray(listRes.data) ? listRes.data : [];
+                    const match = auths.find(a => String(a.code) === String(booking.nuki_pin));
+                    if (match) nukiAuthId = match.id;
+                }
+            } catch (lookupErr) {
+                console.warn('Nuki authId Lookup beim Löschen fehlgeschlagen:', lookupErr.message);
+            }
+        }
+        if (nukiAuthId) {
+            try {
+                await deleteNukiPin(nukiAuthId);
             } catch (nukiErr) {
                 console.warn(`Nuki API Löschen fehlgeschlagen (lokal trotzdem gelöscht):`, nukiErr.message);
             }
