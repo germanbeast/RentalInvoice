@@ -584,12 +584,13 @@ function getStats() {
             (SELECT COUNT(*) FROM guests) as guest_count
     `).get();
 
-    // Top guests by revenue
+    // Top guests by revenue — only guests that still exist
     const topGuests = db.prepare(`
-        SELECT guest_name, SUM(total_amount) as total, COUNT(*) as count
-        FROM invoices
-        WHERE guest_name IS NOT NULL AND guest_name != ''
-        GROUP BY guest_name
+        SELECT i.guest_name, SUM(i.total_amount) as total, COUNT(*) as count
+        FROM invoices i
+        INNER JOIN guests g ON g.id = i.guest_id
+        WHERE i.guest_name IS NOT NULL AND i.guest_name != ''
+        GROUP BY i.guest_id
         ORDER BY total DESC
         LIMIT 5
     `).all();

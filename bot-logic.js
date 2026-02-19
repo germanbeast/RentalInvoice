@@ -174,6 +174,11 @@ async function finalizeInvoiceData(data) {
         branding: db.getBranding()
     };
 
+    // Calculate totalAmount for correct DB storage
+    const subtotal = invoiceData.positions.reduce((sum, p) => sum + (p.qty * p.price), 0);
+    const mwst = invoiceData.kleinunternehmer ? 0 : subtotal * ((invoiceData.mwstSatz || 0) / 100);
+    invoiceData.totalAmount = subtotal + mwst;
+
     // Nuki Logic
     const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
     if (existingBooking && existingBooking.nuki_pin) {
