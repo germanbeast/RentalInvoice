@@ -1457,7 +1457,8 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
             format: 'A4',
             printBackground: true,
             margin: { top: '0', right: '0', bottom: '0', left: '0' },
-            preferCSSPageSize: true
+            preferCSSPageSize: true,
+            scale: 0.85
         });
 
         await browser.close();
