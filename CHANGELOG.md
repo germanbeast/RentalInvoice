@@ -5,6 +5,24 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-02-20
+
+### Hinzugefügt
+- 🎨 **Rechnungsdesign-Baukasten** mit visuellem Editor
+- Live-Vorschau für Rechnungsdesign mit Split-Screen Layout
+- Text-Bausteine anpassbar (Logo, Begrüßung, Intro, Footer)
+- Farb-Anpassungen (Primärfarbe, Tabellen, Text)
+- Schriftarten-Auswahl für Logo und Body
+- Logo-Upload-Funktion (Bild statt Text)
+- Layout-Optionen (Logo, Steuernummer, Datum ein/ausblenden)
+- Template-Konfiguration persistent in Datenbank
+
+### Geändert
+- "Ferienwohnung Beckhome" Logo in Georgia Serif (italic)
+- PDF-Export auf 1 Seite optimiert (scale: 0.85)
+- Kompakteres Layout mit reduzierten Abständen
+- "Jede Stadt" Feld ausgeblendet
+
 ## [1.6.0] - 2026-02-20
 
 ### Hinzugefügt
