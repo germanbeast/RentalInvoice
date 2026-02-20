@@ -572,56 +572,73 @@
     // Server-side Settings (API)
     // =======================
     async function saveAllSettings() {
-        const settings = {
-            vermieter: {
-                name: $('#v-name').value,
-                adresse: $('#v-adresse').value,
-                telefon: $('#v-telefon').value,
-                email: $('#v-email').value,
-                steuernr: $('#v-steuernr').value
-            },
-            bank: {
-                inhaber: $('#b-inhaber').value,
-                iban: $('#b-iban').value,
-                bic: $('#b-bic').value,
-                bank: $('#b-bank').value
-            },
-            paperless: {
-                url: $('#pl-url').value.replace(/\/+$/, ''),
-                token: $('#pl-token').value,
-                correspondent: $('#pl-correspondent').value,
-                doctype: $('#pl-doctype').value,
-                tags: $('#pl-tags').value
-            },
-            smtp: {
-                host: $('#smtp-host').value,
-                port: $('#smtp-port').value,
-                user: $('#smtp-user').value,
-                pass: $('#smtp-pass').value,
-                from: $('#smtp-from').value
-            },
-            pricing: {
-                price_per_night: parseFloat($('#p-night').value) || 0,
-                cleaning_fee: parseFloat($('#p-cleaning').value) || 0,
-                mwst_rate: parseFloat($('#mwst-satz').value) || 0,
-                kleinunternehmer: $('#kleinunternehmer').checked
-            },
-            booking_ical: $('#booking-ical-url').value,
-            paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
-            paperless_amount_field: $('#s-pl-amount-field')?.value || '',
-            wa_phones: JSON.stringify(Array.from(document.querySelectorAll('.wa-phone-input')).map(i => i.value.trim()).filter(v => v)),
-            nuki: {
-                token: $('#nuki-token').value,
-                lockId: $('#nuki-lock-id').value
-            },
-            tg_token: $('#tg-token').value,
-            tg_ids: JSON.stringify(Array.from(document.querySelectorAll('.tg-id-input')).map(i => i.value.trim()).filter(v => v)),
-            reminder_days: $('#reminder-days').value || '2',
-            notifications_enabled: $('#notifications-enabled')?.checked !== false ? 'true' : 'false',
-            twofactor_enabled: $('#twofactor-enabled').checked ? 'true' : 'false'
-        };
-
         try {
+            // First, load existing settings from server to preserve values not shown in UI
+            const existing = await fetch('/api/settings');
+            const existingData = await existing.json();
+            const currentSettings = existingData.success ? existingData.settings : {};
+
+            // Collect new values from UI, only updating what's present
+            const newSettings = {
+                vermieter: {
+                    name: $('#v-name').value || '',
+                    adresse: $('#v-adresse').value || '',
+                    telefon: $('#v-telefon').value || '',
+                    email: $('#v-email').value || '',
+                    steuernr: $('#v-steuernr').value || ''
+                },
+                bank: {
+                    inhaber: $('#b-inhaber').value || '',
+                    iban: $('#b-iban').value || '',
+                    bic: $('#b-bic').value || '',
+                    bank: $('#b-bank').value || ''
+                },
+                paperless: {
+                    url: ($('#pl-url').value || '').replace(/\/+$/, ''),
+                    token: $('#pl-token').value || '',
+                    correspondent: $('#pl-correspondent').value || '',
+                    doctype: $('#pl-doctype').value || '',
+                    tags: $('#pl-tags').value || ''
+                },
+                smtp: {
+                    host: $('#smtp-host').value || '',
+                    port: $('#smtp-port').value || '',
+                    user: $('#smtp-user').value || '',
+                    pass: $('#smtp-pass').value || '',
+                    from: $('#smtp-from').value || ''
+                },
+                pricing: {
+                    price_per_night: parseFloat($('#p-night').value) || 0,
+                    cleaning_fee: parseFloat($('#p-cleaning').value) || 0,
+                    mwst_rate: parseFloat($('#mwst-satz').value) || 0,
+                    kleinunternehmer: $('#kleinunternehmer').checked
+                },
+                booking_ical: $('#booking-ical-url').value || '',
+                paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
+                paperless_amount_field: $('#s-pl-amount-field')?.value || '',
+                nuki: {
+                    token: $('#nuki-token').value || '',
+                    lockId: $('#nuki-lock-id').value || ''
+                },
+                tg_token: $('#tg-token').value || '',
+                reminder_days: $('#reminder-days').value || '2',
+                notifications_enabled: $('#notifications-enabled')?.checked !== false ? 'true' : 'false',
+                twofactor_enabled: $('#twofactor-enabled').checked ? 'true' : 'false'
+            };
+
+            // Only update wa_phones and tg_ids if inputs are present in DOM
+            const waInputs = document.querySelectorAll('.wa-phone-input');
+            if (waInputs.length > 0) {
+                newSettings.wa_phones = JSON.stringify(Array.from(waInputs).map(i => i.value.trim()).filter(v => v));
+            }
+            const tgInputs = document.querySelectorAll('.tg-id-input');
+            if (tgInputs.length > 0) {
+                newSettings.tg_ids = JSON.stringify(Array.from(tgInputs).map(i => i.value.trim()).filter(v => v));
+            }
+
+            // Merge with existing settings - keep existing keys not in newSettings
+            const settings = { ...currentSettings, ...newSettings };
+
             const res = await fetch('/api/settings', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
