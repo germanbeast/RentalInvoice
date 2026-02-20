@@ -1215,6 +1215,7 @@
             if (data.success) {
                 showToast(`Rechnung ${nummer} ${data.message}`, 'success');
                 await fetchArchive();
+                loadDashboard(); // Refresh stats after archiving
                 return true;
             } else {
                 showToast('Fehler beim Archivieren', 'error');
@@ -2688,6 +2689,7 @@
                     showToast('Gast gelöscht', 'success');
                     currentGuestId = null;
                     $('#guest-detail').style.display = 'none';
+                    loadDashboard(); // Refresh stats
                     $('#guests-list').style.display = 'grid';
                     loadGuestsList();
                 }
@@ -2795,6 +2797,7 @@
                                 <span style="font-weight:600;">${formatCurrency(amount)}</span>
                                 ${inv.id ? `<button type="button" class="btn btn-sm btn-outline btn-load-inv" data-id="${inv.id}" data-nr="${escapeHtml(inv.invoice_number || '')}" title="In Formular laden" style="padding:2px 7px; font-size:11px;">Laden</button>` : ''}
                                 ${inv.id ? `<button type="button" class="btn btn-sm btn-ghost btn-download-inv-pdf" data-id="${inv.id}" data-nr="${escapeHtml(inv.invoice_number || '')}" title="PDF herunterladen" style="padding:2px 6px; font-size:11px;">PDF</button>` : ''}
+                                ${inv.id ? `<button type="button" class="btn btn-sm btn-danger btn-delete-inv" data-id="${inv.id}" data-nr="${escapeHtml(inv.invoice_number || '')}" title="Rechnung löschen" style="padding:2px 7px; font-size:11px;">Löschen</button>` : ''}
                             </div>
                         </div>
                     `;
@@ -2804,6 +2807,9 @@
                 });
                 invList.querySelectorAll('.btn-load-inv').forEach(btn => {
                     btn.addEventListener('click', () => loadArchivedInvoiceById(btn.dataset.id));
+                });
+                invList.querySelectorAll('.btn-delete-inv').forEach(btn => {
+                    btn.addEventListener('click', () => deleteGuestInvoice(btn.dataset.id, btn.dataset.nr, guestId));
                 });
             } else {
                 invList.innerHTML = '<p class="text-muted">Keine Rechnungen vorhanden</p>';
@@ -2883,6 +2889,23 @@
             if (data.success) {
                 showToast('Nuki-PIN gelöscht', 'success');
                 showGuestDetail(guestId);
+            } else {
+                showToast(data.error || 'Fehler beim Löschen', 'error');
+            }
+        } catch (e) {
+            showToast('Fehler: ' + e.message, 'error');
+        }
+    }
+
+    async function deleteGuestInvoice(invoiceId, invoiceNr, guestId) {
+        if (!confirm(`Rechnung ${invoiceNr} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
+        try {
+            const res = await fetch(`/api/invoices/${invoiceId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Rechnung gelöscht', 'success');
+                showGuestDetail(guestId);
+                loadDashboard(); // Refresh stats
             } else {
                 showToast(data.error || 'Fehler beim Löschen', 'error');
             }
