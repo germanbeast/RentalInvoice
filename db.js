@@ -432,10 +432,10 @@ function getInvoicesByGuestId(guestId) {
 
 function getOpenInvoices() {
     return getDb().prepare(`
-        SELECT i.*, g.name as guest_display_name 
-        FROM invoices i 
-        LEFT JOIN guests g ON i.guest_id = g.id 
-        WHERE i.is_paid = 0 
+        SELECT i.*, g.name as guest_display_name
+        FROM invoices i
+        INNER JOIN guests g ON i.guest_id = g.id
+        WHERE i.is_paid = 0 AND i.guest_id IS NOT NULL
         ORDER BY i.invoice_date DESC
     `).all();
 }

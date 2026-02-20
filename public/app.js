@@ -2044,9 +2044,28 @@
     // =======================
     // Reset
     // =======================
-    btnReset.addEventListener('click', () => {
+    btnReset.addEventListener('click', async () => {
         if (!confirm('Möchtest du wirklich alle Rechnungsdaten zurücksetzen?\n\n(Gespeicherte Vermieter- und Bankdaten bleiben erhalten.)')) {
             return;
+        }
+
+        // Delete Nuki PIN if one was generated
+        const nukiPinResult = $('#nuki-pin-result');
+        const nukiPinCode = $('#nuki-pin-code').textContent;
+        if (nukiPinResult.style.display !== 'none' && nukiPinCode && nukiPinCode !== '——-') {
+            try {
+                const res = await fetch('/api/nuki/delete-pin-by-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: nukiPinCode })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    console.log('Nuki PIN beim Reset gelöscht:', nukiPinCode);
+                }
+            } catch (e) {
+                console.warn('Nuki PIN Löschung beim Reset fehlgeschlagen:', e.message);
+            }
         }
 
         // Clear guest
@@ -2068,6 +2087,10 @@
         $('#z-datum').value = '';
         $('#z-show-bank').checked = false;
         $('#fieldset-bank').style.display = 'none';
+
+        // Clear Nuki PIN display
+        nukiPinResult.style.display = 'none';
+        $('#nuki-pin-code').textContent = '——-';
 
         // Clear positions
         positions = [];

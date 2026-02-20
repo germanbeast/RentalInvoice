@@ -1442,6 +1442,38 @@ app.post('/api/nuki/create-pin', apiLimiter, async (req, res) => {
     }
 });
 
+// API: Delete Nuki PIN by PIN code (for form reset cleanup)
+app.post('/api/nuki/delete-pin-by-code', apiLimiter, async (req, res) => {
+    try {
+        const { pin } = req.body;
+        if (!pin) return res.status(400).json({ error: 'PIN-Code fehlt' });
+
+        const allSettings = db.getAllSettings();
+        const nuki = allSettings.nuki;
+        if (!nuki || !nuki.token || !nuki.lockId) {
+            return res.json({ success: false, error: 'Nuki-Zugangsdaten fehlen' });
+        }
+
+        // Look up auth_id by PIN code
+        const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
+        const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
+            headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' }
+        });
+        const auths = Array.isArray(listRes.data) ? listRes.data : [];
+        const match = auths.find(a => String(a.code) === String(pin));
+
+        if (match) {
+            await deleteNukiPin(match.id);
+            res.json({ success: true, message: 'Nuki-PIN gelöscht' });
+        } else {
+            res.json({ success: false, error: 'PIN nicht bei Nuki gefunden' });
+        }
+    } catch (error) {
+        console.error('Nuki Delete by Code Error:', error.message);
+        res.status(500).json({ error: 'Fehler beim Löschen: ' + error.message });
+    }
+});
+
 // API: Send Email
 app.post('/api/send-email', apiLimiter, async (req, res) => {
     try {
