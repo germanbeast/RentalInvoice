@@ -731,16 +731,17 @@ select {
 }
 
 /* ===========================
-   INVOICE PAGE (White)
+   INVOICE PAGE (White) - Modern Minimal Design
    =========================== */
 .invoice-page {
     position: relative;
     width: 210mm;
     min-height: 297mm;
-    padding: 15mm 20mm 15mm 25mm;
+    padding: 20mm 25mm;
     color: #1e293b;
-    font-size: 0.85rem;
-    line-height: 1.5;
+    font-size: 11pt;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
     transform-origin: top left;
 }
 
@@ -760,137 +761,188 @@ select {
     height: calc(297mm * var(--preview-scale, 0.45));
 }
 
-/* Faltmarken DIN 5008 */
+/* Faltmarken - Hidden in modern design */
 .inv-markers {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 5mm;
+    display: none;
 }
 
 .inv-marker {
-    position: absolute;
-    left: 0;
-    width: 4mm;
-    height: 0;
-    border-top: 1px solid #cbd5e1;
+    display: none;
 }
 
-.inv-marker-fold-1 {
-    top: 105mm;
-}
-
-.inv-marker-fold-2 {
-    top: 210mm;
-}
-
-/* Header */
+/* Header - New Modern Layout */
 .inv-header {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 2rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+    margin-bottom: 50mm;
+    align-items: start;
 }
 
+/* Logo + Sender left */
 .inv-sender {
-    text-align: right;
-    font-size: 0.75rem;
+    text-align: left;
+    font-size: 8pt;
+    color: #64748b;
+    line-height: 1.7;
+}
+
+.inv-sender::before {
+    content: 'VD';
+    display: block;
+    font-size: 32pt;
+    font-weight: 300;
+    letter-spacing: -2px;
+    color: #0f172a;
+    margin-bottom: 4mm;
+    font-family: 'Inter', sans-serif;
+}
+
+.inv-sender strong {
+    display: block;
+    font-size: 9pt;
+    color: #0f172a;
+    font-weight: 500;
+    margin-bottom: 1mm;
+}
+
+.inv-sender .inv-addr,
+.inv-sender .inv-contact,
+.inv-sender .inv-tax {
+    font-size: 8pt;
     color: #64748b;
     line-height: 1.5;
 }
 
-.inv-sender strong {
-    font-size: 0.85rem;
-    color: #0f172a;
+.inv-contact {
+    margin-top: 1mm;
 }
 
 .inv-contact span {
-    margin-left: 0.75rem;
-}
-
-.inv-contact span:first-child {
-    margin-left: 0;
+    display: block;
 }
 
 .inv-tax {
-    margin-top: 0.25rem;
-    font-size: 0.7rem;
+    margin-top: 1mm;
+    font-size: 7pt;
 }
 
-/* Recipient */
+/* Location + Date right aligned */
+.inv-location-date {
+    text-align: right;
+    font-size: 9pt;
+    color: #0f172a;
+    line-height: 1.7;
+}
+
+.inv-location-date div {
+    font-weight: 400;
+}
+
+/* Recipient - Greeting Style */
 .inv-recipient {
-    margin-bottom: 1.5rem;
+    margin-bottom: 12mm;
+}
+
+.inv-greeting {
+    display: block;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: #0f172a;
+    margin-bottom: 6mm;
+    text-transform: uppercase;
+}
+
+.inv-intro-text {
+    font-size: 10pt;
+    color: #4a4239;
+    line-height: 1.7;
+    margin-bottom: 8mm;
 }
 
 .inv-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #94a3b8;
-    margin-bottom: 0.2rem;
+    display: none; /* Hide "Rechnung an" label */
 }
 
 .inv-recipient strong {
-    font-size: 1rem;
+    display: none; /* Hide guest name, shown in greeting */
 }
 
-/* Meta */
+.inv-recipient .inv-addr {
+    display: none; /* Hide address in new design */
+}
+
+/* Meta - Above Title */
 .inv-meta {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 1.5rem;
-    padding: 0.75rem 1rem;
-    background: #f8fafc;
-    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 15mm;
 }
 
 .inv-meta-item {
-    display: flex;
-    flex-direction: column;
+    display: none; /* Hide individual meta items */
 }
 
-.inv-meta-item .inv-label {
-    margin-bottom: 0.1rem;
-}
-
-.inv-meta-item span:last-child {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #0f172a;
-}
-
-/* Title */
+/* Title - Large Centered */
 .inv-title {
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-size: 24pt;
+    font-weight: 300;
+    letter-spacing: 2px;
     color: #0f172a;
-    margin-bottom: 1rem;
+    text-align: center;
+    margin-bottom: 15mm;
+    text-transform: uppercase;
 }
 
-/* Table */
+/* Table - Beige Background */
 .inv-table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-    margin-bottom: 1.5rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 10pt;
+    margin-bottom: 10mm;
+    background: #f5f1e8;
+    overflow: hidden;
+}
+
+.inv-table thead {
+    background: #e8e1d0;
 }
 
 .inv-table th {
     text-align: left;
-    padding: 0.6rem 0.5rem;
-    font-size: 0.7rem;
+    padding: 4mm 3mm;
+    font-size: 9pt;
     font-weight: 600;
-    color: #64748b;
+    color: #4a4239;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 2px solid #e2e8f0;
+    letter-spacing: 0.03em;
+}
+
+.inv-table th:first-child {
+    padding-left: 5mm;
+}
+
+.inv-table th:last-child {
+    padding-right: 5mm;
 }
 
 .inv-table td {
-    padding: 0.5rem;
-    border-bottom: 1px solid #f1f5f9;
-    color: #334155;
+    padding: 3mm;
+    color: #2d2721;
+    background: #f5f1e8;
+}
+
+.inv-table td:first-child {
+    padding-left: 5mm;
+}
+
+.inv-table td:last-child {
+    padding-right: 5mm;
+}
+
+.inv-table tbody tr:last-child td {
+    padding-bottom: 4mm;
 }
 
 .inv-table .text-right {
@@ -900,51 +952,88 @@ select {
 .inv-empty-row td {
     text-align: center;
     color: #94a3b8;
-    padding: 1.5rem;
+    padding: 8mm;
     font-style: italic;
 }
 
-/* Summary */
+/* Summary - Right Aligned Clean */
 .inv-summary {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.15rem;
-    margin-bottom: 2rem;
+    gap: 2mm;
+    margin-bottom: 15mm;
+    margin-top: 10mm;
 }
 
 .inv-summary-line {
     display: flex;
     justify-content: space-between;
-    width: 220px;
-    font-size: 0.85rem;
-    padding: 0.25rem 0;
-    color: #475569;
+    width: 65mm;
+    font-size: 10pt;
+    padding: 1mm 0;
+    color: #4a4239;
+}
+
+.inv-summary-line:not(.inv-summary-total) {
+    display: none; /* Hide Netto + MwSt, only show total */
 }
 
 .inv-summary-total {
-    border-top: 2px solid #0ea5e9;
-    margin-top: 0.25rem;
-    padding-top: 0.5rem;
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: 14pt;
     color: #0f172a;
 }
 
-/* Payment */
+/* Payment - Footer Style */
 .inv-payment {
-    padding: 1rem;
-    background: #f8fafc;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    position: absolute;
+    bottom: 15mm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    padding: 5mm 25mm;
+    background: #f5f1e8;
+    border-top: 1px solid #e8e1d0;
+}
+
+.inv-payment .inv-label {
+    display: block;
+    font-size: 8pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #4a4239;
+    margin-bottom: 3mm;
 }
 
 .inv-bank-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.25rem 1rem;
-    font-size: 0.8rem;
-    color: #475569;
+    display: block;
+    text-align: center;
+    font-size: 9pt;
+    color: #2d2721;
+    line-height: 1.8;
+}
+
+.inv-bank-grid span {
+    display: inline;
+}
+
+.inv-bank-grid span:nth-child(odd)::after {
+    content: ' ';
+}
+
+.inv-bank-grid span:nth-child(even) {
+    font-weight: 500;
+}
+
+.inv-bank-grid span:nth-child(even):not(:last-child)::after {
+    content: ' • ';
+    margin: 0 1.5mm;
+    color: #94a3b8;
 }
 
 .inv-payment-status {
@@ -964,57 +1053,34 @@ select {
     font-size: 0.82rem;
 }
 
-/* Nuki PIN */
+/* Nuki PIN - Minimal */
 .inv-nuki-pin {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background: #f0f9ff;
-    border: 1px solid #bae6fd;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    display: none; /* Hide in new design or make minimal */
 }
 
-.inv-nuki-content {
-    display: flex;
-    flex-direction: column;
-}
-
-.inv-nuki-code {
-    font-size: 1.4rem;
-    font-weight: 700;
-    letter-spacing: 0.3rem;
-    color: #0284c7;
-}
-
-.inv-nuki-label,
-.inv-nuki-period {
-    font-size: 0.72rem;
-    color: #475569;
+.inv-payment-status {
+    display: none; /* Hide payment status badge in new minimal design */
 }
 
 /* Footer */
 .inv-footer {
-    position: absolute;
-    bottom: 15mm;
-    left: 25mm;
-    right: 20mm;
+    margin-top: 15mm;
+    margin-bottom: 5mm;
     text-align: center;
-    font-size: 0.78rem;
+    font-size: 8pt;
     color: #94a3b8;
-    padding-top: 1rem;
-    border-top: 1px solid #e2e8f0;
+    line-height: 1.6;
 }
 
 .inv-legal-notice {
-    font-size: 0.72rem;
+    font-size: 8pt;
     color: #64748b;
-    margin-bottom: 0.5rem;
-    padding: 0.5rem;
-    background: #fef9c3;
-    border-radius: 4px;
-    color: #854d0e;
+    margin-bottom: 3mm;
+}
+
+.inv-footer #inv-footer-text {
+    font-size: 9pt;
+    color: #4a4239;
 }
 
 /* ===========================

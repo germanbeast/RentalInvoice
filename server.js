@@ -24,6 +24,7 @@ const db = require('./db');
 const waCommands = require('./wa-commands');
 const tgCommands = require('./tg-commands');
 const TelegramBot = require('node-telegram-bot-api');
+const packageJson = require('./package.json');
 require('dotenv').config();
 
 const app = express();
@@ -763,6 +764,15 @@ app.get('/api/me', (req, res) => {
     }
 });
 
+// Version Info
+app.get('/api/version', (req, res) => {
+    res.json({
+        success: true,
+        version: packageJson.version,
+        name: packageJson.name
+    });
+});
+
 // =======================
 // 7b. USER MANAGEMENT API
 // =======================
@@ -912,6 +922,36 @@ app.post('/api/settings/telegram/delete', apiLimiter, (req, res) => {
     } catch (e) {
         console.error('Telegram Delete Error:', e.message);
         res.status(500).json({ error: 'Fehler beim Löschen: ' + e.message });
+    }
+});
+
+app.get('/api/telegram/status', apiLimiter, (req, res) => {
+    try {
+        let status = 'offline';
+        let botInfo = null;
+
+        if (tgBot && currentTgToken) {
+            status = 'online';
+            // Try to get bot info
+            tgBot.getMe()
+                .then(info => {
+                    res.json({
+                        success: true,
+                        status: 'online',
+                        botInfo: {
+                            username: info.username,
+                            first_name: info.first_name
+                        }
+                    });
+                })
+                .catch(() => {
+                    res.json({ success: true, status: 'online' });
+                });
+        } else {
+            res.json({ success: true, status: 'offline' });
+        }
+    } catch (e) {
+        res.json({ success: true, status: 'offline' });
     }
 });
 

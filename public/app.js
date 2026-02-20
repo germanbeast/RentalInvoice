@@ -407,12 +407,27 @@
             $('#inv-v-steuernr').textContent = steuernr ? `St.-Nr.: ${steuernr}` : '';
 
             // Gast
-            $('#inv-g-name').textContent = $('#g-name').value || 'Gast Name';
+            const guestName = $('#g-name').value || 'Gast Name';
+            $('#inv-g-name').textContent = guestName;
             $('#inv-g-adresse').innerHTML = nl2br($('#g-adresse').value);
+
+            // Greeting
+            const lastName = guestName.split(' ').pop().toUpperCase();
+            const greeting = `SEHR GEEHRTE/R ${lastName},`;
+            $('#inv-greeting').textContent = greeting;
 
             // Meta
             $('#inv-r-nummer').textContent = $('#r-nummer').value || '—';
             $('#inv-r-datum').textContent = formatDate($('#r-datum').value);
+
+            // Location + Date in header
+            const rDatum = $('#r-datum').value;
+            const vAdresse = $('#v-adresse').value || '';
+            // Extract city from address (assume last line or after postal code)
+            const cityMatch = vAdresse.match(/\d{5}\s+(.+)/);
+            const city = cityMatch ? cityMatch[1].split('\n')[0].trim() : 'Jede Stadt';
+            $('#inv-location').textContent = city;
+            $('#inv-r-datum-header').textContent = formatDate(rDatum) || '01.01.2030';
 
             const anreise = $('#a-anreise').value;
             const abreise = $('#a-abreise').value;
@@ -763,8 +778,28 @@
             }
 
             loadUsers(); // Refresh user list
+            loadVersion(); // Load app version
         } catch (e) {
             console.error('Settings load error:', e);
+        }
+    }
+
+    async function loadVersion() {
+        try {
+            const res = await fetch('/api/version');
+            const data = await res.json();
+            if (data.success && data.version) {
+                const versionEl = $('#app-version');
+                if (versionEl) {
+                    versionEl.textContent = `Version ${data.version}`;
+                }
+                const currentVersionEl = $('#current-version');
+                if (currentVersionEl) {
+                    currentVersionEl.textContent = data.version;
+                }
+            }
+        } catch (e) {
+            console.error('Version load error:', e);
         }
     }
 
@@ -811,6 +846,38 @@
         }
     }
 
+    // Telegram Status Polling
+    let tgStatusInterval = null;
+
+    async function pollTelegramStatus() {
+        try {
+            const res = await fetch('/api/telegram/status');
+            const data = await res.json();
+            const dot = $('#tg-status-dot');
+            const text = $('#tg-status-text');
+
+            if (data.status === 'online') {
+                if (dot) { dot.className = 'badge online'; dot.textContent = 'Online'; }
+                if (text) {
+                    if (data.botInfo && data.botInfo.username) {
+                        text.textContent = `Verbunden (@${data.botInfo.username})`;
+                    } else {
+                        text.textContent = 'Verbunden';
+                    }
+                }
+            } else {
+                if (dot) { dot.className = 'badge'; dot.textContent = 'Offline'; }
+                if (text) text.textContent = 'Offline';
+            }
+        } catch (e) {
+            console.error('Telegram Status Error:', e);
+            const dot = $('#tg-status-dot');
+            const text = $('#tg-status-text');
+            if (dot) { dot.className = 'badge'; dot.textContent = 'Offline'; }
+            if (text) text.textContent = 'Offline';
+        }
+    }
+
     // Start polling when settings modal opens
     let tgRequestInterval = null;
     if (modalSettings) {
@@ -818,17 +885,23 @@
             if (modalSettings.style.display !== 'none') {
                 // Clear any previous intervals before starting new ones
                 clearInterval(waStatusInterval);
+                clearInterval(tgStatusInterval);
                 clearInterval(tgRequestInterval);
 
                 pollWhatsAppStatus();
                 waStatusInterval = setInterval(pollWhatsAppStatus, 5000);
 
+                pollTelegramStatus();
+                tgStatusInterval = setInterval(pollTelegramStatus, 5000);
+
                 loadTelegramRequests();
                 tgRequestInterval = setInterval(loadTelegramRequests, 8000);
             } else {
                 clearInterval(waStatusInterval);
+                clearInterval(tgStatusInterval);
                 clearInterval(tgRequestInterval);
                 waStatusInterval = null;
+                tgStatusInterval = null;
                 tgRequestInterval = null;
             }
         });
