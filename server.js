@@ -1277,18 +1277,37 @@ app.get('/api/branding', apiLimiter, (req, res) => {
 
 app.post('/api/branding', apiLimiter, (req, res) => {
     try {
-        const { logo_base64, primary_color } = req.body;
+        const { logo_base64, primary_color, template_config } = req.body;
 
         // Validate base64 size (max 2MB)
         if (logo_base64 && logo_base64.length > 2 * 1024 * 1024) {
             return res.status(400).json({ error: 'Logo ist zu groß (max 2MB)' });
         }
 
-        db.saveBranding({ logo_base64, primary_color });
+        db.saveBranding({ logo_base64, primary_color, template_config });
         res.json({ success: true, message: 'Branding gespeichert' });
     } catch (e) {
         console.error('Branding POST Error:', e.message);
         res.status(500).json({ error: 'Branding konnte nicht gespeichert werden' });
+    }
+});
+
+// Template-specific endpoint
+app.post('/api/branding/template', apiLimiter, (req, res) => {
+    try {
+        const { template_config } = req.body;
+        const currentBranding = db.getBranding();
+
+        db.saveBranding({
+            logo_base64: currentBranding.logo_base64,
+            primary_color: currentBranding.primary_color,
+            template_config
+        });
+
+        res.json({ success: true, message: 'Template-Konfiguration gespeichert' });
+    } catch (e) {
+        console.error('Template Config POST Error:', e.message);
+        res.status(500).json({ error: 'Template-Konfiguration konnte nicht gespeichert werden' });
     }
 });
 

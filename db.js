@@ -75,6 +75,7 @@ function initSchema() {
             id INTEGER PRIMARY KEY DEFAULT 1,
             logo_base64 TEXT,
             primary_color TEXT DEFAULT '#6366f1',
+            template_config TEXT DEFAULT '{}',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -137,6 +138,13 @@ function initSchema() {
     if (!tgReqInfo.some(col => col.name === 'updated_at')) {
         db.exec("ALTER TABLE telegram_requests ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
         console.log('✅ Migration: updated_at Spalte zu telegram_requests hinzugefügt.');
+    }
+
+    // Migration: add template_config to branding
+    const brandingInfo = db.prepare("PRAGMA table_info(branding)").all();
+    if (!brandingInfo.some(col => col.name === 'template_config')) {
+        db.exec("ALTER TABLE branding ADD COLUMN template_config TEXT DEFAULT '{}'");
+        console.log('✅ Migration: template_config Spalte zu branding hinzugefügt.');
     }
 
     console.log('✅ Datenbank-Schema initialisiert.');
@@ -512,19 +520,37 @@ function deleteInvoice(id) {
 // Branding
 // =======================
 function getBranding() {
-    return getDb().prepare('SELECT * FROM branding WHERE id = 1').get() || { logo_base64: null, primary_color: '#6366f1' };
+    const result = getDb().prepare('SELECT * FROM branding WHERE id = 1').get();
+    if (result) {
+        // Parse template_config JSON
+        if (result.template_config) {
+            try {
+                result.template_config = JSON.parse(result.template_config);
+            } catch (e) {
+                result.template_config = {};
+            }
+        } else {
+            result.template_config = {};
+        }
+        return result;
+    }
+    return { logo_base64: null, primary_color: '#6366f1', template_config: {} };
 }
 
 function saveBranding(data) {
     const existing = getDb().prepare('SELECT id FROM branding WHERE id = 1').get();
+    const templateConfigJson = typeof data.template_config === 'string'
+        ? data.template_config
+        : JSON.stringify(data.template_config || {});
+
     if (existing) {
         return getDb().prepare(
-            'UPDATE branding SET logo_base64 = ?, primary_color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
-        ).run(data.logo_base64 || null, data.primary_color || '#6366f1');
+            'UPDATE branding SET logo_base64 = ?, primary_color = ?, template_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
+        ).run(data.logo_base64 || null, data.primary_color || '#6366f1', templateConfigJson);
     } else {
         return getDb().prepare(
-            'INSERT INTO branding (id, logo_base64, primary_color) VALUES (1, ?, ?)'
-        ).run(data.logo_base64 || null, data.primary_color || '#6366f1');
+            'INSERT INTO branding (id, logo_base64, primary_color, template_config) VALUES (1, ?, ?, ?)'
+        ).run(data.logo_base64 || null, data.primary_color || '#6366f1', templateConfigJson);
     }
 }
 

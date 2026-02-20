@@ -411,10 +411,17 @@
             $('#inv-g-name').textContent = guestName;
             $('#inv-g-adresse').innerHTML = nl2br($('#g-adresse').value);
 
-            // Greeting
+            // Greeting (use template config if available)
             const lastName = guestName.split(' ').pop().toUpperCase();
-            const greeting = `SEHR GEEHRTE/R ${lastName},`;
+            const greetingTemplate = currentTemplateConfig?.greeting || 'SEHR GEEHRTE/R';
+            const greeting = `${greetingTemplate} ${lastName},`;
             $('#inv-greeting').textContent = greeting;
+
+            // Intro text (use template config if available)
+            const introTextElem = $('#inv-intro-text');
+            if (introTextElem && currentTemplateConfig?.introText) {
+                introTextElem.textContent = currentTemplateConfig.introText;
+            }
 
             // Meta
             $('#inv-r-nummer').textContent = $('#r-nummer').value || '—';
@@ -2632,6 +2639,7 @@
         await loadTelegramRequests();
 
         await loadBranding();
+        await loadTemplateConfig(); // Load template configuration
 
         // Try to restore draft first
         const draftLoaded = loadDraft();
@@ -3190,6 +3198,447 @@
     }
 `;
     document.head.appendChild(style);
+
+    // =======================
+    // INVOICE TEMPLATE DESIGNER
+    // =======================
+    let currentTemplateConfig = {};
+    let templateStyleElement = null;
+
+    // Default template config
+    const defaultTemplateConfig = {
+        logoText: 'Ferienwohnung Beckhome',
+        logoImage: null, // Base64 image
+        greeting: 'SEHR GEEHRTE/R',
+        introText: 'Ich bedanke mich herzlich für die Zusammenarbeit und Ihr entgegengebrachtes Vertrauen. Anbei die Rechnung für das gemeinsame Projekt:',
+        footerText: '',
+        colorPrimary: '#0f172a',
+        colorTableBg: '#f5f1e8',
+        colorTableHeader: '#e8e1d0',
+        colorText: '#2d2721',
+        fontLogo: 'Georgia, serif',
+        fontBody: "'Inter', sans-serif",
+        showLogo: true,
+        showTax: true,
+        showDateHeader: true
+    };
+
+    async function loadTemplateConfig() {
+        try {
+            const res = await fetch('/api/branding');
+            const data = await res.json();
+            if (data.success && data.branding && data.branding.template_config) {
+                currentTemplateConfig = { ...defaultTemplateConfig, ...data.branding.template_config };
+            } else {
+                currentTemplateConfig = { ...defaultTemplateConfig };
+            }
+            applyTemplateStyles();
+            populateTemplateForm();
+            updateTemplatePreview();
+        } catch (e) {
+            console.error('Template config load error:', e);
+            currentTemplateConfig = { ...defaultTemplateConfig };
+        }
+    }
+
+    function applyTemplateStyles() {
+        // Remove old style element if exists
+        if (templateStyleElement) {
+            templateStyleElement.remove();
+        }
+
+        // Create new style element with template config
+        templateStyleElement = document.createElement('style');
+        templateStyleElement.id = 'template-custom-styles';
+        templateStyleElement.textContent = `
+            /* Template Custom Styles */
+            .invoice-page {
+                font-family: ${currentTemplateConfig.fontBody || "'Inter', sans-serif"} !important;
+                color: ${currentTemplateConfig.colorText || '#2d2721'} !important;
+            }
+
+            .inv-sender::before {
+                ${currentTemplateConfig.logoImage
+                    ? `content: ''; background-image: url(${currentTemplateConfig.logoImage}); background-size: contain; background-repeat: no-repeat; width: 150px; height: 60px;`
+                    : `content: '${(currentTemplateConfig.logoText || 'Ferienwohnung Beckhome').replace(/'/g, "\\'")}'; font-family: ${currentTemplateConfig.fontLogo || 'Georgia, serif'};`
+                }
+                display: ${currentTemplateConfig.showLogo ? 'block' : 'none'} !important;
+            }
+
+            .inv-location-date #inv-location {
+                display: ${currentTemplateConfig.showDateHeader ? 'block' : 'none'} !important;
+            }
+
+            .inv-location-date #inv-r-datum-header {
+                display: ${currentTemplateConfig.showDateHeader ? 'block' : 'none'} !important;
+            }
+
+            .inv-tax {
+                display: ${currentTemplateConfig.showTax ? 'block' : 'none'} !important;
+            }
+
+            .inv-title {
+                color: ${currentTemplateConfig.colorPrimary || '#0f172a'} !important;
+            }
+
+            .inv-table {
+                background: ${currentTemplateConfig.colorTableBg || '#f5f1e8'} !important;
+            }
+
+            .inv-table thead {
+                background: ${currentTemplateConfig.colorTableHeader || '#e8e1d0'} !important;
+            }
+
+            .inv-table td {
+                background: ${currentTemplateConfig.colorTableBg || '#f5f1e8'} !important;
+                color: ${currentTemplateConfig.colorText || '#2d2721'} !important;
+            }
+
+            .inv-table th {
+                color: ${currentTemplateConfig.colorText || '#2d2721'} !important;
+            }
+
+            .inv-payment {
+                background: ${currentTemplateConfig.colorTableBg || '#f5f1e8'} !important;
+                border-top-color: ${currentTemplateConfig.colorTableHeader || '#e8e1d0'} !important;
+            }
+
+            .inv-summary-total {
+                color: ${currentTemplateConfig.colorPrimary || '#0f172a'} !important;
+            }
+        `;
+
+        document.head.appendChild(templateStyleElement);
+    }
+
+    function populateTemplateForm() {
+        $('#tpl-logo-text').value = currentTemplateConfig.logoText || '';
+        $('#tpl-greeting').value = currentTemplateConfig.greeting || '';
+        $('#tpl-intro').value = currentTemplateConfig.introText || '';
+        $('#tpl-footer-text').value = currentTemplateConfig.footerText || '';
+        $('#tpl-color-primary').value = currentTemplateConfig.colorPrimary || '#0f172a';
+        $('#tpl-color-table-bg').value = currentTemplateConfig.colorTableBg || '#f5f1e8';
+        $('#tpl-color-table-header').value = currentTemplateConfig.colorTableHeader || '#e8e1d0';
+        $('#tpl-color-text').value = currentTemplateConfig.colorText || '#2d2721';
+        $('#tpl-font-logo').value = currentTemplateConfig.fontLogo || 'Georgia, serif';
+        $('#tpl-font-body').value = currentTemplateConfig.fontBody || "'Inter', sans-serif";
+        $('#tpl-show-logo').checked = currentTemplateConfig.showLogo !== false;
+        $('#tpl-show-tax').checked = currentTemplateConfig.showTax !== false;
+        $('#tpl-show-date-header').checked = currentTemplateConfig.showDateHeader !== false;
+
+        // Logo image preview
+        const logoPreview = $('#tpl-logo-preview');
+        const btnRemoveLogo = $('#btn-tpl-remove-logo');
+        if (currentTemplateConfig.logoImage) {
+            logoPreview.src = currentTemplateConfig.logoImage;
+            logoPreview.style.display = 'block';
+            btnRemoveLogo.style.display = 'inline-block';
+        } else {
+            logoPreview.style.display = 'none';
+            btnRemoveLogo.style.display = 'none';
+        }
+    }
+
+    function updateTemplatePreview() {
+        const previewContainer = $('#template-preview-invoice');
+        if (!previewContainer) return;
+
+        // Build sample invoice with current template config
+        const sampleData = {
+            logoText: currentTemplateConfig.logoText || 'Ferienwohnung Beckhome',
+            landlordName: $('#v-name')?.value || 'Max Mustermann',
+            landlordAddress: $('#v-adresse')?.value || 'Musterstraße 1\n12345 Musterstadt',
+            landlordPhone: $('#v-telefon')?.value || '+49 123 456789',
+            landlordEmail: $('#v-email')?.value || 'max@example.com',
+            landlordTax: $('#v-steuernr')?.value || '12/345/67890',
+            invoiceNumber: 'RE-2024-001',
+            invoiceDate: '20.02.2026',
+            guestName: 'Frau Müller',
+            greeting: (currentTemplateConfig.greeting || 'SEHR GEEHRTE/R') + ' MÜLLER,',
+            introText: currentTemplateConfig.introText || '',
+            items: [
+                { description: 'Übernachtung (7 Nächte)', quantity: 7, price: 80.00, total: 560.00 },
+                { description: 'Endreinigung', quantity: 1, price: 50.00, total: 50.00 }
+            ],
+            totalAmount: 610.00,
+            footerText: currentTemplateConfig.footerText || ''
+        };
+
+        previewContainer.innerHTML = `
+            <style>
+                .preview-invoice {
+                    font-family: ${currentTemplateConfig.fontBody || "'Inter', sans-serif"};
+                    color: ${currentTemplateConfig.colorText || '#2d2721'};
+                    padding: 15mm 20mm;
+                    background: white;
+                }
+                .preview-header {
+                    display: grid;
+                    grid-template-columns: 1fr auto;
+                    gap: 2rem;
+                    margin-bottom: 20mm;
+                }
+                .preview-logo {
+                    ${currentTemplateConfig.logoImage
+                        ? `background-image: url(${currentTemplateConfig.logoImage}); background-size: contain; background-repeat: no-repeat; width: 150px; height: 60px;`
+                        : `font-family: ${currentTemplateConfig.fontLogo || 'Georgia, serif'}; font-size: 18pt; font-style: italic; color: ${currentTemplateConfig.colorPrimary || '#0f172a'};`
+                    }
+                    margin-bottom: 4mm;
+                    display: ${currentTemplateConfig.showLogo ? 'block' : 'none'};
+                }
+                .preview-landlord {
+                    font-size: 8pt;
+                    color: #64748b;
+                    line-height: 1.7;
+                }
+                .preview-date {
+                    text-align: right;
+                    font-size: 9pt;
+                    display: ${currentTemplateConfig.showDateHeader ? 'block' : 'none'};
+                }
+                .preview-greeting {
+                    font-size: 9pt;
+                    font-weight: 600;
+                    letter-spacing: 0.05em;
+                    margin-bottom: 4mm;
+                }
+                .preview-intro {
+                    font-size: 9pt;
+                    line-height: 1.6;
+                    margin-bottom: 6mm;
+                }
+                .preview-title {
+                    font-size: 20pt;
+                    font-weight: 300;
+                    letter-spacing: 2px;
+                    text-align: center;
+                    margin-bottom: 10mm;
+                    color: ${currentTemplateConfig.colorPrimary || '#0f172a'};
+                }
+                .preview-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 9pt;
+                    margin-bottom: 8mm;
+                    background: ${currentTemplateConfig.colorTableBg || '#f5f1e8'};
+                }
+                .preview-table th {
+                    background: ${currentTemplateConfig.colorTableHeader || '#e8e1d0'};
+                    padding: 3mm 2.5mm;
+                    text-align: left;
+                    font-size: 8pt;
+                    font-weight: 600;
+                }
+                .preview-table td {
+                    padding: 2.5mm;
+                }
+                .preview-total {
+                    text-align: right;
+                    font-weight: 700;
+                    font-size: 12pt;
+                    margin-top: 5mm;
+                }
+                .preview-footer {
+                    margin-top: 10mm;
+                    text-align: center;
+                    padding: 4mm;
+                    background: ${currentTemplateConfig.colorTableBg || '#f5f1e8'};
+                    border-top: 1px solid ${currentTemplateConfig.colorTableHeader || '#e8e1d0'};
+                    font-size: 8pt;
+                }
+                .preview-tax {
+                    display: ${currentTemplateConfig.showTax ? 'block' : 'none'};
+                    font-size: 7pt;
+                    margin-top: 1mm;
+                    color: #64748b;
+                }
+            </style>
+            <div class="preview-invoice">
+                <div class="preview-header">
+                    <div>
+                        <div class="preview-logo">${currentTemplateConfig.logoImage ? '' : sampleData.logoText}</div>
+                        <div class="preview-landlord">
+                            <strong>${sampleData.landlordName}</strong><br>
+                            ${sampleData.landlordAddress.replace(/\n/g, '<br>')}<br>
+                            ${sampleData.landlordPhone}<br>
+                            ${sampleData.landlordEmail}
+                            <div class="preview-tax">${sampleData.landlordTax}</div>
+                        </div>
+                    </div>
+                    <div class="preview-date">
+                        ${sampleData.invoiceDate}
+                    </div>
+                </div>
+
+                <div class="preview-greeting">${sampleData.greeting}</div>
+                ${sampleData.introText ? `<div class="preview-intro">${sampleData.introText}</div>` : ''}
+
+                <div class="preview-title">RECHNUNG</div>
+
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Beschreibung</th>
+                            <th style="text-align: center;">Anzahl</th>
+                            <th style="text-align: right;">Preis</th>
+                            <th style="text-align: right;">Gesamt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sampleData.items.map(item => `
+                            <tr>
+                                <td>${item.description}</td>
+                                <td style="text-align: center;">${item.quantity}</td>
+                                <td style="text-align: right;">${item.price.toFixed(2)} €</td>
+                                <td style="text-align: right;">${item.total.toFixed(2)} €</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="preview-total">
+                    Gesamtbetrag: ${sampleData.totalAmount.toFixed(2)} €
+                </div>
+
+                ${sampleData.footerText ? `<div class="preview-footer">${sampleData.footerText}</div>` : ''}
+            </div>
+        `;
+    }
+
+    // Live preview update on input
+    const templateInputs = [
+        '#tpl-logo-text', '#tpl-greeting', '#tpl-intro', '#tpl-footer-text',
+        '#tpl-color-primary', '#tpl-color-table-bg', '#tpl-color-table-header', '#tpl-color-text',
+        '#tpl-font-logo', '#tpl-font-body',
+        '#tpl-show-logo', '#tpl-show-tax', '#tpl-show-date-header'
+    ];
+
+    templateInputs.forEach(selector => {
+        const el = $(selector);
+        if (el) {
+            el.addEventListener('input', () => {
+                // Update config from form
+                currentTemplateConfig.logoText = $('#tpl-logo-text').value;
+                currentTemplateConfig.greeting = $('#tpl-greeting').value;
+                currentTemplateConfig.introText = $('#tpl-intro').value;
+                currentTemplateConfig.footerText = $('#tpl-footer-text').value;
+                currentTemplateConfig.colorPrimary = $('#tpl-color-primary').value;
+                currentTemplateConfig.colorTableBg = $('#tpl-color-table-bg').value;
+                currentTemplateConfig.colorTableHeader = $('#tpl-color-table-header').value;
+                currentTemplateConfig.colorText = $('#tpl-color-text').value;
+                currentTemplateConfig.fontLogo = $('#tpl-font-logo').value;
+                currentTemplateConfig.fontBody = $('#tpl-font-body').value;
+                currentTemplateConfig.showLogo = $('#tpl-show-logo').checked;
+                currentTemplateConfig.showTax = $('#tpl-show-tax').checked;
+                currentTemplateConfig.showDateHeader = $('#tpl-show-date-header').checked;
+                // Note: logoImage is handled separately in file upload handler
+
+                applyTemplateStyles();
+                updateTemplatePreview();
+            });
+        }
+    });
+
+    // Save template
+    const btnSaveTemplate = $('#btn-save-template');
+    if (btnSaveTemplate) {
+        btnSaveTemplate.addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/branding/template', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template_config: currentTemplateConfig })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showNotification('Template gespeichert!', 'success');
+                } else {
+                    showNotification('Fehler beim Speichern', 'error');
+                }
+            } catch (e) {
+                console.error('Template save error:', e);
+                showNotification('Fehler beim Speichern', 'error');
+            }
+        });
+    }
+
+    // Reset template
+    const btnResetTemplate = $('#btn-reset-template');
+    if (btnResetTemplate) {
+        btnResetTemplate.addEventListener('click', () => {
+            if (confirm('Template auf Standardwerte zurücksetzen?')) {
+                currentTemplateConfig = { ...defaultTemplateConfig };
+                populateTemplateForm();
+                updateTemplatePreview();
+            }
+        });
+    }
+
+    // Load template config when opening invoice designer tab
+    const invoiceDesignerTab = $('[data-target="settings-invoice-designer"]');
+    if (invoiceDesignerTab) {
+        invoiceDesignerTab.addEventListener('click', () => {
+            setTimeout(() => {
+                loadTemplateConfig();
+            }, 100);
+        });
+    }
+
+    // Logo upload handlers
+    const btnTplUploadLogo = $('#btn-tpl-upload-logo');
+    const tplLogoFileInput = $('#tpl-logo-file-input');
+    const btnTplRemoveLogo = $('#btn-tpl-remove-logo');
+    const tplLogoPreview = $('#tpl-logo-preview');
+
+    if (btnTplUploadLogo && tplLogoFileInput) {
+        btnTplUploadLogo.addEventListener('click', () => {
+            tplLogoFileInput.click();
+        });
+
+        tplLogoFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                showNotification('Bitte wähle eine Bilddatei', 'error');
+                return;
+            }
+
+            // Validate file size (max 2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                showNotification('Bild ist zu groß (max 2MB)', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = event.target.result;
+                currentTemplateConfig.logoImage = base64;
+
+                // Update preview
+                tplLogoPreview.src = base64;
+                tplLogoPreview.style.display = 'block';
+                btnTplRemoveLogo.style.display = 'inline-block';
+
+                applyTemplateStyles();
+                updateTemplatePreview();
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    if (btnTplRemoveLogo) {
+        btnTplRemoveLogo.addEventListener('click', () => {
+            currentTemplateConfig.logoImage = null;
+            tplLogoPreview.style.display = 'none';
+            btnTplRemoveLogo.style.display = 'none';
+            tplLogoFileInput.value = '';
+
+            applyTemplateStyles();
+            updateTemplatePreview();
+        });
+    }
 
 })();
 // Version 3.0 - SQLite Database Migration
