@@ -120,7 +120,11 @@ async function sendWhatsApp(phone, message) {
         return false;
     }
     try {
-        const cleaned = phone.replace(/[^\d]/g, '');
+        let cleaned = phone.replace(/[^\d]/g, '');
+        // Automatische Konvertierung von dt. Nummern (z.B. 0176 -> 49176)
+        if (cleaned.startsWith('0') && !cleaned.startsWith('00')) {
+            cleaned = '49' + cleaned.substring(1);
+        }
         const chatId = cleaned + '@c.us';
         await waClient.sendMessage(chatId, message);
         console.log(`\u2709\ufe0f  WhatsApp gesendet an ${phone}: ${message.substring(0, 50)}...`);
@@ -1241,7 +1245,7 @@ app.get('/api/invoices/:id/pdf', apiLimiter, async (req, res) => {
 
         const filename = `Rechnung-${(data.rNummer || invoice.invoice_number || 'download').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
         res.download(filePath, filename, (err) => {
-            require('fs').unlink(filePath, () => {});
+            require('fs').unlink(filePath, () => { });
             if (err && !res.headersSent) {
                 res.status(500).json({ error: 'Download fehlgeschlagen' });
             }
