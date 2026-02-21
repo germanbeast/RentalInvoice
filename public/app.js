@@ -18,6 +18,7 @@
     // Buttons
     const btnAddPos = $('#btn-add-position');
     const btnPrint = $('#btn-print');
+    const btnSaveInvoice = $('#btn-save-invoice');
     const btnPaperless = $('#btn-paperless');
     const btnReset = $('#btn-reset');
     const btnSaveVermieter = $('#btn-save-vermieter');
@@ -1916,6 +1917,12 @@
         archiveInvoice();
         window.print();
     });
+
+    if (btnSaveInvoice) {
+        btnSaveInvoice.addEventListener('click', () => {
+            archiveInvoice();
+        });
+    }
 
     // =======================
     // E-Mail Versand (Server Version)
