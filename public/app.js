@@ -3871,12 +3871,17 @@
     const viewWelcome = $('#view-welcome');
     
     function showWelcomeScreen(guestName) {
+        console.log('showWelcomeScreen called with:', guestName);
+
+        // Get fresh reference to welcome view (in case DOM wasn't ready before)
+        const welcomeView = document.querySelector('#view-welcome');
+
         // Hide all other views
-        const viewDash = $('#view-dashboard');
-        const viewInv = $('#view-invoice-form');
-        const viewExp = $('#view-expenses');
-        const wrapper = $('#app-wrapper');
-        const login = $('#login-screen');
+        const viewDash = document.querySelector('#view-dashboard');
+        const viewInv = document.querySelector('#view-invoice-form');
+        const viewExp = document.querySelector('#view-expenses');
+        const wrapper = document.querySelector('#app-wrapper');
+        const login = document.querySelector('#login-screen');
 
         if (viewDash) viewDash.style.display = 'none';
         if (viewInv) viewInv.style.display = 'none';
@@ -3885,21 +3890,24 @@
         if (login) login.style.display = 'none';
 
         // Show welcome screen
-        if (viewWelcome) {
-            viewWelcome.style.display = 'block';
-            
+        if (welcomeView) {
+            console.log('Welcome view found, showing it');
+            welcomeView.style.display = 'block';
+
             // Set guest name
-            const guestNameEl = $('#welcome-guest-name');
+            const guestNameEl = document.querySelector('#welcome-guest-name');
             if (guestNameEl && guestName) {
                 guestNameEl.textContent = guestName;
             }
-            
+
             // Update time and date
             updateWelcomeTime();
             setInterval(updateWelcomeTime, 1000);
-            
+
             // Load settings for WLAN, phone, etc.
             loadWelcomeSettings();
+        } else {
+            console.error('Welcome view not found! Element #view-welcome does not exist.');
         }
     }
     
