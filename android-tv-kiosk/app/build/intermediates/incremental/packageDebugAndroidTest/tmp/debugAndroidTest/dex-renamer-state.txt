@@ -1,0 +1,4 @@
+#Sat Feb 21 19:32:02 CET 2026
+base.0=C\:\\Users\\roybe\\Documents\\Test Powershell\\ferienwohnung-rechnung\\android-tv-kiosk\\app\\build\\intermediates\\dex\\debugAndroidTest\\mergeProjectDexDebugAndroidTest\\0\\classes.dex
+path.0=0/classes.dex
+renamed.0=classes.dex

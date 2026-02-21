@@ -33,7 +33,6 @@
         android:appComponentFactory="androidx.core.app.CoreComponentFactory"
         android:debuggable="true"
         android:extractNativeLibs="true"
-        android:icon="@mipmap/ic_launcher"
         android:label="Ferienwohnung Welcome"
         android:supportsRtl="true"
         android:testOnly="true"
@@ -43,7 +42,6 @@
         <!-- Main Kiosk Activity -->
         <activity
             android:name="com.beckhome.tvwelcome.MainActivity"
-            android:banner="@drawable/app_banner"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:exported="true"
             android:launchMode="singleTask"

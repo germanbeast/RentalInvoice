@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
-INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
-INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
-INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-63:12
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-63:12
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-63:12
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-63:12
 MERGED from [androidx.leanback:leanback:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\35f40c1bbb907980b5751efe6650dfaf\transformed\leanback-1.0.0\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\7011d89884e6a3063a6ce55edd9f882f\transformed\jetified-appcompat-resources-1.6.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\9751129cf9a082d51cb0234e0f752002\transformed\appcompat-1.6.1\AndroidManifest.xml:17:1-22:12
@@ -83,8 +83,8 @@ ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\andro
 	android:name
 		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:17:22-75
 application
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:19:5-63:19
-INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:19:5-63:19
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:19:5-61:19
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:19:5-61:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:28:5-89
@@ -100,79 +100,75 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\cach
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:23:9-35
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:22:9-35
 	android:label
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:22:9-46
-	android:icon
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:21:9-43
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:21:9-46
 	android:allowBackup
 		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:20:9-35
 	android:theme
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:24:9-59
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:23:9-59
 	android:usesCleartextTraffic
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:25:9-44
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:24:9-44
 activity#com.beckhome.tvwelcome.MainActivity
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:28:9-43:20
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:27:9-41:20
 	android:screenOrientation
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:34:13-50
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:32:13-50
 	android:launchMode
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:33:13-44
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:31:13-44
 	android:exported
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:32:13-36
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:30:13-36
 	android:configChanges
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:31:13-74
-	android:banner
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:30:13-50
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:29:13-74
 	android:theme
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:35:13-63
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:33:13-63
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:29:13-41
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:28:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.DEFAULT+category:name:android.intent.category.HOME+category:name:android.intent.category.LEANBACK_LAUNCHER
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:37:13-42:29
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:35:13-40:29
 action#android.intent.action.MAIN
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:38:17-69
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:36:17-69
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:38:25-66
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:36:25-66
 category#android.intent.category.LEANBACK_LAUNCHER
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:39:17-86
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:37:17-86
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:39:27-83
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:37:27-83
 category#android.intent.category.HOME
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:40:17-73
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:38:17-73
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:40:27-70
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:38:27-70
 category#android.intent.category.DEFAULT
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:41:17-76
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:39:17-76
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:41:27-73
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:39:27-73
 activity#com.beckhome.tvwelcome.SettingsActivity
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:46:9-50:66
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:44:9-48:66
 	android:screenOrientation
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:49:13-50
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:47:13-50
 	android:exported
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:48:13-37
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:46:13-37
 	android:theme
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:50:13-63
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:48:13-63
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:47:13-45
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:45:13-45
 receiver#com.beckhome.tvwelcome.BootReceiver
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:53:9-61:20
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:51:9-59:20
 	android:enabled
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:55:13-35
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:53:13-35
 	android:exported
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:56:13-36
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:54:13-36
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:54:13-41
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:52:13-41
 intent-filter#action:name:android.intent.action.BOOT_COMPLETED+action:name:android.intent.action.QUICKBOOT_POWERON
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:57:13-60:29
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:55:13-58:29
 action#android.intent.action.BOOT_COMPLETED
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:58:17-79
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:56:17-79
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:58:25-76
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:56:25-76
 action#android.intent.action.QUICKBOOT_POWERON
-ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:59:17-82
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:57:17-82
 	android:name
-		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:59:25-79
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:57:25-79
 uses-sdk
 INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml

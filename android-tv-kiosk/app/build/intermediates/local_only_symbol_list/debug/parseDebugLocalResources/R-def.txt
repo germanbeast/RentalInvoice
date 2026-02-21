@@ -1,5 +1,8 @@
 R_DEF: Internal format may change without notice
 local
+color ic_launcher_background
+drawable app_banner
+drawable ic_launcher_foreground
 id btn_close
 id btn_save
 id et_checkin_time
@@ -10,3 +13,4 @@ id et_server_url
 id et_wifi_name
 id et_wifi_password
 layout activity_settings
+mipmap ic_launcher

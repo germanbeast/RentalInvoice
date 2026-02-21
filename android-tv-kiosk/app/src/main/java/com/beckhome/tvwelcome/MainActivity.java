@@ -78,8 +78,8 @@ public class MainActivity extends Activity {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    // Check if tap is in top-left corner (logo area)
-                    if (event.getX() < 300 && event.getY() < 300) {
+                    // Check if tap is in top-left corner (logo area) - larger area for easier access
+                    if (event.getX() < 500 && event.getY() < 500) {
                         handleSettingsTap();
                     }
                 }
@@ -168,6 +168,12 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Open settings with MENU key (for easier access in emulator/testing)
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            openSettings();
+            return true;
+        }
+
         // Disable back, home, and recent apps buttons
         if (keyCode == KeyEvent.KEYCODE_BACK ||
             keyCode == KeyEvent.KEYCODE_HOME ||

@@ -1,6 +1,18 @@
 [
     {
-        "merged": "com.beckhome.tvwelcome.app-debug-24:/layout_activity_settings.xml.flat",
-        "source": "com.beckhome.tvwelcome.app-main-26:/layout/activity_settings.xml"
+        "merged": "com.beckhome.tvwelcome.app-debug-24:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.beckhome.tvwelcome.app-main-26:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.beckhome.tvwelcome.app-debug-24:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.beckhome.tvwelcome.app-main-26:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\roybe\\.gradle\\daemon\\8.13\\com.beckhome.tvwelcome.app-debug-24:\\layout_activity_settings.xml.flat",
+        "source": "C:\\Users\\roybe\\.gradle\\daemon\\8.13\\com.beckhome.tvwelcome.app-main-26:\\layout\\activity_settings.xml"
+    },
+    {
+        "merged": "com.beckhome.tvwelcome.app-debug-24:/drawable_app_banner.xml.flat",
+        "source": "com.beckhome.tvwelcome.app-main-26:/drawable/app_banner.xml"
     }
 ]

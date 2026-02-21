@@ -1,0 +1,5 @@
+com.beckhome.tvwelcome.test.app-androidTest-0 C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\build\generated\res\resValues\androidTest\debug
+com.beckhome.tvwelcome.test.app-updated_navigation_xml-1 C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\build\generated\updated_navigation_xml\debugAndroidTest
+com.beckhome.tvwelcome.test.app-mergeDebugAndroidTestResources-2 C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+com.beckhome.tvwelcome.test.app-mergeDebugAndroidTestResources-3 C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+com.beckhome.tvwelcome.test.app-debugAndroidTest-4 C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources
