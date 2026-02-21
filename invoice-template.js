@@ -142,58 +142,61 @@ function renderInvoiceHtml(data) {
             </div>
         </div>
 
-        <!-- PAYMENT STATUS -->
-        <div class="inv-payment-status">
-            <div class="inv-paid-badge ${zBezahlt ? 'paid' : 'unpaid'}">
-                ${zBezahlt ? `
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <!-- BOTTOM WRAPPER -->
+        <div class="inv-bottom">
+            <!-- PAYMENT STATUS -->
+            <div class="inv-payment-status">
+                <div class="inv-paid-badge ${zBezahlt ? 'paid' : 'unpaid'}">
+                    ${zBezahlt ? `
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>Bezahlt via ${zMethode}${zDatum ? ` am ${formatDate(zDatum)}` : ''}</span>
+                    ` : `
+                    <span>Offen – noch nicht bezahlt</span>
+                    `}
+                </div>
+            </div>
+
+            <!-- NUKI -->
+            ${nukiPin ? `
+            <div class="inv-nuki-pin">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="inv-nuki-icon">
+                    <path d="M6.5 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5" />
+                    <path d="M8.5 7.5L14 7.5V9.5M11.5 7.5V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
                 </svg>
-                <span>Bezahlt via ${zMethode}${zDatum ? ` am ${formatDate(zDatum)}` : ''}</span>
-                ` : `
-                <span>Offen – noch nicht bezahlt</span>
-                `}
-            </div>
-        </div>
-
-        <!-- NUKI -->
-        ${nukiPin ? `
-        <div class="inv-nuki-pin">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="inv-nuki-icon">
-                <path d="M6.5 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5" />
-                <path d="M8.5 7.5L14 7.5V9.5M11.5 7.5V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-            </svg>
-            <div class="inv-nuki-content">
-                <span class="inv-nuki-label">Ihr Zugangscode:</span>
-                <span class="inv-nuki-code">${nukiPin}</span>
-                <span class="inv-nuki-period">Gültig: ${formatDate(aAnreise)} bis ${formatDate(aAbreise)}</span>
-            </div>
-        </div>
-        ` : ''}
-
-        <!-- BANK -->
-        ${zShowBank ? `
-        <div class="inv-payment">
-            <div class="inv-label">Bankverbindung</div>
-            <div class="inv-bank-grid">
-                <span>Kontoinhaber:</span><span>${bInhaber || '–'}</span>
-                <span>IBAN:</span><span>${bIban || '–'}</span>
-                <span>BIC:</span><span>${bBic || '–'}</span>
-                <span>Bank:</span><span>${bBank || '–'}</span>
-            </div>
-        </div>
-        ` : ''}
-
-        <!-- FOOTER -->
-        <div class="inv-footer">
-            ${kleinunternehmer ? `
-            <div class="inv-legal-notice">
-                Kleinunternehmer (MwSt.-Befreiung nach § 19 UStG) — Der Rechnungsbetrag enthält gemäß § 19 UStG keine Umsatzsteuer.
+                <div class="inv-nuki-content">
+                    <span class="inv-nuki-label">Ihr Zugangscode:</span>
+                    <span class="inv-nuki-code">${nukiPin}</span>
+                    <span class="inv-nuki-period">Gültig: ${formatDate(aAnreise)} bis ${formatDate(aAbreise)}</span>
+                </div>
             </div>
             ` : ''}
-            <div class="inv-footer-text">
-                ${zBezahlt ? `Betrag wurde bezahlt via ${zMethode}. Vielen Dank!` : (zShowBank ? 'Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf das angegebene Konto.' : 'Vielen Dank für Ihren Aufenthalt!')}
+
+            <!-- FOOTER -->
+            <div class="inv-footer">
+                ${kleinunternehmer ? `
+                <div class="inv-legal-notice">
+                    Kleinunternehmer (MwSt.-Befreiung nach § 19 UStG) — Der Rechnungsbetrag enthält gemäß § 19 UStG keine Umsatzsteuer.
+                </div>
+                ` : ''}
+                <div class="inv-footer-text">
+                    ${zBezahlt ? `Betrag wurde bezahlt via ${zMethode}. Vielen Dank!` : (zShowBank ? 'Bitte überweisen Sie den Betrag innerhalb eines Monats auf das angegebene Konto.' : 'Vielen Dank für Ihren Aufenthalt!')}
+                </div>
             </div>
+
+            <!-- BANK -->
+            ${zShowBank ? `
+            <div class="inv-payment">
+                <div class="inv-label">Bankverbindung</div>
+                <div class="inv-bank-grid">
+                    <span>Kontoinhaber:</span><span>${bInhaber || '–'}</span>
+                    <span>IBAN:</span><span>${bIban || '–'}</span>
+                    <span>BIC:</span><span>${bBic || '–'}</span>
+                    <span>Bank:</span><span>${bBank || '–'}</span>
+                </div>
+            </div>
+            ` : ''}
         </div>
     </div>
 </body>

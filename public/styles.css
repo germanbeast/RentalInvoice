@@ -743,6 +743,13 @@ select {
     font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     line-height: 1.5;
     transform-origin: top left;
+    display: flex;
+    flex-direction: column;
+}
+
+.inv-bottom {
+    margin-top: auto;
+    width: 100%;
 }
 
 /* Scaling */
@@ -1019,14 +1026,12 @@ select {
 
 /* Payment - Footer Style */
 .inv-payment {
-    position: absolute;
-    bottom: 10mm;
-    left: 0;
-    right: 0;
     text-align: center;
     padding: 4mm 20mm;
+    margin-top: 5mm;
     background: #f5f1e8;
-    border-top: 1px solid #e8e1d0;
+    border: 1px solid #e8e1d0;
+    border-radius: 6px;
 }
 
 .inv-payment .inv-label {

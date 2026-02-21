@@ -618,7 +618,8 @@
                                     <div class="inv-recipient">
                                         <div class="inv-greeting" id="inv-greeting">SEHR GEEHRTE FRAU IBRAHIM,</div>
                                         <div class="inv-intro-text" id="inv-intro-text">
-                                            Ich bedanke mich herzlich für die Zusammenarbeit und Ihr entgegengebrachtes Vertrauen.
+                                            Ich bedanke mich herzlich für die Zusammenarbeit und Ihr entgegengebrachtes
+                                            Vertrauen.
                                             Anbei die Rechnung für das gemeinsame Projekt:
                                         </div>
                                         <div class="inv-label">Rechnung an</div>
@@ -678,61 +679,66 @@
                                         </div>
                                     </div>
 
-                                    <!-- ZAHLUNGSSTATUS -->
-                                    <div class="inv-payment-status" id="inv-payment-status">
-                                        <div class="inv-paid-badge" id="inv-paid-badge">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                                                <path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2"
-                                                    stroke-linecap="round" stroke-linejoin="round" />
+                                    <!-- BOTTOM WRAPPER (pushed to bottom) -->
+                                    <div class="inv-bottom">
+                                        <!-- ZAHLUNGSSTATUS -->
+                                        <div class="inv-payment-status" id="inv-payment-status">
+                                            <div class="inv-paid-badge" id="inv-paid-badge">
+                                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                                    <path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                                <span id="inv-paid-text">Bezahlt via PayPal</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- NUKI PIN -->
+                                        <div class="inv-nuki-pin" id="inv-nuki-pin" style="display:none;">
+                                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"
+                                                class="inv-nuki-icon">
+                                                <path d="M6.5 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+                                                    stroke="currentColor" stroke-width="1.5" />
+                                                <path d="M8.5 7.5L14 7.5V9.5M11.5 7.5V9.5" stroke="currentColor"
+                                                    stroke-width="1.5" stroke-linecap="round" />
                                             </svg>
-                                            <span id="inv-paid-text">Bezahlt via PayPal</span>
+                                            <div class="inv-nuki-content">
+                                                <span class="inv-nuki-label">Ihr Zugangscode:</span>
+                                                <span class="inv-nuki-code" id="inv-nuki-pin-code">000000</span>
+                                                <span class="inv-nuki-period">Gültig: <span id="inv-nuki-from"></span>
+                                                    bis
+                                                    <span id="inv-nuki-to"></span></span>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <!-- NUKI PIN -->
-                                    <div class="inv-nuki-pin" id="inv-nuki-pin" style="display:none;">
-                                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"
-                                            class="inv-nuki-icon">
-                                            <path d="M6.5 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor"
-                                                stroke-width="1.5" />
-                                            <path d="M8.5 7.5L14 7.5V9.5M11.5 7.5V9.5" stroke="currentColor"
-                                                stroke-width="1.5" stroke-linecap="round" />
-                                        </svg>
-                                        <div class="inv-nuki-content">
-                                            <span class="inv-nuki-label">Ihr Zugangscode:</span>
-                                            <span class="inv-nuki-code" id="inv-nuki-pin-code">000000</span>
-                                            <span class="inv-nuki-period">Gültig: <span id="inv-nuki-from"></span> bis
-                                                <span id="inv-nuki-to"></span></span>
+                                        <!-- FOOTER -->
+                                        <div class="inv-footer" id="inv-footer">
+                                            <div id="inv-kleinunternehmer-notice" class="inv-legal-notice"
+                                                style="display:none;">
+                                                Kleinunternehmer (MwSt.-Befreiung nach § 19 UStG) — Der Rechnungsbetrag
+                                                enthält gemäß § 19 UStG keine Umsatzsteuer.
+                                            </div>
+                                            <div id="inv-footer-text">
+                                                Betrag wurde bezahlt via PayPal. Vielen Dank!
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <!-- BANK (optional) -->
-                                    <div class="inv-payment" id="inv-payment" style="display:none;">
-                                        <div class="inv-label">Bankverbindung</div>
-                                        <div class="inv-bank-grid">
-                                            <span>Kontoinhaber:</span><span id="inv-b-inhaber">–</span>
-                                            <span>IBAN:</span><span id="inv-b-iban">–</span>
-                                            <span>BIC:</span><span id="inv-b-bic">–</span>
-                                            <span>Bank:</span><span id="inv-b-bank">–</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- FOOTER -->
-                                    <div class="inv-footer" id="inv-footer">
-                                        <div id="inv-kleinunternehmer-notice" class="inv-legal-notice"
-                                            style="display:none;">
-                                            Kleinunternehmer (MwSt.-Befreiung nach § 19 UStG) — Der Rechnungsbetrag
-                                            enthält gemäß § 19 UStG keine Umsatzsteuer.
-                                        </div>
-                                        <div id="inv-footer-text">
-                                            Betrag wurde bezahlt via PayPal. Vielen Dank!
+                                        <!-- BANK (optional) -->
+                                        <div class="inv-payment" id="inv-payment" style="display:none;">
+                                            <div class="inv-label">Bankverbindung</div>
+                                            <div class="inv-bank-grid">
+                                                <span>Kontoinhaber:</span><span id="inv-b-inhaber">–</span>
+                                                <span>IBAN:</span><span id="inv-b-iban">–</span>
+                                                <span>BIC:</span><span id="inv-b-bic">–</span>
+                                                <span>Bank:</span><span id="inv-b-bank">–</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </section>
                 </div>
+                </section>
+            </div>
 
             <!-- VIEW: INVOICE DESIGNER -->
         </main>
@@ -811,7 +817,8 @@
                                 <h2>Rechnungsdesigner</h2>
                                 <p class="text-muted">Gestalte deine Rechnung individuell nach deinen Wünschen.</p>
 
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+                                <div
+                                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
 
                                     <!-- LEFT: Controls -->
                                     <div>
@@ -820,12 +827,15 @@
                                             <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Template</h3>
                                             <div class="form-group">
                                                 <label for="tpl-name">Template-Name</label>
-                                                <input type="text" id="tpl-name" class="form-control" placeholder="Mein Template" maxlength="50">
-                                                <small class="text-muted">Gib deinem Template einen eigenen Namen</small>
+                                                <input type="text" id="tpl-name" class="form-control"
+                                                    placeholder="Mein Template" maxlength="50">
+                                                <small class="text-muted">Gib deinem Template einen eigenen
+                                                    Namen</small>
                                             </div>
                                             <div class="form-group">
                                                 <label for="tpl-preset-select">Vorlage wählen</label>
-                                                <select id="tpl-preset-select" class="form-control" style="width: 100%;">
+                                                <select id="tpl-preset-select" class="form-control"
+                                                    style="width: 100%;">
                                                     <option value="custom">Benutzerdefiniert</option>
                                                     <option value="modern" selected>Modern (Beige)</option>
                                                     <option value="classic">Klassisch (Weiß)</option>
@@ -839,21 +849,26 @@
                                             <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Text-Bausteine</h3>
                                             <div class="form-group">
                                                 <label for="tpl-logo-text">Logo-Text</label>
-                                                <input type="text" id="tpl-logo-text" class="form-control" placeholder="Ferienwohnung Beckhome">
+                                                <input type="text" id="tpl-logo-text" class="form-control"
+                                                    placeholder="Ferienwohnung Beckhome">
                                                 <small class="text-muted">Wird im Kopf der Rechnung angezeigt</small>
                                             </div>
                                             <div class="form-group">
                                                 <label for="tpl-greeting">Anrede</label>
-                                                <input type="text" id="tpl-greeting" class="form-control" placeholder="SEHR GEEHRTE/R">
-                                                <small class="text-muted">{NACHNAME} wird durch Gast-Nachname ersetzt</small>
+                                                <input type="text" id="tpl-greeting" class="form-control"
+                                                    placeholder="SEHR GEEHRTE/R">
+                                                <small class="text-muted">{NACHNAME} wird durch Gast-Nachname
+                                                    ersetzt</small>
                                             </div>
                                             <div class="form-group">
                                                 <label for="tpl-intro">Intro-Text</label>
-                                                <textarea id="tpl-intro" class="form-control" rows="2" placeholder="Ich bedanke mich herzlich..."></textarea>
+                                                <textarea id="tpl-intro" class="form-control" rows="2"
+                                                    placeholder="Ich bedanke mich herzlich..."></textarea>
                                             </div>
                                             <div class="form-group">
                                                 <label for="tpl-footer-text">Footer-Text</label>
-                                                <input type="text" id="tpl-footer-text" class="form-control" placeholder="Vielen Dank für Ihre Buchung!">
+                                                <input type="text" id="tpl-footer-text" class="form-control"
+                                                    placeholder="Vielen Dank für Ihre Buchung!">
                                             </div>
                                         </div>
 
@@ -863,21 +878,25 @@
                                             <div class="form-row">
                                                 <div class="form-group">
                                                     <label for="tpl-color-primary">Primärfarbe</label>
-                                                    <input type="color" id="tpl-color-primary" class="form-control" value="#0f172a">
+                                                    <input type="color" id="tpl-color-primary" class="form-control"
+                                                        value="#0f172a">
                                                 </div>
                                                 <div class="form-group">
                                                     <label for="tpl-color-table-bg">Tabellen-Hintergrund</label>
-                                                    <input type="color" id="tpl-color-table-bg" class="form-control" value="#f5f1e8">
+                                                    <input type="color" id="tpl-color-table-bg" class="form-control"
+                                                        value="#f5f1e8">
                                                 </div>
                                             </div>
                                             <div class="form-row">
                                                 <div class="form-group">
                                                     <label for="tpl-color-table-header">Tabellen-Kopf</label>
-                                                    <input type="color" id="tpl-color-table-header" class="form-control" value="#e8e1d0">
+                                                    <input type="color" id="tpl-color-table-header" class="form-control"
+                                                        value="#e8e1d0">
                                                 </div>
                                                 <div class="form-group">
                                                     <label for="tpl-color-text">Textfarbe</label>
-                                                    <input type="color" id="tpl-color-text" class="form-control" value="#2d2721">
+                                                    <input type="color" id="tpl-color-text" class="form-control"
+                                                        value="#2d2721">
                                                 </div>
                                             </div>
                                         </div>
@@ -915,10 +934,14 @@
                                                 <div style="margin-top: 0.5rem;">
                                                     <img id="tpl-logo-preview" src="" alt="Logo Preview"
                                                         style="display: none; max-width: 200px; max-height: 80px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.5rem;">
-                                                    <input type="file" id="tpl-logo-file-input" accept="image/*" style="display: none;">
+                                                    <input type="file" id="tpl-logo-file-input" accept="image/*"
+                                                        style="display: none;">
                                                     <div class="btn-group">
-                                                        <button type="button" id="btn-tpl-upload-logo" class="btn btn-primary btn-sm">Logo wählen</button>
-                                                        <button type="button" id="btn-tpl-remove-logo" class="btn btn-ghost btn-danger btn-sm" style="display: none;">Entfernen</button>
+                                                        <button type="button" id="btn-tpl-upload-logo"
+                                                            class="btn btn-primary btn-sm">Logo wählen</button>
+                                                        <button type="button" id="btn-tpl-remove-logo"
+                                                            class="btn btn-ghost btn-danger btn-sm"
+                                                            style="display: none;">Entfernen</button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -928,22 +951,27 @@
                                         <div class="card" style="margin-bottom: 1.5rem;">
                                             <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Layout & Elemente</h3>
                                             <div class="form-group">
-                                                <label><input type="checkbox" id="tpl-show-logo" checked> Logo/Text-Logo anzeigen</label>
+                                                <label><input type="checkbox" id="tpl-show-logo" checked> Logo/Text-Logo
+                                                    anzeigen</label>
                                             </div>
                                             <div class="form-group">
-                                                <label><input type="checkbox" id="tpl-show-tax" checked> Steuernummer anzeigen</label>
+                                                <label><input type="checkbox" id="tpl-show-tax" checked> Steuernummer
+                                                    anzeigen</label>
                                             </div>
                                             <div class="form-group">
-                                                <label><input type="checkbox" id="tpl-show-date-header" checked> Datum im Header anzeigen</label>
+                                                <label><input type="checkbox" id="tpl-show-date-header" checked> Datum
+                                                    im Header anzeigen</label>
                                             </div>
                                             <div class="form-group">
-                                                <label><input type="checkbox" id="tpl-show-fold-marks"> Falzmarken anzeigen</label>
+                                                <label><input type="checkbox" id="tpl-show-fold-marks"> Falzmarken
+                                                    anzeigen</label>
                                             </div>
                                         </div>
 
                                         <!-- SAVE BUTTONS -->
                                         <div style="display: flex; gap: 0.75rem;">
-                                            <button type="button" id="btn-save-template" class="btn btn-primary" style="flex: 1;">
+                                            <button type="button" id="btn-save-template" class="btn btn-primary"
+                                                style="flex: 1;">
                                                 Template speichern
                                             </button>
                                             <button type="button" id="btn-reset-template" class="btn btn-ghost">
@@ -953,17 +981,24 @@
                                     </div>
 
                                     <!-- RIGHT: Live Preview -->
-                                    <div style="display: flex; flex-direction: column; background: var(--bg-secondary); border-radius: 12px; padding: 1.5rem; min-height: 500px;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                    <div
+                                        style="display: flex; flex-direction: column; background: var(--bg-secondary); border-radius: 12px; padding: 1.5rem; min-height: 500px;">
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                             <h3 style="margin: 0; font-size: 1.1rem;">Live-Vorschau</h3>
                                             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                                <button type="button" id="btn-zoom-out" class="btn btn-ghost btn-sm">-</button>
-                                                <span id="zoom-level" style="min-width: 40px; text-align: center; font-weight: 600; font-size: 0.85rem;">60%</span>
-                                                <button type="button" id="btn-zoom-in" class="btn btn-ghost btn-sm">+</button>
+                                                <button type="button" id="btn-zoom-out"
+                                                    class="btn btn-ghost btn-sm">-</button>
+                                                <span id="zoom-level"
+                                                    style="min-width: 40px; text-align: center; font-weight: 600; font-size: 0.85rem;">60%</span>
+                                                <button type="button" id="btn-zoom-in"
+                                                    class="btn btn-ghost btn-sm">+</button>
                                             </div>
                                         </div>
-                                        <div id="template-preview-container" style="flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: repeating-conic-gradient(#e5e5e5 0% 25%, transparent 0% 50%) 50% / 16px 16px; border-radius: 8px;">
-                                            <div id="template-preview-invoice" class="invoice-page" style="transform: scale(0.6); transform-origin: top center; box-shadow: 0 4px 16px rgba(0,0,0,0.15); margin: 1rem;">
+                                        <div id="template-preview-container"
+                                            style="flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: repeating-conic-gradient(#e5e5e5 0% 25%, transparent 0% 50%) 50% / 16px 16px; border-radius: 8px;">
+                                            <div id="template-preview-invoice" class="invoice-page"
+                                                style="transform: scale(0.6); transform-origin: top center; box-shadow: 0 4px 16px rgba(0,0,0,0.15); margin: 1rem;">
                                                 <!-- Invoice preview will be inserted here via JS -->
                                             </div>
                                         </div>
@@ -1281,7 +1316,9 @@
                         <footer class="content-footer">
                             <div class="status-indicator">
                                 <span>Änderungen werden nicht automatisch gespeichert.</span>
-                                <span id="app-version" style="margin-left: 1rem; color: var(--text-muted); font-size: 0.85rem;">Version wird geladen...</span>
+                                <span id="app-version"
+                                    style="margin-left: 1rem; color: var(--text-muted); font-size: 0.85rem;">Version
+                                    wird geladen...</span>
                             </div>
                             <button type="button" id="btn-save-settings" class="btn btn-primary btn-lg">Einstellungen
                                 speichern</button>
@@ -1376,24 +1413,31 @@
                                 </div>
                             </div>
                             <div class="card" id="guest-nuki-section" style="margin-top:1rem; display:block;">
-                                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+                                <div class="card-title"
+                                    style="display:flex;justify-content:space-between;align-items:center;">
                                     <span>🔑 Nuki PINs</span>
-                                    <button type="button" id="btn-toggle-new-pin-form" class="btn btn-sm btn-primary">+ Neuer PIN</button>
+                                    <button type="button" id="btn-toggle-new-pin-form" class="btn btn-sm btn-primary">+
+                                        Neuer PIN</button>
                                 </div>
-                                <div id="guest-new-pin-form" style="display:none; padding:10px 0 4px 0; border-bottom:1px solid var(--border); margin-bottom:8px;">
+                                <div id="guest-new-pin-form"
+                                    style="display:none; padding:10px 0 4px 0; border-bottom:1px solid var(--border); margin-bottom:8px;">
                                     <div class="form-row" style="gap:8px; margin-bottom:6px;">
                                         <div class="form-group" style="margin:0;">
                                             <label style="font-size:0.82rem;">Anreise</label>
-                                            <input type="date" id="new-pin-arrival" class="form-control" style="font-size:0.9rem;">
+                                            <input type="date" id="new-pin-arrival" class="form-control"
+                                                style="font-size:0.9rem;">
                                         </div>
                                         <div class="form-group" style="margin:0;">
                                             <label style="font-size:0.82rem;">Abreise</label>
-                                            <input type="date" id="new-pin-departure" class="form-control" style="font-size:0.9rem;">
+                                            <input type="date" id="new-pin-departure" class="form-control"
+                                                style="font-size:0.9rem;">
                                         </div>
                                     </div>
                                     <div style="display:flex;gap:6px;">
-                                        <button type="button" id="btn-create-guest-pin" class="btn btn-sm btn-primary">Erstellen</button>
-                                        <button type="button" id="btn-cancel-new-pin" class="btn btn-sm btn-ghost">Abbrechen</button>
+                                        <button type="button" id="btn-create-guest-pin"
+                                            class="btn btn-sm btn-primary">Erstellen</button>
+                                        <button type="button" id="btn-cancel-new-pin"
+                                            class="btn btn-sm btn-ghost">Abbrechen</button>
                                     </div>
                                 </div>
                                 <div id="guest-nuki-list">
