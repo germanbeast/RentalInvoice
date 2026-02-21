@@ -3865,9 +3865,6 @@
         });
     }
 
-})();
-// Version 3.0 - SQLite Database Migration
-
     // =======================
     // WELCOME SCREEN (Google TV Kiosk)
     // =======================
@@ -4031,9 +4028,11 @@
     // Check URL for welcome screen parameter
     const urlParams = new URLSearchParams(window.location.search);
     const welcomeGuest = urlParams.get('welcome');
-    
+
     if (welcomeGuest) {
         // Show welcome screen with guest name
         showWelcomeScreen(decodeURIComponent(welcomeGuest));
     }
 
+})();
+// Version 3.0 - SQLite Database Migration
