@@ -1763,29 +1763,38 @@ app.post('/api/notifications/test-whatsapp', apiLimiter, async (req, res) => {
         }
 
         const allSettings = db.getAllSettings();
-        // Support both wa_phones (array) and legacy wa_phone (string)
-        let waPhone = null;
-        try {
-            const phones = Array.isArray(allSettings.wa_phones)
-                ? allSettings.wa_phones
-                : JSON.parse(allSettings.wa_phones || '[]');
-            waPhone = phones.find(p => p && p.trim()) || allSettings.wa_phone || null;
-        } catch (e) {
-            waPhone = allSettings.wa_phone || null;
+        let phones = [];
+        const rawPhones = allSettings.wa_phones;
+        if (Array.isArray(rawPhones)) {
+            phones = rawPhones;
+        } else {
+            try { phones = JSON.parse(rawPhones || '[]'); } catch (e) {
+                if (allSettings.wa_phone) phones = [allSettings.wa_phone];
+            }
+        }
+        if (phones.length === 0 && allSettings.wa_phone) {
+            phones.push(allSettings.wa_phone);
         }
 
-        if (!waPhone) {
-            return res.status(400).json({ error: 'Empf\u00e4nger-Nummer muss in den Einstellungen hinterlegt sein.' });
+        const validPhones = phones.filter(p => p && String(p).trim());
+        if (validPhones.length === 0) {
+            return res.status(400).json({ error: 'Es sind keine Empf\u00e4nger-Nummern hinterlegt.' });
         }
 
         const msg = '\u2705 Test-Nachricht von Rental Invoice! WhatsApp-Benachrichtigungen funktionieren.';
-        const sent = await sendWhatsApp(waPhone.trim(), msg);
-        db.logNotification('test', msg, sent ? 'sent' : 'failed');
+        let anySent = false;
 
-        if (sent) {
-            res.json({ success: true, message: 'Test-Nachricht gesendet!' });
+        for (const phone of validPhones) {
+            const sent = await sendWhatsApp(String(phone).trim(), msg);
+            if (sent) anySent = true;
+        }
+
+        db.logNotification('test', msg, anySent ? 'sent' : 'failed');
+
+        if (anySent) {
+            res.json({ success: true, message: `Test-Nachricht an ${validPhones.length} Nummer(n) gesendet!` });
         } else {
-            res.status(500).json({ error: 'Nachricht konnte nicht gesendet werden.' });
+            res.status(500).json({ error: 'Nachricht konnte an keine Nummer gesendet werden.' });
         }
     } catch (e) {
         console.error('Test WhatsApp Error:', e.message);
