@@ -592,10 +592,23 @@ function ensureAuthenticated(req, res, next) {
     return res.status(404).send('Not Found');
 }
 
+// =======================
+// 6. PUBLIC STATIC FILES (NO AUTH REQUIRED)
+// =======================
+// Serve welcome.html without authentication for TV Kiosk mode
+app.get('/welcome.html', (req, res) => {
+    const filePath = path.join(PUBLIC_DIR, 'welcome.html');
+    res.sendFile(filePath);
+});
+
+// Serve CSS and JS files without authentication
+app.use('/styles.css', express.static(path.join(PUBLIC_DIR, 'styles.css')));
+app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
+
 app.use(ensureAuthenticated);
 
 // =======================
-// 6. STATIC FILE SERVING
+// 7. PROTECTED STATIC FILE SERVING
 // =======================
 app.use(express.static(PUBLIC_DIR, {
     dotfiles: 'deny',
