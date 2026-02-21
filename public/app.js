@@ -3697,18 +3697,18 @@
                 const data = await res.json();
                 if (data.success) {
                     localStorage.removeItem('invoice_template_backup');
-                    showNotification('Template gespeichert! ✓', 'success');
+                    showToast('Template gespeichert! ✓', 'success');
                     // Apply to main invoice preview as well
                     applyTemplateStyles();
                     if (typeof updatePreview === 'function') {
                         updatePreview();
                     }
                 } else {
-                    showNotification('Fehler beim Speichern', 'error');
+                    showToast('Fehler beim Speichern', 'error');
                 }
             } catch (e) {
                 console.error('Template save error:', e);
-                showNotification('Fehler beim Speichern', 'error');
+                showToast('Fehler beim Speichern', 'error');
             } finally {
                 btnSaveTemplate.disabled = false;
                 btnSaveTemplate.textContent = 'Template speichern';
@@ -3800,13 +3800,13 @@
 
             // Validate file type
             if (!file.type.startsWith('image/')) {
-                showNotification('Bitte wähle eine Bilddatei', 'error');
+                showToast('Bitte wähle eine Bilddatei', 'error');
                 return;
             }
 
             // Validate file size (max 2MB)
             if (file.size > 2 * 1024 * 1024) {
-                showNotification('Bild ist zu groß (max 2MB)', 'error');
+                showToast('Bild ist zu groß (max 2MB)', 'error');
                 return;
             }
 
