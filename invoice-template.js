@@ -45,7 +45,7 @@ function renderInvoiceHtml(data) {
     <style>
         ${styles}
         body { background: white !important; padding: 0 !important; margin: 0; font-family: 'Inter', sans-serif; }
-        .invoice-page { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; width: 100%; height: 100%; }
+        .invoice-page { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; }
         @media print {
             body { margin: 0; }
             .invoice-page { border: none; }
