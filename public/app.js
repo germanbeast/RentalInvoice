@@ -3926,30 +3926,30 @@
             // WLAN Info
             const wifiName = urlParams.get('wifi');
             const wifiPass = urlParams.get('wifi_pass');
-            if (wifiName) {
+            if (wifiName && wifiName.trim()) {
                 const wifiNameEl = $('#welcome-wifi-name');
                 if (wifiNameEl) wifiNameEl.textContent = decodeURIComponent(wifiName);
             }
-            if (wifiPass) {
-                const wifiPassEl = $('#welcome-wifi-password');
-                if (wifiPassEl) wifiPassEl.textContent = decodeURIComponent(wifiPass);
+            if (wifiPass && wifiPass.trim()) {
+                const wifiPassEl = $('#welcome-wifi-pass');
+                if (wifiPassEl) wifiPassEl.textContent = 'Passwort: ' + decodeURIComponent(wifiPass);
             }
 
             // Check-In/Out Times
             const checkinTime = urlParams.get('checkin');
             const checkoutTime = urlParams.get('checkout');
-            if (checkinTime) {
+            if (checkinTime && checkinTime.trim()) {
                 const checkinEl = $('#welcome-checkin');
                 if (checkinEl) checkinEl.textContent = decodeURIComponent(checkinTime);
             }
-            if (checkoutTime) {
+            if (checkoutTime && checkoutTime.trim()) {
                 const checkoutEl = $('#welcome-checkout');
                 if (checkoutEl) checkoutEl.textContent = decodeURIComponent(checkoutTime);
             }
 
             // Phone
             const phone = urlParams.get('phone');
-            if (phone) {
+            if (phone && phone.trim()) {
                 const phoneEl = $('#welcome-phone');
                 if (phoneEl) phoneEl.textContent = decodeURIComponent(phone);
             }
