@@ -3307,11 +3307,32 @@
         try {
             const res = await fetch('/api/branding');
             const data = await res.json();
+
+            let loadedConfig = { ...defaultTemplateConfig };
             if (data.success && data.branding && data.branding.template_config) {
-                currentTemplateConfig = { ...defaultTemplateConfig, ...data.branding.template_config };
-            } else {
-                currentTemplateConfig = { ...defaultTemplateConfig };
+                if (Object.keys(data.branding.template_config).length > 0) {
+                    loadedConfig = { ...defaultTemplateConfig, ...data.branding.template_config };
+                }
             }
+
+            // Restore from unsaved local session if available
+            const localBackup = localStorage.getItem('invoice_template_backup');
+            if (localBackup) {
+                try {
+                    const parsed = JSON.parse(localBackup);
+                    if (confirm('Es gibt ungespeicherte Template-Änderungen aus deiner letzten Sitzung. Möchtest du diese wiederherstellen?')) {
+                        loadedConfig = { ...defaultTemplateConfig, ...parsed };
+                        setTimeout(() => triggerTemplateAutoSave(), 1000);
+                    } else {
+                        localStorage.removeItem('invoice_template_backup');
+                    }
+                } catch (e) {
+                    localStorage.removeItem('invoice_template_backup');
+                }
+            }
+
+            currentTemplateConfig = loadedConfig;
+
             applyTemplateStyles();
             populateTemplateForm();
             updateTemplatePreview();
@@ -3339,9 +3360,9 @@
 
             .inv-sender::before {
                 ${currentTemplateConfig.logoImage
-                    ? `content: ''; background-image: url(${currentTemplateConfig.logoImage}); background-size: contain; background-repeat: no-repeat; width: 150px; height: 60px;`
-                    : `content: '${(currentTemplateConfig.logoText || 'Ferienwohnung Beckhome').replace(/'/g, "\\'")}'; font-family: ${currentTemplateConfig.fontLogo || 'Georgia, serif'};`
-                }
+                ? `content: ''; background-image: url(${currentTemplateConfig.logoImage}); background-size: contain; background-repeat: no-repeat; width: 150px; height: 60px;`
+                : `content: '${(currentTemplateConfig.logoText || 'Ferienwohnung Beckhome').replace(/'/g, "\\'")}'; font-family: ${currentTemplateConfig.fontLogo || 'Georgia, serif'};`
+            }
                 display: ${currentTemplateConfig.showLogo ? 'block' : 'none'} !important;
             }
 
@@ -3466,9 +3487,9 @@
                 }
                 .preview-logo {
                     ${currentTemplateConfig.logoImage
-                        ? `background-image: url(${currentTemplateConfig.logoImage}); background-size: contain; background-repeat: no-repeat; width: 150px; height: 60px;`
-                        : `font-family: ${currentTemplateConfig.fontLogo || 'Georgia, serif'}; font-size: 18pt; font-style: italic; color: ${currentTemplateConfig.colorPrimary || '#0f172a'};`
-                    }
+                ? `background-image: url(${currentTemplateConfig.logoImage}); background-size: contain; background-repeat: no-repeat; width: 150px; height: 60px;`
+                : `font-family: ${currentTemplateConfig.fontLogo || 'Georgia, serif'}; font-size: 18pt; font-style: italic; color: ${currentTemplateConfig.colorPrimary || '#0f172a'};`
+            }
                     margin-bottom: 4mm;
                     display: ${currentTemplateConfig.showLogo ? 'block' : 'none'};
                 }
@@ -3591,6 +3612,38 @@
         `;
     }
 
+    // Auto-Save Logic for Template
+    let templateSaveTimeout = null;
+    function triggerTemplateAutoSave() {
+        // Save locally immediately to prevent data loss on reload
+        localStorage.setItem('invoice_template_backup', JSON.stringify(currentTemplateConfig));
+
+        // Debounce server save (auto-save to DB after 2 seconds of inactivity)
+        if (templateSaveTimeout) clearTimeout(templateSaveTimeout);
+        templateSaveTimeout = setTimeout(async () => {
+            try {
+                const btn = $('#btn-save-template');
+                if (btn) btn.textContent = 'Speichert...';
+
+                const res = await fetch('/api/branding/template', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template_config: currentTemplateConfig })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.removeItem('invoice_template_backup');
+                }
+            } catch (e) {
+                console.error('Auto-save error:', e);
+            } finally {
+                const btn = $('#btn-save-template');
+                if (btn) btn.textContent = 'Template speichern';
+            }
+        }, 2000);
+    }
+
     // Live preview update on input
     const templateInputs = [
         '#tpl-name', '#tpl-logo-text', '#tpl-greeting', '#tpl-intro', '#tpl-footer-text',
@@ -3623,6 +3676,7 @@
 
                 applyTemplateStyles();
                 updateTemplatePreview();
+                triggerTemplateAutoSave();
             });
         }
     });
@@ -3642,6 +3696,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
+                    localStorage.removeItem('invoice_template_backup');
                     showNotification('Template gespeichert! ✓', 'success');
                     // Apply to main invoice preview as well
                     applyTemplateStyles();
@@ -3668,7 +3723,9 @@
             if (confirm('Template auf Standardwerte zurücksetzen?')) {
                 currentTemplateConfig = { ...defaultTemplateConfig };
                 populateTemplateForm();
+                applyTemplateStyles();
                 updateTemplatePreview();
+                triggerTemplateAutoSave();
             }
         });
     }
@@ -3686,6 +3743,7 @@
                     populateTemplateForm();
                     applyTemplateStyles();
                     updateTemplatePreview();
+                    triggerTemplateAutoSave();
                     tplPresetSelect.value = 'custom'; // Switch back to custom after loading
                 }
             }
@@ -3764,6 +3822,7 @@
 
                 applyTemplateStyles();
                 updateTemplatePreview();
+                triggerTemplateAutoSave();
             };
             reader.readAsDataURL(file);
         });
@@ -3778,6 +3837,7 @@
 
             applyTemplateStyles();
             updateTemplatePreview();
+            triggerTemplateAutoSave();
         });
     }
 
