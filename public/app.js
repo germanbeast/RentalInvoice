@@ -33,6 +33,8 @@
     const btnLogout = $('#btn-logout');
     const btnUpdate = $('#btn-update-check');
     const btnSyncPaperless = $('#btn-sync-paperless');
+    const btnOpenInvoiceDesigner = $('#btn-open-invoice-designer');
+    const btnCloseDesigner = $('#btn-close-designer');
 
     // Navigation Items
     const navDashboard = $('#nav-dashboard');
@@ -44,6 +46,7 @@
     const viewDashboard = $('#view-dashboard');
     const viewInvoiceForm = $('#view-invoice-form');
     const viewExpenses = $('#view-expenses');
+    const viewInvoiceDesigner = $('#view-invoice-designer');
 
     const modalSettings = $('#modal-settings');
     const toastContainer = $('#toast-container');
@@ -1327,7 +1330,7 @@
     }
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewInvoiceDesigner];
         const navItems = [navDashboard, navInvoice, navGuests, navExpenses];
 
         views.forEach(v => {
@@ -1351,6 +1354,10 @@
             viewExpenses.style.display = 'flex';
             navExpenses.classList.add('active');
             loadExpenses();
+        } else if (viewId === 'invoice-designer') {
+            viewInvoiceDesigner.style.display = 'flex';
+            loadTemplateConfig();
+            updateTemplatePreview();
         }
 
         startViewPolling(viewId);
@@ -1364,6 +1371,17 @@
     navDashboard.addEventListener('click', () => switchView('dashboard'));
     navInvoice.addEventListener('click', () => switchView('invoice'));
     navExpenses.addEventListener('click', () => switchView('expenses'));
+
+    // Invoice Designer
+    if (btnOpenInvoiceDesigner) {
+        btnOpenInvoiceDesigner.addEventListener('click', () => {
+            modalSettings.style.display = 'none';
+            switchView('invoice-designer');
+        });
+    }
+    if (btnCloseDesigner) {
+        btnCloseDesigner.addEventListener('click', () => switchView('dashboard'));
+    }
 
     // =======================
     // Dashboard Module
