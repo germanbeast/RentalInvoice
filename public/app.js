@@ -1353,14 +1353,15 @@
             navExpenses.classList.add('active');
             loadExpenses();
         } else if (viewId === 'invoice-designer') {
-            console.log('switchView: invoice-designer case reached');
-            console.log('viewInvoiceDesigner element:', viewInvoiceDesigner);
             viewInvoiceDesigner.style.display = 'flex';
-            console.log('Display set to flex, calling loadTemplateConfig...');
+            console.log('Designer view computed style:', window.getComputedStyle(viewInvoiceDesigner).display);
+            console.log('Designer view offsetHeight:', viewInvoiceDesigner.offsetHeight);
+            console.log('Designer view offsetWidth:', viewInvoiceDesigner.offsetWidth);
+            console.log('Designer view parent:', viewInvoiceDesigner.parentElement);
+            console.log('Parent computed display:', window.getComputedStyle(viewInvoiceDesigner.parentElement).display);
+            console.log('Parent offsetHeight:', viewInvoiceDesigner.parentElement.offsetHeight);
             loadTemplateConfig();
-            console.log('Calling updateTemplatePreview...');
             updateTemplatePreview();
-            console.log('Done with invoice-designer setup');
         }
 
         startViewPolling(viewId);
