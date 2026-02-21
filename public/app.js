@@ -76,6 +76,15 @@
     }
 
     async function checkAuth() {
+        // Check if this is a TV welcome screen request (bypass auth)
+        const urlParams = new URLSearchParams(window.location.search);
+        const welcomeGuest = urlParams.get('welcome');
+
+        if (welcomeGuest) {
+            // Skip auth check for TV welcome screen
+            return;
+        }
+
         try {
             const response = await fetch('/api/me');
             const data = await response.json();
