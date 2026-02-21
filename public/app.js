@@ -1353,9 +1353,14 @@
             navExpenses.classList.add('active');
             loadExpenses();
         } else if (viewId === 'invoice-designer') {
+            console.log('switchView: invoice-designer case reached');
+            console.log('viewInvoiceDesigner element:', viewInvoiceDesigner);
             viewInvoiceDesigner.style.display = 'flex';
+            console.log('Display set to flex, calling loadTemplateConfig...');
             loadTemplateConfig();
+            console.log('Calling updateTemplatePreview...');
             updateTemplatePreview();
+            console.log('Done with invoice-designer setup');
         }
 
         startViewPolling(viewId);
@@ -1373,8 +1378,12 @@
     // Invoice Designer - using event delegation since button is in modal
     document.addEventListener('click', (e) => {
         if (e.target.closest('#btn-open-invoice-designer')) {
+            console.log('Invoice Designer button clicked');
+            console.log('Closing modal...');
             modalSettings.style.display = 'none';
+            console.log('Switching to invoice-designer view...');
             switchView('invoice-designer');
+            console.log('Switch complete');
         }
         if (e.target.closest('#btn-close-designer')) {
             switchView('dashboard');
