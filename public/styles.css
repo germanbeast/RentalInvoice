@@ -736,7 +736,9 @@ select {
 .invoice-page {
     position: relative;
     width: 210mm;
-    min-height: 297mm;
+    height: 297mm;
+    max-height: 297mm;
+    box-sizing: border-box;
     padding: 15mm 20mm;
     color: #1e293b;
     font-size: 9.5pt;
@@ -745,6 +747,7 @@ select {
     transform-origin: top left;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .inv-bottom {
