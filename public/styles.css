@@ -2269,7 +2269,7 @@ input[type="checkbox"]:focus-visible {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     overflow-y: auto;
     z-index: 9999;
