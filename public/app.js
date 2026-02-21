@@ -3204,6 +3204,62 @@
     // =======================
     let currentTemplateConfig = {};
     let templateStyleElement = null;
+    let previewZoom = 0.75; // Default 75%
+
+    // Template Presets
+    const templatePresets = {
+        modern: {
+            logoText: 'Ferienwohnung Beckhome',
+            logoImage: null,
+            greeting: 'SEHR GEEHRTE/R',
+            introText: 'Ich bedanke mich herzlich für die Zusammenarbeit und Ihr entgegengebrachtes Vertrauen. Anbei die Rechnung für das gemeinsame Projekt:',
+            footerText: '',
+            colorPrimary: '#0f172a',
+            colorTableBg: '#f5f1e8',
+            colorTableHeader: '#e8e1d0',
+            colorText: '#2d2721',
+            fontLogo: 'Georgia, serif',
+            fontBody: "'Inter', sans-serif",
+            showLogo: true,
+            showTax: true,
+            showDateHeader: true,
+            showFoldMarks: false
+        },
+        classic: {
+            logoText: 'Ferienwohnung',
+            logoImage: null,
+            greeting: 'SEHR GEEHRTE/R',
+            introText: 'Vielen Dank für Ihre Buchung. Nachfolgend erhalten Sie die Rechnung für Ihren Aufenthalt:',
+            footerText: 'Wir freuen uns auf Ihren Besuch!',
+            colorPrimary: '#1e293b',
+            colorTableBg: '#ffffff',
+            colorTableHeader: '#f1f5f9',
+            colorText: '#1e293b',
+            fontLogo: "'Times New Roman', serif",
+            fontBody: "'Arial', sans-serif",
+            showLogo: true,
+            showTax: true,
+            showDateHeader: true,
+            showFoldMarks: true
+        },
+        minimal: {
+            logoText: 'Beckhome',
+            logoImage: null,
+            greeting: 'HALLO',
+            introText: '',
+            footerText: '',
+            colorPrimary: '#000000',
+            colorTableBg: '#f9fafb',
+            colorTableHeader: '#e5e7eb',
+            colorText: '#374151',
+            fontLogo: "'Inter', sans-serif",
+            fontBody: "'Inter', sans-serif",
+            showLogo: true,
+            showTax: false,
+            showDateHeader: false,
+            showFoldMarks: false
+        }
+    };
 
     // Default template config
     const defaultTemplateConfig = {
@@ -3220,7 +3276,8 @@
         fontBody: "'Inter', sans-serif",
         showLogo: true,
         showTax: true,
-        showDateHeader: true
+        showDateHeader: true,
+        showFoldMarks: false
     };
 
     async function loadTemplateConfig() {
@@ -3306,6 +3363,10 @@
             .inv-summary-total {
                 color: ${currentTemplateConfig.colorPrimary || '#0f172a'} !important;
             }
+
+            .inv-markers {
+                display: ${currentTemplateConfig.showFoldMarks ? 'block' : 'none'} !important;
+            }
         `;
 
         document.head.appendChild(templateStyleElement);
@@ -3325,6 +3386,7 @@
         $('#tpl-show-logo').checked = currentTemplateConfig.showLogo !== false;
         $('#tpl-show-tax').checked = currentTemplateConfig.showTax !== false;
         $('#tpl-show-date-header').checked = currentTemplateConfig.showDateHeader !== false;
+        $('#tpl-show-fold-marks').checked = currentTemplateConfig.showFoldMarks === true;
 
         // Logo image preview
         const logoPreview = $('#tpl-logo-preview');
@@ -3510,7 +3572,7 @@
         '#tpl-logo-text', '#tpl-greeting', '#tpl-intro', '#tpl-footer-text',
         '#tpl-color-primary', '#tpl-color-table-bg', '#tpl-color-table-header', '#tpl-color-text',
         '#tpl-font-logo', '#tpl-font-body',
-        '#tpl-show-logo', '#tpl-show-tax', '#tpl-show-date-header'
+        '#tpl-show-logo', '#tpl-show-tax', '#tpl-show-date-header', '#tpl-show-fold-marks'
     ];
 
     templateInputs.forEach(selector => {
@@ -3531,6 +3593,7 @@
                 currentTemplateConfig.showLogo = $('#tpl-show-logo').checked;
                 currentTemplateConfig.showTax = $('#tpl-show-tax').checked;
                 currentTemplateConfig.showDateHeader = $('#tpl-show-date-header').checked;
+                currentTemplateConfig.showFoldMarks = $('#tpl-show-fold-marks').checked;
                 // Note: logoImage is handled separately in file upload handler
 
                 applyTemplateStyles();
@@ -3544,6 +3607,9 @@
     if (btnSaveTemplate) {
         btnSaveTemplate.addEventListener('click', async () => {
             try {
+                btnSaveTemplate.disabled = true;
+                btnSaveTemplate.textContent = 'Speichern...';
+
                 const res = await fetch('/api/branding/template', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3551,13 +3617,21 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showNotification('Template gespeichert!', 'success');
+                    showNotification('Template gespeichert! ✓', 'success');
+                    // Apply to main invoice preview as well
+                    applyTemplateStyles();
+                    if (typeof updatePreview === 'function') {
+                        updatePreview();
+                    }
                 } else {
                     showNotification('Fehler beim Speichern', 'error');
                 }
             } catch (e) {
                 console.error('Template save error:', e);
                 showNotification('Fehler beim Speichern', 'error');
+            } finally {
+                btnSaveTemplate.disabled = false;
+                btnSaveTemplate.textContent = 'Template speichern';
             }
         });
     }
@@ -3581,6 +3655,58 @@
             setTimeout(() => {
                 loadTemplateConfig();
             }, 100);
+        });
+    }
+
+    // Template Preset Selector
+    const tplPresetSelect = $('#tpl-preset-select');
+    if (tplPresetSelect) {
+        tplPresetSelect.addEventListener('change', (e) => {
+            const presetName = e.target.value;
+            if (presetName === 'custom') return;
+
+            if (templatePresets[presetName]) {
+                if (confirm(`Template "${presetName}" laden? Aktuelle Änderungen gehen verloren.`)) {
+                    currentTemplateConfig = { ...templatePresets[presetName] };
+                    populateTemplateForm();
+                    applyTemplateStyles();
+                    updateTemplatePreview();
+                    tplPresetSelect.value = 'custom'; // Switch back to custom after loading
+                }
+            }
+        });
+    }
+
+    // Zoom Controls
+    const btnZoomIn = $('#btn-zoom-in');
+    const btnZoomOut = $('#btn-zoom-out');
+    const zoomLevelDisplay = $('#zoom-level');
+    const previewInvoice = $('#template-preview-invoice');
+
+    function updateZoom() {
+        if (previewInvoice) {
+            previewInvoice.style.transform = `scale(${previewZoom})`;
+        }
+        if (zoomLevelDisplay) {
+            zoomLevelDisplay.textContent = `${Math.round(previewZoom * 100)}%`;
+        }
+    }
+
+    if (btnZoomIn) {
+        btnZoomIn.addEventListener('click', () => {
+            if (previewZoom < 1.5) {
+                previewZoom += 0.1;
+                updateZoom();
+            }
+        });
+    }
+
+    if (btnZoomOut) {
+        btnZoomOut.addEventListener('click', () => {
+            if (previewZoom > 0.3) {
+                previewZoom -= 0.1;
+                updateZoom();
+            }
         });
     }
 

@@ -805,19 +805,32 @@
 
                             <!-- RECHNUNGSDESIGN -->
                             <section id="settings-invoice-designer" class="settings-page">
-                                <h2>🎨 Rechnungsdesign</h2>
-                                <p class="text-muted">Gestalte deine Rechnung individuell nach deinen Wünschen.</p>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                                    <div>
+                                        <h2 style="margin: 0;">🎨 Rechnungsdesign</h2>
+                                        <p class="text-muted" style="margin-top: 0.5rem;">Gestalte deine Rechnung individuell nach deinen Wünschen.</p>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <label style="margin: 0;">Template:</label>
+                                        <select id="tpl-preset-select" style="min-width: 150px;">
+                                            <option value="custom">Benutzerdefiniert</option>
+                                            <option value="modern">Modern (Beige)</option>
+                                            <option value="classic">Klassisch (Weiß)</option>
+                                            <option value="minimal">Minimal (Clean)</option>
+                                        </select>
+                                    </div>
+                                </div>
 
                                 <!-- Designer Container -->
-                                <div class="invoice-designer-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                                <div class="invoice-designer-container" style="display: grid; grid-template-columns: 380px 1fr; gap: 1.5rem; height: calc(100vh - 200px); overflow: hidden;">
 
                                     <!-- LEFT: Editor -->
-                                    <div class="designer-editor">
-                                        <h3 style="margin-bottom: 1rem;">Einstellungen</h3>
+                                    <div class="designer-editor" style="overflow-y: auto; padding-right: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; position: sticky; top: 0; background: var(--bg); padding: 0.5rem 0; z-index: 10;">Einstellungen</h3>
 
                                         <!-- TEXT BAUSTEINE -->
-                                        <div class="card">
-                                            <h4 style="margin-bottom: 1rem;">📝 Text-Bausteine</h4>
+                                        <div class="card" style="margin-bottom: 1rem;">
+                                            <h4 style="margin-bottom: 0.75rem; font-size: 0.95rem;">📝 Text-Bausteine</h4>
 
                                             <div class="form-group">
                                                 <label for="tpl-logo-text">Logo-Text</label>
@@ -843,8 +856,8 @@
                                         </div>
 
                                         <!-- FARBEN -->
-                                        <div class="card" style="margin-top: 1.5rem;">
-                                            <h4 style="margin-bottom: 1rem;">🎨 Farben</h4>
+                                        <div class="card" style="margin-bottom: 1rem;">
+                                            <h4 style="margin-bottom: 0.75rem; font-size: 0.95rem;">🎨 Farben</h4>
 
                                             <div class="form-row">
                                                 <div class="form-group">
@@ -870,8 +883,8 @@
                                         </div>
 
                                         <!-- SCHRIFTARTEN -->
-                                        <div class="card" style="margin-top: 1.5rem;">
-                                            <h4 style="margin-bottom: 1rem;">✍️ Schriftarten</h4>
+                                        <div class="card" style="margin-bottom: 1rem;">
+                                            <h4 style="margin-bottom: 0.75rem; font-size: 0.95rem;">✍️ Schriftarten</h4>
 
                                             <div class="form-group">
                                                 <label for="tpl-font-logo">Logo-Schriftart</label>
@@ -897,8 +910,8 @@
                                         </div>
 
                                         <!-- LOGO UPLOAD -->
-                                        <div class="card" style="margin-top: 1.5rem;">
-                                            <h4 style="margin-bottom: 1rem;">🖼️ Logo (optional)</h4>
+                                        <div class="card" style="margin-bottom: 1rem;">
+                                            <h4 style="margin-bottom: 0.75rem; font-size: 0.95rem;">🖼️ Logo (optional)</h4>
 
                                             <div class="form-group">
                                                 <label>Bild-Logo hochladen (ersetzt Text-Logo)</label>
@@ -915,8 +928,8 @@
                                         </div>
 
                                         <!-- LAYOUT OPTIONEN -->
-                                        <div class="card" style="margin-top: 1.5rem;">
-                                            <h4 style="margin-bottom: 1rem;">📐 Layout</h4>
+                                        <div class="card" style="margin-bottom: 1rem;">
+                                            <h4 style="margin-bottom: 0.75rem; font-size: 0.95rem;">📐 Layout & Elemente</h4>
 
                                             <div class="form-group">
                                                 <label>
@@ -938,6 +951,13 @@
                                                     Datum im Header anzeigen
                                                 </label>
                                             </div>
+
+                                            <div class="form-group">
+                                                <label>
+                                                    <input type="checkbox" id="tpl-show-fold-marks">
+                                                    Falzmarken anzeigen
+                                                </label>
+                                            </div>
                                         </div>
 
                                         <!-- BUTTONS -->
@@ -948,11 +968,18 @@
                                     </div>
 
                                     <!-- RIGHT: Live Preview -->
-                                    <div class="designer-preview">
-                                        <h3 style="margin-bottom: 1rem;">Vorschau</h3>
-                                        <div id="template-preview-container" style="background: #f8f9fa; border: 2px solid #e2e8f0; border-radius: 8px; padding: 1rem; overflow: auto; max-height: 800px;">
-                                            <div id="template-preview-invoice" class="invoice-page" style="transform: scale(0.5); transform-origin: top left; width: 200%;">
-                                                <!-- Mini invoice preview will be inserted here via JS -->
+                                    <div class="designer-preview" style="display: flex; flex-direction: column; height: 100%;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                            <h3 style="margin: 0;">Vorschau</h3>
+                                            <div style="display: flex; gap: 0.5rem;">
+                                                <button type="button" id="btn-zoom-out" class="btn btn-ghost btn-sm">−</button>
+                                                <span id="zoom-level" style="min-width: 50px; text-align: center;">75%</span>
+                                                <button type="button" id="btn-zoom-in" class="btn btn-ghost btn-sm">+</button>
+                                            </div>
+                                        </div>
+                                        <div id="template-preview-container" style="background: #f8f9fa; border: 2px solid #e2e8f0; border-radius: 8px; padding: 2rem; overflow: auto; flex: 1; display: flex; justify-content: center; align-items: flex-start;">
+                                            <div id="template-preview-invoice" class="invoice-page" style="transform: scale(0.75); transform-origin: top center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                                <!-- Invoice preview will be inserted here via JS -->
                                             </div>
                                         </div>
                                     </div>
