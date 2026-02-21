@@ -40,6 +40,7 @@
     const navInvoice = $('#nav-invoice');
     const navGuests = $('#nav-guests');
     const navExpenses = $('#nav-expenses');
+    const navWelcome = $('#nav-welcome');
 
     // View Panes
     const viewDashboard = $('#view-dashboard');
@@ -1365,6 +1366,13 @@
     navDashboard.addEventListener('click', () => switchView('dashboard'));
     navInvoice.addEventListener('click', () => switchView('invoice'));
     navExpenses.addEventListener('click', () => switchView('expenses'));
+
+    if (navWelcome) {
+        navWelcome.addEventListener('click', () => {
+            // Show welcome screen with test guest name
+            showWelcomeScreen('Test Familie');
+        });
+    }
 
 
     // =======================
