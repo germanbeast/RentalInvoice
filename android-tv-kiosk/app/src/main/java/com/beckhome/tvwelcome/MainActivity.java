@@ -121,8 +121,8 @@ public class MainActivity extends Activity {
             guestName = intentGuestName;
         }
 
-        // Build URL with query parameters
-        String url = serverUrl + "/?welcome=" + java.net.URLEncoder.encode(guestName);
+        // Build URL to dedicated welcome page
+        String url = serverUrl + "/welcome.html?welcome=" + java.net.URLEncoder.encode(guestName);
 
         // Add additional settings as URL parameters for the web app to use
         url += "&wifi=" + java.net.URLEncoder.encode(prefs.getString("wifi_name", ""));
