@@ -33,8 +33,6 @@
     const btnLogout = $('#btn-logout');
     const btnUpdate = $('#btn-update-check');
     const btnSyncPaperless = $('#btn-sync-paperless');
-    const btnOpenInvoiceDesigner = $('#btn-open-invoice-designer');
-    const btnCloseDesigner = $('#btn-close-designer');
 
     // Navigation Items
     const navDashboard = $('#nav-dashboard');
@@ -1372,16 +1370,16 @@
     navInvoice.addEventListener('click', () => switchView('invoice'));
     navExpenses.addEventListener('click', () => switchView('expenses'));
 
-    // Invoice Designer
-    if (btnOpenInvoiceDesigner) {
-        btnOpenInvoiceDesigner.addEventListener('click', () => {
+    // Invoice Designer - using event delegation since button is in modal
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'btn-open-invoice-designer') {
             modalSettings.style.display = 'none';
             switchView('invoice-designer');
-        });
-    }
-    if (btnCloseDesigner) {
-        btnCloseDesigner.addEventListener('click', () => switchView('dashboard'));
-    }
+        }
+        if (e.target && e.target.id === 'btn-close-designer') {
+            switchView('dashboard');
+        }
+    });
 
     // =======================
     // Dashboard Module
