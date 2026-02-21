@@ -1372,11 +1372,11 @@
 
     // Invoice Designer - using event delegation since button is in modal
     document.addEventListener('click', (e) => {
-        if (e.target && e.target.id === 'btn-open-invoice-designer') {
+        if (e.target.closest('#btn-open-invoice-designer')) {
             modalSettings.style.display = 'none';
             switchView('invoice-designer');
         }
-        if (e.target && e.target.id === 'btn-close-designer') {
+        if (e.target.closest('#btn-close-designer')) {
             switchView('dashboard');
         }
     });
