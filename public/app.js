@@ -3894,10 +3894,20 @@
             console.log('Welcome view found, showing it');
             welcomeView.style.display = 'block';
 
+            // Debug: Check computed styles
+            setTimeout(() => {
+                const computedStyle = window.getComputedStyle(welcomeView);
+                console.log('Welcome view display:', computedStyle.display);
+                console.log('Welcome view visibility:', computedStyle.visibility);
+                console.log('Welcome view z-index:', computedStyle.zIndex);
+                console.log('Welcome view position:', computedStyle.position);
+            }, 100);
+
             // Set guest name
             const guestNameEl = document.querySelector('#welcome-guest-name');
             if (guestNameEl && guestName) {
                 guestNameEl.textContent = guestName;
+                console.log('Guest name set to:', guestName);
             }
 
             // Update time and date
