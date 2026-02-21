@@ -817,13 +817,21 @@
                                     <div>
                                         <!-- Template Presets -->
                                         <div class="card" style="margin-bottom: 1.5rem;">
-                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Template wählen</h3>
-                                            <select id="tpl-preset-select" class="form-control" style="width: 100%;">
-                                                <option value="custom">Benutzerdefiniert</option>
-                                                <option value="modern" selected>Modern (Beige)</option>
-                                                <option value="classic">Klassisch (Weiß)</option>
-                                                <option value="minimal">Minimal (Clean)</option>
-                                            </select>
+                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Template</h3>
+                                            <div class="form-group">
+                                                <label for="tpl-name">Template-Name</label>
+                                                <input type="text" id="tpl-name" class="form-control" placeholder="Mein Template" maxlength="50">
+                                                <small class="text-muted">Gib deinem Template einen eigenen Namen</small>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tpl-preset-select">Vorlage wählen</label>
+                                                <select id="tpl-preset-select" class="form-control" style="width: 100%;">
+                                                    <option value="custom">Benutzerdefiniert</option>
+                                                    <option value="modern" selected>Modern (Beige)</option>
+                                                    <option value="classic">Klassisch (Weiß)</option>
+                                                    <option value="minimal">Minimal (Clean)</option>
+                                                </select>
+                                            </div>
                                         </div>
 
                                         <!-- TEXT BAUSTEINE -->

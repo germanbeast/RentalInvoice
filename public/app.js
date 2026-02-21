@@ -3151,11 +3151,19 @@
         try {
             const res = await fetch('/api/branding');
             const data = await res.json();
-            if (data.success && data.branding && data.branding.logo_base64) {
-                currentLogoBase64 = data.branding.logo_base64;
-                logoPreview.src = currentLogoBase64;
-                logoPreview.style.display = 'block';
-                btnRemoveLogo.style.display = 'inline-flex';
+            if (data.success && data.branding) {
+                // Load logo
+                if (data.branding.logo_base64) {
+                    currentLogoBase64 = data.branding.logo_base64;
+                    logoPreview.src = currentLogoBase64;
+                    logoPreview.style.display = 'block';
+                    btnRemoveLogo.style.display = 'inline-flex';
+                }
+                // Load template config
+                if (data.branding.template_config) {
+                    currentTemplateConfig = { ...defaultTemplateConfig, ...data.branding.template_config };
+                    applyTemplateStyles();
+                }
             }
         } catch (e) {
             console.error('Load branding error:', e);
@@ -3277,6 +3285,7 @@
 
     // Default template config
     const defaultTemplateConfig = {
+        name: 'Mein Template',
         logoText: 'Ferienwohnung Beckhome',
         logoImage: null, // Base64 image
         greeting: 'SEHR GEEHRTE/R',
@@ -3387,6 +3396,7 @@
     }
 
     function populateTemplateForm() {
+        $('#tpl-name').value = currentTemplateConfig.name || 'Mein Template';
         $('#tpl-logo-text').value = currentTemplateConfig.logoText || '';
         $('#tpl-greeting').value = currentTemplateConfig.greeting || '';
         $('#tpl-intro').value = currentTemplateConfig.introText || '';
@@ -3583,7 +3593,7 @@
 
     // Live preview update on input
     const templateInputs = [
-        '#tpl-logo-text', '#tpl-greeting', '#tpl-intro', '#tpl-footer-text',
+        '#tpl-name', '#tpl-logo-text', '#tpl-greeting', '#tpl-intro', '#tpl-footer-text',
         '#tpl-color-primary', '#tpl-color-table-bg', '#tpl-color-table-header', '#tpl-color-text',
         '#tpl-font-logo', '#tpl-font-body',
         '#tpl-show-logo', '#tpl-show-tax', '#tpl-show-date-header', '#tpl-show-fold-marks'
@@ -3594,6 +3604,7 @@
         if (el) {
             el.addEventListener('input', () => {
                 // Update config from form
+                currentTemplateConfig.name = $('#tpl-name').value;
                 currentTemplateConfig.logoText = $('#tpl-logo-text').value;
                 currentTemplateConfig.greeting = $('#tpl-greeting').value;
                 currentTemplateConfig.introText = $('#tpl-intro').value;
