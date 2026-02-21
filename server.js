@@ -1296,18 +1296,18 @@ app.post('/api/branding', apiLimiter, (req, res) => {
 app.post('/api/branding/template', apiLimiter, (req, res) => {
     try {
         const { template_config } = req.body;
-        const currentBranding = db.getBranding();
+        const currentBranding = db.getBranding() || {};
 
         db.saveBranding({
-            logo_base64: currentBranding.logo_base64,
-            primary_color: currentBranding.primary_color,
+            logo_base64: currentBranding.logo_base64 || null,
+            primary_color: currentBranding.primary_color || null,
             template_config
         });
 
         res.json({ success: true, message: 'Template-Konfiguration gespeichert' });
     } catch (e) {
-        console.error('Template Config POST Error:', e.message);
-        res.status(500).json({ error: 'Template-Konfiguration konnte nicht gespeichert werden' });
+        console.error('Template Config POST Error:', e.message, e.stack);
+        res.status(500).json({ success: false, error: 'Template-Konfiguration konnte nicht gespeichert werden' });
     }
 });
 
