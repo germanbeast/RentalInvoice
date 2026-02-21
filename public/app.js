@@ -432,7 +432,7 @@
             const vAdresse = $('#v-adresse').value || '';
             // Extract city from address (assume last line or after postal code)
             const cityMatch = vAdresse.match(/\d{5}\s+(.+)/);
-            const city = cityMatch ? cityMatch[1].split('\n')[0].trim() : 'Jede Stadt';
+            const city = cityMatch ? cityMatch[1].split('\n')[0].trim() : '';
             $('#inv-location').textContent = city;
             $('#inv-r-datum-header').textContent = formatDate(rDatum) || '01.01.2030';
 
@@ -1695,7 +1695,7 @@
 
     // Settings Sidebar Navigation
     document.querySelectorAll('.settings-sidebar .nav-item').forEach(item => {
-        item.addEventListener('click', (e) => {
+        item.addEventListener('click', async (e) => {
             e.preventDefault();
             const targetId = item.dataset.target;
             const targetPage = $('#' + targetId);
@@ -1717,8 +1717,7 @@
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {
                     settingsModal.classList.add('designer-active');
-                    loadTemplateConfig();
-                    updateTemplatePreview();
+                    await loadTemplateConfig();
                 } else {
                     settingsModal.classList.remove('designer-active');
                 }
