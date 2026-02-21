@@ -3866,12 +3866,18 @@
     
     function showWelcomeScreen(guestName) {
         // Hide all other views
-        if (viewDashboard) viewDashboard.style.display = 'none';
-        if (viewInvoiceForm) viewInvoiceForm.style.display = 'none';
-        if (viewExpenses) viewExpenses.style.display = 'none';
-        if (appWrapper) appWrapper.style.display = 'none';
-        if (loginScreen) loginScreen.style.display = 'none';
-        
+        const viewDash = $('#view-dashboard');
+        const viewInv = $('#view-invoice-form');
+        const viewExp = $('#view-expenses');
+        const wrapper = $('#app-wrapper');
+        const login = $('#login-screen');
+
+        if (viewDash) viewDash.style.display = 'none';
+        if (viewInv) viewInv.style.display = 'none';
+        if (viewExp) viewExp.style.display = 'none';
+        if (wrapper) wrapper.style.display = 'none';
+        if (login) login.style.display = 'none';
+
         // Show welcome screen
         if (viewWelcome) {
             viewWelcome.style.display = 'block';
