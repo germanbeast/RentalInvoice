@@ -1,0 +1,309 @@
+-- Merging decision tree log ---
+manifest
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:1-65:12
+MERGED from [androidx.leanback:leanback:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\35f40c1bbb907980b5751efe6650dfaf\transformed\leanback-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\7011d89884e6a3063a6ce55edd9f882f\transformed\jetified-appcompat-resources-1.6.1\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\9751129cf9a082d51cb0234e0f752002\transformed\appcompat-1.6.1\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.recyclerview:recyclerview:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\b086c193446f452f34d3e85950ab32c8\transformed\recyclerview-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.legacy:legacy-support-core-ui:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\d13238185eb997911f69586ff136f0e9\transformed\legacy-support-core-ui-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.media:media:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\8a4bcf2015b0f0721f5c73ffb7bee621\transformed\media-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.fragment:fragment:1.3.6] C:\Users\roybe\.gradle\caches\8.13\transforms\de1402ef7b077b76eca13e0e49313b39\transformed\fragment-1.3.6\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.activity:activity:1.6.0] C:\Users\roybe\.gradle\caches\8.13\transforms\9743eaf85a3cc57af5f8bb0c7e6ee89d\transformed\jetified-activity-1.6.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\4e1f6fa0a0cdda9da006355ad1586c64\transformed\drawerlayout-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\07fcdfe7d553d9485c72b377ed9853b3\transformed\jetified-emoji2-views-helper-1.2.0\AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.legacy:legacy-support-core-utils:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\f8af5b77754b1bc0f1a6fe4c2f855cd2\transformed\legacy-support-core-utils-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\ce9344e2943187a32a45450a6c7edaab\transformed\viewpager-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.coordinatorlayout:coordinatorlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\27152b5077f395caecf3a018461f575b\transformed\coordinatorlayout-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.slidingpanelayout:slidingpanelayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\98d4c438d3864154be0f20b9af4b2d08\transformed\slidingpanelayout-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\8fb1378ae3e001fde541ccdfd31de8cb\transformed\customview-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.swiperefreshlayout:swiperefreshlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\6905aad465472f9fccd834de763e7ed8\transformed\swiperefreshlayout-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.asynclayoutinflater:asynclayoutinflater:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\850993fdc32e7ecd4115ebb7ad2b8cd3\transformed\asynclayoutinflater-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.loader:loader:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\a34792fd085fdf1f12c80c39dda794a7\transformed\loader-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\020b126365c45e0779394a83931bc5ff\transformed\lifecycle-viewmodel-2.5.1\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\ea3f73218cd7d141102d50406efd122b\transformed\jetified-lifecycle-viewmodel-savedstate-2.5.1\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.core:core-ktx:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\54e49dcc46116ffb12528647f78cfe20\transformed\jetified-core-ktx-1.9.0\AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\93c96da67cccfd07dde764e91896b18c\transformed\vectordrawable-animated-1.1.0\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\fc1af002c11c96c9834d19d67583f5d2\transformed\vectordrawable-1.1.0\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\4393d66053a2d88a53d125480d5b43d7\transformed\cursoradapter-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:17:1-37:12
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\61ee391a510be532be82d6c56e919209\transformed\lifecycle-runtime-2.5.1\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.savedstate:savedstate:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\0d1dc00389e8a078c23d80339048459d\transformed\jetified-savedstate-1.2.0\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.interpolator:interpolator:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\fd03f2aa5276cf78db053a07078f9689\transformed\interpolator-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\97be29755e6b940ef3dec554e527f2c8\transformed\versionedparcelable-1.1.1\AndroidManifest.xml:17:1-27:12
+MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\67b5f746dc5ca3f37a0531f2211c36b4\transformed\jetified-startup-runtime-1.1.1\AndroidManifest.xml:17:1-33:12
+MERGED from [androidx.tracing:tracing:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\b65b8f856d20f8fcb1147da66bb73469\transformed\jetified-tracing-1.0.0\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\552d588183967f73b65ed83bd1ee3606\transformed\lifecycle-livedata-2.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\2aa6e49bbbc84a9aa312e5861e1bfe2f\transformed\lifecycle-livedata-core-2.5.1\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.arch.core:core-runtime:2.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\c833f6a2ec3472b8229936e7c8edc6b3\transformed\core-runtime-2.1.0\AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.documentfile:documentfile:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\97069dfc2f9675b7bd2ab4490ce44068\transformed\documentfile-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\119e44b14be8f134ca7864e03b684282\transformed\localbroadcastmanager-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.print:print:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\3420ee9bcc985541a2cc9e76873321db\transformed\print-1.0.0\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\roybe\.gradle\caches\8.13\transforms\76d61942979747a03778cc8f6ce979ac\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:17:1-22:12
+	package
+		INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+	android:versionName
+		INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+	xmlns:tools
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:3:5-51
+	android:versionCode
+		INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+	xmlns:android
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:2:11-69
+uses-feature#android.hardware.touchscreen
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:6:5-8:36
+	android:required
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:8:9-33
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:7:9-52
+uses-feature#android.software.leanback
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:9:5-11:35
+	android:required
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:11:9-32
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:10:9-49
+uses-permission#android.permission.INTERNET
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:14:5-67
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:14:22-64
+uses-permission#android.permission.ACCESS_NETWORK_STATE
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:15:5-79
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:15:22-76
+uses-permission#android.permission.RECEIVE_BOOT_COMPLETED
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:16:5-81
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:16:22-78
+uses-permission#android.permission.SYSTEM_ALERT_WINDOW
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:17:5-78
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:17:22-75
+application
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:19:5-63:19
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:19:5-63:19
+MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:28:5-89
+MERGED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:28:5-89
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:25:5-35:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:25:5-35:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\97be29755e6b940ef3dec554e527f2c8\transformed\versionedparcelable-1.1.1\AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\97be29755e6b940ef3dec554e527f2c8\transformed\versionedparcelable-1.1.1\AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\67b5f746dc5ca3f37a0531f2211c36b4\transformed\jetified-startup-runtime-1.1.1\AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\67b5f746dc5ca3f37a0531f2211c36b4\transformed\jetified-startup-runtime-1.1.1\AndroidManifest.xml:25:5-31:19
+	android:extractNativeLibs
+		INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+	android:appComponentFactory
+		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:28:18-86
+	android:supportsRtl
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:23:9-35
+	android:label
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:22:9-46
+	android:icon
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:21:9-43
+	android:allowBackup
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:20:9-35
+	android:theme
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:24:9-59
+	android:usesCleartextTraffic
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:25:9-44
+activity#com.beckhome.tvwelcome.MainActivity
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:28:9-43:20
+	android:screenOrientation
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:34:13-50
+	android:launchMode
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:33:13-44
+	android:exported
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:32:13-36
+	android:configChanges
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:31:13-74
+	android:banner
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:30:13-50
+	android:theme
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:35:13-63
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:29:13-41
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.DEFAULT+category:name:android.intent.category.HOME+category:name:android.intent.category.LEANBACK_LAUNCHER
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:37:13-42:29
+action#android.intent.action.MAIN
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:38:17-69
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:38:25-66
+category#android.intent.category.LEANBACK_LAUNCHER
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:39:17-86
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:39:27-83
+category#android.intent.category.HOME
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:40:17-73
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:40:27-70
+category#android.intent.category.DEFAULT
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:41:17-76
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:41:27-73
+activity#com.beckhome.tvwelcome.SettingsActivity
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:46:9-50:66
+	android:screenOrientation
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:49:13-50
+	android:exported
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:48:13-37
+	android:theme
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:50:13-63
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:47:13-45
+receiver#com.beckhome.tvwelcome.BootReceiver
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:53:9-61:20
+	android:enabled
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:55:13-35
+	android:exported
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:56:13-36
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:54:13-41
+intent-filter#action:name:android.intent.action.BOOT_COMPLETED+action:name:android.intent.action.QUICKBOOT_POWERON
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:57:13-60:29
+action#android.intent.action.BOOT_COMPLETED
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:58:17-79
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:58:25-76
+action#android.intent.action.QUICKBOOT_POWERON
+ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:59:17-82
+	android:name
+		ADDED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml:59:25-79
+uses-sdk
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+MERGED from [androidx.leanback:leanback:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\35f40c1bbb907980b5751efe6650dfaf\transformed\leanback-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.leanback:leanback:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\35f40c1bbb907980b5751efe6650dfaf\transformed\leanback-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\7011d89884e6a3063a6ce55edd9f882f\transformed\jetified-appcompat-resources-1.6.1\AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\7011d89884e6a3063a6ce55edd9f882f\transformed\jetified-appcompat-resources-1.6.1\AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\9751129cf9a082d51cb0234e0f752002\transformed\appcompat-1.6.1\AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] C:\Users\roybe\.gradle\caches\8.13\transforms\9751129cf9a082d51cb0234e0f752002\transformed\appcompat-1.6.1\AndroidManifest.xml:20:5-44
+MERGED from [androidx.recyclerview:recyclerview:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\b086c193446f452f34d3e85950ab32c8\transformed\recyclerview-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.recyclerview:recyclerview:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\b086c193446f452f34d3e85950ab32c8\transformed\recyclerview-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.legacy:legacy-support-core-ui:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\d13238185eb997911f69586ff136f0e9\transformed\legacy-support-core-ui-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.legacy:legacy-support-core-ui:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\d13238185eb997911f69586ff136f0e9\transformed\legacy-support-core-ui-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.media:media:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\8a4bcf2015b0f0721f5c73ffb7bee621\transformed\media-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.media:media:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\8a4bcf2015b0f0721f5c73ffb7bee621\transformed\media-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.fragment:fragment:1.3.6] C:\Users\roybe\.gradle\caches\8.13\transforms\de1402ef7b077b76eca13e0e49313b39\transformed\fragment-1.3.6\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.3.6] C:\Users\roybe\.gradle\caches\8.13\transforms\de1402ef7b077b76eca13e0e49313b39\transformed\fragment-1.3.6\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.activity:activity:1.6.0] C:\Users\roybe\.gradle\caches\8.13\transforms\9743eaf85a3cc57af5f8bb0c7e6ee89d\transformed\jetified-activity-1.6.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.6.0] C:\Users\roybe\.gradle\caches\8.13\transforms\9743eaf85a3cc57af5f8bb0c7e6ee89d\transformed\jetified-activity-1.6.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\4e1f6fa0a0cdda9da006355ad1586c64\transformed\drawerlayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\4e1f6fa0a0cdda9da006355ad1586c64\transformed\drawerlayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\07fcdfe7d553d9485c72b377ed9853b3\transformed\jetified-emoji2-views-helper-1.2.0\AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\07fcdfe7d553d9485c72b377ed9853b3\transformed\jetified-emoji2-views-helper-1.2.0\AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:21:5-44
+MERGED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:21:5-44
+MERGED from [androidx.legacy:legacy-support-core-utils:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\f8af5b77754b1bc0f1a6fe4c2f855cd2\transformed\legacy-support-core-utils-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.legacy:legacy-support-core-utils:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\f8af5b77754b1bc0f1a6fe4c2f855cd2\transformed\legacy-support-core-utils-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\ce9344e2943187a32a45450a6c7edaab\transformed\viewpager-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\ce9344e2943187a32a45450a6c7edaab\transformed\viewpager-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.coordinatorlayout:coordinatorlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\27152b5077f395caecf3a018461f575b\transformed\coordinatorlayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.coordinatorlayout:coordinatorlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\27152b5077f395caecf3a018461f575b\transformed\coordinatorlayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.slidingpanelayout:slidingpanelayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\98d4c438d3864154be0f20b9af4b2d08\transformed\slidingpanelayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.slidingpanelayout:slidingpanelayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\98d4c438d3864154be0f20b9af4b2d08\transformed\slidingpanelayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\8fb1378ae3e001fde541ccdfd31de8cb\transformed\customview-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\8fb1378ae3e001fde541ccdfd31de8cb\transformed\customview-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.swiperefreshlayout:swiperefreshlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\6905aad465472f9fccd834de763e7ed8\transformed\swiperefreshlayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.swiperefreshlayout:swiperefreshlayout:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\6905aad465472f9fccd834de763e7ed8\transformed\swiperefreshlayout-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.asynclayoutinflater:asynclayoutinflater:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\850993fdc32e7ecd4115ebb7ad2b8cd3\transformed\asynclayoutinflater-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.asynclayoutinflater:asynclayoutinflater:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\850993fdc32e7ecd4115ebb7ad2b8cd3\transformed\asynclayoutinflater-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\a34792fd085fdf1f12c80c39dda794a7\transformed\loader-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\a34792fd085fdf1f12c80c39dda794a7\transformed\loader-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\020b126365c45e0779394a83931bc5ff\transformed\lifecycle-viewmodel-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\020b126365c45e0779394a83931bc5ff\transformed\lifecycle-viewmodel-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\ea3f73218cd7d141102d50406efd122b\transformed\jetified-lifecycle-viewmodel-savedstate-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\ea3f73218cd7d141102d50406efd122b\transformed\jetified-lifecycle-viewmodel-savedstate-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.core:core-ktx:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\54e49dcc46116ffb12528647f78cfe20\transformed\jetified-core-ktx-1.9.0\AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\54e49dcc46116ffb12528647f78cfe20\transformed\jetified-core-ktx-1.9.0\AndroidManifest.xml:5:5-44
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\93c96da67cccfd07dde764e91896b18c\transformed\vectordrawable-animated-1.1.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\93c96da67cccfd07dde764e91896b18c\transformed\vectordrawable-animated-1.1.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\fc1af002c11c96c9834d19d67583f5d2\transformed\vectordrawable-1.1.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\fc1af002c11c96c9834d19d67583f5d2\transformed\vectordrawable-1.1.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\4393d66053a2d88a53d125480d5b43d7\transformed\cursoradapter-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\4393d66053a2d88a53d125480d5b43d7\transformed\cursoradapter-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\61ee391a510be532be82d6c56e919209\transformed\lifecycle-runtime-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\61ee391a510be532be82d6c56e919209\transformed\lifecycle-runtime-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.savedstate:savedstate:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\0d1dc00389e8a078c23d80339048459d\transformed\jetified-savedstate-1.2.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.savedstate:savedstate:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\0d1dc00389e8a078c23d80339048459d\transformed\jetified-savedstate-1.2.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.interpolator:interpolator:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\fd03f2aa5276cf78db053a07078f9689\transformed\interpolator-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\fd03f2aa5276cf78db053a07078f9689\transformed\interpolator-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\97be29755e6b940ef3dec554e527f2c8\transformed\versionedparcelable-1.1.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\97be29755e6b940ef3dec554e527f2c8\transformed\versionedparcelable-1.1.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\67b5f746dc5ca3f37a0531f2211c36b4\transformed\jetified-startup-runtime-1.1.1\AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\67b5f746dc5ca3f37a0531f2211c36b4\transformed\jetified-startup-runtime-1.1.1\AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.tracing:tracing:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\b65b8f856d20f8fcb1147da66bb73469\transformed\jetified-tracing-1.0.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.tracing:tracing:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\b65b8f856d20f8fcb1147da66bb73469\transformed\jetified-tracing-1.0.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\552d588183967f73b65ed83bd1ee3606\transformed\lifecycle-livedata-2.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\552d588183967f73b65ed83bd1ee3606\transformed\lifecycle-livedata-2.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\2aa6e49bbbc84a9aa312e5861e1bfe2f\transformed\lifecycle-livedata-core-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.5.1] C:\Users\roybe\.gradle\caches\8.13\transforms\2aa6e49bbbc84a9aa312e5861e1bfe2f\transformed\lifecycle-livedata-core-2.5.1\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.arch.core:core-runtime:2.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\c833f6a2ec3472b8229936e7c8edc6b3\transformed\core-runtime-2.1.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.arch.core:core-runtime:2.1.0] C:\Users\roybe\.gradle\caches\8.13\transforms\c833f6a2ec3472b8229936e7c8edc6b3\transformed\core-runtime-2.1.0\AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.documentfile:documentfile:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\97069dfc2f9675b7bd2ab4490ce44068\transformed\documentfile-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.documentfile:documentfile:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\97069dfc2f9675b7bd2ab4490ce44068\transformed\documentfile-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\119e44b14be8f134ca7864e03b684282\transformed\localbroadcastmanager-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\119e44b14be8f134ca7864e03b684282\transformed\localbroadcastmanager-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.print:print:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\3420ee9bcc985541a2cc9e76873321db\transformed\print-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.print:print:1.0.0] C:\Users\roybe\.gradle\caches\8.13\transforms\3420ee9bcc985541a2cc9e76873321db\transformed\print-1.0.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\roybe\.gradle\caches\8.13\transforms\76d61942979747a03778cc8f6ce979ac\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\roybe\.gradle\caches\8.13\transforms\76d61942979747a03778cc8f6ce979ac\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:20:5-44
+	android:targetSdkVersion
+		INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from C:\Users\roybe\Documents\Test Powershell\ferienwohnung-rechnung\android-tv-kiosk\app\src\main\AndroidManifest.xml
+provider#androidx.startup.InitializationProvider
+ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:26:9-34:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:26:9-34:20
+MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\67b5f746dc5ca3f37a0531f2211c36b4\transformed\jetified-startup-runtime-1.1.1\AndroidManifest.xml:26:9-30:34
+MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\roybe\.gradle\caches\8.13\transforms\67b5f746dc5ca3f37a0531f2211c36b4\transformed\jetified-startup-runtime-1.1.1\AndroidManifest.xml:26:9-30:34
+	tools:node
+		ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:28:13-31
+	android:authorities
+		ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:26:13-68
+	android:exported
+		ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:25:13-67
+meta-data#androidx.emoji2.text.EmojiCompatInitializer
+ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.2.0] C:\Users\roybe\.gradle\caches\8.13\transforms\e6824132ad21a51f5bd68e19997dca65\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:30:17-75
+permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:23:9-81
+permission#com.beckhome.tvwelcome.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:23:9-81
+uses-permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:26:22-94
+uses-permission#com.beckhome.tvwelcome.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.9.0] C:\Users\roybe\.gradle\caches\8.13\transforms\00eeb73d329f60914ee7cf1a9183d8d3\transformed\core-1.9.0\AndroidManifest.xml:26:22-94
+meta-data#androidx.lifecycle.ProcessLifecycleInitializer
+ADDED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:31:13-33:52
+	android:value
+		ADDED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:33:17-49
+	android:name
+		ADDED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\roybe\.gradle\caches\8.13\transforms\279af7dcfba2409b9faa8b0c83df5340\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:32:17-78

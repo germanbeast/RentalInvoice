@@ -1,0 +1,12 @@
+R_DEF: Internal format may change without notice
+local
+id btn_close
+id btn_save
+id et_checkin_time
+id et_checkout_time
+id et_contact_phone
+id et_guest_name
+id et_server_url
+id et_wifi_name
+id et_wifi_password
+layout activity_settings
