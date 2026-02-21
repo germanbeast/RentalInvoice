@@ -735,196 +735,6 @@
                 </div>
 
             <!-- VIEW: INVOICE DESIGNER -->
-            <div id="view-invoice-designer" class="content-view" style="display:none;">
-                <div class="content-header">
-                    <div class="content-breadcrumb">
-                        <h2>🎨 Rechnungsdesigner</h2>
-                        <p style="margin: 0.5rem 0 0 0; color: var(--text-muted);">Gestalte deine Rechnung individuell nach deinen Wünschen</p>
-                    </div>
-                    <button type="button" id="btn-close-designer" class="btn btn-ghost">
-                        Zurück
-                    </button>
-                </div>
-
-                <!-- Designer Grid -->
-                <div style="display: grid; grid-template-columns: 400px 1fr; gap: 2rem; height: calc(100vh - 200px); padding: 2rem;">
-
-                    <!-- LEFT SIDEBAR: Controls -->
-                    <div style="overflow-y: auto; padding-right: 1rem;">
-
-                        <!-- Template Presets -->
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Template wählen</h3>
-                            <select id="tpl-preset-select" class="form-control" style="width: 100%;">
-                                <option value="custom">Benutzerdefiniert</option>
-                                <option value="modern" selected>Modern (Beige)</option>
-                                <option value="classic">Klassisch (Weiß)</option>
-                                <option value="minimal">Minimal (Clean)</option>
-                            </select>
-                        </div>
-
-                        <!-- TEXT BAUSTEINE -->
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">📝 Text-Bausteine</h3>
-
-                            <div class="form-group">
-                                <label for="tpl-logo-text">Logo-Text</label>
-                                <input type="text" id="tpl-logo-text" class="form-control" placeholder="Ferienwohnung Beckhome">
-                                <small class="text-muted">Wird im Kopf der Rechnung angezeigt</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="tpl-greeting">Begrüßungsformel</label>
-                                <input type="text" id="tpl-greeting" class="form-control" placeholder="SEHR GEEHRTE/R">
-                                <small class="text-muted">Dynamisch: {NACHNAME} wird durch Gast-Nachname ersetzt</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="tpl-intro">Intro-Text</label>
-                                <textarea id="tpl-intro" class="form-control" rows="3" placeholder="Ich bedanke mich herzlich für die Zusammenarbeit..."></textarea>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="tpl-footer-text">Footer-Text</label>
-                                <input type="text" id="tpl-footer-text" class="form-control" placeholder="Vielen Dank für Ihre Buchung!">
-                            </div>
-                        </div>
-
-                        <!-- FARBEN -->
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">🎨 Farben</h3>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="tpl-color-primary">Primärfarbe</label>
-                                    <input type="color" id="tpl-color-primary" class="form-control" value="#0f172a">
-                                </div>
-                                <div class="form-group">
-                                    <label for="tpl-color-table-bg">Tabellen-Hintergrund</label>
-                                    <input type="color" id="tpl-color-table-bg" class="form-control" value="#f5f1e8">
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="tpl-color-table-header">Tabellen-Kopf</label>
-                                    <input type="color" id="tpl-color-table-header" class="form-control" value="#e8e1d0">
-                                </div>
-                                <div class="form-group">
-                                    <label for="tpl-color-text">Textfarbe</label>
-                                    <input type="color" id="tpl-color-text" class="form-control" value="#2d2721">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- SCHRIFTARTEN -->
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">✍️ Schriftarten</h3>
-
-                            <div class="form-group">
-                                <label for="tpl-font-logo">Logo-Schriftart</label>
-                                <select id="tpl-font-logo" class="form-control">
-                                    <option value="Georgia, serif">Georgia (Serif)</option>
-                                    <option value="'Times New Roman', serif">Times New Roman</option>
-                                    <option value="'Playfair Display', serif">Playfair Display</option>
-                                    <option value="'Inter', sans-serif">Inter (Sans-Serif)</option>
-                                    <option value="'Arial', sans-serif">Arial</option>
-                                    <option value="'Courier New', monospace">Courier New</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="tpl-font-body">Basis-Schriftart</label>
-                                <select id="tpl-font-body" class="form-control">
-                                    <option value="'Inter', sans-serif">Inter</option>
-                                    <option value="'Arial', sans-serif">Arial</option>
-                                    <option value="'Helvetica', sans-serif">Helvetica</option>
-                                    <option value="Georgia, serif">Georgia</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- LOGO UPLOAD -->
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">🖼️ Logo (optional)</h3>
-
-                            <div class="form-group">
-                                <label>Bild-Logo hochladen (ersetzt Text-Logo)</label>
-                                <div style="margin-top: 0.5rem;">
-                                    <img id="tpl-logo-preview" src="" alt="Logo Preview"
-                                        style="display: none; max-width: 200px; max-height: 80px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.5rem;">
-                                    <input type="file" id="tpl-logo-file-input" accept="image/*" style="display: none;">
-                                    <div class="btn-group">
-                                        <button type="button" id="btn-tpl-upload-logo" class="btn btn-primary btn-sm">Logo wählen</button>
-                                        <button type="button" id="btn-tpl-remove-logo" class="btn btn-ghost btn-danger btn-sm" style="display: none;">Entfernen</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- LAYOUT OPTIONEN -->
-                        <div class="card" style="margin-bottom: 1.5rem;">
-                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">📐 Layout & Elemente</h3>
-
-                            <div class="form-group">
-                                <label>
-                                    <input type="checkbox" id="tpl-show-logo" checked>
-                                    Logo/Text-Logo anzeigen
-                                </label>
-                            </div>
-
-                            <div class="form-group">
-                                <label>
-                                    <input type="checkbox" id="tpl-show-tax" checked>
-                                    Steuernummer anzeigen
-                                </label>
-                            </div>
-
-                            <div class="form-group">
-                                <label>
-                                    <input type="checkbox" id="tpl-show-date-header" checked>
-                                    Datum im Header anzeigen
-                                </label>
-                            </div>
-
-                            <div class="form-group">
-                                <label>
-                                    <input type="checkbox" id="tpl-show-fold-marks">
-                                    Falzmarken anzeigen
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- BUTTONS -->
-                        <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 1.5rem;">
-                            <button type="button" id="btn-save-template" class="btn btn-primary" style="width: 100%; margin-bottom: 0.75rem; background: white; color: #667eea; font-weight: 600;">
-                                💾 Template speichern
-                            </button>
-                            <button type="button" id="btn-reset-template" class="btn btn-ghost" style="width: 100%; color: white; border-color: white;">
-                                ↺ Zurücksetzen
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- RIGHT: Live Preview -->
-                    <div style="display: flex; flex-direction: column; background: #f8f9fa; border-radius: 12px; padding: 2rem; overflow: hidden;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                            <h3 style="margin: 0;">Live-Vorschau</h3>
-                            <div style="display: flex; gap: 0.75rem; align-items: center;">
-                                <button type="button" id="btn-zoom-out" class="btn btn-ghost btn-sm">−</button>
-                                <span id="zoom-level" style="min-width: 50px; text-align: center; font-weight: 600;">75%</span>
-                                <button type="button" id="btn-zoom-in" class="btn btn-ghost btn-sm">+</button>
-                            </div>
-                        </div>
-                        <div id="template-preview-container" style="flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%, transparent 75%, #f0f0f0 75%, #f0f0f0), linear-gradient(45deg, #f0f0f0 25%, transparent 25%, transparent 75%, #f0f0f0 75%, #f0f0f0); background-size: 20px 20px; background-position: 0 0, 10px 10px;">
-                            <div id="template-preview-invoice" class="invoice-page" style="transform: scale(0.75); transform-origin: top center; box-shadow: 0 8px 24px rgba(0,0,0,0.2); margin: 2rem;">
-                                <!-- Invoice preview will be inserted here via JS -->
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
         </main>
 
         <!-- EINSTELLUNGEN MODAL -->
@@ -939,6 +749,7 @@
                         <nav class="sidebar-nav">
                             <div class="nav-section">BASIC SETTINGS</div>
                             <a href="#" class="nav-item active" data-target="settings-branding">Branding / Logo</a>
+                            <a href="#" class="nav-item" data-target="settings-invoice-designer">Rechnungsdesigner</a>
                             <a href="#" class="nav-item" data-target="settings-v-data">Vermieter-Daten</a>
                             <a href="#" class="nav-item" data-target="settings-pricing">Preise & Gebühren</a>
                             <a href="#" class="nav-item" data-target="settings-smtp">E-Mail (SMTP)</a>
@@ -993,17 +804,165 @@
                                     </div>
                                 </div>
 
-                                <div class="card" style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
-                                    <h3 style="margin: 0 0 0.5rem 0; color: white; font-size: 1.25rem;">🎨 Rechnungsdesigner</h3>
-                                    <p style="margin: 0 0 1rem 0; color: rgba(255,255,255,0.9); font-size: 0.9rem;">
-                                        Gestalte deine Rechnung individuell nach deinen Wünschen mit unserem vollständigen Designer.
-                                    </p>
-                                    <button type="button" id="btn-open-invoice-designer" class="btn" style="background: white; color: #667eea; font-weight: 600;">
-                                        Rechnungsdesigner starten
-                                    </button>
-                                </div>
                             </section>
 
+                            <!-- RECHNUNGSDESIGNER -->
+                            <section id="settings-invoice-designer" class="settings-page">
+                                <h2>Rechnungsdesigner</h2>
+                                <p class="text-muted">Gestalte deine Rechnung individuell nach deinen Wünschen.</p>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+
+                                    <!-- LEFT: Controls -->
+                                    <div>
+                                        <!-- Template Presets -->
+                                        <div class="card" style="margin-bottom: 1.5rem;">
+                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Template wählen</h3>
+                                            <select id="tpl-preset-select" class="form-control" style="width: 100%;">
+                                                <option value="custom">Benutzerdefiniert</option>
+                                                <option value="modern" selected>Modern (Beige)</option>
+                                                <option value="classic">Klassisch (Weiß)</option>
+                                                <option value="minimal">Minimal (Clean)</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- TEXT BAUSTEINE -->
+                                        <div class="card" style="margin-bottom: 1.5rem;">
+                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Text-Bausteine</h3>
+                                            <div class="form-group">
+                                                <label for="tpl-logo-text">Logo-Text</label>
+                                                <input type="text" id="tpl-logo-text" class="form-control" placeholder="Ferienwohnung Beckhome">
+                                                <small class="text-muted">Wird im Kopf der Rechnung angezeigt</small>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tpl-greeting">Anrede</label>
+                                                <input type="text" id="tpl-greeting" class="form-control" placeholder="SEHR GEEHRTE/R">
+                                                <small class="text-muted">{NACHNAME} wird durch Gast-Nachname ersetzt</small>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tpl-intro">Intro-Text</label>
+                                                <textarea id="tpl-intro" class="form-control" rows="2" placeholder="Ich bedanke mich herzlich..."></textarea>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tpl-footer-text">Footer-Text</label>
+                                                <input type="text" id="tpl-footer-text" class="form-control" placeholder="Vielen Dank für Ihre Buchung!">
+                                            </div>
+                                        </div>
+
+                                        <!-- FARBEN -->
+                                        <div class="card" style="margin-bottom: 1.5rem;">
+                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Farben</h3>
+                                            <div class="form-row">
+                                                <div class="form-group">
+                                                    <label for="tpl-color-primary">Primärfarbe</label>
+                                                    <input type="color" id="tpl-color-primary" class="form-control" value="#0f172a">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="tpl-color-table-bg">Tabellen-Hintergrund</label>
+                                                    <input type="color" id="tpl-color-table-bg" class="form-control" value="#f5f1e8">
+                                                </div>
+                                            </div>
+                                            <div class="form-row">
+                                                <div class="form-group">
+                                                    <label for="tpl-color-table-header">Tabellen-Kopf</label>
+                                                    <input type="color" id="tpl-color-table-header" class="form-control" value="#e8e1d0">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="tpl-color-text">Textfarbe</label>
+                                                    <input type="color" id="tpl-color-text" class="form-control" value="#2d2721">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- SCHRIFTARTEN -->
+                                        <div class="card" style="margin-bottom: 1.5rem;">
+                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Schriftarten</h3>
+                                            <div class="form-group">
+                                                <label for="tpl-font-logo">Logo-Schriftart</label>
+                                                <select id="tpl-font-logo" class="form-control">
+                                                    <option value="Georgia, serif">Georgia (Serif)</option>
+                                                    <option value="'Times New Roman', serif">Times New Roman</option>
+                                                    <option value="'Playfair Display', serif">Playfair Display</option>
+                                                    <option value="'Inter', sans-serif">Inter (Sans-Serif)</option>
+                                                    <option value="'Arial', sans-serif">Arial</option>
+                                                    <option value="'Courier New', monospace">Courier New</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="tpl-font-body">Basis-Schriftart</label>
+                                                <select id="tpl-font-body" class="form-control">
+                                                    <option value="'Inter', sans-serif">Inter</option>
+                                                    <option value="'Arial', sans-serif">Arial</option>
+                                                    <option value="'Helvetica', sans-serif">Helvetica</option>
+                                                    <option value="Georgia, serif">Georgia</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- LOGO UPLOAD -->
+                                        <div class="card" style="margin-bottom: 1.5rem;">
+                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Logo (optional)</h3>
+                                            <div class="form-group">
+                                                <label>Bild-Logo hochladen (ersetzt Text-Logo)</label>
+                                                <div style="margin-top: 0.5rem;">
+                                                    <img id="tpl-logo-preview" src="" alt="Logo Preview"
+                                                        style="display: none; max-width: 200px; max-height: 80px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.5rem;">
+                                                    <input type="file" id="tpl-logo-file-input" accept="image/*" style="display: none;">
+                                                    <div class="btn-group">
+                                                        <button type="button" id="btn-tpl-upload-logo" class="btn btn-primary btn-sm">Logo wählen</button>
+                                                        <button type="button" id="btn-tpl-remove-logo" class="btn btn-ghost btn-danger btn-sm" style="display: none;">Entfernen</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- LAYOUT OPTIONEN -->
+                                        <div class="card" style="margin-bottom: 1.5rem;">
+                                            <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Layout & Elemente</h3>
+                                            <div class="form-group">
+                                                <label><input type="checkbox" id="tpl-show-logo" checked> Logo/Text-Logo anzeigen</label>
+                                            </div>
+                                            <div class="form-group">
+                                                <label><input type="checkbox" id="tpl-show-tax" checked> Steuernummer anzeigen</label>
+                                            </div>
+                                            <div class="form-group">
+                                                <label><input type="checkbox" id="tpl-show-date-header" checked> Datum im Header anzeigen</label>
+                                            </div>
+                                            <div class="form-group">
+                                                <label><input type="checkbox" id="tpl-show-fold-marks"> Falzmarken anzeigen</label>
+                                            </div>
+                                        </div>
+
+                                        <!-- SAVE BUTTONS -->
+                                        <div style="display: flex; gap: 0.75rem;">
+                                            <button type="button" id="btn-save-template" class="btn btn-primary" style="flex: 1;">
+                                                Template speichern
+                                            </button>
+                                            <button type="button" id="btn-reset-template" class="btn btn-ghost">
+                                                Zurücksetzen
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- RIGHT: Live Preview -->
+                                    <div style="display: flex; flex-direction: column; background: var(--bg-secondary); border-radius: 12px; padding: 1.5rem; min-height: 500px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                            <h3 style="margin: 0; font-size: 1.1rem;">Live-Vorschau</h3>
+                                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                                <button type="button" id="btn-zoom-out" class="btn btn-ghost btn-sm">-</button>
+                                                <span id="zoom-level" style="min-width: 40px; text-align: center; font-weight: 600; font-size: 0.85rem;">60%</span>
+                                                <button type="button" id="btn-zoom-in" class="btn btn-ghost btn-sm">+</button>
+                                            </div>
+                                        </div>
+                                        <div id="template-preview-container" style="flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: repeating-conic-gradient(#e5e5e5 0% 25%, transparent 0% 50%) 50% / 16px 16px; border-radius: 8px;">
+                                            <div id="template-preview-invoice" class="invoice-page" style="transform: scale(0.6); transform-origin: top center; box-shadow: 0 4px 16px rgba(0,0,0,0.15); margin: 1rem;">
+                                                <!-- Invoice preview will be inserted here via JS -->
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </section>
 
                             <!-- VERMIETER -->
                             <section id="settings-v-data" class="settings-page">

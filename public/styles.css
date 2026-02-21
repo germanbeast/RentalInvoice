@@ -1122,6 +1122,12 @@ select {
     height: 700px;
 }
 
+.modal-lg.designer-active {
+    max-width: 95vw;
+    height: 90vh;
+    transition: max-width 0.3s ease, height 0.3s ease;
+}
+
 .settings-layout {
     display: grid;
     grid-template-columns: 260px 1fr;

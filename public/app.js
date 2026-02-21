@@ -44,7 +44,6 @@
     const viewDashboard = $('#view-dashboard');
     const viewInvoiceForm = $('#view-invoice-form');
     const viewExpenses = $('#view-expenses');
-    const viewInvoiceDesigner = $('#view-invoice-designer');
 
     const modalSettings = $('#modal-settings');
     const toastContainer = $('#toast-container');
@@ -1328,7 +1327,7 @@
     }
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewInvoiceDesigner];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses];
         const navItems = [navDashboard, navInvoice, navGuests, navExpenses];
 
         views.forEach(v => {
@@ -1352,16 +1351,6 @@
             viewExpenses.style.display = 'flex';
             navExpenses.classList.add('active');
             loadExpenses();
-        } else if (viewId === 'invoice-designer') {
-            viewInvoiceDesigner.style.display = 'flex';
-            console.log('Designer view computed style:', window.getComputedStyle(viewInvoiceDesigner).display);
-            console.log('Designer view offsetHeight:', viewInvoiceDesigner.offsetHeight);
-            console.log('Designer view offsetWidth:', viewInvoiceDesigner.offsetWidth);
-            console.log('Designer view parent:', viewInvoiceDesigner.parentElement);
-            console.log('Parent computed display:', window.getComputedStyle(viewInvoiceDesigner.parentElement).display);
-            console.log('Parent offsetHeight:', viewInvoiceDesigner.parentElement.offsetHeight);
-            loadTemplateConfig();
-            updateTemplatePreview();
         }
 
         startViewPolling(viewId);
@@ -1376,20 +1365,6 @@
     navInvoice.addEventListener('click', () => switchView('invoice'));
     navExpenses.addEventListener('click', () => switchView('expenses'));
 
-    // Invoice Designer - using event delegation since button is in modal
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('#btn-open-invoice-designer')) {
-            console.log('Invoice Designer button clicked');
-            console.log('Closing modal...');
-            modalSettings.style.display = 'none';
-            console.log('Switching to invoice-designer view...');
-            switchView('invoice-designer');
-            console.log('Switch complete');
-        }
-        if (e.target.closest('#btn-close-designer')) {
-            switchView('dashboard');
-        }
-    });
 
     // =======================
     // Dashboard Module
@@ -1697,13 +1672,17 @@
         loadTelegramRequests();
     });
 
+    const settingsModal = $('.settings-modal');
+
     btnCloseSettings.addEventListener('click', () => {
         modalSettings.style.display = 'none';
+        settingsModal.classList.remove('designer-active');
     });
 
     modalSettings.addEventListener('click', (e) => {
         if (e.target === modalSettings) {
             modalSettings.style.display = 'none';
+            settingsModal.classList.remove('designer-active');
         }
     });
 
@@ -1711,6 +1690,7 @@
         await saveAllSettings();
         await saveBranding();
         modalSettings.style.display = 'none';
+        settingsModal.classList.remove('designer-active');
     });
 
     // Settings Sidebar Navigation
@@ -1733,6 +1713,15 @@
                 // Update Breadcrumbs
                 const bcPage = $('#settings-current-page');
                 if (bcPage) bcPage.textContent = pageTitle;
+
+                // Toggle larger modal for designer
+                if (targetId === 'settings-invoice-designer') {
+                    settingsModal.classList.add('designer-active');
+                    loadTemplateConfig();
+                    updateTemplatePreview();
+                } else {
+                    settingsModal.classList.remove('designer-active');
+                }
             }
         });
     });
@@ -3671,16 +3660,6 @@
                 populateTemplateForm();
                 updateTemplatePreview();
             }
-        });
-    }
-
-    // Load template config when opening invoice designer tab
-    const invoiceDesignerTab = $('[data-target="settings-invoice-designer"]');
-    if (invoiceDesignerTab) {
-        invoiceDesignerTab.addEventListener('click', () => {
-            setTimeout(() => {
-                loadTemplateConfig();
-            }, 100);
         });
     }
 
