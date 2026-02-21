@@ -761,13 +761,31 @@ select {
     height: calc(297mm * var(--preview-scale, 0.45));
 }
 
-/* Faltmarken - Hidden in modern design */
+/* Faltmarken */
 .inv-markers {
     display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 20mm;
+    pointer-events: none;
+    z-index: 50;
 }
 
 .inv-marker {
-    display: none;
+    position: absolute;
+    left: 0;
+    width: 6mm;
+    border-top: 1px solid #94a3b8;
+}
+
+.inv-marker-fold-1 {
+    top: 105mm;
+}
+
+.inv-marker-fold-2 {
+    top: 210mm;
 }
 
 /* Header - New Modern Layout */
@@ -868,15 +886,18 @@ select {
 }
 
 .inv-label {
-    display: none; /* Hide "Rechnung an" label */
+    display: none;
+    /* Hide "Rechnung an" label */
 }
 
 .inv-recipient strong {
-    display: none; /* Hide guest name, shown in greeting */
+    display: none;
+    /* Hide guest name, shown in greeting */
 }
 
 .inv-recipient .inv-addr {
-    display: none; /* Hide address in new design */
+    display: none;
+    /* Hide address in new design */
 }
 
 /* Meta - Above Title */
@@ -886,7 +907,8 @@ select {
 }
 
 .inv-meta-item {
-    display: none; /* Hide individual meta items */
+    display: none;
+    /* Hide individual meta items */
 }
 
 /* Title - Large Centered */
@@ -982,7 +1004,8 @@ select {
 }
 
 .inv-summary-line:not(.inv-summary-total) {
-    display: none; /* Hide Netto + MwSt, only show total */
+    display: none;
+    /* Hide Netto + MwSt, only show total */
 }
 
 .inv-summary-total {
@@ -1061,11 +1084,13 @@ select {
 
 /* Nuki PIN - Minimal */
 .inv-nuki-pin {
-    display: none; /* Hide in new design or make minimal */
+    display: none;
+    /* Hide in new design or make minimal */
 }
 
 .inv-payment-status {
-    display: none; /* Hide payment status badge in new minimal design */
+    display: none;
+    /* Hide payment status badge in new minimal design */
 }
 
 /* Footer */
@@ -1591,8 +1616,14 @@ select {
    PRINT STYLES
    =========================== */
 @media print {
+    @page {
+        margin: 0;
+    }
+
     body {
         background: white !important;
+        margin: 0;
+        padding: 0;
     }
 
     body::before {
@@ -1626,9 +1657,16 @@ select {
     }
 
     .invoice-page {
-        transform: none !important;
-        width: 100% !important;
+        transform: scale(0.96) !important;
+        transform-origin: top left !important;
+        width: 104.1% !important;
+        /* 100 / 0.96 */
         min-height: auto !important;
+        max-height: 104vh !important;
+        overflow: hidden !important;
+        page-break-after: avoid !important;
+        page-break-before: avoid !important;
+        page-break-inside: avoid !important;
     }
 
     .invoice-preview {
@@ -2203,6 +2241,7 @@ input[type="checkbox"]:focus-visible {
     position: absolute;
     pointer-events: none;
 }
+
 .toggle-switch input[type="checkbox"]::after,
 .toggle-switch input[type="checkbox"]:checked {
     display: none;
