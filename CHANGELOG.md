@@ -5,6 +5,24 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-02-20
+
+### Hinzugefügt
+- Zoom-Funktionalität im Rechnungsdesigner (+/- Buttons, 30%-150%)
+- Template-Presets: "Modern", "Klassisch", "Minimal"
+- Falzmarken ein/ausblenden Option
+- Vollbild-Designer mit optimiertem Layout
+
+### Verbessert
+- Preview-Größe deutlich erhöht (nutzt 100% Höhe)
+- Split-Screen Layout optimiert (380px Editor + Rest Preview)
+- Save-Button mit Loading-State
+- Template wird nach Speichern sofort auf Hauptrechnung angewendet
+
+### Behoben
+- Template-Speichern übernimmt jetzt korrekt alle Änderungen
+- Preview-Skalierung verbessert
+
 ## [1.7.0] - 2026-02-20
 
 ### Hinzugefügt
