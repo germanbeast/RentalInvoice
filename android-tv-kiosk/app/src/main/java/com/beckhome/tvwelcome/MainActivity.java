@@ -2,9 +2,13 @@ package com.beckhome.tvwelcome;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
@@ -14,15 +18,25 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
 
     private WebView webView;
+    private SharedPreferences prefs;
 
-    // TODO: Change this to your server IP!
-    private static final String SERVER_URL = "http://192.168.1.100:3000/?welcome=";
-    private static final String DEFAULT_GUEST = "Willkommen";
+    // Settings tap gesture
+    private int tapCount = 0;
+    private Handler tapHandler = new Handler();
+    private Runnable tapResetRunnable = new Runnable() {
+        @Override
+        public void run() {
+            tapCount = 0;
+        }
+    };
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Load preferences
+        prefs = getSharedPreferences("WelcomeSettings", MODE_PRIVATE);
 
         // Enable fullscreen kiosk mode
         enableKioskMode();
@@ -48,7 +62,7 @@ public class MainActivity extends Activity {
                 // Handle app launch intents
                 if (url.startsWith("intent://")) {
                     try {
-                        android.content.Intent intent = android.content.Intent.parseUri(url, android.content.Intent.URI_INTENT_SCHEME);
+                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
                         startActivity(intent);
                         return true;
                     } catch (Exception e) {
@@ -59,13 +73,65 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Add touch listener for settings gesture (5x tap)
+        webView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    // Check if tap is in top-left corner (logo area)
+                    if (event.getX() < 300 && event.getY() < 300) {
+                        handleSettingsTap();
+                    }
+                }
+                return false;
+            }
+        });
+
         // Load welcome page
-        String guestName = getIntent().getStringExtra("guest_name");
-        if (guestName == null || guestName.isEmpty()) {
-            guestName = DEFAULT_GUEST;
+        loadWelcomePage();
+    }
+
+    private void handleSettingsTap() {
+        tapCount++;
+
+        // Reset counter after 2 seconds
+        tapHandler.removeCallbacks(tapResetRunnable);
+        tapHandler.postDelayed(tapResetRunnable, 2000);
+
+        // Open settings after 5 taps
+        if (tapCount >= 5) {
+            tapCount = 0;
+            openSettings();
+        }
+    }
+
+    private void openSettings() {
+        Intent intent = new Intent(this, SettingsActivity.class);
+        startActivity(intent);
+    }
+
+    private void loadWelcomePage() {
+        // Get settings from SharedPreferences
+        String serverUrl = prefs.getString("server_url", "http://192.168.1.100:3000");
+        String guestName = prefs.getString("guest_name", "Willkommen");
+
+        // Get guest name from intent (if provided)
+        String intentGuestName = getIntent().getStringExtra("guest_name");
+        if (intentGuestName != null && !intentGuestName.isEmpty()) {
+            guestName = intentGuestName;
         }
 
-        webView.loadUrl(SERVER_URL + java.net.URLEncoder.encode(guestName));
+        // Build URL with query parameters
+        String url = serverUrl + "/?welcome=" + java.net.URLEncoder.encode(guestName);
+
+        // Add additional settings as URL parameters for the web app to use
+        url += "&wifi=" + java.net.URLEncoder.encode(prefs.getString("wifi_name", ""));
+        url += "&wifi_pass=" + java.net.URLEncoder.encode(prefs.getString("wifi_password", ""));
+        url += "&checkin=" + java.net.URLEncoder.encode(prefs.getString("checkin_time", ""));
+        url += "&checkout=" + java.net.URLEncoder.encode(prefs.getString("checkout_time", ""));
+        url += "&phone=" + java.net.URLEncoder.encode(prefs.getString("contact_phone", ""));
+
+        webView.loadUrl(url);
     }
 
     private void enableKioskMode() {
@@ -115,5 +181,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         enableKioskMode();
+        // Reload page when returning from settings
+        loadWelcomePage();
     }
 }

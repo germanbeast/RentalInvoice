@@ -42,6 +42,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Settings Activity -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+
         <!-- Boot Receiver for Auto-Start -->
         <receiver
             android:name=".BootReceiver"

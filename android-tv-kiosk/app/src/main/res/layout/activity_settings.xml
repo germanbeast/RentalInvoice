@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1e293b"
+    android:padding="40dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚙️ Einstellungen"
+            android:textSize="48sp"
+            android:textColor="#ffffff"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="40dp"/>
+
+        <!-- Server Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🌐 Server Einstellungen"
+            android:textSize="28sp"
+            android:textColor="#667eea"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="15dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Server URL (mit http://)"
+            android:textSize="20sp"
+            android:textColor="#94a3b8"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/et_server_url"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:hint="http://192.168.1.100:3000"
+            android:textSize="22sp"
+            android:textColor="#ffffff"
+            android:textColorHint="#64748b"
+            android:background="#334155"
+            android:padding="15dp"
+            android:inputType="textUri"
+            android:layout_marginBottom="25dp"/>
+
+        <!-- Guest Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="👤 Gast Informationen"
+            android:textSize="28sp"
+            android:textColor="#667eea"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="15dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Gast-Name"
+            android:textSize="20sp"
+            android:textColor="#94a3b8"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/et_guest_name"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:hint="Familie Müller"
+            android:textSize="22sp"
+            android:textColor="#ffffff"
+            android:textColorHint="#64748b"
+            android:background="#334155"
+            android:padding="15dp"
+            android:inputType="textPersonName"
+            android:layout_marginBottom="25dp"/>
+
+        <!-- WiFi Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📶 WLAN Informationen"
+            android:textSize="28sp"
+            android:textColor="#667eea"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="15dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="WLAN Name"
+            android:textSize="20sp"
+            android:textColor="#94a3b8"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/et_wifi_name"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:hint="Ferienwohnung-WLAN"
+            android:textSize="22sp"
+            android:textColor="#ffffff"
+            android:textColorHint="#64748b"
+            android:background="#334155"
+            android:padding="15dp"
+            android:inputType="text"
+            android:layout_marginBottom="20dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="WLAN Passwort"
+            android:textSize="20sp"
+            android:textColor="#94a3b8"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/et_wifi_password"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:hint="••••••••"
+            android:textSize="22sp"
+            android:textColor="#ffffff"
+            android:textColorHint="#64748b"
+            android:background="#334155"
+            android:padding="15dp"
+            android:inputType="textPassword"
+            android:layout_marginBottom="25dp"/>
+
+        <!-- Booking Times -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🕐 Zeiten"
+            android:textSize="28sp"
+            android:textColor="#667eea"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="15dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Check-In Zeit"
+            android:textSize="20sp"
+            android:textColor="#94a3b8"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/et_checkin_time"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:hint="15:00 Uhr"
+            android:textSize="22sp"
+            android:textColor="#ffffff"
+            android:textColorHint="#64748b"
+            android:background="#334155"
+            android:padding="15dp"
+            android:inputType="text"
+            android:layout_marginBottom="20dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Check-Out Zeit"
+            android:textSize="20sp"
+            android:textColor="#94a3b8"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/et_checkout_time"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:hint="10:00 Uhr"
+            android:textSize="22sp"
+            android:textColor="#ffffff"
+            android:textColorHint="#64748b"
+            android:background="#334155"
+            android:padding="15dp"
+            android:inputType="text"
+            android:layout_marginBottom="25dp"/>
+
+        <!-- Contact -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📞 Kontakt"
+            android:textSize="28sp"
+            android:textColor="#667eea"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="15dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Telefonnummer"
+            android:textSize="20sp"
+            android:textColor="#94a3b8"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/et_contact_phone"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:hint="+49 123 456789"
+            android:textSize="22sp"
+            android:textColor="#ffffff"
+            android:textColorHint="#64748b"
+            android:background="#334155"
+            android:padding="15dp"
+            android:inputType="phone"
+            android:layout_marginBottom="40dp"/>
+
+        <!-- Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="20dp">
+
+            <Button
+                android:id="@+id/btn_save"
+                android:layout_width="0dp"
+                android:layout_height="70dp"
+                android:layout_weight="1"
+                android:text="💾 Speichern"
+                android:textSize="24sp"
+                android:textColor="#ffffff"
+                android:background="#10b981"
+                android:layout_marginEnd="10dp"/>
+
+            <Button
+                android:id="@+id/btn_close"
+                android:layout_width="0dp"
+                android:layout_height="70dp"
+                android:layout_weight="1"
+                android:text="❌ Schließen"
+                android:textSize="24sp"
+                android:textColor="#ffffff"
+                android:background="#ef4444"
+                android:layout_marginStart="10dp"/>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tipp: 5x schnell auf Logo tippen um Settings zu öffnen"
+            android:textSize="18sp"
+            android:textColor="#64748b"
+            android:gravity="center"
+            android:layout_marginTop="30dp"
+            android:layout_marginBottom="20dp"/>
+
+    </LinearLayout>
+</ScrollView>

@@ -3914,30 +3914,69 @@
     
     async function loadWelcomeSettings() {
         try {
-            // Load vermieter data for phone and logo
-            const res = await fetch('/api/settings');
-            const data = await res.json();
-            
-            if (data.success && data.settings) {
-                const vermieter = data.settings.vermieter || {};
-                
-                // Set phone
+            // Check URL parameters first (from Android app)
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // WLAN Info
+            const wifiName = urlParams.get('wifi');
+            const wifiPass = urlParams.get('wifi_pass');
+            if (wifiName) {
+                const wifiNameEl = $('#welcome-wifi-name');
+                if (wifiNameEl) wifiNameEl.textContent = decodeURIComponent(wifiName);
+            }
+            if (wifiPass) {
+                const wifiPassEl = $('#welcome-wifi-password');
+                if (wifiPassEl) wifiPassEl.textContent = decodeURIComponent(wifiPass);
+            }
+
+            // Check-In/Out Times
+            const checkinTime = urlParams.get('checkin');
+            const checkoutTime = urlParams.get('checkout');
+            if (checkinTime) {
+                const checkinEl = $('#welcome-checkin');
+                if (checkinEl) checkinEl.textContent = decodeURIComponent(checkinTime);
+            }
+            if (checkoutTime) {
+                const checkoutEl = $('#welcome-checkout');
+                if (checkoutEl) checkoutEl.textContent = decodeURIComponent(checkoutTime);
+            }
+
+            // Phone
+            const phone = urlParams.get('phone');
+            if (phone) {
                 const phoneEl = $('#welcome-phone');
-                if (phoneEl && vermieter.telefon) {
-                    phoneEl.textContent = vermieter.telefon;
-                }
-                
-                // Set logo text
-                const logoEl = $('#welcome-logo');
-                if (logoEl && vermieter.name) {
-                    logoEl.textContent = vermieter.name;
+                if (phoneEl) phoneEl.textContent = decodeURIComponent(phone);
+            }
+
+            // If no URL params, load from server (fallback)
+            if (!phone || !wifiName) {
+                // Load vermieter data for phone and logo
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+
+                if (data.success && data.settings) {
+                    const vermieter = data.settings.vermieter || {};
+
+                    // Set phone (only if not in URL)
+                    if (!phone) {
+                        const phoneEl = $('#welcome-phone');
+                        if (phoneEl && vermieter.telefon) {
+                            phoneEl.textContent = vermieter.telefon;
+                        }
+                    }
+
+                    // Set logo text
+                    const logoEl = $('#welcome-logo');
+                    if (logoEl && vermieter.name) {
+                        logoEl.textContent = vermieter.name;
+                    }
                 }
             }
-            
+
             // Load branding for logo
             const brandingRes = await fetch('/api/branding');
             const brandingData = await brandingRes.json();
-            
+
             if (brandingData.success && brandingData.branding) {
                 const logoEl = $('#welcome-logo');
                 if (logoEl && brandingData.branding.template_config?.logoText) {
