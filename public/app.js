@@ -3850,3 +3850,128 @@
 
 })();
 // Version 3.0 - SQLite Database Migration
+
+    // =======================
+    // WELCOME SCREEN (Google TV Kiosk)
+    // =======================
+    const viewWelcome = $('#view-welcome');
+    
+    function showWelcomeScreen(guestName) {
+        // Hide all other views
+        if (viewDashboard) viewDashboard.style.display = 'none';
+        if (viewInvoiceForm) viewInvoiceForm.style.display = 'none';
+        if (viewExpenses) viewExpenses.style.display = 'none';
+        if (appWrapper) appWrapper.style.display = 'none';
+        if (loginScreen) loginScreen.style.display = 'none';
+        
+        // Show welcome screen
+        if (viewWelcome) {
+            viewWelcome.style.display = 'block';
+            
+            // Set guest name
+            const guestNameEl = $('#welcome-guest-name');
+            if (guestNameEl && guestName) {
+                guestNameEl.textContent = guestName;
+            }
+            
+            // Update time and date
+            updateWelcomeTime();
+            setInterval(updateWelcomeTime, 1000);
+            
+            // Load settings for WLAN, phone, etc.
+            loadWelcomeSettings();
+        }
+    }
+    
+    function updateWelcomeTime() {
+        const now = new Date();
+        const timeEl = $('#welcome-time');
+        const dateEl = $('#welcome-date');
+        
+        if (timeEl) {
+            timeEl.textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        if (dateEl) {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateEl.textContent = now.toLocaleDateString('de-DE', options);
+        }
+    }
+    
+    async function loadWelcomeSettings() {
+        try {
+            // Load vermieter data for phone and logo
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            
+            if (data.success && data.settings) {
+                const vermieter = data.settings.vermieter || {};
+                
+                // Set phone
+                const phoneEl = $('#welcome-phone');
+                if (phoneEl && vermieter.telefon) {
+                    phoneEl.textContent = vermieter.telefon;
+                }
+                
+                // Set logo text
+                const logoEl = $('#welcome-logo');
+                if (logoEl && vermieter.name) {
+                    logoEl.textContent = vermieter.name;
+                }
+            }
+            
+            // Load branding for logo
+            const brandingRes = await fetch('/api/branding');
+            const brandingData = await brandingRes.json();
+            
+            if (brandingData.success && brandingData.branding) {
+                const logoEl = $('#welcome-logo');
+                if (logoEl && brandingData.branding.template_config?.logoText) {
+                    logoEl.textContent = brandingData.branding.template_config.logoText;
+                }
+            }
+        } catch (e) {
+            console.error('Load welcome settings error:', e);
+        }
+    }
+    
+    // App launch buttons
+    const btnLaunchWaipu = $('#btn-launch-waipu');
+    const btnLaunchNetflix = $('#btn-launch-netflix');
+    const btnLaunchYoutube = $('#btn-launch-youtube');
+    const btnLaunchPrime = $('#btn-launch-prime');
+    
+    if (btnLaunchWaipu) {
+        btnLaunchWaipu.addEventListener('click', () => {
+            // On Android TV, this will try to launch the app
+            window.location.href = 'intent://de.exaring.waiputv#Intent;scheme=app;package=de.exaring.waiputv;end';
+        });
+    }
+    
+    if (btnLaunchNetflix) {
+        btnLaunchNetflix.addEventListener('click', () => {
+            window.location.href = 'intent://com.netflix.mediaclient#Intent;scheme=app;package=com.netflix.mediaclient;end';
+        });
+    }
+    
+    if (btnLaunchYoutube) {
+        btnLaunchYoutube.addEventListener('click', () => {
+            window.location.href = 'intent://com.google.android.youtube.tv#Intent;scheme=app;package=com.google.android.youtube.tv;end';
+        });
+    }
+    
+    if (btnLaunchPrime) {
+        btnLaunchPrime.addEventListener('click', () => {
+            window.location.href = 'intent://com.amazon.avod.thirdpartyclient#Intent;scheme=app;package=com.amazon.avod.thirdpartyclient;end';
+        });
+    }
+    
+    // Check URL for welcome screen parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const welcomeGuest = urlParams.get('welcome');
+    
+    if (welcomeGuest) {
+        // Show welcome screen with guest name
+        showWelcomeScreen(decodeURIComponent(welcomeGuest));
+    }
+

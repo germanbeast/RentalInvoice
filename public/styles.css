@@ -2260,3 +2260,196 @@ input[type="checkbox"]:focus-visible {
     border: none;
     box-shadow: none;
 }
+/* =======================
+   WELCOME SCREEN (Google TV)
+   ======================= */
+.welcome-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: white;
+    overflow-y: auto;
+    z-index: 9999;
+}
+
+.welcome-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 60px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 50px;
+}
+
+.welcome-header {
+    text-align: center;
+}
+
+.welcome-logo {
+    font-family: Georgia, serif;
+    font-size: 2.5rem;
+    font-style: italic;
+    margin-bottom: 20px;
+    color: #e0e7ff;
+}
+
+.welcome-time {
+    font-size: 4rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+}
+
+.welcome-date {
+    font-size: 1.5rem;
+    color: #94a3b8;
+    font-weight: 300;
+}
+
+.welcome-main {
+    text-align: center;
+    padding: 40px 0;
+}
+
+.welcome-title {
+    font-size: 3rem;
+    font-weight: 300;
+    margin-bottom: 20px;
+    color: #e0e7ff;
+}
+
+.welcome-guest-name {
+    font-size: 4.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.welcome-message {
+    font-size: 1.8rem;
+    color: #cbd5e1;
+    font-weight: 300;
+}
+
+.welcome-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 30px;
+    margin: 20px 0;
+}
+
+.welcome-info-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 30px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.welcome-info-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-5px);
+}
+
+.welcome-info-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.welcome-info-label {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.welcome-info-value {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.welcome-info-sub {
+    font-size: 1rem;
+    color: #cbd5e1;
+}
+
+.welcome-apps {
+    text-align: center;
+}
+
+.welcome-apps-title {
+    font-size: 2rem;
+    font-weight: 300;
+    margin-bottom: 30px;
+    color: #e0e7ff;
+}
+
+.welcome-apps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 25px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.welcome-app-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 40px 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.welcome-app-btn:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: transparent;
+    transform: scale(1.05);
+}
+
+.welcome-app-icon {
+    font-size: 4rem;
+}
+
+.welcome-app-name {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.welcome-footer {
+    text-align: center;
+    padding-top: 40px;
+    color: #94a3b8;
+    font-size: 1.1rem;
+}
+
+/* Responsive for smaller TVs */
+@media (max-width: 1280px) {
+    .welcome-container {
+        padding: 40px 60px;
+    }
+    
+    .welcome-guest-name {
+        font-size: 3.5rem;
+    }
+    
+    .welcome-info-grid,
+    .welcome-apps-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
