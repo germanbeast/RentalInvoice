@@ -494,7 +494,7 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", "https://cdnjs.cloudflare.com"],
             frameSrc: ["'none'"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
@@ -539,7 +539,7 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 30,
+    max: 120,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'API Rate-Limit erreicht. Bitte warten.' }
