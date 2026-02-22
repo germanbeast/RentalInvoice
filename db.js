@@ -187,6 +187,13 @@ function initSchema() {
         );
     `);
 
+    // Migration: add paperless_id to estate_invoices
+    const estateInvoicesInfo = db.prepare("PRAGMA table_info(estate_invoices)").all();
+    if (!estateInvoicesInfo.some(col => col.name === 'paperless_id')) {
+        db.exec("ALTER TABLE estate_invoices ADD COLUMN paperless_id INTEGER UNIQUE");
+        console.log('✅ Migration: paperless_id Spalte zu estate_invoices hinzugefügt.');
+    }
+
     console.log('✅ Datenbank-Schema initialisiert.');
 }
 
@@ -759,6 +766,37 @@ function getEstateStats() {
     };
 }
 
+// Estate Invoice helpers for Paperless
+function getEstateInvoiceByPaperlessId(paperlessId) {
+    return getDb().prepare('SELECT * FROM estate_invoices WHERE paperless_id = ?').get(paperlessId);
+}
+
+// Update functions for edit feature
+function updateEstateMileage(id, data) {
+    const total = data.distance_km * (data.rate_per_km || 0.30);
+    return getDb().prepare(
+        `UPDATE estate_mileage
+         SET date = ?, from_location = ?, to_location = ?, purpose = ?, distance_km = ?, rate_per_km = ?, total_amount = ?, notes = ?
+         WHERE id = ?`
+    ).run(data.date, data.from_location, data.to_location, data.purpose, data.distance_km, data.rate_per_km || 0.30, total, data.notes || null, id);
+}
+
+function updateEstateExpense(id, data) {
+    return getDb().prepare(
+        `UPDATE estate_expenses
+         SET date = ?, category = ?, description = ?, amount = ?, receipt_file = ?, notes = ?
+         WHERE id = ?`
+    ).run(data.date, data.category, data.description, data.amount, data.receipt_file || null, data.notes || null, id);
+}
+
+function updateEstateInvoice(id, data) {
+    return getDb().prepare(
+        `UPDATE estate_invoices
+         SET date = ?, vendor = ?, invoice_number = ?, description = ?, amount = ?, file_path = ?, category = ?, notes = ?
+         WHERE id = ?`
+    ).run(data.date, data.vendor, data.invoice_number || null, data.description, data.amount, data.file_path || null, data.category || null, data.notes || null, id);
+}
+
 // =======================
 // Bookings & Notifications
 // =======================
@@ -1066,12 +1104,16 @@ module.exports = {
     // Estate Management
     getAllEstateMileage,
     createEstateMileage,
+    updateEstateMileage,
     deleteEstateMileage,
     getAllEstateExpenses,
     createEstateExpense,
+    updateEstateExpense,
     deleteEstateExpense,
     getAllEstateInvoices,
     createEstateInvoice,
+    updateEstateInvoice,
     deleteEstateInvoice,
-    getEstateStats
+    getEstateStats,
+    getEstateInvoiceByPaperlessId
 };

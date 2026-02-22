@@ -20,6 +20,7 @@ const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
+const multer = require('multer');
 const db = require('./db');
 const waCommands = require('./wa-commands');
 const tgCommands = require('./tg-commands');
@@ -31,6 +32,38 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const UPLOADS_DIR = path.join(__dirname, 'uploads', 'estate');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Configure Multer for file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, UPLOADS_DIR);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|pdf|gif/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Nur Bilder (JPEG, PNG, GIF) und PDFs erlaubt'));
+        }
+    }
+});
 
 // =======================
 // 1. DATABASE INIT
@@ -1623,6 +1656,149 @@ app.post('/api/estate/generate-report', apiLimiter, async (req, res) => {
     } catch (e) {
         console.error('Estate Report Generation Error:', e.message);
         res.status(500).json({ error: 'PDF-Generierung fehlgeschlagen: ' + e.message });
+    }
+});
+
+// UPDATE Endpoints for Edit Feature
+app.put('/api/estate/mileage/:id', apiLimiter, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { date, from_location, to_location, purpose, distance_km, rate_per_km, notes } = req.body;
+
+        if (!date || !from_location || !to_location || !purpose || !distance_km) {
+            return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt werden' });
+        }
+
+        if (isNaN(distance_km) || distance_km <= 0) {
+            return res.status(400).json({ error: 'Ungültige Kilometerangabe' });
+        }
+
+        db.updateEstateMileage(parseInt(id), { date, from_location, to_location, purpose, distance_km, rate_per_km, notes });
+        res.json({ success: true, message: 'Fahrtkosten aktualisiert' });
+    } catch (e) {
+        console.error('Estate Mileage PUT Error:', e.message);
+        res.status(500).json({ error: 'Fahrtkosten konnten nicht aktualisiert werden' });
+    }
+});
+
+app.put('/api/estate/expenses/:id', apiLimiter, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { date, category, description, amount, receipt_file, notes } = req.body;
+
+        if (!date || !category || !description || !amount) {
+            return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt werden' });
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Ungültiger Betrag' });
+        }
+
+        db.updateEstateExpense(parseInt(id), { date, category, description, amount, receipt_file, notes });
+        res.json({ success: true, message: 'Aufwendung aktualisiert' });
+    } catch (e) {
+        console.error('Estate Expense PUT Error:', e.message);
+        res.status(500).json({ error: 'Aufwendung konnte nicht aktualisiert werden' });
+    }
+});
+
+app.put('/api/estate/invoices/:id', apiLimiter, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { date, vendor, invoice_number, description, amount, file_path, category, notes } = req.body;
+
+        if (!date || !vendor || !description || !amount) {
+            return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt werden' });
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Ungültiger Betrag' });
+        }
+
+        db.updateEstateInvoice(parseInt(id), { date, vendor, invoice_number, description, amount, file_path, category, notes });
+        res.json({ success: true, message: 'Rechnung aktualisiert' });
+    } catch (e) {
+        console.error('Estate Invoice PUT Error:', e.message);
+        res.status(500).json({ error: 'Rechnung konnte nicht aktualisiert werden' });
+    }
+});
+
+// File Upload for Estate Expenses/Invoices
+app.post('/api/estate/upload', apiLimiter, upload.single('file'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Keine Datei hochgeladen' });
+        }
+
+        const filePath = `/uploads/estate/${req.file.filename}`;
+        res.json({ success: true, filePath, filename: req.file.originalname });
+    } catch (e) {
+        console.error('Estate Upload Error:', e.message);
+        res.status(500).json({ error: 'Datei konnte nicht hochgeladen werden' });
+    }
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Paperless NGX Sync for Estate Invoices
+app.post('/api/estate/paperless-sync', apiLimiter, async (req, res) => {
+    try {
+        const allSettings = db.getAllSettings();
+        const pl = allSettings.paperless || {};
+        const tag = allSettings.paperless_estate_tag || 'Erbverwaltung';
+        const amountFieldName = allSettings.paperless_amount_field || 'Betrag';
+
+        if (!pl.url || !pl.token) {
+            return res.status(400).json({ error: 'Paperless-Zugangsdaten nicht konfiguriert' });
+        }
+
+        // 1. Get Tag ID from Paperless
+        const tagsRes = await axios.get(`${pl.url}/api/tags/?name__icontains=${encodeURIComponent(tag)}`, {
+            headers: { 'Authorization': `Token ${pl.token}` }
+        });
+        const tagObj = tagsRes.data.results.find(t => t.name.toLowerCase() === tag.toLowerCase());
+        if (!tagObj) return res.json({ success: true, message: `Tag "${tag}" nicht in Paperless gefunden.`, count: 0 });
+
+        // 2. Search documents with this tag
+        const docsRes = await axios.get(`${pl.url}/api/documents/?tags__id__all=${tagObj.id}`, {
+            headers: { 'Authorization': `Token ${pl.token}` }
+        });
+
+        // 3. Get Custom Fields definitions
+        const fieldsRes = await axios.get(`${pl.url}/api/custom_fields/`, {
+            headers: { 'Authorization': `Token ${pl.token}` }
+        });
+        const amountFieldDef = fieldsRes.data.results.find(f => f.name.toLowerCase() === amountFieldName.toLowerCase());
+
+        let count = 0;
+        for (const doc of docsRes.data.results) {
+            // Check if already synced
+            if (db.getEstateInvoiceByPaperlessId(doc.id)) continue;
+
+            let amount = 0;
+            if (amountFieldDef && doc.custom_fields) {
+                const fieldVal = doc.custom_fields.find(cf => cf.field === amountFieldDef.id);
+                if (fieldVal && fieldVal.value) amount = parseFloat(fieldVal.value);
+            }
+
+            db.createEstateInvoice({
+                date: doc.created ? doc.created.split('T')[0] : (doc.added ? doc.added.split('T')[0] : new Date().toISOString().split('T')[0]),
+                vendor: 'Paperless Import',
+                invoice_number: doc.id.toString(),
+                description: doc.title,
+                amount: amount,
+                file_path: `${pl.url}/api/documents/${doc.id}/download/`,
+                category: 'Paperless',
+                notes: `Importiert von Paperless NGX (Doc ID: ${doc.id})`
+            });
+            count++;
+        }
+
+        res.json({ success: true, message: `${count} neue Rechnungen aus Paperless synchronisiert`, count });
+    } catch (e) {
+        console.error('Estate Paperless Sync Error:', e.message);
+        res.status(500).json({ error: 'Synchronisierung fehlgeschlagen: ' + e.message });
     }
 });
 

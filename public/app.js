@@ -4077,6 +4077,9 @@
     // Mileage Form
     $('#form-mileage')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const form = e.target;
+        const editId = form.dataset.editId;
+
         const data = {
             date: $('#mileage-date').value,
             from_location: $('#mileage-from').value,
@@ -4086,16 +4089,23 @@
             rate_per_km: parseFloat($('#mileage-rate').value) || 0.30,
             notes: $('#mileage-notes').value
         };
+
         try {
-            const res = await fetch('/api/estate/mileage', {
-                method: 'POST',
+            const url = editId ? `/api/estate/mileage/${editId}` : '/api/estate/mileage';
+            const method = editId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             const result = await res.json();
             if (result.success) {
-                showToast('Fahrtkosten gespeichert', 'success');
-                e.target.reset();
+                showToast(editId ? 'Fahrtkosten aktualisiert' : 'Fahrtkosten gespeichert', 'success');
+                form.reset();
+                delete form.dataset.editId;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Fahrtkosten speichern`;
                 loadEstateMileage();
                 loadEstateStats();
             } else {
@@ -4225,7 +4235,13 @@
                 <td class="text-right">${m.distance_km.toFixed(1)} km</td>
                 <td class="text-right">${formatCurrency(m.total_amount)}</td>
                 <td class="text-right">
-                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-mileage" data-id="${m.id}">
+                    <button class="btn btn-ghost btn-icon btn-edit-mileage" data-id="${m.id}" title="Bearbeiten">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-mileage" data-id="${m.id}" title="Löschen">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -4234,6 +4250,13 @@
                 </td>
             `;
             list.appendChild(tr);
+        });
+
+        $$('.btn-edit-mileage').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const m = mileage.find(item => item.id === parseInt(btn.dataset.id));
+                if (m) editEstateMileage(m);
+            });
         });
 
         $$('.btn-delete-mileage').forEach(btn => {
@@ -4252,6 +4275,24 @@
                 }
             });
         });
+    }
+
+    function editEstateMileage(m) {
+        $('#mileage-date').value = m.date;
+        $('#mileage-from').value = m.from_location;
+        $('#mileage-to').value = m.to_location;
+        $('#mileage-purpose').value = m.purpose;
+        $('#mileage-distance').value = m.distance_km;
+        $('#mileage-rate').value = m.rate_per_km;
+        $('#mileage-notes').value = m.notes || '';
+
+        const form = $('#form-mileage');
+        form.dataset.editId = m.id;
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Aktualisieren`;
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     async function loadEstateExpenses() {
