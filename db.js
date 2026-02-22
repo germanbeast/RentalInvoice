@@ -147,6 +147,46 @@ function initSchema() {
         console.log('✅ Migration: template_config Spalte zu branding hinzugefügt.');
     }
 
+    // Estate Management Tables
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS estate_mileage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL,
+            from_location TEXT NOT NULL,
+            to_location TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            distance_km REAL NOT NULL,
+            rate_per_km REAL DEFAULT 0.30,
+            total_amount REAL NOT NULL,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS estate_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            amount REAL NOT NULL,
+            receipt_file TEXT,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS estate_invoices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL,
+            vendor TEXT NOT NULL,
+            invoice_number TEXT,
+            description TEXT NOT NULL,
+            amount REAL NOT NULL,
+            file_path TEXT,
+            category TEXT,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
     console.log('✅ Datenbank-Schema initialisiert.');
 }
 
@@ -630,6 +670,96 @@ function getStats() {
 }
 
 // =======================
+// Estate Management
+// =======================
+
+// Estate Mileage
+function getAllEstateMileage() {
+    return getDb().prepare('SELECT * FROM estate_mileage ORDER BY date DESC, created_at DESC').all();
+}
+
+function createEstateMileage(data) {
+    const total = data.distance_km * (data.rate_per_km || 0.30);
+    const result = getDb().prepare(
+        `INSERT INTO estate_mileage (date, from_location, to_location, purpose, distance_km, rate_per_km, total_amount, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(data.date, data.from_location, data.to_location, data.purpose, data.distance_km, data.rate_per_km || 0.30, total, data.notes || null);
+    return { id: result.lastInsertRowid, ...data, total_amount: total };
+}
+
+function deleteEstateMileage(id) {
+    return getDb().prepare('DELETE FROM estate_mileage WHERE id = ?').run(id);
+}
+
+// Estate Expenses
+function getAllEstateExpenses() {
+    return getDb().prepare('SELECT * FROM estate_expenses ORDER BY date DESC, created_at DESC').all();
+}
+
+function createEstateExpense(data) {
+    const result = getDb().prepare(
+        `INSERT INTO estate_expenses (date, category, description, amount, receipt_file, notes)
+         VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(data.date, data.category, data.description, data.amount, data.receipt_file || null, data.notes || null);
+    return { id: result.lastInsertRowid, ...data };
+}
+
+function deleteEstateExpense(id) {
+    return getDb().prepare('DELETE FROM estate_expenses WHERE id = ?').run(id);
+}
+
+// Estate Invoices
+function getAllEstateInvoices() {
+    return getDb().prepare('SELECT * FROM estate_invoices ORDER BY date DESC, created_at DESC').all();
+}
+
+function createEstateInvoice(data) {
+    const result = getDb().prepare(
+        `INSERT INTO estate_invoices (date, vendor, invoice_number, description, amount, file_path, category, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(data.date, data.vendor, data.invoice_number || null, data.description, data.amount, data.file_path || null, data.category || null, data.notes || null);
+    return { id: result.lastInsertRowid, ...data };
+}
+
+function deleteEstateInvoice(id) {
+    return getDb().prepare('DELETE FROM estate_invoices WHERE id = ?').run(id);
+}
+
+// Statistics für PDF-Abrechnung
+function getEstateStats() {
+    const db = getDb();
+
+    const mileageTotal = db.prepare('SELECT SUM(total_amount) as total FROM estate_mileage').get();
+    const expensesTotal = db.prepare('SELECT SUM(amount) as total FROM estate_expenses').get();
+    const invoicesTotal = db.prepare('SELECT SUM(amount) as total FROM estate_invoices').get();
+
+    const mileageByMonth = db.prepare(`
+        SELECT strftime('%Y-%m', date) as month, SUM(total_amount) as total, COUNT(*) as count
+        FROM estate_mileage
+        GROUP BY month
+        ORDER BY month DESC
+    `).all();
+
+    const expensesByCategory = db.prepare(`
+        SELECT category, SUM(amount) as total, COUNT(*) as count
+        FROM estate_expenses
+        GROUP BY category
+        ORDER BY total DESC
+    `).all();
+
+    return {
+        totals: {
+            mileage: mileageTotal.total || 0,
+            expenses: expensesTotal.total || 0,
+            invoices: invoicesTotal.total || 0,
+            grand_total: (mileageTotal.total || 0) + (expensesTotal.total || 0) + (invoicesTotal.total || 0)
+        },
+        mileageByMonth,
+        expensesByCategory
+    };
+}
+
+// =======================
 // Bookings & Notifications
 // =======================
 function getBookingByUid(uid) {
@@ -932,5 +1062,16 @@ module.exports = {
     deleteTelegramRequest,
     revokeTelegramAccess,
     // Migration
-    migrateFromLocalStorage
+    migrateFromLocalStorage,
+    // Estate Management
+    getAllEstateMileage,
+    createEstateMileage,
+    deleteEstateMileage,
+    getAllEstateExpenses,
+    createEstateExpense,
+    deleteEstateExpense,
+    getAllEstateInvoices,
+    createEstateInvoice,
+    deleteEstateInvoice,
+    getEstateStats
 };

@@ -2453,3 +2453,137 @@ input[type="checkbox"]:focus-visible {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* ===========================
+   ESTATE MANAGEMENT STYLES
+   =========================== */
+
+/* Tabs */
+.estate-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.estate-tab {
+    padding: 0.75rem 1.25rem;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.estate-tab:hover {
+    color: var(--text-primary);
+    background: rgba(148, 163, 184, 0.05);
+}
+
+.estate-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.estate-tab-content {
+    display: none;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Estate Table */
+.estate-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.estate-table thead {
+    background: var(--bg-body);
+}
+
+.estate-table th,
+.estate-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.estate-table th {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.estate-table tbody tr:hover {
+    background: rgba(56, 189, 248, 0.03);
+}
+
+/* Stats Grid */
+.estate-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-card-total {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.1));
+    border-color: var(--accent);
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stat-card-total .stat-value {
+    color: var(--accent);
+}
+
+/* Category Badge */
+.category-badge {
+    display: inline-flex;
+    padding: 0.2rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .estate-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .estate-tab {
+        white-space: nowrap;
+    }
+
+    .estate-stats-grid {
+        grid-template-columns: 1fr;
+    }
+}

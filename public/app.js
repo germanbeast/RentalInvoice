@@ -40,12 +40,14 @@
     const navInvoice = $('#nav-invoice');
     const navGuests = $('#nav-guests');
     const navExpenses = $('#nav-expenses');
+    const navEstate = $('#nav-estate');
     const navWelcome = $('#nav-welcome');
 
     // View Panes
     const viewDashboard = $('#view-dashboard');
     const viewInvoiceForm = $('#view-invoice-form');
     const viewExpenses = $('#view-expenses');
+    const viewEstate = $('#view-estate');
 
     const modalSettings = $('#modal-settings');
     const toastContainer = $('#toast-container');
@@ -1338,8 +1340,8 @@
     }
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1362,6 +1364,10 @@
             viewExpenses.style.display = 'flex';
             navExpenses.classList.add('active');
             loadExpenses();
+        } else if (viewId === 'estate') {
+            viewEstate.style.display = 'flex';
+            navEstate.classList.add('active');
+            loadEstateData();
         }
 
         startViewPolling(viewId);
@@ -1375,6 +1381,7 @@
     navDashboard.addEventListener('click', () => switchView('dashboard'));
     navInvoice.addEventListener('click', () => switchView('invoice'));
     navExpenses.addEventListener('click', () => switchView('expenses'));
+    if (navEstate) navEstate.addEventListener('click', () => switchView('estate'));
 
     if (navWelcome) {
         navWelcome.addEventListener('click', () => {
@@ -4052,5 +4059,327 @@
         showWelcomeScreen(decodeURIComponent(welcomeGuest));
     }
 
+    // =======================
+    // ESTATE MANAGEMENT FUNCTIONS
+    // =======================
+
+    // Estate Tabs
+    $$('.estate-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            $$('.estate-tab').forEach(t => t.classList.remove('active'));
+            $$('.estate-tab-content').forEach(c => c.style.display = 'none');
+            tab.classList.add('active');
+            $(`#estate-tab-${tabName}`).style.display = 'block';
+        });
+    });
+
+    // Mileage Form
+    $('#form-mileage')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = {
+            date: $('#mileage-date').value,
+            from_location: $('#mileage-from').value,
+            to_location: $('#mileage-to').value,
+            purpose: $('#mileage-purpose').value,
+            distance_km: parseFloat($('#mileage-distance').value),
+            rate_per_km: parseFloat($('#mileage-rate').value) || 0.30,
+            notes: $('#mileage-notes').value
+        };
+        try {
+            const res = await fetch('/api/estate/mileage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Fahrtkosten gespeichert', 'success');
+                e.target.reset();
+                loadEstateMileage();
+                loadEstateStats();
+            } else {
+                showToast(result.error || 'Fehler beim Speichern', 'error');
+            }
+        } catch (err) {
+            showToast('Server-Fehler', 'error');
+        }
+    });
+
+    // Estate Expense Form
+    $('#form-estate-expense')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = {
+            date: $('#expense-date').value,
+            category: $('#expense-category').value,
+            description: $('#expense-description').value,
+            amount: parseFloat($('#expense-amount').value),
+            notes: $('#expense-notes').value
+        };
+        try {
+            const res = await fetch('/api/estate/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Aufwendung gespeichert', 'success');
+                e.target.reset();
+                loadEstateExpenses();
+                loadEstateStats();
+            } else {
+                showToast(result.error || 'Fehler beim Speichern', 'error');
+            }
+        } catch (err) {
+            showToast('Server-Fehler', 'error');
+        }
+    });
+
+    // Estate Invoice Form
+    $('#form-estate-invoice')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = {
+            date: $('#invoice-date').value,
+            vendor: $('#invoice-vendor').value,
+            invoice_number: $('#invoice-number').value,
+            description: $('#invoice-description').value,
+            amount: parseFloat($('#invoice-amount').value),
+            notes: $('#invoice-notes').value
+        };
+        try {
+            const res = await fetch('/api/estate/invoices', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Rechnung gespeichert', 'success');
+                e.target.reset();
+                loadEstateInvoices();
+                loadEstateStats();
+            } else {
+                showToast(result.error || 'Fehler beim Speichern', 'error');
+            }
+        } catch (err) {
+            showToast('Server-Fehler', 'error');
+        }
+    });
+
+    // PDF Report Generation
+    $('#btn-estate-report')?.addEventListener('click', async () => {
+        try {
+            const res = await fetch('/api/estate/generate-report', { method: 'POST' });
+            if (!res.ok) throw new Error('PDF-Generierung fehlgeschlagen');
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Erbverwaltung-Abrechnung-${new Date().toISOString().split('T')[0]}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            showToast('PDF-Abrechnung erfolgreich erstellt', 'success');
+        } catch (err) {
+            showToast('Fehler bei PDF-Generierung: ' + err.message, 'error');
+        }
+    });
+
+    // Load Functions
+    async function loadEstateData() {
+        await Promise.all([
+            loadEstateMileage(),
+            loadEstateExpenses(),
+            loadEstateInvoices(),
+            loadEstateStats()
+        ]);
+    }
+
+    async function loadEstateMileage() {
+        try {
+            const res = await fetch('/api/estate/mileage');
+            const data = await res.json();
+            if (data.success) {
+                renderEstateMileage(data.mileage);
+            }
+        } catch (err) {
+            console.error('Load mileage error:', err);
+        }
+    }
+
+    function renderEstateMileage(mileage) {
+        const list = $('#mileage-list');
+        list.innerHTML = '';
+        if (mileage.length === 0) {
+            list.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Keine Fahrtkostenabrechnung vorhanden</td></tr>';
+            return;
+        }
+        mileage.forEach(m => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${formatDate(m.date)}</td>
+                <td>${escapeHtml(m.from_location)} → ${escapeHtml(m.to_location)}</td>
+                <td>${escapeHtml(m.purpose)}</td>
+                <td class="text-right">${m.distance_km.toFixed(1)} km</td>
+                <td class="text-right">${formatCurrency(m.total_amount)}</td>
+                <td class="text-right">
+                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-mileage" data-id="${m.id}">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </td>
+            `;
+            list.appendChild(tr);
+        });
+
+        $$('.btn-delete-mileage').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Fahrtkosten wirklich löschen?')) return;
+                try {
+                    const res = await fetch(`/api/estate/mileage/${btn.dataset.id}`, { method: 'DELETE' });
+                    const result = await res.json();
+                    if (result.success) {
+                        showToast('Fahrtkosten gelöscht', 'success');
+                        loadEstateMileage();
+                        loadEstateStats();
+                    }
+                } catch (err) {
+                    showToast('Fehler beim Löschen', 'error');
+                }
+            });
+        });
+    }
+
+    async function loadEstateExpenses() {
+        try {
+            const res = await fetch('/api/estate/expenses');
+            const data = await res.json();
+            if (data.success) {
+                renderEstateExpenses(data.expenses);
+            }
+        } catch (err) {
+            console.error('Load estate expenses error:', err);
+        }
+    }
+
+    function renderEstateExpenses(expenses) {
+        const list = $('#estate-expenses-list');
+        list.innerHTML = '';
+        if (expenses.length === 0) {
+            list.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Keine Aufwendungen vorhanden</td></tr>';
+            return;
+        }
+        expenses.forEach(e => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${formatDate(e.date)}</td>
+                <td><span class="category-badge">${escapeHtml(e.category)}</span></td>
+                <td>${escapeHtml(e.description)}</td>
+                <td class="text-right">${formatCurrency(e.amount)}</td>
+                <td class="text-right">
+                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-estate-expense" data-id="${e.id}">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </td>
+            `;
+            list.appendChild(tr);
+        });
+
+        $$('.btn-delete-estate-expense').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Aufwendung wirklich löschen?')) return;
+                try {
+                    const res = await fetch(`/api/estate/expenses/${btn.dataset.id}`, { method: 'DELETE' });
+                    const result = await res.json();
+                    if (result.success) {
+                        showToast('Aufwendung gelöscht', 'success');
+                        loadEstateExpenses();
+                        loadEstateStats();
+                    }
+                } catch (err) {
+                    showToast('Fehler beim Löschen', 'error');
+                }
+            });
+        });
+    }
+
+    async function loadEstateInvoices() {
+        try {
+            const res = await fetch('/api/estate/invoices');
+            const data = await res.json();
+            if (data.success) {
+                renderEstateInvoices(data.invoices);
+            }
+        } catch (err) {
+            console.error('Load estate invoices error:', err);
+        }
+    }
+
+    function renderEstateInvoices(invoices) {
+        const list = $('#estate-invoices-list');
+        list.innerHTML = '';
+        if (invoices.length === 0) {
+            list.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Keine Rechnungen vorhanden</td></tr>';
+            return;
+        }
+        invoices.forEach(inv => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${formatDate(inv.date)}</td>
+                <td>${escapeHtml(inv.vendor)}</td>
+                <td>${escapeHtml(inv.invoice_number || '—')}</td>
+                <td>${escapeHtml(inv.description)}</td>
+                <td class="text-right">${formatCurrency(inv.amount)}</td>
+                <td class="text-right">
+                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-estate-invoice" data-id="${inv.id}">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </td>
+            `;
+            list.appendChild(tr);
+        });
+
+        $$('.btn-delete-estate-invoice').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Rechnung wirklich löschen?')) return;
+                try {
+                    const res = await fetch(`/api/estate/invoices/${btn.dataset.id}`, { method: 'DELETE' });
+                    const result = await res.json();
+                    if (result.success) {
+                        showToast('Rechnung gelöscht', 'success');
+                        loadEstateInvoices();
+                        loadEstateStats();
+                    }
+                } catch (err) {
+                    showToast('Fehler beim Löschen', 'error');
+                }
+            });
+        });
+    }
+
+    async function loadEstateStats() {
+        try {
+            const res = await fetch('/api/estate/stats');
+            const data = await res.json();
+            if (data.success) {
+                $('#stat-mileage').textContent = formatCurrency(data.stats.totals.mileage);
+                $('#stat-expenses').textContent = formatCurrency(data.stats.totals.expenses);
+                $('#stat-invoices').textContent = formatCurrency(data.stats.totals.invoices);
+                $('#stat-total').textContent = formatCurrency(data.stats.totals.grand_total);
+            }
+        } catch (err) {
+            console.error('Load estate stats error:', err);
+        }
+    }
 })();
 // Version 3.0 - SQLite Database Migration

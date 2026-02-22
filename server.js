@@ -25,6 +25,7 @@ const waCommands = require('./wa-commands');
 const tgCommands = require('./tg-commands');
 const TelegramBot = require('node-telegram-bot-api');
 const packageJson = require('./package.json');
+const { renderEstateReportHtml } = require('./estate-report-template');
 require('dotenv').config();
 
 const app = express();
@@ -1447,6 +1448,181 @@ app.get('/api/stats', apiLimiter, (req, res) => {
     } catch (e) {
         console.error('Stats GET Error:', e.message);
         res.status(500).json({ error: 'Statistiken konnten nicht geladen werden' });
+    }
+});
+
+// =======================
+// 12b. ESTATE MANAGEMENT API
+// =======================
+
+// Fahrtkostenabrechnung
+app.get('/api/estate/mileage', apiLimiter, (req, res) => {
+    try {
+        const mileage = db.getAllEstateMileage();
+        res.json({ success: true, mileage });
+    } catch (e) {
+        console.error('Estate Mileage GET Error:', e.message);
+        res.status(500).json({ error: 'Fahrtkostenabrechnung konnte nicht geladen werden' });
+    }
+});
+
+app.post('/api/estate/mileage', apiLimiter, (req, res) => {
+    try {
+        const { date, from_location, to_location, purpose, distance_km, rate_per_km, notes } = req.body;
+
+        if (!date || !from_location || !to_location || !purpose || !distance_km) {
+            return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt werden' });
+        }
+
+        if (isNaN(distance_km) || distance_km <= 0) {
+            return res.status(400).json({ error: 'Ungültige Kilometerangabe' });
+        }
+
+        const mileage = db.createEstateMileage({ date, from_location, to_location, purpose, distance_km, rate_per_km, notes });
+        res.json({ success: true, message: 'Fahrtkosten gespeichert', mileage });
+    } catch (e) {
+        console.error('Estate Mileage POST Error:', e.message);
+        res.status(500).json({ error: 'Fahrtkosten konnten nicht gespeichert werden' });
+    }
+});
+
+app.delete('/api/estate/mileage/:id', apiLimiter, (req, res) => {
+    try {
+        db.deleteEstateMileage(parseInt(req.params.id));
+        res.json({ success: true, message: 'Fahrtkosten gelöscht' });
+    } catch (e) {
+        console.error('Estate Mileage DELETE Error:', e.message);
+        res.status(500).json({ error: 'Fahrtkosten konnten nicht gelöscht werden' });
+    }
+});
+
+// Aufwendungen/Auslagen
+app.get('/api/estate/expenses', apiLimiter, (req, res) => {
+    try {
+        const expenses = db.getAllEstateExpenses();
+        res.json({ success: true, expenses });
+    } catch (e) {
+        console.error('Estate Expenses GET Error:', e.message);
+        res.status(500).json({ error: 'Aufwendungen konnten nicht geladen werden' });
+    }
+});
+
+app.post('/api/estate/expenses', apiLimiter, (req, res) => {
+    try {
+        const { date, category, description, amount, receipt_file, notes } = req.body;
+
+        if (!date || !category || !description || !amount) {
+            return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt werden' });
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Ungültiger Betrag' });
+        }
+
+        const expense = db.createEstateExpense({ date, category, description, amount, receipt_file, notes });
+        res.json({ success: true, message: 'Aufwendung gespeichert', expense });
+    } catch (e) {
+        console.error('Estate Expense POST Error:', e.message);
+        res.status(500).json({ error: 'Aufwendung konnte nicht gespeichert werden' });
+    }
+});
+
+app.delete('/api/estate/expenses/:id', apiLimiter, (req, res) => {
+    try {
+        db.deleteEstateExpense(parseInt(req.params.id));
+        res.json({ success: true, message: 'Aufwendung gelöscht' });
+    } catch (e) {
+        console.error('Estate Expense DELETE Error:', e.message);
+        res.status(500).json({ error: 'Aufwendung konnte nicht gelöscht werden' });
+    }
+});
+
+// Rechnungen
+app.get('/api/estate/invoices', apiLimiter, (req, res) => {
+    try {
+        const invoices = db.getAllEstateInvoices();
+        res.json({ success: true, invoices });
+    } catch (e) {
+        console.error('Estate Invoices GET Error:', e.message);
+        res.status(500).json({ error: 'Rechnungen konnten nicht geladen werden' });
+    }
+});
+
+app.post('/api/estate/invoices', apiLimiter, (req, res) => {
+    try {
+        const { date, vendor, invoice_number, description, amount, file_path, category, notes } = req.body;
+
+        if (!date || !vendor || !description || !amount) {
+            return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt werden' });
+        }
+
+        if (isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Ungültiger Betrag' });
+        }
+
+        const invoice = db.createEstateInvoice({ date, vendor, invoice_number, description, amount, file_path, category, notes });
+        res.json({ success: true, message: 'Rechnung gespeichert', invoice });
+    } catch (e) {
+        console.error('Estate Invoice POST Error:', e.message);
+        res.status(500).json({ error: 'Rechnung konnte nicht gespeichert werden' });
+    }
+});
+
+app.delete('/api/estate/invoices/:id', apiLimiter, (req, res) => {
+    try {
+        db.deleteEstateInvoice(parseInt(req.params.id));
+        res.json({ success: true, message: 'Rechnung gelöscht' });
+    } catch (e) {
+        console.error('Estate Invoice DELETE Error:', e.message);
+        res.status(500).json({ error: 'Rechnung konnte nicht gelöscht werden' });
+    }
+});
+
+// Statistiken & PDF-Vorbereitung
+app.get('/api/estate/stats', apiLimiter, (req, res) => {
+    try {
+        const stats = db.getEstateStats();
+        res.json({ success: true, stats });
+    } catch (e) {
+        console.error('Estate Stats GET Error:', e.message);
+        res.status(500).json({ error: 'Statistiken konnten nicht geladen werden' });
+    }
+});
+
+// PDF-Abrechnung generieren
+app.post('/api/estate/generate-report', apiLimiter, async (req, res) => {
+    try {
+        const mileage = db.getAllEstateMileage();
+        const expenses = db.getAllEstateExpenses();
+        const invoices = db.getAllEstateInvoices();
+        const stats = db.getEstateStats();
+
+        const html = renderEstateReportHtml({ mileage, expenses, invoices, stats });
+
+        const browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+        });
+        const page = await browser.newPage();
+        await page.setRequestInterception(true);
+        page.on('request', (request) => {
+            if (request.resourceType() === 'document') request.continue();
+            else request.abort();
+        });
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+        const pdf = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
+        });
+        await browser.close();
+
+        res.contentType('application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Erbverwaltung-Abrechnung-${new Date().toISOString().split('T')[0]}.pdf"`);
+        res.send(pdf);
+    } catch (e) {
+        console.error('Estate Report Generation Error:', e.message);
+        res.status(500).json({ error: 'PDF-Generierung fehlgeschlagen: ' + e.message });
     }
 });
 
