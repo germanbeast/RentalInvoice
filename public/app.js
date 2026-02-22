@@ -4119,23 +4119,40 @@
     // Estate Expense Form
     $('#form-estate-expense')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const form = e.target;
+        const editId = form.dataset.editId;
+
+        // Handle file upload if present
+        const fileInput = $('#expense-file');
+        let filePath = null;
+        if (fileInput && fileInput.files.length > 0) {
+            filePath = await uploadEstateFile(fileInput);
+        }
+
         const data = {
             date: $('#expense-date').value,
             category: $('#expense-category').value,
             description: $('#expense-description').value,
             amount: parseFloat($('#expense-amount').value),
-            notes: $('#expense-notes').value
+            notes: $('#expense-notes').value,
+            receipt_file: filePath
         };
         try {
-            const res = await fetch('/api/estate/expenses', {
-                method: 'POST',
+            const url = editId ? `/api/estate/expenses/${editId}` : '/api/estate/expenses';
+            const method = editId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             const result = await res.json();
             if (result.success) {
-                showToast('Aufwendung gespeichert', 'success');
-                e.target.reset();
+                showToast(editId ? 'Aufwendung aktualisiert' : 'Aufwendung gespeichert', 'success');
+                form.reset();
+                delete form.dataset.editId;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Aufwendung speichern`;
                 loadEstateExpenses();
                 loadEstateStats();
             } else {
@@ -4149,24 +4166,41 @@
     // Estate Invoice Form
     $('#form-estate-invoice')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const form = e.target;
+        const editId = form.dataset.editId;
+
+        // Handle file upload if present
+        const fileInput = $('#invoice-file');
+        let filePath = null;
+        if (fileInput && fileInput.files.length > 0) {
+            filePath = await uploadEstateFile(fileInput);
+        }
+
         const data = {
             date: $('#invoice-date').value,
             vendor: $('#invoice-vendor').value,
             invoice_number: $('#invoice-number').value,
             description: $('#invoice-description').value,
             amount: parseFloat($('#invoice-amount').value),
-            notes: $('#invoice-notes').value
+            notes: $('#invoice-notes').value,
+            file_path: filePath
         };
         try {
-            const res = await fetch('/api/estate/invoices', {
-                method: 'POST',
+            const url = editId ? `/api/estate/invoices/${editId}` : '/api/estate/invoices';
+            const method = editId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             const result = await res.json();
             if (result.success) {
-                showToast('Rechnung gespeichert', 'success');
-                e.target.reset();
+                showToast(editId ? 'Rechnung aktualisiert' : 'Rechnung gespeichert', 'success');
+                form.reset();
+                delete form.dataset.editId;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Rechnung speichern`;
                 loadEstateInvoices();
                 loadEstateStats();
             } else {
@@ -4322,7 +4356,13 @@
                 <td>${escapeHtml(e.description)}</td>
                 <td class="text-right">${formatCurrency(e.amount)}</td>
                 <td class="text-right">
-                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-estate-expense" data-id="${e.id}">
+                    <button class="btn btn-ghost btn-icon btn-edit-estate-expense" data-id="${e.id}" title="Bearbeiten">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-estate-expense" data-id="${e.id}" title="Löschen">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -4331,6 +4371,13 @@
                 </td>
             `;
             list.appendChild(tr);
+        });
+
+        $$('.btn-edit-estate-expense').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const expense = expenses.find(item => item.id === parseInt(btn.dataset.id));
+                if (expense) editEstateExpense(expense);
+            });
         });
 
         $$('.btn-delete-estate-expense').forEach(btn => {
@@ -4349,6 +4396,28 @@
                 }
             });
         });
+    }
+
+    function editEstateExpense(e) {
+        $('#expense-date').value = e.date;
+        $('#expense-category').value = e.category;
+        $('#expense-description').value = e.description;
+        $('#expense-amount').value = e.amount;
+        $('#expense-notes').value = e.notes || '';
+
+        const form = $('#form-estate-expense');
+        form.dataset.editId = e.id;
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Aktualisieren`;
+
+        // Switch to expenses tab
+        $$('.estate-tab').forEach(t => t.classList.remove('active'));
+        $$('.estate-tab-content').forEach(c => c.style.display = 'none');
+        document.querySelector('.estate-tab[data-tab="expenses"]').classList.add('active');
+        $('#estate-tab-expenses').style.display = 'block';
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     async function loadEstateInvoices() {
@@ -4379,7 +4448,13 @@
                 <td>${escapeHtml(inv.description)}</td>
                 <td class="text-right">${formatCurrency(inv.amount)}</td>
                 <td class="text-right">
-                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-estate-invoice" data-id="${inv.id}">
+                    <button class="btn btn-ghost btn-icon btn-edit-estate-invoice" data-id="${inv.id}" title="Bearbeiten">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="btn btn-ghost btn-icon btn-danger btn-delete-estate-invoice" data-id="${inv.id}" title="Löschen">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -4388,6 +4463,13 @@
                 </td>
             `;
             list.appendChild(tr);
+        });
+
+        $$('.btn-edit-estate-invoice').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const invoice = invoices.find(item => item.id === parseInt(btn.dataset.id));
+                if (invoice) editEstateInvoice(invoice);
+            });
         });
 
         $$('.btn-delete-estate-invoice').forEach(btn => {
@@ -4408,6 +4490,29 @@
         });
     }
 
+    function editEstateInvoice(inv) {
+        $('#invoice-date').value = inv.date;
+        $('#invoice-vendor').value = inv.vendor;
+        $('#invoice-number').value = inv.invoice_number || '';
+        $('#invoice-description').value = inv.description;
+        $('#invoice-amount').value = inv.amount;
+        $('#invoice-notes').value = inv.notes || '';
+
+        const form = $('#form-estate-invoice');
+        form.dataset.editId = inv.id;
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Aktualisieren`;
+
+        // Switch to invoices tab
+        $$('.estate-tab').forEach(t => t.classList.remove('active'));
+        $$('.estate-tab-content').forEach(c => c.style.display = 'none');
+        document.querySelector('.estate-tab[data-tab="invoices"]').classList.add('active');
+        $('#estate-tab-invoices').style.display = 'block';
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     async function loadEstateStats() {
         try {
             const res = await fetch('/api/estate/stats');
@@ -4420,6 +4525,51 @@
             }
         } catch (err) {
             console.error('Load estate stats error:', err);
+        }
+    }
+
+    // File Upload Handler
+    async function uploadEstateFile(fileInput) {
+        const file = fileInput.files[0];
+        if (!file) return null;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/api/estate/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Datei hochgeladen: ' + result.filename, 'success');
+                return result.filePath;
+            } else {
+                showToast('Upload fehlgeschlagen', 'error');
+                return null;
+            }
+        } catch (err) {
+            showToast('Upload-Fehler', 'error');
+            return null;
+        }
+    }
+
+    // Paperless Sync Handler
+    async function syncPaperlessEstateInvoices() {
+        try {
+            showToast('Synchronisierung gestartet...', 'info');
+            const res = await fetch('/api/estate/paperless-sync', { method: 'POST' });
+            const result = await res.json();
+            if (result.success) {
+                showToast(result.message, 'success');
+                loadEstateInvoices();
+                loadEstateStats();
+            } else {
+                showToast(result.error || 'Sync fehlgeschlagen', 'error');
+            }
+        } catch (err) {
+            showToast('Sync-Fehler: ' + err.message, 'error');
         }
     }
 })();

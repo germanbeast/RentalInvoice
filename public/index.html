@@ -398,6 +398,10 @@
                                 <label for="expense-notes">Notizen</label>
                                 <textarea id="expense-notes" rows="2" placeholder="Optionale Notizen..."></textarea>
                             </div>
+                            <div class="form-group">
+                                <label for="expense-file">Beleg hochladen (optional)</label>
+                                <input type="file" id="expense-file" accept=".pdf,.jpg,.jpeg,.png,.gif">
+                            </div>
                             <button type="submit" class="btn btn-accent">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -471,6 +475,10 @@
                                 <label for="invoice-notes">Notizen</label>
                                 <textarea id="invoice-notes" rows="2" placeholder="Optionale Notizen..."></textarea>
                             </div>
+                            <div class="form-group">
+                                <label for="invoice-file">Rechnung hochladen (optional)</label>
+                                <input type="file" id="invoice-file" accept=".pdf,.jpg,.jpeg,.png,.gif">
+                            </div>
                             <button type="submit" class="btn btn-accent">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -482,13 +490,22 @@
                     </div>
 
                     <div class="card">
-                        <div class="card-title">
-                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="8" y1="6" x2="21" y2="6"></line>
-                                <line x1="8" y1="12" x2="21" y2="12"></line>
-                                <line x1="8" y1="18" x2="21" y2="18"></line>
-                            </svg>
-                            Rechnungen-Übersicht
+                        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                </svg>
+                                Rechnungen-Übersicht
+                            </div>
+                            <button type="button" id="btn-paperless-sync" class="btn btn-ghost btn-sm" onclick="syncPaperlessEstateInvoices()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                </svg>
+                                Paperless Sync
+                            </button>
                         </div>
                         <table class="estate-table">
                             <thead>
