@@ -1145,8 +1145,13 @@ app.post('/api/settings/paperless/test', apiLimiter, async (req, res) => {
         // Create HTTPS agent with custom certificate if available
         const httpsAgent = createPaperlessHttpsAgent();
         const axiosConfig = {
-            headers: { 'Authorization': `Token ${token}` },
-            timeout: 10000 // 10 second timeout
+            headers: {
+                'Authorization': `Token ${token}`,
+                'User-Agent': 'Ferienwohnung-Rechnung/1.0',
+                'Accept': 'application/json'
+            },
+            timeout: 10000, // 10 second timeout
+            validateStatus: (status) => status < 500 // Don't throw on 4xx errors
         };
         if (httpsAgent) {
             axiosConfig.httpsAgent = httpsAgent;
@@ -1907,7 +1912,11 @@ app.post('/api/estate/paperless-sync', apiLimiter, async (req, res) => {
         // Create HTTPS agent with custom certificate if available
         const httpsAgent = createPaperlessHttpsAgent();
         const axiosConfig = {
-            headers: { 'Authorization': `Token ${pl.token}` }
+            headers: {
+                'Authorization': `Token ${pl.token}`,
+                'User-Agent': 'Ferienwohnung-Rechnung/1.0',
+                'Accept': 'application/json'
+            }
         };
         if (httpsAgent) {
             axiosConfig.httpsAgent = httpsAgent;
