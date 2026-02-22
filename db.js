@@ -190,7 +190,8 @@ function initSchema() {
     // Migration: add paperless_id to estate_invoices
     const estateInvoicesInfo = db.prepare("PRAGMA table_info(estate_invoices)").all();
     if (!estateInvoicesInfo.some(col => col.name === 'paperless_id')) {
-        db.exec("ALTER TABLE estate_invoices ADD COLUMN paperless_id INTEGER UNIQUE");
+        db.exec("ALTER TABLE estate_invoices ADD COLUMN paperless_id INTEGER");
+        db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_estate_invoices_paperless_id ON estate_invoices(paperless_id)");
         console.log('✅ Migration: paperless_id Spalte zu estate_invoices hinzugefügt.');
     }
 
