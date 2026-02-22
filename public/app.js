@@ -1878,17 +1878,19 @@
         btnTestConnection.textContent = 'Teste…';
 
         try {
-            const response = await fetch(`${url}/api/`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Token ${token}`
-                }
+            // Use server-side proxy to test connection (supports custom certificates)
+            const response = await fetch('/api/settings/paperless/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, token })
             });
 
-            if (response.ok) {
+            const result = await response.json();
+
+            if (result.success) {
                 showToast('Paperless-Verbindung erfolgreich! ✓', 'success');
             } else {
-                showToast(`Paperless-Fehler: HTTP ${response.status}`, 'error');
+                showToast(`Paperless-Fehler: ${result.error}`, 'error');
             }
         } catch (err) {
             showToast(`Verbindungsfehler: ${err.message}`, 'error');

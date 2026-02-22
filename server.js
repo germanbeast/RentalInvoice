@@ -1134,6 +1134,41 @@ app.delete('/api/settings/paperless/cert', apiLimiter, (req, res) => {
     }
 });
 
+// Test Paperless connection (server-side proxy to use custom cert)
+app.post('/api/settings/paperless/test', apiLimiter, async (req, res) => {
+    try {
+        const { url, token } = req.body;
+        if (!url || !token) {
+            return res.status(400).json({ error: 'URL und Token erforderlich' });
+        }
+
+        // Create HTTPS agent with custom certificate if available
+        const httpsAgent = createPaperlessHttpsAgent();
+        const axiosConfig = {
+            headers: { 'Authorization': `Token ${token}` },
+            timeout: 10000 // 10 second timeout
+        };
+        if (httpsAgent) {
+            axiosConfig.httpsAgent = httpsAgent;
+        }
+
+        const cleanUrl = url.replace(/\/+$/, '');
+        const response = await axios.get(`${cleanUrl}/api/`, axiosConfig);
+
+        if (response.status === 200) {
+            res.json({ success: true, message: 'Paperless-Verbindung erfolgreich!' });
+        } else {
+            res.json({ success: false, error: `HTTP ${response.status}` });
+        }
+    } catch (e) {
+        console.error('Paperless Test Error:', e.message);
+        res.status(500).json({
+            success: false,
+            error: e.response?.data?.detail || e.message || 'Verbindungsfehler'
+        });
+    }
+});
+
 // =======================
 // 9. GUESTS API
 // =======================
