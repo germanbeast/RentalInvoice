@@ -1158,18 +1158,42 @@ app.post('/api/settings/paperless/test', apiLimiter, async (req, res) => {
         }
 
         const cleanUrl = url.replace(/\/+$/, '');
+        console.log('🔍 Paperless Test:', {
+            url: `${cleanUrl}/api/`,
+            headers: { ...axiosConfig.headers, Authorization: 'Token ***' }
+        });
+
         const response = await axios.get(`${cleanUrl}/api/`, axiosConfig);
+
+        console.log('✅ Paperless Response:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: response.data ? Object.keys(response.data) : 'no data'
+        });
 
         if (response.status === 200) {
             res.json({ success: true, message: 'Paperless-Verbindung erfolgreich!' });
         } else {
-            res.json({ success: false, error: `HTTP ${response.status}` });
+            console.error('❌ Paperless Test Failed:', {
+                status: response.status,
+                data: response.data
+            });
+            res.json({
+                success: false,
+                error: `HTTP ${response.status}`,
+                details: response.data?.detail || JSON.stringify(response.data)
+            });
         }
     } catch (e) {
-        console.error('Paperless Test Error:', e.message);
+        console.error('❌ Paperless Test Error:', {
+            message: e.message,
+            status: e.response?.status,
+            data: e.response?.data
+        });
         res.status(500).json({
             success: false,
-            error: e.response?.data?.detail || e.message || 'Verbindungsfehler'
+            error: e.response?.data?.detail || e.message || 'Verbindungsfehler',
+            details: e.response?.data ? JSON.stringify(e.response.data) : undefined
         });
     }
 });
