@@ -101,24 +101,24 @@ const uploadCert = multer({
 function createPaperlessHttpsAgent() {
     const certPath = path.join(CERTS_DIR, 'paperless-cert.pem');
 
+    // Always disable certificate validation for Paperless (works with Cloudflare Origin Certs)
+    // If custom cert exists, try to use it, but still disable validation as fallback
     if (fs.existsSync(certPath)) {
         try {
             const ca = fs.readFileSync(certPath);
             return new https.Agent({
                 ca: ca,
-                rejectUnauthorized: true
+                rejectUnauthorized: false  // Changed: allow even with custom cert (for Cloudflare)
             });
         } catch (err) {
             console.error('⚠️  Fehler beim Laden des Paperless-Zertifikats:', err.message);
-            // Fallback: Accept self-signed certs (less secure)
-            return new https.Agent({
-                rejectUnauthorized: false
-            });
         }
     }
 
-    // No cert file - use default agent (will fail on self-signed certs)
-    return undefined;
+    // No cert file or error - disable validation (works with self-signed/Cloudflare certs)
+    return new https.Agent({
+        rejectUnauthorized: false
+    });
 }
 
 // =======================
