@@ -1898,6 +1898,76 @@
         }
     });
 
+    // Certificate Upload
+    $('#btn-upload-cert')?.addEventListener('click', async () => {
+        const fileInput = $('#paperless-cert-file');
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            showToast('Bitte wähle eine Zertifikatsdatei aus', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('certificate', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/api/settings/paperless/upload-cert', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Zertifikat erfolgreich hochgeladen! 🔒', 'success');
+                fileInput.value = '';
+                loadCertStatus();
+            } else {
+                showToast(result.error || 'Upload fehlgeschlagen', 'error');
+            }
+        } catch (err) {
+            showToast('Upload-Fehler: ' + err.message, 'error');
+        }
+    });
+
+    // Delete Certificate
+    $('#btn-delete-cert')?.addEventListener('click', async () => {
+        if (!confirm('Möchtest du das Zertifikat wirklich löschen?')) return;
+
+        try {
+            const res = await fetch('/api/settings/paperless/cert', { method: 'DELETE' });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Zertifikat gelöscht', 'success');
+                loadCertStatus();
+            } else {
+                showToast(result.error || 'Löschen fehlgeschlagen', 'error');
+            }
+        } catch (err) {
+            showToast('Fehler beim Löschen: ' + err.message, 'error');
+        }
+    });
+
+    // Load Certificate Status
+    async function loadCertStatus() {
+        try {
+            const res = await fetch('/api/settings/paperless/cert-status');
+            const result = await res.json();
+            if (result.success && result.certificate.exists) {
+                $('#cert-status-display').style.display = 'block';
+                const date = new Date(result.certificate.uploadedAt);
+                $('#cert-upload-date').textContent = date.toLocaleDateString('de-DE') + ' ' + date.toLocaleTimeString('de-DE');
+            } else {
+                $('#cert-status-display').style.display = 'none';
+            }
+        } catch (err) {
+            console.error('Cert Status Error:', err);
+        }
+    }
+
+    // Load cert status on settings open
+    const settingsPaperlessTab = document.querySelector('.nav-item[data-target="settings-paperless"]');
+    if (settingsPaperlessTab) {
+        settingsPaperlessTab.addEventListener('click', loadCertStatus);
+    }
+
     $('#btn-nuki-test').addEventListener('click', async () => {
         const token = $('#nuki-token').value;
         const lockId = $('#nuki-lock-id').value;

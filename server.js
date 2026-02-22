@@ -9,6 +9,7 @@ const nodemailer = require('nodemailer');
 const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
@@ -33,10 +34,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const UPLOADS_DIR = path.join(__dirname, 'uploads', 'estate');
+const CERTS_DIR = path.join(__dirname, 'uploads', 'certs');
 
-// Ensure uploads directory exists
+// Ensure uploads directories exist
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+if (!fs.existsSync(CERTS_DIR)) {
+    fs.mkdirSync(CERTS_DIR, { recursive: true });
 }
 
 // Configure Multer for file uploads
@@ -64,6 +69,57 @@ const upload = multer({
         }
     }
 });
+
+// Configure Multer for certificate uploads
+const certStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, CERTS_DIR);
+    },
+    filename: (req, file, cb) => {
+        // Always overwrite with fixed name
+        cb(null, 'paperless-cert.pem');
+    }
+});
+
+const uploadCert = multer({
+    storage: certStorage,
+    limits: { fileSize: 1024 * 1024 }, // 1MB limit for certs
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /pem|crt|cer/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        if (extname || file.mimetype === 'application/x-pem-file' || file.mimetype === 'application/x-x509-ca-cert') {
+            return cb(null, true);
+        } else {
+            cb(new Error('Nur Zertifikate (.pem, .crt, .cer) erlaubt'));
+        }
+    }
+});
+
+// =======================
+// Helper: Create HTTPS Agent with Custom Certificate
+// =======================
+function createPaperlessHttpsAgent() {
+    const certPath = path.join(CERTS_DIR, 'paperless-cert.pem');
+
+    if (fs.existsSync(certPath)) {
+        try {
+            const ca = fs.readFileSync(certPath);
+            return new https.Agent({
+                ca: ca,
+                rejectUnauthorized: true
+            });
+        } catch (err) {
+            console.error('⚠️  Fehler beim Laden des Paperless-Zertifikats:', err.message);
+            // Fallback: Accept self-signed certs (less secure)
+            return new https.Agent({
+                rejectUnauthorized: false
+            });
+        }
+    }
+
+    // No cert file - use default agent (will fail on self-signed certs)
+    return undefined;
+}
 
 // =======================
 // 1. DATABASE INIT
@@ -1018,6 +1074,66 @@ app.post('/api/settings/telegram/revoke', apiLimiter, (req, res) => {
     }
 });
 
+// Upload Cloudflare/Custom Certificate for Paperless
+app.post('/api/settings/paperless/upload-cert', apiLimiter, uploadCert.single('certificate'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Kein Zertifikat hochgeladen' });
+        }
+        res.json({
+            success: true,
+            message: 'Zertifikat erfolgreich hochgeladen',
+            filename: req.file.filename,
+            path: req.file.path
+        });
+    } catch (e) {
+        console.error('Certificate Upload Error:', e.message);
+        res.status(500).json({ error: 'Zertifikat konnte nicht hochgeladen werden: ' + e.message });
+    }
+});
+
+// Check if certificate exists
+app.get('/api/settings/paperless/cert-status', apiLimiter, (req, res) => {
+    try {
+        const certPath = path.join(CERTS_DIR, 'paperless-cert.pem');
+        const exists = fs.existsSync(certPath);
+
+        let certInfo = null;
+        if (exists) {
+            const stats = fs.statSync(certPath);
+            certInfo = {
+                exists: true,
+                uploadedAt: stats.mtime,
+                size: stats.size
+            };
+        }
+
+        res.json({
+            success: true,
+            certificate: certInfo || { exists: false }
+        });
+    } catch (e) {
+        console.error('Certificate Status Error:', e.message);
+        res.status(500).json({ error: 'Zertifikat-Status konnte nicht abgerufen werden' });
+    }
+});
+
+// Delete certificate
+app.delete('/api/settings/paperless/cert', apiLimiter, (req, res) => {
+    try {
+        const certPath = path.join(CERTS_DIR, 'paperless-cert.pem');
+        if (fs.existsSync(certPath)) {
+            fs.unlinkSync(certPath);
+            res.json({ success: true, message: 'Zertifikat gelöscht' });
+        } else {
+            res.status(404).json({ error: 'Kein Zertifikat vorhanden' });
+        }
+    } catch (e) {
+        console.error('Certificate Delete Error:', e.message);
+        res.status(500).json({ error: 'Zertifikat konnte nicht gelöscht werden: ' + e.message });
+    }
+});
+
 // =======================
 // 9. GUESTS API
 // =======================
@@ -1753,22 +1869,25 @@ app.post('/api/estate/paperless-sync', apiLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Paperless-Zugangsdaten nicht konfiguriert' });
         }
 
-        // 1. Get Tag ID from Paperless
-        const tagsRes = await axios.get(`${pl.url}/api/tags/?name__icontains=${encodeURIComponent(tag)}`, {
+        // Create HTTPS agent with custom certificate if available
+        const httpsAgent = createPaperlessHttpsAgent();
+        const axiosConfig = {
             headers: { 'Authorization': `Token ${pl.token}` }
-        });
+        };
+        if (httpsAgent) {
+            axiosConfig.httpsAgent = httpsAgent;
+        }
+
+        // 1. Get Tag ID from Paperless
+        const tagsRes = await axios.get(`${pl.url}/api/tags/?name__icontains=${encodeURIComponent(tag)}`, axiosConfig);
         const tagObj = tagsRes.data.results.find(t => t.name.toLowerCase() === tag.toLowerCase());
         if (!tagObj) return res.json({ success: true, message: `Tag "${tag}" nicht in Paperless gefunden.`, count: 0 });
 
         // 2. Search documents with this tag
-        const docsRes = await axios.get(`${pl.url}/api/documents/?tags__id__all=${tagObj.id}`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
+        const docsRes = await axios.get(`${pl.url}/api/documents/?tags__id__all=${tagObj.id}`, axiosConfig);
 
         // 3. Get Custom Fields definitions
-        const fieldsRes = await axios.get(`${pl.url}/api/custom_fields/`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
+        const fieldsRes = await axios.get(`${pl.url}/api/custom_fields/`, axiosConfig);
         const amountFieldDef = fieldsRes.data.results.find(f => f.name.toLowerCase() === amountFieldName.toLowerCase());
 
         let count = 0;
