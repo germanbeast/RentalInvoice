@@ -1396,8 +1396,9 @@
 
     if (navWelcome) {
         navWelcome.addEventListener('click', () => {
-            // Show welcome screen with test guest name
-            showWelcomeScreen('Test Familie');
+            // Vorschau: genau die Seite, die auch die TV-Box zeigt (die eingebaute Ansicht lag
+            // innerhalb des ausgeblendeten App-Rahmens und blieb deshalb leer)
+            window.open('/welcome.html', '_blank');
         });
     }
 
