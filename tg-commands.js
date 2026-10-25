@@ -146,7 +146,7 @@ async function showHelp(bot, chatId) {
         '• <code>/rechnung</code> – neue Rechnung (inkl. Tür-Code)\n' +
         '• <code>/pin</code> – nur einen Tür-Code erstellen\n' +
         '• <code>/status</code> – offene Rechnungen\n' +
-        '• <code>/codes</code> – angelegte Türcodes anzeigen\n' +
+        '• <code>/codes</code> – Türcodes live aus Nuki anzeigen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
@@ -176,34 +176,47 @@ async function showOpenInvoices(bot, chatId) {
     return send(bot, chatId, text, menuOnlyKeyboard());
 }
 
+const fmtBerlin = new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+});
+
 async function showCodes(bot, chatId) {
-    let rows = [];
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    let codes;
     try {
-        rows = db.getDb().prepare(`
-            SELECT b.summary, b.checkin, b.checkout, b.nuki_pin, g.name AS guest_name
-            FROM bookings b
-            LEFT JOIN guests g ON g.id = b.guest_id
-            WHERE b.nuki_pin IS NOT NULL AND b.nuki_pin != '' AND b.checkout >= date('now')
-            ORDER BY b.checkin ASC
-            LIMIT 25
-        `).all();
+        codes = await botLogic.listNukiCodes();
     } catch (e) {
-        console.error('[TG] Türcode-Abfrage:', e.message);
-        return send(bot, chatId, '❌ Türcodes konnten nicht geladen werden.', menuOnlyKeyboard());
+        console.error('[TG] Nuki-Codes:', e.message);
+        return send(bot, chatId, `❌ <b>Türcodes konnten nicht von Nuki geladen werden.</b>\n${esc(e.message)}`,
+            keyboard([[btn('🔁 Erneut versuchen', 'codes'), btn('🏠 Hauptmenü', 'menu')]]));
     }
-    if (!rows.length) {
-        return send(bot, chatId, '🔐 Aktuell sind keine Türcodes angelegt.', menuOnlyKeyboard());
+
+    const now = Date.now();
+    const isExpired = c => c.until && new Date(c.until).getTime() < now;
+    const current = codes.filter(c => !isExpired(c));
+    const expiredCount = codes.length - current.length;
+
+    if (!current.length) {
+        const extra = expiredCount ? `\n<i>(${expiredCount} abgelaufene Einträge ausgeblendet)</i>` : '';
+        return send(bot, chatId, `🔐 Aktuell sind keine gültigen Türcodes im Nuki-Schloss angelegt.${extra}`, menuOnlyKeyboard());
     }
-    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
-    let text = `<b>🔐 Angelegte Türcodes (${rows.length})</b>\n\n`;
-    rows.forEach(r => {
-        const name = short(r.guest_name || String(r.summary || 'Buchung').split('(')[0].replace(/^(Buchung|Gast):/, '').trim() || 'Buchung', 36);
-        const active = r.checkin <= today && today <= r.checkout;
-        text += `${active ? '🟢' : '⏳'} <b>${esc(name)}</b>\n` +
-            `   🔑 <code>${esc(r.nuki_pin)}</code>  ·  ${fmtDate(r.checkin)} – ${fmtDate(r.checkout)}\n`;
+
+    const MAX = 25;
+    const shown = current.slice(0, MAX);
+    let text = `<b>🔐 Türcodes im Nuki-Schloss (${current.length})</b>\n<i>Live-Abfrage</i>\n\n`;
+    shown.forEach(c => {
+        const started = !c.from || new Date(c.from).getTime() <= now;
+        const icon = !c.enabled ? '⛔' : (started ? '🟢' : '⏳');
+        const period = (c.from || c.until)
+            ? `${c.from ? fmtBerlin.format(new Date(c.from)) : '…'} – ${c.until ? fmtBerlin.format(new Date(c.until)) : 'unbefristet'}`
+            : 'unbefristet';
+        text += `${icon} <b>${esc(short(c.name, 30))}</b>${c.enabled ? '' : ' (deaktiviert)'}\n` +
+            `   🔑 <code>${esc(c.code)}</code>  ·  ${esc(period)}\n`;
     });
-    text += '\n🟢 aktuell im Haus · ⏳ geplant';
-    return send(bot, chatId, text, menuOnlyKeyboard());
+    if (current.length > MAX) text += `\n… und ${current.length - MAX} weitere\n`;
+    if (expiredCount) text += `\n<i>${expiredCount} abgelaufene Einträge ausgeblendet</i>`;
+    text += '\n🟢 gültig · ⏳ noch nicht gültig · ⛔ deaktiviert';
+    return send(bot, chatId, text, keyboard([[btn('🔄 Aktualisieren', 'codes'), btn('🏠 Hauptmenü', 'menu')]]));
 }
 
 async function showArrivals(bot, chatId) {

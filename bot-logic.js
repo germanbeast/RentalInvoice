@@ -228,6 +228,43 @@ async function createNukiPinDirect(arrival, departure, guestName) {
     return { success: true, pin: generatedCode, authId };
 }
 
+/**
+ * Fetches all keypad codes (type 13) live from the Nuki Web API.
+ * Returns [{ id, name, code, enabled, from, until, lastActive }] sorted by start date.
+ */
+async function listNukiCodes() {
+    const nuki = db.getAllSettings().nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+    const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
+
+    let res;
+    try {
+        res = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
+            headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' },
+            timeout: 15000
+        });
+    } catch (e) {
+        const status = e.response && e.response.status;
+        if (status === 401) throw new Error('Nuki-Token ungültig oder abgelaufen (401)');
+        if (status === 429) throw new Error('Nuki-API: zu viele Anfragen (429) – bitte kurz warten');
+        throw new Error('Nuki-API nicht erreichbar: ' + e.message);
+    }
+
+    const auths = Array.isArray(res.data) ? res.data : [];
+    return auths
+        .filter(a => a.type === 13 && a.code !== undefined && a.code !== null && String(a.code) !== '')
+        .map(a => ({
+            id: a.id,
+            name: a.name || 'Unbenannt',
+            code: String(a.code),
+            enabled: a.enabled !== false,
+            from: a.allowedFromDate || null,
+            until: a.allowedUntilDate || null,
+            lastActive: a.lastActiveDate || null
+        }))
+        .sort((x, y) => String(x.from || '').localeCompare(String(y.from || '')));
+}
+
 async function finalizeInvoiceData(data) {
     const allSettings = db.getAllSettings();
     const vermieter = allSettings.vermieter || {};
@@ -354,5 +391,6 @@ module.exports = {
     getStatusText,
     finalizeInvoiceData,
     generateInvoicePdf,
-    createNukiPinDirect
+    createNukiPinDirect,
+    listNukiCodes
 };

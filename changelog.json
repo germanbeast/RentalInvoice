@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.8.1",
+    "currentVersion": "1.8.2",
     "releases": [
+        {
+            "version": "1.8.2",
+            "date": "2026-10-25",
+            "title": "Telegram /codes mit Live-Abfrage von Nuki",
+            "features": [
+                "/codes liest die Türcodes direkt aus der Nuki-API (nicht mehr aus der lokalen Datenbank)",
+                "Anzeige mit Gültigkeitszeitraum in deutscher Zeit, Status (gültig/geplant/deaktiviert) und Aktualisieren-Button"
+            ]
+        },
         {
             "version": "1.8.1",
             "date": "2026-10-25",

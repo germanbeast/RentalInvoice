@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-10-25
+
+### Geändert
+- Telegram /codes fragt die Türcodes live bei der Nuki-API ab (statt aus der lokalen Datenbank)
+
 ## [1.8.1] - 2026-10-25
 
 ### Behoben
