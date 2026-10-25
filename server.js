@@ -269,6 +269,9 @@ async function initTelegram() {
             });
         });
 
+        // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
+        tgCommands.setup(tgBot).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
                 console.error('❌ Telegram Token ungültig (401). Polling gestoppt.');

@@ -9,19 +9,88 @@ const puppeteer = require('puppeteer');
  * Shared logic for both WhatsApp and Telegram bots.
  */
 
-function parseDates(text) {
-    const dateRangeRegex = /(\d{1,2})\.(\d{1,2})\.?\s*(?:-\s*)?(\d{1,2})\.(\d{1,2})\.?(?:\s*(\d{2,4}))?/;
-    const match = text.match(dateRangeRegex);
-    if (match) {
-        let [_, d1, m1, d2, m2, y] = match;
-        const currentYear = new Date().getFullYear();
-        const year = y ? (y.length === 2 ? '20' + y : y) : currentYear;
+const MAX_STAY_NIGHTS = 90;
 
-        const arrival = `${year}-${m1.padStart(2, '0')}-${d1.padStart(2, '0')}`;
-        const departure = `${year}-${m2.padStart(2, '0')}-${d2.padStart(2, '0')}`;
-        return { arrival, departure };
+function isValidYmd(y, m, d) {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+function ymd(y, m, d) {
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/**
+ * Extracts an arrival/departure range from free text.
+ * Accepts "15.03. - 20.03.", "15.03.-20.03.2026", "15.03.2026 bis 20.03.2026", "15.3 20.3." ...
+ *
+ * Year handling:
+ *  - explicit year on the departure (or arrival) date is used for both dates unless given separately
+ *  - without a year: the next occurrence of the arrival date is assumed (a date more than
+ *    30 days in the past is moved to next year); a departure before the arrival rolls over
+ *    into the following year (28.12. - 03.01.)
+ *
+ * Returns { arrival, departure, error, matched } - arrival/departure are 'YYYY-MM-DD' or null,
+ * `matched` is the exact substring that was recognised (so callers can strip it from the text).
+ */
+function parseDates(text, today = new Date()) {
+    const none = { arrival: null, departure: null, error: null, matched: null };
+    if (!text) return none;
+
+    const re = /(\d{1,2})\.(\d{1,2})\.?(\d{4}|\d{2}(?![\d.]))?(?!\d)/g;
+    const found = [];
+    let m;
+    while ((m = re.exec(text)) !== null && found.length < 2) {
+        found.push({
+            d: parseInt(m[1], 10),
+            m: parseInt(m[2], 10),
+            y: m[3] ? (m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10)) : null,
+            start: m.index,
+            end: m.index + m[0].length
+        });
     }
-    return { arrival: null, departure: null };
+    if (found.length < 2) return none;
+
+    const [a, b] = found;
+    const matched = text.slice(a.start, b.end);
+
+    if (a.m < 1 || a.m > 12 || b.m < 1 || b.m > 12 || a.d < 1 || a.d > 31 || b.d < 1 || b.d > 31) {
+        return { ...none, matched, error: 'Ungültiges Datum (Tag oder Monat außerhalb des gültigen Bereichs).' };
+    }
+
+    const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    let yA = a.y;
+    let yB = b.y;
+
+    if (yA === null && yB === null) {
+        yA = today.getFullYear();
+        // Past dates (more than 30 days ago) are interpreted as next year's stay
+        if (isValidYmd(yA, a.m, a.d) && Date.UTC(yA, a.m - 1, a.d) < todayUtc - 30 * 86400000) yA += 1;
+        yB = yA;
+        if (b.m < a.m || (b.m === a.m && b.d < a.d)) yB = yA + 1;
+    } else if (yA === null) {
+        yA = yB;
+        if (a.m > b.m || (a.m === b.m && a.d > b.d)) yA = yB - 1;
+    } else if (yB === null) {
+        yB = yA;
+        if (b.m < a.m || (b.m === a.m && b.d < a.d)) yB = yA + 1;
+    }
+
+    if (!isValidYmd(yA, a.m, a.d)) return { ...none, matched, error: `Das Datum ${a.d}.${a.m}.${yA} existiert nicht.` };
+    if (!isValidYmd(yB, b.m, b.d)) return { ...none, matched, error: `Das Datum ${b.d}.${b.m}.${yB} existiert nicht.` };
+
+    const arrival = ymd(yA, a.m, a.d);
+    const departure = ymd(yB, b.m, b.d);
+
+    if (departure <= arrival) {
+        return { arrival: null, departure: null, matched, error: 'Die Abreise muss nach der Anreise liegen.' };
+    }
+    const nights = Math.round((Date.UTC(yB, b.m - 1, b.d) - Date.UTC(yA, a.m - 1, a.d)) / 86400000);
+    if (nights > MAX_STAY_NIGHTS) {
+        return { arrival: null, departure: null, matched, error: `Der Aufenthalt wäre ${nights} Nächte lang – bitte Datum prüfen (Maximum ${MAX_STAY_NIGHTS}).` };
+    }
+
+    return { arrival, departure, error: null, matched };
 }
 
 function calcNights(anreise, abreise) {
@@ -42,31 +111,53 @@ function looksLikeDateOrInvalid(str) {
     return false;
 }
 
-function parseInvoiceText(text) {
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    const data = { gName: '', gAdresse: '', arrival: '', departure: '' };
+const EMAIL_IN_TEXT = /[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+/;
 
+/**
+ * Splits a free-text booking message into name / address / e-mail / dates.
+ * - A leading command word ("Rechnung", "/pin", ...) is stripped but the rest of the line is kept,
+ *   so "Rechnung Max Mustermann" yields the name "Max Mustermann".
+ * - Dates may sit on their own line or on the same line as the name.
+ * - gEmail is only set when an e-mail address was found (otherwise the key is absent).
+ * - dateError carries a human readable reason if a date range was recognised but is invalid.
+ */
+function parseInvoiceText(text) {
+    const data = { gName: '', gAdresse: '', arrival: '', departure: '' };
+    if (!text) return data;
+
+    let work = String(text).replace(/\r/g, '');
+
+    // Dates first, so they can be removed from the remaining text
+    const dates = parseDates(work.replace(/\n/g, ' '));
+    if (dates.matched) {
+        // remove the matched range from the original (newline-preserving) text where possible
+        const flat = work.replace(/\n/g, ' ');
+        const idx = flat.indexOf(dates.matched);
+        if (idx >= 0) work = work.slice(0, idx) + '\n' + work.slice(idx + dates.matched.length);
+    }
+    data.arrival = dates.arrival || '';
+    data.departure = dates.departure || '';
+    if (dates.error) data.dateError = dates.error;
+
+    let lines = work.split('\n')
+        .map(l => l.trim().replace(/^\/?(rechnung|pin)(@\w+)?\b[:\s-]*/i, '').trim())
+        .map(l => l.replace(/^[,;\-–—\s]+|[,;\-–—\s]+$/g, '').trim())
+        .filter(l => l);
+
+    // Pull out an e-mail address
+    const emailLineIdx = lines.findIndex(l => EMAIL_IN_TEXT.test(l));
+    if (emailLineIdx >= 0) {
+        const mail = lines[emailLineIdx].match(EMAIL_IN_TEXT)[0];
+        data.gEmail = mail;
+        const rest = lines[emailLineIdx].replace(mail, '').replace(/^[,;\s]+|[,;\s]+$/g, '').trim();
+        if (rest) lines[emailLineIdx] = rest; else lines.splice(emailLineIdx, 1);
+    }
+
+    lines = lines.filter(l => !looksLikeDateOrInvalid(l));
     if (lines.length === 0) return data;
 
-    // Find the first line that is not a date, not "rechnung", and not purely numeric
-    const nameLine = lines.find(l =>
-        !l.toLowerCase().includes('rechnung') &&
-        !looksLikeDateOrInvalid(l)
-    );
-    data.gName = nameLine || '';
-
-    const fullText = text.replace(/\n/g, ' ');
-    const dates = parseDates(fullText);
-    data.arrival = dates.arrival;
-    data.departure = dates.departure;
-
-    const addressLines = lines.filter(l =>
-        l !== data.gName &&
-        !l.toLowerCase().includes('rechnung') &&
-        !looksLikeDateOrInvalid(l)
-    );
-    data.gAdresse = addressLines.join('\n');
-
+    data.gName = lines[0];
+    data.gAdresse = lines.slice(1).join('\n');
     return data;
 }
 
