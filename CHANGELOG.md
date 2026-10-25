@@ -5,6 +5,18 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-10-25
+
+### Hinzugefügt
+- Telegram-Bot: Hauptmenü mit Buttons und gefülltes /-Befehlsmenü
+- Zurück und Abbrechen in jedem Dialogschritt (Button oder Text)
+- Zusammenfassung mit Bestätigung vor dem Anlegen von Tür-Code und Rechnung
+
+### Verbessert
+- Bot fragt nur nach fehlenden Angaben (Slot-Filling)
+- Befehlserkennung nur am Textanfang, Session-Timeout, HTML-Escaping
+- Datumserkennung: Jahreswechsel, Plausibilitätsprüfung (gilt auch für WhatsApp)
+
 ## [1.7.1] - 2026-02-20
 
 ### Hinzugefügt

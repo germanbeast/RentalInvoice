@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.7.0",
+    "currentVersion": "1.8.0",
     "releases": [
+        {
+            "version": "1.8.0",
+            "date": "2026-10-25",
+            "title": "Telegram-Bot: einfachere Bedienung",
+            "features": [
+                "Hauptmenü mit Buttons und gefülltes /-Befehlsmenü",
+                "Zurück und Abbrechen in jedem Schritt (Button oder Text)",
+                "Bot fragt nur noch nach fehlenden Angaben",
+                "Zusammenfassung mit Bestätigung vor dem Anlegen von Tür-Code und Rechnung",
+                "Sichere Befehlserkennung, Timeout nach 10 Minuten, Sonderzeichen in Namen unkritisch",
+                "Verbesserte Datumserkennung (Jahreswechsel, ungültige Daten)"
+            ]
+        },
         {
             "version": "1.7.0",
             "date": "2026-02-16",
