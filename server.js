@@ -2230,10 +2230,10 @@ app.post('/api/estate/generate-report', apiLimiter, async (req, res) => {
         const page = await browser.newPage();
         await page.setRequestInterception(true);
         page.on('request', (request) => {
-            if (request.resourceType() === 'document') request.continue();
+            if (request.resourceType() === 'document' || request.url().startsWith('data:')) request.continue();
             else request.abort();
         });
-        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+        await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
         const pdf = await page.pdf({
             format: 'A4',
             printBackground: true,
@@ -2430,14 +2430,14 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
 
         await page.setRequestInterception(true);
         page.on('request', (request) => {
-            if (request.resourceType() === 'document') {
+            if (request.resourceType() === 'document' || request.url().startsWith('data:')) {
                 request.continue();
             } else {
                 request.abort();
             }
         });
 
-        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+        await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
 
         const pdf = await page.pdf({
             format: 'A4',
