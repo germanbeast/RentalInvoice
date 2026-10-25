@@ -147,6 +147,25 @@ function initSchema() {
         console.log('✅ Migration: template_config Spalte zu branding hinzugefügt.');
     }
 
+    // Migration: booking source / cancellation tracking / arrival detection
+    const bookingCols = db.prepare("PRAGMA table_info(bookings)").all().map(c => c.name);
+    if (!bookingCols.includes('source')) {
+        db.exec("ALTER TABLE bookings ADD COLUMN source TEXT");
+        db.exec(`UPDATE bookings SET source = CASE
+                    WHEN uid LIKE 'manual-%' THEN 'manual'
+                    WHEN summary LIKE 'Airbnb:%' THEN 'Airbnb'
+                    ELSE 'Booking.com' END WHERE source IS NULL`);
+        console.log('✅ Migration: source Spalte zu bookings hinzugefügt.');
+    }
+    if (!bookingCols.includes('missing_count')) {
+        db.exec("ALTER TABLE bookings ADD COLUMN missing_count INTEGER DEFAULT 0");
+        console.log('✅ Migration: missing_count Spalte zu bookings hinzugefügt.');
+    }
+    if (!bookingCols.includes('arrived_at')) {
+        db.exec("ALTER TABLE bookings ADD COLUMN arrived_at TEXT");
+        console.log('✅ Migration: arrived_at Spalte zu bookings hinzugefügt.');
+    }
+
     // Estate Management Tables
     db.exec(`
         CREATE TABLE IF NOT EXISTS estate_mileage (
@@ -810,12 +829,13 @@ function upsertBooking(data) {
     const db = getDb();
     const existing = db.prepare('SELECT id FROM bookings WHERE uid = ?').get(data.uid);
     if (existing) {
-        db.prepare('UPDATE bookings SET summary = ?, checkin = ?, checkout = ?, description = ? WHERE uid = ?')
-            .run(data.summary, data.checkin, data.checkout, data.description, data.uid);
+        // Seen in the feed again -> reset the "missing" counter used for cancellation detection
+        db.prepare('UPDATE bookings SET summary = ?, checkin = ?, checkout = ?, description = ?, missing_count = 0, source = COALESCE(?, source) WHERE uid = ?')
+            .run(data.summary, data.checkin, data.checkout, data.description, data.source || null, data.uid);
         return { updated: true, id: existing.id };
     } else {
-        const result = db.prepare('INSERT INTO bookings (uid, summary, checkin, checkout, description) VALUES (?, ?, ?, ?, ?)')
-            .run(data.uid, data.summary, data.checkin, data.checkout, data.description);
+        const result = db.prepare('INSERT INTO bookings (uid, summary, checkin, checkout, description, source) VALUES (?, ?, ?, ?, ?, ?)')
+            .run(data.uid, data.summary, data.checkin, data.checkout, data.description, data.source || null);
         return { inserted: true, id: result.lastInsertRowid };
     }
 }

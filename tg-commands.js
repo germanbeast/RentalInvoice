@@ -339,7 +339,7 @@ async function runSync(bot, chatId) {
     let text = '<b>🔄 Kalenderabfrage abgeschlossen</b>\n\n';
     r.feeds.forEach(f => {
         text += f.ok
-            ? `✅ <b>${esc(f.source)}</b>: ${f.events} Einträge, ${f.newCount} neu\n`
+            ? `✅ <b>${esc(f.source)}</b>: ${f.events} Einträge, ${f.newCount} neu${f.cancelled ? `, ${f.cancelled} storniert` : ''}\n`
             : `❌ <b>${esc(f.source)}</b>: ${esc(short(f.error, 80))}\n`;
     });
     text += r.newCount > 0

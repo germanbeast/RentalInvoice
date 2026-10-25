@@ -5,6 +5,14 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-10-25
+
+### Hinzugefügt
+- Doppelbuchungs-Warnung bei Überschneidung zwischen Booking.com und Airbnb
+- Storno-Erkennung mit Schutzmechanismen; Türcode wird gelöscht, Buchung entfernt, Benachrichtigung gesendet
+- Anreise-Meldung über das Nuki-Zutrittsprotokoll (alle 10 Minuten)
+- Neue Spalten in `bookings`: source, missing_count, arrived_at (automatische Migration)
+
 ## [1.10.1] - 2026-10-25
 
 ### Behoben

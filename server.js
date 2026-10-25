@@ -386,21 +386,39 @@ function getIcalFeeds(allSettings) {
     return feeds;
 }
 
+const bookingMonitor = require('./booking-monitor')({
+    db,
+    axios,
+    deleteNukiPin: (authId) => deleteNukiPin(authId),
+    botLogic: require('./bot-logic'),
+    formatDateDE: (d) => formatDateDE(d),
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg);
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    }
+});
+
 async function pollIcalFeed(feed, todayYmd, adjusted) {
     const response = await axios.get(feed.url, {
         timeout: 10000,
         maxContentLength: 5 * 1024 * 1024,
         headers: { 'User-Agent': 'RentalInvoice/1.0' }
     });
+    // A calendar feed must be an iCal document - an error page or login redirect must never count as "no bookings"
+    if (typeof response.data !== 'string' || !response.data.includes('BEGIN:VCALENDAR')) {
+        throw new Error('Antwort ist kein iCal-Kalender (Link prüfen)');
+    }
     const data = ical.parseICS(response.data);
     let newCount = 0;
     let events = 0;
+    const seen = new Set();
 
     for (const k in data) {
         if (!data.hasOwnProperty(k)) continue;
         const ev = data[k];
         if (ev.type !== 'VEVENT' || !ev.uid) continue;
         events++;
+        seen.add(ev.uid);
 
         const rawSummary = String(ev.summary || 'Buchung').substring(0, 500);
         // Airbnb exports blocked dates as "Airbnb (Not available)" - only "Reserved" are real stays
@@ -417,7 +435,8 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
             summary,
             checkin,
             checkout,
-            description: String(ev.description || '').substring(0, 2000)
+            description: String(ev.description || '').substring(0, 2000),
+            source: feed.source
         });
 
         // Existing booking whose dates changed (booking modified, or corrected date parsing):
@@ -477,7 +496,7 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
         }
     }
-    return { newCount, events };
+    return { newCount, events, seen };
 }
 
 let icalSyncRunning = false;
@@ -507,11 +526,23 @@ async function runIcalSync({ manual = false } = {}) {
             try {
                 const r = await pollIcalFeed(feed, todayYmd, adjusted);
                 newCount += r.newCount;
-                results.push({ source: feed.source, ok: true, events: r.events, newCount: r.newCount });
+                let cancelled = 0;
+                try {
+                    cancelled = (await bookingMonitor.processMissing(feed.source, r.seen)).cancelled || 0;
+                } catch (me) {
+                    console.error(`\u274c Storno-Erkennung (${feed.source}) Fehler:`, me.message);
+                }
+                results.push({ source: feed.source, ok: true, events: r.events, newCount: r.newCount, cancelled });
             } catch (fe) {
                 console.error(`\u274c iCal-Polling (${feed.source}) Fehler:`, fe.message);
                 results.push({ source: feed.source, ok: false, error: fe.message });
             }
+        }
+
+        try {
+            await bookingMonitor.checkOverlaps();
+        } catch (oe) {
+            console.error('\u274c Doppelbuchungs-Prüfung Fehler:', oe.message);
         }
 
         if (adjusted.length > 0) {
@@ -654,6 +685,11 @@ async function runNukiCleanup() {
 }
 
 cron.schedule('10 * * * *', runNukiCleanup);
+
+// Job 1c: detect first use of a guest's door code (every 10 minutes)
+cron.schedule('*/10 * * * *', () => {
+    bookingMonitor.checkArrivals().catch(e => console.error('\u274c Anreise-Erkennung Fehler:', e.message));
+});
 setTimeout(runNukiCleanup, 90 * 1000);
 
 // Job 2: Reminder Check (daily at 08:00)

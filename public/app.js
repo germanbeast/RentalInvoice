@@ -2034,7 +2034,7 @@
                     return;
                 }
                 const parts = data.feeds.map(f => f.ok
-                    ? `${f.source}: ${f.events} Einträge, ${f.newCount} neu`
+                    ? `${f.source}: ${f.events} Einträge, ${f.newCount} neu${f.cancelled ? ', ' + f.cancelled + ' storniert' : ''}`
                     : `${f.source}: Fehler (${f.error})`);
                 const anyError = data.feeds.some(f => !f.ok);
                 if (status) status.textContent = (anyError ? '⚠️ ' : '✅ ') + parts.join(' · ');

@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.10.1",
+    "currentVersion": "1.11.0",
     "releases": [
+        {
+            "version": "1.11.0",
+            "date": "2026-10-25",
+            "title": "Doppelbuchungs-Warnung, Storno-Erkennung, Anreise-Meldung",
+            "features": [
+                "Warnung per Telegram/WhatsApp bei überschneidenden Buchungen aus Booking.com und Airbnb",
+                "Stornierungen erkennen: verschwindet eine kommende Buchung 3 Abgleiche lang aus dem Kalender, wird der Türcode gelöscht und die Buchung entfernt (mit Schutz bei leeren/defekten Kalendern)",
+                "Anreise-Meldung: erster Zutritt mit dem Türcode des Gastes wird aus dem Nuki-Zutrittsprotokoll erkannt und gemeldet",
+                "Kalender-Antworten, die kein iCal sind (Fehlerseiten), werden als Fehler erkannt statt als leerer Kalender"
+            ]
+        },
         {
             "version": "1.10.1",
             "date": "2026-10-25",

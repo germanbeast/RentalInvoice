@@ -314,6 +314,21 @@ function isPlaceholderGuestName(name) {
     return /^(booking|airbnb) \d{2}\.\d{2}\.$/i.test(n) || /not available|closed|reserved/i.test(n);
 }
 
+/** Deletes a placeholder guest ("Booking 30.10." ...) when no booking or invoice references it any more. */
+function cleanupPlaceholderGuest(guestId) {
+    if (!guestId) return false;
+    try {
+        const g = db.getGuestById(guestId);
+        if (g && isPlaceholderGuestName(g.name) &&
+            db.getBookingsByGuestId(guestId).length === 0 &&
+            db.getInvoicesByGuestId(guestId).length === 0) {
+            db.deleteGuest(guestId);
+            return true;
+        }
+    } catch (e) { /* best-effort */ }
+    return false;
+}
+
 /**
  * Assigns a real guest name to a booking: links/creates the guest, renames the Nuki code
  * and removes the placeholder guest if nothing else references it.
@@ -341,17 +356,7 @@ async function applyGuestName(bookingId, fullName) {
         }
     }
 
-    // Drop the placeholder guest when it is now unused
-    if (oldGuestId && oldGuestId !== guest.id) {
-        try {
-            const old = db.getGuestById(oldGuestId);
-            if (old && isPlaceholderGuestName(old.name) &&
-                db.getBookingsByGuestId(oldGuestId).length === 0 &&
-                db.getInvoicesByGuestId(oldGuestId).length === 0) {
-                db.deleteGuest(oldGuestId);
-            }
-        } catch (e) { /* cleanup is best-effort */ }
-    }
+    if (oldGuestId && oldGuestId !== guest.id) cleanupPlaceholderGuest(oldGuestId);
 
     return { guestId: guest.id, name, nukiRenamed, nukiError, booking };
 }
@@ -486,5 +491,6 @@ module.exports = {
     listNukiCodes,
     updateNukiAuth,
     applyGuestName,
-    isPlaceholderGuestName
+    isPlaceholderGuestName,
+    cleanupPlaceholderGuest
 };
