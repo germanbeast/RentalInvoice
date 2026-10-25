@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-10-25
+
+### Behoben
+- Stündlich wiederkehrende Meldung "Türcode gelöscht": Nuki bestätigt das Löschen sofort, entfernt den Eintrag aber erst nach Synchronisation mit dem Schloss. Anforderungen werden jetzt gemerkt (einmal melden, nach 6 h still wiederholen, nach 24 h einmalig warnen)
+
 ## [1.10.0] - 2026-10-25
 
 ### Hinzugefügt

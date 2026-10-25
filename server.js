@@ -534,9 +534,18 @@ cron.schedule('*/15 * * * *', () => {
 });
 
 // Job 1b: delete expired door codes from the Nuki lock (hourly, plus once shortly after start)
+//
+// Nuki answers DELETE with 204 as soon as the *server* accepted the request; the entry stays in the
+// list until the lock itself has synced the deletion. Therefore a delete is requested only once,
+// remembered (setting `nuki_delete_requests`), retried after RETRY_MS and only reported again as
+// "stuck" if the lock still has not removed it after STUCK_MS.
+const NUKI_DELETE_RETRY_MS = 6 * 60 * 60 * 1000;
+const NUKI_DELETE_STUCK_MS = 24 * 60 * 60 * 1000;
+
 async function cleanupExpiredNukiCodes() {
-    const nuki = db.getAllSettings().nuki;
-    if (!nuki || !nuki.token || !nuki.lockId) return { deleted: [], failed: 0 };
+    const settings = db.getAllSettings();
+    const nuki = settings.nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) return { deleted: [], stuck: [], failed: 0, confirmed: 0 };
 
     const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
     const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
@@ -547,8 +556,18 @@ async function cleanupExpiredNukiCodes() {
 
     const now = Date.now();
     const todayYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+    const rawState = settings.nuki_delete_requests;
+    const state = rawState && typeof rawState === 'object' ? { ...rawState } : {};
     const deleted = [];
+    const stuck = [];
     let failed = 0;
+    let confirmed = 0;
+
+    // Requests the lock has completed (entry gone from the list) -> forget them
+    const liveIds = new Set(auths.map(a => String(a.id)));
+    for (const id of Object.keys(state)) {
+        if (!liveIds.has(id)) { delete state[id]; confirmed++; }
+    }
 
     for (const a of auths) {
         // Only keypad codes created by this system ("Gast: ...") whose validity has ended.
@@ -562,13 +581,35 @@ async function cleanupExpiredNukiCodes() {
         ).get(String(a.id), String(a.code || ''), String(a.code || ''));
         if (booking && booking.checkout && booking.checkout > todayYmd) continue;
 
+        const key = String(a.id);
+        const req = state[key];
+        const label = `${a.name} (bis ${formatDateDE(a.allowedUntilDate)})`;
+
+        if (req) {
+            // Delete already requested - waiting for the lock to sync
+            if (now - req.ts >= NUKI_DELETE_STUCK_MS && !req.warned) {
+                req.warned = true;
+                stuck.push(label);
+            }
+            if (now - (req.lastTry || req.ts) < NUKI_DELETE_RETRY_MS) continue;
+            try {
+                await deleteNukiPin(a.id);
+                req.lastTry = now;
+            } catch (re) {
+                req.lastTry = now;
+                console.warn(`⚠️ Erneutes Löschen von Nuki-Code ${a.id} fehlgeschlagen:`, re.message);
+            }
+            continue;
+        }
+
         try {
             await deleteNukiPin(a.id);
+            state[key] = { ts: now, lastTry: now };
             if (booking) {
                 db.clearNukiAuth(booking.id);
                 db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(booking.id);
             }
-            deleted.push(`${a.name} (bis ${formatDateDE(a.allowedUntilDate)})`);
+            deleted.push(label);
             await new Promise(r => setTimeout(r, 500)); // be gentle with the Nuki API
         } catch (de) {
             failed++;
@@ -577,7 +618,6 @@ async function cleanupExpiredNukiCodes() {
     }
 
     // Bookings whose code is no longer present in Nuki (deleted by hand): drop the stale reference
-    const liveIds = new Set(auths.map(a => String(a.id)));
     const stale = db.getDb().prepare(
         "SELECT id, nuki_auth_id FROM bookings WHERE nuki_auth_id IS NOT NULL AND nuki_auth_id != '' AND checkout < ?"
     ).all(todayYmd);
@@ -588,17 +628,24 @@ async function cleanupExpiredNukiCodes() {
         }
     }
 
-    return { deleted, failed };
+    if (JSON.stringify(state) !== JSON.stringify(rawState || {})) db.setSetting('nuki_delete_requests', state);
+    return { deleted, stuck, failed, confirmed };
 }
 
 async function runNukiCleanup() {
     try {
-        const { deleted, failed } = await cleanupExpiredNukiCodes();
+        const { deleted, stuck, failed, confirmed } = await cleanupExpiredNukiCodes();
+        if (confirmed > 0) console.log(`✅ ${confirmed} Nuki-Code(s) vom Schloss entfernt (Löschung bestätigt).`);
         if (deleted.length > 0) {
-            console.log(`🧹 ${deleted.length} abgelaufene Nuki-Code(s) gelöscht.`);
-            const msg = `🧹 *${deleted.length} abgelaufene${deleted.length === 1 ? 'r Türcode' : ' Türcodes'} gelöscht*\n${deleted.map(d => '• ' + d).join('\n')}`;
+            console.log(`🧹 Löschung von ${deleted.length} abgelaufenen Nuki-Code(s) angefordert.`);
+            const msg = `🧹 *${deleted.length} abgelaufene${deleted.length === 1 ? 'r Türcode wird' : ' Türcodes werden'} gelöscht*\n${deleted.map(d => '• ' + d).join('\n')}\n_Nuki entfernt sie, sobald das Schloss synchronisiert hat. Die Codes sind bereits abgelaufen und nicht mehr nutzbar._`;
             const sent = await sendToAllRecipients(msg);
             db.logNotification('nuki_cleanup', msg, sent ? 'sent' : 'failed');
+        }
+        if (stuck.length > 0) {
+            const msg = `⚠️ *Türcode nach 24 Stunden noch im Schloss*\n${stuck.map(d => '• ' + d).join('\n')}\nNuki konnte die Löschung noch nicht ausführen (Schloss/Bridge offline?). Bitte ggf. in der Nuki-App löschen. Der Code ist abgelaufen und nicht mehr nutzbar.`;
+            const sent = await sendToAllRecipients(msg);
+            db.logNotification('nuki_cleanup_stuck', msg, sent ? 'sent' : 'failed');
         }
         if (failed > 0) console.warn(`⚠️ ${failed} Nuki-Code(s) konnten nicht gelöscht werden (nächster Versuch in 1 Stunde).`);
     } catch (e) {

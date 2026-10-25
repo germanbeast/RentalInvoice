@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.10.0",
+    "currentVersion": "1.10.1",
     "releases": [
+        {
+            "version": "1.10.1",
+            "date": "2026-10-25",
+            "title": "Nuki-Löschung: keine Dauer-Meldung mehr",
+            "features": [
+                "Behebt: Dieselbe Lösch-Meldung kam stündlich, weil Nuki Löschungen erst nach Synchronisation mit dem Schloss ausführt",
+                "Löschanforderungen werden gemerkt: einmal melden, nach 6 Stunden still wiederholen, nach 24 Stunden einmalig vor einem hängenden Code warnen"
+            ]
+        },
         {
             "version": "1.10.0",
             "date": "2026-10-25",
