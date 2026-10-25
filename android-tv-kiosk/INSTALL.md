@@ -250,3 +250,25 @@ adb shell am start -n com.beckhome.tvwelcome/.MainActivity
 ---
 
 Bei Fragen oder Problemen, schreib mir! 😊
+
+---
+
+## 🔒 Echter Kiosk-Modus (Fernbedienung gesperrt)
+
+Ab App-Version 1.1 kann die App Home-, Zurück- und Übersichtstaste komplett sperren (Android „Lock Task“).
+Dafür muss sie **Geräte-Eigentümer** sein. Das geht nur einmalig und nur, wenn auf der Box **kein Google-Konto** eingerichtet ist
+(sonst meldet Android „already several accounts“; dann Konto unter Einstellungen → Konten entfernen).
+
+```bash
+adb install -r app-debug.apk
+adb shell dpm set-device-owner com.beckhome.tvwelcome/.AdminReceiver
+adb shell am start -n com.beckhome.tvwelcome/.MainActivity
+```
+
+Ab dann bleibt die App im Vordergrund. Einstellungen öffnest du weiterhin mit 5× Tippen oben links (oder MENU-Taste).
+
+**Kiosk wieder beenden:**
+```bash
+adb shell am start -n com.beckhome.tvwelcome/.MainActivity --ez exit_kiosk true
+```
+Das hebt die Sperre auf und gibt den Geräte-Eigentümer-Status wieder frei.

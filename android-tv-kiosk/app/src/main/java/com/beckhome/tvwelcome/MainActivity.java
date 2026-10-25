@@ -2,6 +2,8 @@ package com.beckhome.tvwelcome;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
@@ -37,6 +39,11 @@ public class MainActivity extends Activity {
 
         // Load preferences
         prefs = getSharedPreferences("WelcomeSettings", MODE_PRIVATE);
+
+        // Kiosk beenden, falls per adb angefordert (siehe INSTALL.md)
+        if (getIntent().getBooleanExtra("exit_kiosk", false)) {
+            exitKioskMode();
+        }
 
         // Enable fullscreen kiosk mode
         enableKioskMode();
@@ -158,6 +165,46 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Echter Kiosk-Modus (Lock Task): Home, Zurück und Übersicht der Fernbedienung sind gesperrt.
+     * Funktioniert nur, wenn die App Geräte-Eigentümer ist:
+     * adb shell dpm set-device-owner com.beckhome.tvwelcome/.AdminReceiver
+     */
+    private void startLockTaskIfOwner() {
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) return;
+        try {
+            ComponentName admin = new ComponentName(this, AdminReceiver.class);
+            dpm.setLockTaskPackages(admin, new String[]{getPackageName()});
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+            }
+            startLockTask();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void exitKioskMode() {
+        try {
+            stopLockTask();
+        } catch (Exception ignored) {
+        }
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
+            dpm.clearDeviceOwnerApp(getPackageName());
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra("exit_kiosk", false)) {
+            exitKioskMode();
+        }
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
@@ -187,6 +234,9 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         enableKioskMode();
+        if (!getIntent().getBooleanExtra("exit_kiosk", false)) {
+            startLockTaskIfOwner();
+        }
         // Reload page when returning from settings
         loadWelcomePage();
     }
