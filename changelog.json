@@ -1,6 +1,16 @@
 {
-    "currentVersion": "1.9.0",
+    "currentVersion": "1.9.1",
     "releases": [
+        {
+            "version": "1.9.1",
+            "date": "2026-10-25",
+            "title": "Manuelle Kalenderabfrage",
+            "features": [
+                "Button 'Kalender jetzt abfragen' in den Einstellungen (Booking.com & Airbnb), speichert die Links und zeigt das Ergebnis je Kalender",
+                "Telegram: Befehl /sync und Menü-Button 'Kalender abfragen'",
+                "Sperre gegen gleichzeitige Abfragen; Fehler in einem Kalender stoppen den anderen nicht"
+            ]
+        },
         {
             "version": "1.9.0",
             "date": "2026-10-25",

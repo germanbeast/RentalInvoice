@@ -71,7 +71,8 @@ function mainMenuKeyboard() {
     return keyboard([
         [btn('🧾 Neue Rechnung', 'new:invoice'), btn('🔑 Nur Tür-Code', 'new:pin')],
         [btn('🔐 Türcodes', 'codes'), btn('📅 Anreisen', 'arrivals')],
-        [btn('📋 Offene Rechnungen', 'open'), btn('❓ Hilfe', 'help')]
+        [btn('🔄 Kalender abfragen', 'sync'), btn('📋 Offene Rechnungen', 'open')],
+        [btn('❓ Hilfe', 'help')]
     ]);
 }
 
@@ -147,6 +148,7 @@ async function showHelp(bot, chatId) {
         '• <code>/pin</code> – nur einen Tür-Code erstellen\n' +
         '• <code>/status</code> – offene Rechnungen\n' +
         '• <code>/codes</code> – Türcodes live aus Nuki anzeigen\n' +
+        '• <code>/sync</code> – Booking.com &amp; Airbnb jetzt abfragen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
@@ -217,6 +219,37 @@ async function showCodes(bot, chatId) {
     if (expiredCount) text += `\n<i>${expiredCount} abgelaufene Einträge ausgeblendet</i>`;
     text += '\n🟢 gültig · ⏳ noch nicht gültig · ⛔ deaktiviert';
     return send(bot, chatId, text, keyboard([[btn('🔄 Aktualisieren', 'codes'), btn('🏠 Hauptmenü', 'menu')]]));
+}
+
+let hooks = {};
+
+async function runSync(bot, chatId) {
+    if (!hooks.syncCalendars) {
+        return send(bot, chatId, '❌ Die Kalenderabfrage ist nicht verfügbar.', menuOnlyKeyboard());
+    }
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    const pending = await send(bot, chatId, '🔄 Kalender werden abgefragt …');
+    let r;
+    try {
+        r = await hooks.syncCalendars();
+    } catch (e) {
+        console.error('[TG] Kalenderabfrage:', e.message);
+        return send(bot, chatId, `❌ <b>Abfrage fehlgeschlagen:</b> ${esc(e.message)}`, menuOnlyKeyboard());
+    }
+    if (r.busy) return send(bot, chatId, '⏳ Eine Abfrage läuft bereits – bitte gleich noch einmal versuchen.', menuOnlyKeyboard());
+    if (r.noFeeds) return send(bot, chatId, '⚠️ Es ist kein iCal-Link hinterlegt (Booking.com oder Airbnb). Bitte in den Einstellungen im Webinterface eintragen.', menuOnlyKeyboard());
+
+    let text = '<b>🔄 Kalenderabfrage abgeschlossen</b>\n\n';
+    r.feeds.forEach(f => {
+        text += f.ok
+            ? `✅ <b>${esc(f.source)}</b>: ${f.events} Einträge, ${f.newCount} neu\n`
+            : `❌ <b>${esc(f.source)}</b>: ${esc(short(f.error, 80))}\n`;
+    });
+    text += r.newCount > 0
+        ? `\n🏠 ${r.newCount} neue Buchung(en) erkannt – Türcode wurde angelegt (Details in der Benachrichtigung).`
+        : '\nKeine neuen Buchungen.';
+    if (r.adjusted && r.adjusted.length) text += `\n🔧 ${r.adjusted.length} Türcode-Zeitraum angepasst.`;
+    return send(bot, chatId, text, keyboard([[btn('🔐 Türcodes', 'codes'), btn('🏠 Hauptmenü', 'menu')]]));
 }
 
 async function showArrivals(bot, chatId) {
@@ -609,7 +642,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|codes|türcodes|tuercodes|status|offen|anreisen|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|sync|codes|türcodes|tuercodes|status|offen|anreisen|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -690,6 +723,8 @@ async function processMessage(bot, msg) {
             case 'status':
             case 'offen':
                 return showOpenInvoices(bot, chatId);
+            case 'sync':
+                return runSync(bot, chatId);
             case 'codes':
             case 'türcodes':
             case 'tuercodes':
@@ -811,6 +846,8 @@ async function processCallback(bot, q) {
                 return showArrivals(bot, chatId);
             case data === 'codes':
                 return showCodes(bot, chatId);
+            case data === 'sync':
+                return runSync(bot, chatId);
             case data === 'new:invoice':
                 return startFlow(bot, chatId, 'invoice', '');
             case data === 'new:pin':
@@ -858,7 +895,8 @@ async function processCallback(bot, q) {
 // ---------------------------------------------------------------------------
 // Setup (von server.js aufgerufen)
 // ---------------------------------------------------------------------------
-async function setup(bot) {
+async function setup(bot, options = {}) {
+    hooks = options;
     bot.on('callback_query', (q) => {
         processCallback(bot, q).catch(e => console.error('❌ Fehler in tgCommands.processCallback:', e));
     });
@@ -868,6 +906,7 @@ async function setup(bot) {
             { command: 'menu', description: 'Hauptmenü öffnen' },
             { command: 'rechnung', description: 'Neue Rechnung erstellen' },
             { command: 'pin', description: 'Nur Tür-Code erstellen' },
+            { command: 'sync', description: 'Kalender jetzt abfragen' },
             { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },
             { command: 'anreisen', description: 'Kommende Buchungen anzeigen' },

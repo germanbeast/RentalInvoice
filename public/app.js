@@ -2009,6 +2009,49 @@
     });
 
     // =======================
+    // Manual calendar sync (Booking.com + Airbnb)
+    // =======================
+    const btnIcalSync = $('#btn-ical-sync');
+    if (btnIcalSync) {
+        btnIcalSync.addEventListener('click', async () => {
+            const status = $('#ical-sync-status');
+            btnIcalSync.disabled = true;
+            btnIcalSync.textContent = '🔄 Frage ab …';
+            if (status) status.textContent = '';
+            try {
+                // Send the URLs along so a freshly pasted link is saved and used right away
+                const bUrl = ($('#booking-ical-url')?.value || '').trim();
+                const aUrl = ($('#airbnb-ical-url')?.value || '').trim();
+                const response = await fetch('/api/ical/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ booking_ical: bUrl, airbnb_ical: aUrl })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    showToast(data.error || 'Abfrage fehlgeschlagen', 'error');
+                    if (status) status.textContent = '❌ ' + (data.error || 'Fehler');
+                    return;
+                }
+                const parts = data.feeds.map(f => f.ok
+                    ? `${f.source}: ${f.events} Einträge, ${f.newCount} neu`
+                    : `${f.source}: Fehler (${f.error})`);
+                const anyError = data.feeds.some(f => !f.ok);
+                if (status) status.textContent = (anyError ? '⚠️ ' : '✅ ') + parts.join(' · ');
+                showToast(
+                    data.newCount > 0 ? `${data.newCount} neue Buchung(en) erkannt – Tür-Code angelegt` : 'Abfrage abgeschlossen – keine neuen Buchungen',
+                    anyError ? 'error' : 'success'
+                );
+            } catch (err) {
+                showToast('Abfrage fehlgeschlagen: ' + err.message, 'error');
+            } finally {
+                btnIcalSync.disabled = false;
+                btnIcalSync.textContent = '🔄 Kalender jetzt abfragen';
+            }
+        });
+    }
+
+    // =======================
     // Print
     // =======================
     btnPrint.addEventListener('click', () => {

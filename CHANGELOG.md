@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-10-25
+
+### Hinzugefügt
+- Manuelle Kalenderabfrage: Button in den Einstellungen und Telegram-Befehl /sync (Booking.com und Airbnb)
+
 ## [1.9.0] - 2026-10-25
 
 ### Hinzugefügt

@@ -270,7 +270,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }) }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -405,11 +405,13 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
     });
     const data = ical.parseICS(response.data);
     let newCount = 0;
+    let events = 0;
 
     for (const k in data) {
         if (!data.hasOwnProperty(k)) continue;
         const ev = data[k];
         if (ev.type !== 'VEVENT' || !ev.uid) continue;
+        events++;
 
         const rawSummary = String(ev.summary || 'Buchung').substring(0, 500);
         // Airbnb exports blocked dates as "Airbnb (Not available)" - only "Reserved" are real stays
@@ -480,28 +482,40 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
         }
     }
-    return newCount;
+    return { newCount, events };
 }
 
-cron.schedule('*/15 * * * *', async () => {
+let icalSyncRunning = false;
+
+/**
+ * Polls all configured calendars (Booking.com, Airbnb).
+ * manual=true ignores the "notifications disabled" switch (used by the manual sync button / Telegram /sync).
+ * Returns { busy, noFeeds, disabled, feeds:[{source, ok, events, newCount, error}], newCount, adjusted }
+ */
+async function runIcalSync({ manual = false } = {}) {
+    if (icalSyncRunning) return { busy: true, feeds: [], newCount: 0, adjusted: [] };
+    icalSyncRunning = true;
     try {
         const allSettings = db.getAllSettings();
-        const notifyEnabled = allSettings.notifications_enabled;
         const feeds = getIcalFeeds(allSettings);
+        if (feeds.length === 0) return { noFeeds: true, feeds: [], newCount: 0, adjusted: [] };
+        if (!manual && allSettings.notifications_enabled === 'false') return { disabled: true, feeds: [], newCount: 0, adjusted: [] };
 
-        if (feeds.length === 0 || notifyEnabled === 'false') return;
-
-        console.log('📅 iCal-Polling läuft...');
+        console.log(`\ud83d\udcc5 iCal-Polling l\u00e4uft${manual ? ' (manuell)' : ''}...`);
         const adjusted = [];
         const todayYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+        const results = [];
         let newCount = 0;
 
         // Each feed is isolated: an error in one calendar does not stop the other
         for (const feed of feeds) {
             try {
-                newCount += await pollIcalFeed(feed, todayYmd, adjusted);
+                const r = await pollIcalFeed(feed, todayYmd, adjusted);
+                newCount += r.newCount;
+                results.push({ source: feed.source, ok: true, events: r.events, newCount: r.newCount });
             } catch (fe) {
-                console.error(`❌ iCal-Polling (${feed.source}) Fehler:`, fe.message);
+                console.error(`\u274c iCal-Polling (${feed.source}) Fehler:`, fe.message);
+                results.push({ source: feed.source, ok: false, error: fe.message });
             }
         }
 
@@ -512,11 +526,16 @@ cron.schedule('*/15 * * * *', async () => {
         }
 
         if (newCount > 0) {
-            console.log(`🎉 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
+            console.log(`\ud83c\udf89 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
         }
-    } catch (e) {
-        console.error('❌ iCal-Polling Fehler:', e.message);
+        return { feeds: results, newCount, adjusted };
+    } finally {
+        icalSyncRunning = false;
     }
+}
+
+cron.schedule('*/15 * * * *', () => {
+    runIcalSync().catch(e => console.error('\u274c iCal-Polling Fehler:', e.message));
 });
 
 // Job 1b: delete expired door codes from the Nuki lock (hourly, plus once shortly after start)
@@ -2276,6 +2295,30 @@ app.post('/api/send-email', apiLimiter, async (req, res) => {
     } catch (error) {
         console.error('Email Error:', error.message);
         res.status(500).json({ error: 'E-Mail-Versand fehlgeschlagen' });
+    }
+});
+
+// API: manual calendar sync (Booking.com + Airbnb) - same logic as the 15-minute job
+app.post('/api/ical/sync', apiLimiter, async (req, res) => {
+    try {
+        // Optionally persist freshly entered calendar links (only these two keys are touched)
+        const body = req.body || {};
+        for (const key of ['booking_ical', 'airbnb_ical']) {
+            if (typeof body[key] === 'string') {
+                const url = body[key].trim();
+                if (url && !/^https?:\/\//i.test(url)) {
+                    return res.status(400).json({ success: false, error: `Ungültiger Link (${key === 'airbnb_ical' ? 'Airbnb' : 'Booking.com'}): muss mit https:// beginnen.` });
+                }
+                db.setSetting(key, url);
+            }
+        }
+        const result = await runIcalSync({ manual: true });
+        if (result.busy) return res.status(409).json({ success: false, error: 'Eine Abfrage läuft bereits – bitte kurz warten.' });
+        if (result.noFeeds) return res.status(400).json({ success: false, error: 'Kein iCal-Link hinterlegt (Booking.com oder Airbnb).' });
+        res.json({ success: true, ...result });
+    } catch (e) {
+        console.error('Manuelle iCal-Abfrage Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Abfrage fehlgeschlagen: ' + e.message });
     }
 });
 
