@@ -285,14 +285,14 @@ async function initTelegram() {
     }
 }
 
-async function sendTelegram(chatId, message) {
+async function sendTelegram(chatId, message, replyMarkup) {
     if (!tgBot) return false;
     try {
         try {
-            await tgBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+            await tgBot.sendMessage(chatId, message, { parse_mode: 'Markdown', ...(replyMarkup ? { reply_markup: replyMarkup } : {}) });
         } catch (mdErr) {
             // e.g. names containing _ or * break Markdown parsing -> resend as plain text
-            await tgBot.sendMessage(chatId, message.replace(/[*_`]/g, ''));
+            await tgBot.sendMessage(chatId, message.replace(/[*_`]/g, ''), replyMarkup ? { reply_markup: replyMarkup } : {});
         }
         console.log(`✉️ Telegram gesendet an ${chatId}`);
         return true;
@@ -303,7 +303,7 @@ async function sendTelegram(chatId, message) {
 }
 
 // Send to all configured notification recipients
-async function sendToAllRecipients(message) {
+async function sendToAllRecipients(message, opts = {}) {
     const allSettings = db.getAllSettings();
     let anySent = false;
 
@@ -335,7 +335,7 @@ async function sendToAllRecipients(message) {
     }
     for (const id of tgIds) {
         if (id && String(id).trim()) {
-            if (await sendTelegram(String(id).trim(), message)) anySent = true;
+            if (await sendTelegram(String(id).trim(), message, opts.tgKeyboard)) anySent = true;
         }
     }
 
@@ -365,20 +365,9 @@ function icalDateToYmd(d) {
 
 // Adjust the validity period of an existing Nuki keypad code
 async function updateNukiPinDates(authId, arrival, departure) {
-    const nuki = db.getAllSettings().nuki;
-    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
-    await axios.put(`https://api.nuki.io/smartlock/auth/${authId}`, {
+    await require('./bot-logic').updateNukiAuth(authId, {
         allowedFromDate: `${arrival}T15:00:00.000Z`,
-        allowedUntilDate: `${departure}T11:00:00.000Z`,
-        allowedWeekDays: 127,
-        allowedFromTime: 0,
-        allowedUntilTime: 0
-    }, {
-        headers: {
-            'Authorization': `Bearer ${nuki.token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
+        allowedUntilDate: `${departure}T11:00:00.000Z`
     });
 }
 
@@ -450,11 +439,13 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
 
             // --- Brand New: Auto-Nuki PIN for iCal ---
             let pinMsg = '';
+            let needsName = false;
             try {
                 // Booking.com: guess guest name from summary (e.g., "Mustermann, Max (12345)")
                 // Airbnb: no guest name in the feed -> unique placeholder per stay
                 const guessedName = summary.split('(')[0].trim().replace('Buchung:', '').trim();
                 const hasRealName = guessedName && !/not available|closed|reserved/i.test(guessedName);
+                needsName = feed.source === 'Airbnb' || !hasRealName;
                 const guestName = feed.source === 'Airbnb'
                     ? `Airbnb ${formatDateDE(checkin).slice(0, 6)}`
                     : (hasRealName ? guessedName : `Booking ${formatDateDE(checkin).slice(0, 6)}`);
@@ -478,7 +469,11 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
             }
 
             const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}`;
-            const sent = await sendToAllRecipients(msg);
+            // Calendars rarely contain the guest name -> offer to add it right from the Telegram message
+            const tgKeyboard = needsName
+                ? { inline_keyboard: [[{ text: '👤 Namen eintragen', callback_data: `nm:${result.id}` }]] }
+                : undefined;
+            const sent = await sendToAllRecipients(msg, { tgKeyboard });
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
         }
     }
@@ -1519,20 +1514,7 @@ app.put('/api/nuki/pin/:bookingId/extend', apiLimiter, async (req, res) => {
 
         // If there is an existing auth entry, update it; otherwise create a new PIN
         if (booking.nuki_auth_id) {
-            const ax = require('axios');
-            await ax.put(`https://api.nuki.io/smartlock/auth/${booking.nuki_auth_id}`, {
-                allowedFromDate: `${arrival}T15:00:00.000Z`,
-                allowedUntilDate: `${departure}T11:00:00.000Z`,
-                allowedWeekDays: 127,
-                allowedFromTime: 0,
-                allowedUntilTime: 0
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${nuki.token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            });
+            await updateNukiPinDates(booking.nuki_auth_id, arrival, departure);
             // Update local dates
             db.getDb().prepare('UPDATE bookings SET checkin = ?, checkout = ? WHERE id = ?').run(arrival, departure, bookingId);
             res.json({ success: true, pin: booking.nuki_pin });

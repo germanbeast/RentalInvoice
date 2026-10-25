@@ -265,6 +265,97 @@ async function listNukiCodes() {
         .sort((x, y) => String(x.from || '').localeCompare(String(y.from || '')));
 }
 
+/**
+ * Updates an existing Nuki keypad code. Nuki's update endpoint is
+ * POST /smartlock/{lockId}/auth/{id} and expects the complete authorization,
+ * so the current entry is read first and only the given fields are changed.
+ * patch: any of { name, allowedFromDate, allowedUntilDate, enabled }
+ */
+async function updateNukiAuth(authId, patch) {
+    const nuki = db.getAllSettings().nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+    const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
+    const headers = { 'Authorization': `Bearer ${nuki.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' };
+
+    try {
+        const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, { headers, timeout: 15000 });
+        const auths = Array.isArray(listRes.data) ? listRes.data : [];
+        const cur = auths.find(a => String(a.id) === String(authId));
+        if (!cur) throw new Error('Code im Nuki-Schloss nicht gefunden (evtl. manuell gelöscht)');
+
+        const body = {
+            name: cur.name,
+            type: cur.type,
+            code: Number(cur.code),
+            allowedFromDate: cur.allowedFromDate,
+            allowedUntilDate: cur.allowedUntilDate,
+            allowedWeekDays: cur.allowedWeekDays !== undefined ? cur.allowedWeekDays : 127,
+            allowedFromTime: cur.allowedFromTime || 0,
+            allowedUntilTime: cur.allowedUntilTime || 0,
+            enabled: cur.enabled !== false,
+            ...patch
+        };
+        Object.keys(body).forEach(k => (body[k] === undefined || body[k] === null) && delete body[k]);
+
+        await axios.post(`https://api.nuki.io/smartlock/${lockId}/auth/${authId}`, body, { headers, timeout: 15000 });
+    } catch (e) {
+        if (e.response) {
+            const detail = typeof e.response.data === 'object' ? JSON.stringify(e.response.data) : String(e.response.data || '');
+            throw new Error(`Nuki-API ${e.response.status}${detail ? ': ' + detail.slice(0, 160) : ''}`);
+        }
+        throw e;
+    }
+}
+
+// True for the neutral names created when the calendar contains no real guest name
+function isPlaceholderGuestName(name) {
+    const n = String(name || '').trim();
+    if (!n || /^gast$/i.test(n)) return true;
+    return /^(booking|airbnb) \d{2}\.\d{2}\.$/i.test(n) || /not available|closed|reserved/i.test(n);
+}
+
+/**
+ * Assigns a real guest name to a booking: links/creates the guest, renames the Nuki code
+ * and removes the placeholder guest if nothing else references it.
+ */
+async function applyGuestName(bookingId, fullName) {
+    const name = String(fullName || '').trim();
+    if (name.length < 2) throw new Error('Name zu kurz');
+    const d = db.getDb();
+    const booking = d.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+    if (!booking) throw new Error('Buchung nicht gefunden');
+
+    const guest = db.findOrCreateGuest(name, null, null);
+    const oldGuestId = booking.guest_id;
+    d.prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, bookingId);
+
+    let nukiRenamed = false;
+    let nukiError = null;
+    if (booking.nuki_auth_id) {
+        try {
+            await updateNukiAuth(booking.nuki_auth_id, { name: `Gast: ${name}`.substring(0, 20) });
+            nukiRenamed = true;
+        } catch (e) {
+            nukiError = e.message;
+            console.warn(`⚠️ Nuki-Code von Buchung ${bookingId} konnte nicht umbenannt werden:`, e.message);
+        }
+    }
+
+    // Drop the placeholder guest when it is now unused
+    if (oldGuestId && oldGuestId !== guest.id) {
+        try {
+            const old = db.getGuestById(oldGuestId);
+            if (old && isPlaceholderGuestName(old.name) &&
+                db.getBookingsByGuestId(oldGuestId).length === 0 &&
+                db.getInvoicesByGuestId(oldGuestId).length === 0) {
+                db.deleteGuest(oldGuestId);
+            }
+        } catch (e) { /* cleanup is best-effort */ }
+    }
+
+    return { guestId: guest.id, name, nukiRenamed, nukiError, booking };
+}
+
 async function finalizeInvoiceData(data) {
     const allSettings = db.getAllSettings();
     const vermieter = allSettings.vermieter || {};
@@ -392,5 +483,8 @@ module.exports = {
     finalizeInvoiceData,
     generateInvoicePdf,
     createNukiPinDirect,
-    listNukiCodes
+    listNukiCodes,
+    updateNukiAuth,
+    applyGuestName,
+    isPlaceholderGuestName
 };

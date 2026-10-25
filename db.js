@@ -906,12 +906,15 @@ function clearNukiAuth(id) {
 
 function findBookingForStay(guestName, arrival, departure) {
     // Helper to link manual invoices to iCal bookings
+    // Matches the calendar summary/description OR the guest linked to the booking
+    // (calendars without guest names get their name assigned later via the bot)
     return getDb().prepare(`
-        SELECT * FROM bookings
-        WHERE (summary LIKE ? OR description LIKE ?)
-        AND checkin = ? AND checkout = ?
+        SELECT b.* FROM bookings b
+        LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE (b.summary LIKE ? OR b.description LIKE ? OR g.name = ?)
+        AND b.checkin = ? AND b.checkout = ?
         LIMIT 1
-    `).get(`%${guestName}%`, `%${guestName}%`, arrival, departure);
+    `).get(`%${guestName}%`, `%${guestName}%`, guestName, arrival, departure);
 }
 
 function createManualBooking(guestId, guestName, arrival, departure, pin, authId) {

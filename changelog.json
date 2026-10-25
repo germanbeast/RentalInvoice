@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.9.1",
+    "currentVersion": "1.10.0",
     "releases": [
+        {
+            "version": "1.10.0",
+            "date": "2026-10-25",
+            "title": "Gastnamen nachtragen & Nuki-Update korrigiert",
+            "features": [
+                "Neue Buchungen ohne Gastnamen: Telegram-Meldung mit Button 'Namen eintragen' (benennt Gast und Nuki-Code um)",
+                "Telegram: /namen listet Buchungen ohne Namen; nach dem Eintragen direkt 'Rechnung erstellen' mit vorbelegten Daten",
+                "Behebt: Änderung bestehender Nuki-Codes (Zeitraum verlängern/anpassen) nutzt jetzt den korrekten Nuki-API-Aufruf (POST /smartlock/{id}/auth/{id})",
+                "Rechnungen finden den Türcode einer Buchung auch über den zugeordneten Gast"
+            ]
+        },
         {
             "version": "1.9.1",
             "date": "2026-10-25",

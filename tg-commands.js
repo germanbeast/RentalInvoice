@@ -24,7 +24,8 @@ const sessions = new Map();
 // ---------------------------------------------------------------------------
 const FLOWS = {
     invoice: { title: 'Neue Rechnung', icon: '🧾', steps: ['name', 'address', 'email', 'dates'] },
-    pin: { title: 'Tür-Code', icon: '🔑', steps: ['name', 'dates'] }
+    pin: { title: 'Tür-Code', icon: '🔑', steps: ['name', 'dates'] },
+    guestname: { title: 'Gastname eintragen', icon: '👤', steps: ['name'] }
 };
 
 const FIELD_LABELS = { name: 'Name', address: 'Adresse', email: 'E-Mail', dates: 'Zeitraum' };
@@ -148,6 +149,7 @@ async function showHelp(bot, chatId) {
         '• <code>/pin</code> – nur einen Tür-Code erstellen\n' +
         '• <code>/status</code> – offene Rechnungen\n' +
         '• <code>/codes</code> – Türcodes live aus Nuki anzeigen\n' +
+        '• <code>/namen</code> – Gastnamen zu Buchungen nachtragen\n' +
         '• <code>/sync</code> – Booking.com &amp; Airbnb jetzt abfragen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
@@ -221,6 +223,101 @@ async function showCodes(bot, chatId) {
     return send(bot, chatId, text, keyboard([[btn('🔄 Aktualisieren', 'codes'), btn('🏠 Hauptmenü', 'menu')]]));
 }
 
+// ---------------------------------------------------------------------------
+// Gastnamen nachtragen (Kalender liefern oft nur "Not available")
+// ---------------------------------------------------------------------------
+function guessNameFromSummary(summary) {
+    return String(summary || '').split('(')[0].replace(/^(Buchung|Gast|Airbnb):/i, '').trim();
+}
+
+function getBookingRow(id) {
+    return db.getDb().prepare(`
+        SELECT b.*, g.name AS guest_name, g.address AS guest_address, g.email AS guest_email
+        FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE b.id = ?
+    `).get(id);
+}
+
+function bookingsNeedingName() {
+    const rows = db.getDb().prepare(`
+        SELECT b.id, b.summary, b.checkin, b.checkout, g.name AS guest_name
+        FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE b.checkout >= date('now') AND b.uid NOT LIKE 'manual-%'
+        ORDER BY b.checkin ASC
+    `).all();
+    return rows.filter(r => botLogic.isPlaceholderGuestName(r.guest_name || guessNameFromSummary(r.summary)));
+}
+
+async function startNameFlow(bot, chatId, bookingId) {
+    const b = getBookingRow(bookingId);
+    if (!b) return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard());
+
+    const old = sessions.get(chatId);
+    if (old && old.lastMsgId) {
+        bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: old.lastMsgId }).catch(() => { });
+    }
+    const source = /^airbnb/i.test(b.summary || '') ? 'Airbnb' : 'Booking.com';
+    const session = {
+        flow: 'guestname', step: null, bookingId, booking: { checkin: b.checkin, checkout: b.checkout, source },
+        data: { gName: '' }, updatedAt: Date.now(), lastMsgId: null, sequential: false, editing: false, busy: false
+    };
+    sessions.set(chatId, session);
+    return askStep(bot, chatId, session, 'name');
+}
+
+async function executeGuestName(bot, chatId, session) {
+    if (session.busy) return;
+    session.busy = true;
+    touch(session);
+    try {
+        bot.sendChatAction(chatId, 'typing').catch(() => { });
+        const r = await botLogic.applyGuestName(session.bookingId, session.data.gName);
+        sessions.delete(chatId);
+
+        let text = `✅ <b>Gast gespeichert:</b> ${esc(r.name)}\n📅 ${fmtDate(r.booking.checkin)} – ${fmtDate(r.booking.checkout)}\n`;
+        if (r.booking.nuki_auth_id) {
+            text += r.nukiRenamed
+                ? '🔑 Der Türcode wurde im Nuki-Schloss umbenannt.\n'
+                : `⚠️ Der Türcode konnte in Nuki nicht umbenannt werden: ${esc(short(r.nukiError, 120))}\n(Der Code selbst funktioniert weiterhin.)\n`;
+        }
+        const left = (() => { try { return bookingsNeedingName().length; } catch (e) { return 0; } })();
+        const rows = [[btn('🧾 Rechnung erstellen', `inv:${session.bookingId}`)]];
+        if (left > 0) rows.push([btn(`👤 Weitere Namen offen (${left})`, 'names')]);
+        rows.push([btn('🔐 Türcodes', 'codes'), btn('🏠 Hauptmenü', 'menu')]);
+        return send(bot, chatId, text, keyboard(rows));
+    } catch (e) {
+        console.error('[TG] Gastname speichern:', e);
+        session.busy = false;
+        session.step = 'name';
+        return send(bot, chatId, `❌ <b>Fehler:</b> ${esc(e.message)}\n\nBitte den Namen erneut eingeben.`, stepKeyboard(session, 'name'), session);
+    }
+}
+
+async function showNamesOpen(bot, chatId) {
+    let rows;
+    try { rows = bookingsNeedingName(); } catch (e) {
+        console.error('[TG] Namen-Abfrage:', e.message);
+        return send(bot, chatId, '❌ Buchungen konnten nicht geladen werden.', menuOnlyKeyboard());
+    }
+    if (!rows.length) return send(bot, chatId, '✅ Für alle kommenden Buchungen ist ein Gastname hinterlegt.', menuOnlyKeyboard());
+    const shown = rows.slice(0, 8);
+    const kb = shown.map(r => [btn(`👤 ${fmtDate(r.checkin).slice(0, 6)}–${fmtDate(r.checkout).slice(0, 6)} · Namen eintragen`, `nm:${r.id}`)]);
+    kb.push([btn('🏠 Hauptmenü', 'menu')]);
+    const more = rows.length > shown.length ? `\n… und ${rows.length - shown.length} weitere` : '';
+    return send(bot, chatId, `<b>👤 Buchungen ohne Gastnamen (${rows.length})</b>\nWähle eine Buchung:${more}`, keyboard(kb));
+}
+
+async function startInvoiceFromBooking(bot, chatId, bookingId) {
+    const b = getBookingRow(bookingId);
+    if (!b || !b.guest_name || botLogic.isPlaceholderGuestName(b.guest_name)) {
+        return send(bot, chatId, '⚠️ Bitte zuerst den Gastnamen eintragen.', keyboard([[btn('👤 Namen eintragen', `nm:${bookingId}`), btn('🏠 Hauptmenü', 'menu')]]));
+    }
+    const prefill = { gName: b.guest_name, arrival: b.checkin, departure: b.checkout };
+    if (b.guest_address) prefill.gAdresse = b.guest_address;
+    if (b.guest_email) prefill.gEmail = b.guest_email;
+    return startFlow(bot, chatId, 'invoice', '', prefill);
+}
+
 let hooks = {};
 
 async function runSync(bot, chatId) {
@@ -256,10 +353,10 @@ async function showArrivals(bot, chatId) {
     let rows = [];
     try {
         rows = db.getDb().prepare(`
-            SELECT summary, checkin, checkout, nuki_pin
-            FROM bookings
-            WHERE checkout >= date('now')
-            ORDER BY checkin ASC
+            SELECT b.summary, b.checkin, b.checkout, b.nuki_pin, g.name AS guest_name
+            FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+            WHERE b.checkout >= date('now')
+            ORDER BY b.checkin ASC
             LIMIT 10
         `).all();
     } catch (e) {
@@ -271,10 +368,17 @@ async function showArrivals(bot, chatId) {
     }
     let text = '<b>📅 Kommende Buchungen</b>\n\n';
     rows.forEach(r => {
-        const name = short(String(r.summary || 'Buchung').split('(')[0].replace('Buchung:', '').trim() || 'Buchung', 36);
+        const real = r.guest_name || guessNameFromSummary(r.summary);
+        const missing = botLogic.isPlaceholderGuestName(real);
+        const name = missing ? '❓ Name fehlt' : short(real, 36);
         text += `• ${fmtDate(r.checkin)} – ${fmtDate(r.checkout)}\n   ${esc(name)}${r.nuki_pin ? `  🔑 <code>${esc(r.nuki_pin)}</code>` : ''}\n`;
     });
-    return send(bot, chatId, text, menuOnlyKeyboard());
+    let missingCount = 0;
+    try { missingCount = bookingsNeedingName().length; } catch (e) { /* ignore */ }
+    const kb = [];
+    if (missingCount > 0) kb.push([btn(`👤 Namen eintragen (${missingCount})`, 'names')]);
+    kb.push([btn('🏠 Hauptmenü', 'menu')]);
+    return send(bot, chatId, text, keyboard(kb));
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +417,12 @@ function promptFor(session, step) {
     const flow = FLOWS[session.flow];
     const idx = flow.steps.indexOf(step);
     const progress = `Schritt ${idx + 1}/${flow.steps.length}`;
+    if (session.flow === 'guestname') {
+        const b = session.booking || {};
+        return `${flow.icon} <b>${flow.title}</b>\n\n` +
+            `Buchung: <b>${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}</b>${b.source ? ` (${esc(b.source)})` : ''}\n\n` +
+            'Wie heißt der Gast?\n<i>Bitte Vor- und Nachname angeben.</i>';
+    }
     const head = `${flow.icon} <b>${flow.title}</b> · ${progress}\n\n`;
     const forWho = session.flow === 'pin' ? 'Für wen soll der Tür-Code erstellt werden?' : 'Für wen ist die Rechnung?';
     switch (step) {
@@ -354,6 +464,8 @@ async function askStep(bot, chatId, session, step, notice) {
 /** Nach einer Eingabe: nächsten Schritt bestimmen (oder Bestätigung zeigen). */
 async function advance(bot, chatId, session, fromStep) {
     const flow = FLOWS[session.flow];
+
+    if (session.flow === 'guestname') return executeGuestName(bot, chatId, session);
 
     if (session.editing) {
         session.editing = false;
@@ -526,7 +638,7 @@ async function goBack(bot, chatId, session) {
 // ---------------------------------------------------------------------------
 // Flows starten
 // ---------------------------------------------------------------------------
-async function startFlow(bot, chatId, flowName, initialText) {
+async function startFlow(bot, chatId, flowName, initialText, prefill) {
     const old = sessions.get(chatId);
     if (old && old.lastMsgId) {
         bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: old.lastMsgId }).catch(() => { });
@@ -540,6 +652,7 @@ async function startFlow(bot, chatId, flowName, initialText) {
         departure: parsed.departure || ''
     };
     if (flowName === 'invoice' && parsed.gEmail) data.gEmail = parsed.gEmail;
+    if (prefill) Object.assign(data, prefill);
 
     const session = { flow: flowName, step: null, data, updatedAt: Date.now(), lastMsgId: null, sequential: false, editing: false, busy: false };
     sessions.set(chatId, session);
@@ -642,7 +755,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|sync|codes|türcodes|tuercodes|status|offen|anreisen|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -725,6 +838,8 @@ async function processMessage(bot, msg) {
                 return showOpenInvoices(bot, chatId);
             case 'sync':
                 return runSync(bot, chatId);
+            case 'namen':
+                return showNamesOpen(bot, chatId);
             case 'codes':
             case 'türcodes':
             case 'tuercodes':
@@ -848,6 +963,12 @@ async function processCallback(bot, q) {
                 return showCodes(bot, chatId);
             case data === 'sync':
                 return runSync(bot, chatId);
+            case data === 'names':
+                return showNamesOpen(bot, chatId);
+            case data.startsWith('nm:'):
+                return startNameFlow(bot, chatId, parseInt(data.slice(3), 10));
+            case data.startsWith('inv:'):
+                return startInvoiceFromBooking(bot, chatId, parseInt(data.slice(4), 10));
             case data === 'new:invoice':
                 return startFlow(bot, chatId, 'invoice', '');
             case data === 'new:pin':
@@ -906,6 +1027,7 @@ async function setup(bot, options = {}) {
             { command: 'menu', description: 'Hauptmenü öffnen' },
             { command: 'rechnung', description: 'Neue Rechnung erstellen' },
             { command: 'pin', description: 'Nur Tür-Code erstellen' },
+            { command: 'namen', description: 'Gastnamen nachtragen' },
             { command: 'sync', description: 'Kalender jetzt abfragen' },
             { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },
