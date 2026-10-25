@@ -453,13 +453,13 @@ async function generateInvoicePdf(invoiceData) {
         const page = await browser.newPage();
         await page.setRequestInterception(true);
         page.on('request', (request) => {
-            if (request.resourceType() === 'document') {
+            if (request.resourceType() === 'document' || request.url().startsWith('data:')) {
                 request.continue();
             } else {
                 request.abort();
             }
         });
-        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+        await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
         pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,

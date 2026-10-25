@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.12.1",
+    "currentVersion": "1.12.2",
     "releases": [
+        {
+            "version": "1.12.2",
+            "date": "2026-10-25",
+            "title": "PDF-Erstellung robuster",
+            "fixes": [
+                "Rechnungs-PDF brach mit „Navigation timeout of 15000 ms exceeded“ ab; die Wartezeit ist jetzt 60 s und es wird nicht mehr auf Netzwerkruhe gewartet",
+                "Eingebettete Logos (data-URLs) werden im PDF wieder mitgedruckt"
+            ]
+        },
         {
             "version": "1.12.1",
             "date": "2026-10-25",
