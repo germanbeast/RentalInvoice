@@ -48,6 +48,8 @@
     const viewInvoiceForm = $('#view-invoice-form');
     const viewExpenses = $('#view-expenses');
     const viewEstate = $('#view-estate');
+    const viewBookings = $('#view-bookings');
+    const navBookings = $('#nav-bookings');
 
     const modalSettings = $('#modal-settings');
     const toastContainer = $('#toast-container');
@@ -1337,13 +1339,15 @@
             viewPollInterval = setInterval(loadDashboard, POLL_MS);
         } else if (viewId === 'expenses') {
             viewPollInterval = setInterval(loadExpenses, POLL_MS);
+        } else if (viewId === 'bookings') {
+            viewPollInterval = setInterval(() => { if (!document.querySelector('#bookings-list input')) loadBookings(); }, POLL_MS);
         }
         // 'invoice' view has no background data to poll
     }
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1366,6 +1370,10 @@
             viewExpenses.style.display = 'flex';
             navExpenses.classList.add('active');
             loadExpenses();
+        } else if (viewId === 'bookings') {
+            viewBookings.style.display = 'flex';
+            navBookings.classList.add('active');
+            loadBookings();
         } else if (viewId === 'estate') {
             viewEstate.style.display = 'flex';
             navEstate.classList.add('active');
@@ -1383,6 +1391,7 @@
     navDashboard.addEventListener('click', () => switchView('dashboard'));
     navInvoice.addEventListener('click', () => switchView('invoice'));
     navExpenses.addEventListener('click', () => switchView('expenses'));
+    if (navBookings) navBookings.addEventListener('click', () => switchView('bookings'));
     if (navEstate) navEstate.addEventListener('click', () => switchView('estate'));
 
     if (navWelcome) {
@@ -1393,12 +1402,197 @@
     }
 
 
+
+    // =======================
+    // Heute-Übersicht, Buchungen, Status
+    // =======================
+    const fmtDE = ymd => ymd ? ymd.split('-').reverse().join('.').slice(0, 6) : '';
+    const fmtDEfull = ymd => ymd ? ymd.split('-').reverse().join('.') : '';
+    const weekdayDE = ymd => ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(ymd + 'T12:00:00').getDay()];
+    const srcClass = s => /airbnb/i.test(s) ? 'airbnb' : (s === 'manual' ? 'manual' : 'booking');
+    const srcLabel = s => s === 'manual' ? 'Manuell' : s;
+
+    async function apiJson(url, opts) {
+        const res = await fetch(url, opts);
+        return res.json();
+    }
+
+    async function loadOverview() {
+        const sec = $('#today-section');
+        if (!sec) return;
+        try {
+            const d = await apiJson('/api/overview');
+            if (!d.success) return;
+            $('#today-date').textContent = `${weekdayDE(d.today)}, ${fmtDEfull(d.today)}`;
+
+            const inh = $('#today-inhouse');
+            inh.innerHTML = d.inHouse.length ? d.inHouse.map(b => `
+                <div class="today-row"><span>${escapeHtml(b.name || (b.source + '-Buchung'))}<span class="tag">${escapeHtml(srcLabel(b.source))}</span></span>
+                <small>bis ${fmtDE(b.checkout)}${b.state === 'departing' ? ' · heute' : ''}</small></div>`).join('')
+                : '<div class="today-empty">Aktuell ist niemand im Haus.</div>';
+
+            const ev = $('#today-events');
+            ev.innerHTML = d.events.length ? d.events.map(e => `
+                <div class="today-row"><span>${e.type === 'arrival' ? '<span class="tag arr">Anreise</span>' : '<span class="tag dep">Abreise</span>'} ${escapeHtml(e.booking.name || (e.booking.source + '-Buchung'))}</span>
+                <small>${e.date === d.today ? 'heute' : weekdayDE(e.date) + ' ' + fmtDE(e.date)}</small></div>`).join('')
+                : '<div class="today-empty">In den nächsten 14 Tagen keine Anreisen oder Abreisen.</div>';
+
+            const todo = [];
+            if (d.namesMissing > 0) todo.push(`<div class="today-warn">❓ ${d.namesMissing} Buchung${d.namesMissing === 1 ? '' : 'en'} ohne Namen – <button class="today-link" data-goto="noname">jetzt eintragen</button></div>`);
+            if (d.openInvoices.count > 0) todo.push(`<div>🧾 ${d.openInvoices.count} offene Rechnung${d.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(d.openInvoices.total)})</div>`);
+            d.warnings.forEach(w => todo.push(`<div class="${w.type === 'overlap' || w.type === 'sync' ? 'today-bad' : 'today-warn'}">⚠️ ${escapeHtml(w.text)}</div>`));
+            $('#today-todo').innerHTML = todo.length ? todo.join('') : '<div class="today-empty">✅ Alles erledigt – nichts offen.</div>';
+            $('#today-todo').querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => {
+                bookingsFilter = 'noname';
+                switchView('bookings');
+            }));
+
+            const st = $('#today-status');
+            if (d.sync && d.sync.at) {
+                const mins = Math.max(0, Math.round((Date.now() - new Date(d.sync.at).getTime()) / 60000));
+                const failed = (d.sync.feeds || []).filter(f => !f.ok).length;
+                st.textContent = `Kalender zuletzt abgefragt: ${mins < 1 ? 'gerade eben' : mins < 90 ? `vor ${mins} Min.` : new Date(d.sync.at).toLocaleString('de-DE')}${failed ? ' · ⚠️ Fehler' : ''}`;
+            } else {
+                st.textContent = 'Kalender noch nicht abgefragt';
+            }
+        } catch (e) { /* keep last state */ }
+    }
+
+    const overviewSyncBtn = $('#btn-overview-sync');
+    if (overviewSyncBtn) {
+        overviewSyncBtn.addEventListener('click', async () => {
+            overviewSyncBtn.disabled = true;
+            const old = overviewSyncBtn.textContent;
+            overviewSyncBtn.textContent = 'Frage ab …';
+            try {
+                const d = await apiJson('/api/ical/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                if (d.success) showToast('Kalender abgefragt' + (d.newCount ? ` – ${d.newCount} neue Buchung(en)` : ''), 'success');
+                else showToast(d.error || 'Abfrage fehlgeschlagen', 'error');
+            } catch (e) { showToast('Abfrage fehlgeschlagen', 'error'); }
+            overviewSyncBtn.disabled = false;
+            overviewSyncBtn.textContent = old;
+            loadOverview();
+        });
+    }
+
+    // ---- Buchungen
+    let bookingsFilter = 'upcoming';
+    let bookingsQuery = '';
+    let bookingsData = [];
+
+    async function loadBookings() {
+        const list = $('#bookings-list');
+        if (!list) return;
+        $$('#bookings-filter button').forEach(b => b.classList.toggle('active', b.dataset.filter === bookingsFilter));
+        try {
+            const d = await apiJson(`/api/bookings?filter=${encodeURIComponent(bookingsFilter)}&q=${encodeURIComponent(bookingsQuery)}`);
+            if (!d.success) { list.innerHTML = '<div class="bookings-empty">Buchungen konnten nicht geladen werden.</div>'; return; }
+            bookingsData = d.bookings;
+            renderBookings();
+        } catch (e) {
+            list.innerHTML = '<div class="bookings-empty">Keine Verbindung zum Server.</div>';
+        }
+    }
+
+    function renderBookings() {
+        const list = $('#bookings-list');
+        if (!bookingsData.length) { list.innerHTML = '<div class="bookings-empty">Keine Buchungen gefunden.</div>'; return; }
+        list.innerHTML = bookingsData.map(b => {
+            const stateTxt = b.state === 'inhouse' ? 'Im Haus' : b.state === 'departing' ? 'Reist heute ab' : b.state === 'past' ? 'Beendet' : '';
+            const code = b.hasCode ? (b.arrivedAt ? '🔑 Code genutzt' : '🔑 Code angelegt') : '— kein Code';
+            return `<div class="card booking-card" data-id="${b.id}">
+                <div>
+                    <div class="booking-name">${b.needsName ? '<span class="booking-noname">❓ Name fehlt</span>' : escapeHtml(b.name)}<span class="src ${srcClass(b.source)}">${escapeHtml(srcLabel(b.source))}</span></div>
+                    <div class="booking-sub">${stateTxt}</div>
+                </div>
+                <div><div>${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)}</div><div class="booking-sub">${b.nights} Nacht${b.nights === 1 ? '' : 'e'}</div></div>
+                <div class="booking-sub">${code}</div>
+                <div class="booking-actions">
+                    <button class="btn-mini" data-act="name">${b.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
+                    <button class="btn-mini" data-act="invoice">Rechnung erstellen</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function startNameEdit(card, b) {
+        const nameBox = card.querySelector('.booking-name');
+        nameBox.innerHTML = `<input type="text" maxlength="80" placeholder="Vor- und Nachname" value="${escapeHtml(b.name || '').replace(/"/g, '&quot;')}">`;
+        const input = nameBox.querySelector('input');
+        input.focus();
+        let busy = false;
+        const save = async () => {
+            if (busy) return;
+            const name = input.value.trim();
+            if (name.length < 2) { renderBookings(); return; }
+            busy = true;
+            try {
+                const d = await apiJson(`/api/bookings/${b.id}/guest`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+                if (d.success) showToast('Name gespeichert' + (d.nukiRenamed ? ' – Türcode umbenannt' : ''), 'success');
+                else showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+            } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
+            loadBookings();
+        };
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') renderBookings();
+        });
+        input.addEventListener('blur', save);
+    }
+
+    function invoiceFromBooking(b) {
+        switchView('invoice');
+        const set = (sel, val) => { const el = $(sel); if (el && val) { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } };
+        set('#g-name', b.name);
+        set('#g-email', b.guestEmail);
+        set('#a-anreise', b.checkin);
+        set('#a-abreise', b.checkout);
+        if (!b.name) showToast('Bitte noch den Gastnamen eintragen', 'info');
+    }
+
+    const bookingsListEl = $('#bookings-list');
+    if (bookingsListEl) {
+        bookingsListEl.addEventListener('mousedown', e => { /* keep blur-save from swallowing button clicks */ });
+        bookingsListEl.addEventListener('click', e => {
+            const btn = e.target.closest('[data-act]');
+            if (!btn) return;
+            const card = btn.closest('.booking-card');
+            const b = bookingsData.find(x => String(x.id) === card.dataset.id);
+            if (!b) return;
+            if (btn.dataset.act === 'name') startNameEdit(card, b);
+            else invoiceFromBooking(b);
+        });
+        $$('#bookings-filter button').forEach(btn => btn.addEventListener('click', () => { bookingsFilter = btn.dataset.filter; loadBookings(); }));
+        let searchTimer = null;
+        const searchEl = $('#bookings-search');
+        if (searchEl) searchEl.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { bookingsQuery = searchEl.value.trim(); loadBookings(); }, 250); });
+    }
+
+    // ---- Verbindungsstatus (Punkte in den Einstellungen)
+    async function loadStatusDots(refresh) {
+        try {
+            const d = await apiJson('/api/status' + (refresh ? '?refresh=1' : ''));
+            if (!d.success) return;
+            const set = (key, cls, title) => {
+                $$(`.status-dot[data-status="${key}"]`).forEach(el => { el.className = 'status-dot ' + cls; el.title = title; });
+            };
+            set('telegram', !d.telegram.configured ? '' : d.telegram.running ? 'ok' : 'bad', !d.telegram.configured ? 'Nicht eingerichtet' : d.telegram.running ? 'Bot läuft' : 'Bot gestoppt');
+            set('nuki', !d.nuki.configured ? '' : d.nuki.ok ? 'ok' : 'bad', !d.nuki.configured ? 'Nicht eingerichtet' : d.nuki.ok ? `Verbunden (${d.nuki.codes} Codes)` : 'Fehler: ' + (d.nuki.error || ''));
+            const feeds = d.calendars.feeds || [];
+            const calCls = !d.calendars.configured.length ? '' : (!feeds.length ? 'warn' : feeds.every(f => f.ok) ? 'ok' : 'bad');
+            set('calendars', calCls, !d.calendars.configured.length ? 'Kein Kalender eingerichtet' : calCls === 'ok' ? 'Letzte Abfrage erfolgreich' : calCls === 'bad' ? 'Letzte Abfrage mit Fehler' : 'Noch nicht abgefragt');
+        } catch (e) { /* dots stay neutral */ }
+    }
+    const settingsBtn = $('#btn-settings');
+    if (settingsBtn) settingsBtn.addEventListener('click', () => loadStatusDots(false));
+
     // =======================
     // Dashboard Module
     // =======================
     let revenueChart = null;
 
     async function loadDashboard() {
+        loadOverview();
         try {
             const res = await fetch('/api/stats');
             const data = await res.json();

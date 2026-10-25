@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-10-25
+
+### Hinzugefügt
+- Dashboard-Bereich „Heute“ (im Haus, An-/Abreisen, To-dos, Warnungen, Kalender jetzt abfragen)
+- Seite „Buchungen“ mit Filter, Suche, Namenseingabe (benennt Nuki-Code um) und Rechnung aus Buchung
+- Statuspunkte in den Einstellungen; Menüpunkt „Booking.com & Airbnb“
+- Öffentlicher Endpunkt `/api/welcome` (nur Vorname/Aufenthalt/Telefon) für den TV Welcome Screen
+
+### Behoben
+- Handy-Layout: Einstellungen und Rechnungsseite liefen seitlich über
+
 ## [1.11.0] - 2026-10-25
 
 ### Hinzugefügt

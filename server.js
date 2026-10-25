@@ -554,6 +554,9 @@ async function runIcalSync({ manual = false } = {}) {
         if (newCount > 0) {
             console.log(`\ud83c\udf89 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
         }
+        try {
+            db.setSetting('ical_last_sync', { at: new Date().toISOString(), manual, feeds: results });
+        } catch (se) { /* status only */ }
         return { feeds: results, newCount, adjusted };
     } finally {
         icalSyncRunning = false;
@@ -930,6 +933,32 @@ app.get('/welcome.html', (req, res) => {
     res.sendFile(filePath);
 });
 
+// Public, minimal data for the TV welcome screen (no secrets: no WLAN, no codes, no invoices).
+// Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
+app.get('/api/welcome', (req, res) => {
+    try {
+        const s = db.getAllSettings();
+        const today = berlinToday();
+        const mode = ['first', 'full', 'none'].includes(s.welcome_name_mode) ? s.welcome_name_mode : 'first';
+        const current = loadBookingRows()
+            .filter(r => r.checkin <= today && r.checkout >= today && r.state !== 'past')
+            .sort((a, b) => (a.checkout === today) - (b.checkout === today) || a.checkin.localeCompare(b.checkin))[0];
+        let name = '';
+        if (current && current.name && mode !== 'none') {
+            const parts = current.name.trim().split(/\s+/);
+            name = mode === 'full' ? current.name : parts[0];
+        }
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            success: true, today,
+            guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
+            phone: (s.vermieter && s.vermieter.telefon) || ''
+        });
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
 // Serve CSS and JS files without authentication
 app.use('/styles.css', express.static(path.join(PUBLIC_DIR, 'styles.css')));
 app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
@@ -1171,6 +1200,162 @@ app.delete('/api/users/:id', (req, res) => {
         res.json({ success: true, message: 'Benutzer gelöscht' });
     } catch (e) {
         res.status(500).json({ error: 'Benutzer konnte nicht gelöscht werden' });
+    }
+});
+
+// =======================
+// 8b. OVERVIEW / BOOKINGS / STATUS API (web UI)
+// =======================
+const botLogicShared = require('./bot-logic');
+
+function berlinToday() {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+}
+function addDays(ymd, n) {
+    const [y, m, d] = ymd.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + n));
+    return dt.toISOString().slice(0, 10);
+}
+function nightsBetween(a, b) {
+    if (!a || !b) return 0;
+    return Math.max(0, Math.round((Date.UTC(...b.split('-').map((x, i) => i === 1 ? x - 1 : +x)) - Date.UTC(...a.split('-').map((x, i) => i === 1 ? x - 1 : +x))) / 86400000));
+}
+
+function loadBookingRows() {
+    const rows = db.getDb().prepare(`
+        SELECT b.id, b.uid, b.summary, b.checkin, b.checkout, b.source, b.nuki_pin, b.nuki_auth_id,
+               b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email
+        FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE b.checkin IS NOT NULL AND b.checkout IS NOT NULL
+        ORDER BY b.checkin DESC
+        LIMIT 1000
+    `).all();
+    const today = berlinToday();
+    return rows.map(r => {
+        const source = r.source || (/^airbnb/i.test(r.summary || '') ? 'Airbnb' : (String(r.uid).startsWith('manual-') ? 'manual' : 'Booking.com'));
+        const guessed = String(r.summary || '').split('(')[0].replace(/^(Buchung|Gast|Airbnb):/i, '').trim();
+        const name = r.guest_name || guessed;
+        const needsName = botLogicShared.isPlaceholderGuestName(name);
+        let state = 'upcoming';
+        if (r.checkout < today) state = 'past';
+        else if (r.checkin <= today) state = r.checkout === today ? 'departing' : 'inhouse';
+        return {
+            id: r.id, source, name: needsName ? '' : name, needsName,
+            checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout),
+            hasCode: !!(r.nuki_auth_id || r.nuki_pin), pin: r.nuki_pin || null,
+            arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state
+        };
+    });
+}
+
+app.get('/api/bookings', apiLimiter, (req, res) => {
+    try {
+        let rows = loadBookingRows();
+        const filter = String(req.query.filter || 'upcoming');
+        if (filter === 'upcoming') rows = rows.filter(r => r.state !== 'past').sort((a, b) => a.checkin.localeCompare(b.checkin));
+        else if (filter === 'past') rows = rows.filter(r => r.state === 'past');
+        else if (filter === 'noname') rows = rows.filter(r => r.needsName && r.state !== 'past').sort((a, b) => a.checkin.localeCompare(b.checkin));
+        const q = String(req.query.q || '').trim().toLowerCase();
+        if (q) rows = rows.filter(r => `${r.name} ${r.source} ${r.checkin} ${r.checkout}`.toLowerCase().includes(q));
+        res.json({ success: true, bookings: rows.slice(0, 300) });
+    } catch (e) {
+        console.error('Bookings API Error:', e.message);
+        res.status(500).json({ success: false, error: 'Buchungen konnten nicht geladen werden' });
+    }
+});
+
+// Assign a real guest name to a booking (also renames the Nuki code)
+app.put('/api/bookings/:id/guest', apiLimiter, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const name = String((req.body && req.body.name) || '').trim();
+        if (!id || name.length < 2 || name.length > 80) return res.status(400).json({ success: false, error: 'Bitte einen gültigen Namen angeben (2–80 Zeichen).' });
+        const r = await botLogicShared.applyGuestName(id, name);
+        res.json({ success: true, name: r.name, nukiRenamed: r.nukiRenamed, nukiError: r.nukiError });
+    } catch (e) {
+        console.error('Booking guest name Error:', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/overview', apiLimiter, (req, res) => {
+    try {
+        const today = berlinToday();
+        const horizon = addDays(today, 14);
+        const all = loadBookingRows();
+        const active = all.filter(r => r.state !== 'past');
+
+        const inHouse = active.filter(r => r.state === 'inhouse' || r.state === 'departing');
+        const events = [];
+        active.forEach(r => {
+            if (r.checkin >= today && r.checkin <= horizon) events.push({ date: r.checkin, type: 'arrival', booking: r });
+            if (r.checkout >= today && r.checkout <= horizon) events.push({ date: r.checkout, type: 'departure', booking: r });
+        });
+        events.sort((a, b) => a.date.localeCompare(b.date) || (a.type === 'departure' ? -1 : 1));
+
+        const open = db.getOpenInvoices();
+        const openTotal = open.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
+
+        const warnings = [];
+        try {
+            bookingMonitor.findOverlaps().forEach(([a, b]) => {
+                warnings.push({ type: 'overlap', text: `Überschneidung: ${a.source || 'Booking.com'} ${formatDateDE(a.checkin)}–${formatDateDE(a.checkout)} ↔ ${b.source || 'Airbnb'} ${formatDateDE(b.checkin)}–${formatDateDE(b.checkout)}` });
+            });
+        } catch (e) { /* ignore */ }
+        active.filter(r => !r.hasCode && r.source !== 'manual' && r.checkin <= addDays(today, 7) && r.state !== 'departing').forEach(r => {
+            warnings.push({ type: 'nocode', text: `Kein Türcode für ${r.name || r.source + '-Buchung'} (${formatDateDE(r.checkin)})` });
+        });
+        const sync = db.getAllSettings().ical_last_sync || null;
+        if (sync && Array.isArray(sync.feeds)) {
+            sync.feeds.filter(f => !f.ok).forEach(f => warnings.push({ type: 'sync', text: `${f.source}: Kalenderabfrage fehlgeschlagen (${f.error})` }));
+        }
+
+        res.json({
+            success: true, today,
+            inHouse, events: events.slice(0, 12),
+            namesMissing: active.filter(r => r.needsName && r.source !== 'manual').length,
+            openInvoices: { count: open.length, total: openTotal },
+            warnings, sync
+        });
+    } catch (e) {
+        console.error('Overview API Error:', e.message);
+        res.status(500).json({ success: false, error: 'Übersicht konnte nicht geladen werden' });
+    }
+});
+
+// Connection status (Nuki is cached for 2 minutes to spare the API)
+let nukiStatusCache = { at: 0, value: null };
+app.get('/api/status', apiLimiter, async (req, res) => {
+    try {
+        const s = db.getAllSettings();
+        const result = { telegram: { configured: !!s.tg_token, running: !!tgBot } };
+
+        const nuki = s.nuki;
+        if (!nuki || !nuki.token || !nuki.lockId) {
+            result.nuki = { configured: false };
+        } else {
+            if (Date.now() - nukiStatusCache.at > 2 * 60 * 1000 || req.query.refresh === '1') {
+                try {
+                    const codes = await botLogicShared.listNukiCodes();
+                    nukiStatusCache = { at: Date.now(), value: { configured: true, ok: true, codes: codes.length } };
+                } catch (e) {
+                    nukiStatusCache = { at: Date.now(), value: { configured: true, ok: false, error: e.message } };
+                }
+            }
+            result.nuki = nukiStatusCache.value;
+        }
+
+        const feeds = getIcalFeeds(s);
+        const last = s.ical_last_sync || null;
+        result.calendars = {
+            configured: feeds.map(f => f.source),
+            lastSync: last ? last.at : null,
+            feeds: last && Array.isArray(last.feeds) ? last.feeds : []
+        };
+        res.json({ success: true, ...result });
+    } catch (e) {
+        console.error('Status API Error:', e.message);
+        res.status(500).json({ success: false, error: 'Status konnte nicht geladen werden' });
     }
 });
 

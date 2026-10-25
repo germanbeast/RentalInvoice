@@ -2587,3 +2587,92 @@ input[type="checkbox"]:focus-visible {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* ===== Heute-Übersicht ===== */
+.today-section { margin-bottom: 20px; }
+.today-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.today-head h3 { margin: 0; font-size: 1.15rem; }
+.today-date { color: var(--text-secondary); font-size: .9rem; }
+.today-status { flex: 1; color: var(--text-muted); font-size: .8rem; min-width: 120px; }
+.btn-mini { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-hover); border-radius: 8px; padding: 6px 12px; font-size: .8rem; cursor: pointer; }
+.btn-mini:hover { border-color: var(--accent); color: var(--accent); }
+.btn-mini:disabled { opacity: .5; cursor: default; }
+.today-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.today-card { padding: 14px 16px; }
+.today-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 10px; }
+.today-body { display: flex; flex-direction: column; gap: 8px; font-size: .9rem; }
+.today-empty { color: var(--text-muted); font-size: .85rem; }
+.today-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.today-row small { color: var(--text-secondary); white-space: nowrap; }
+.today-warn { color: #fbbf24; }
+.today-bad { color: #f87171; }
+.today-link { color: var(--accent); cursor: pointer; text-decoration: underline; background: none; border: 0; padding: 0; font: inherit; text-align: left; }
+.tag { display: inline-block; font-size: .68rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border-hover); color: var(--text-secondary); margin-left: 6px; vertical-align: middle; }
+.tag.arr { color: var(--accent-green); border-color: rgba(52,211,153,.4); }
+.tag.dep { color: #fbbf24; border-color: rgba(251,191,36,.4); }
+
+/* ===== Buchungen ===== */
+.bookings-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.bookings-toolbar input[type=search] { flex: 1; min-width: 180px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); border-radius: 8px; padding: 8px 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border-hover); border-radius: 8px; overflow: hidden; }
+.seg button { background: transparent; color: var(--text-secondary); border: 0; padding: 8px 12px; cursor: pointer; font-size: .85rem; }
+.seg button.active { background: var(--accent); color: #0b1120; font-weight: 600; }
+.bookings-list { display: flex; flex-direction: column; gap: 10px; }
+.booking-card { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1.3fr) minmax(0,1.2fr) auto; gap: 14px; align-items: center; padding: 12px 16px; }
+.booking-name { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.booking-name input { background: var(--bg-input); border: 1px solid var(--accent); color: var(--text-primary); border-radius: 6px; padding: 5px 8px; min-width: 0; width: 100%; }
+.booking-sub { color: var(--text-secondary); font-size: .82rem; }
+.booking-noname { color: #fbbf24; font-weight: 600; }
+.src { font-size: .68rem; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+.src.booking { background: rgba(56,189,248,.15); color: var(--accent); }
+.src.airbnb { background: rgba(248,113,113,.15); color: #f87171; }
+.src.manual { background: rgba(148,163,184,.15); color: var(--text-secondary); }
+.booking-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.bookings-empty { color: var(--text-muted); padding: 24px; text-align: center; }
+
+/* ===== Status-Punkte ===== */
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); margin-left: 8px; vertical-align: middle; }
+.status-dot.ok { background: var(--accent-green); }
+.status-dot.warn { background: #fbbf24; }
+.status-dot.bad { background: #f87171; }
+
+@media (max-width: 900px) {
+    .today-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    .booking-card { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+    .booking-actions { grid-column: 1 / -1; justify-content: flex-start; }
+    .bookings-toolbar { flex-direction: column; align-items: stretch; }
+    .seg { width: 100%; }
+    .seg button { flex: 1; padding: 8px 4px; font-size: .78rem; }
+    .today-head .btn-mini { width: 100%; }
+}
+@media (max-width: 768px) {
+    .today-section, .bookings-toolbar, .bookings-list, .dashboard-stats-grid, .dashboard-charts-grid { padding-left: 12px; padding-right: 12px; }
+}
+@media (max-width: 768px) {
+    .content-header { flex-wrap: wrap; gap: 8px; }
+    .content-actions { flex-wrap: wrap; }
+    .main-grid > *, .form-column, .preview-column { min-width: 0; }
+    .content-area, .content-view { max-width: 100vw; }
+}
+
+/* Einstellungen auf dem Handy: Menü oben als wischbare Leiste statt Spalte links */
+@media (max-width: 768px) {
+    .modal-lg { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+    .modal-lg.designer-active { max-width: 100vw; height: 100dvh; }
+    .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    .settings-sidebar { padding: 0; border-right: 0; border-bottom: 1px solid var(--border); min-width: 0; }
+    .settings-sidebar .sidebar-header { display: none; }
+    .settings-sidebar .sidebar-nav { display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; flex: none; -webkit-overflow-scrolling: touch; }
+    .settings-sidebar .nav-section { display: none; }
+    .settings-sidebar .nav-item { white-space: nowrap; padding: 0.85rem 1rem; border-right: 0; border-bottom: 2px solid transparent; flex: none; }
+    .settings-sidebar .nav-item.active { border-right: 0; border-bottom-color: var(--accent); }
+    .settings-content .content-header { padding: 0.6rem 1rem; }
+    .settings-content .breadcrumbs .bc-home, .settings-content .breadcrumbs .bc-module, .settings-content .breadcrumbs .bc-sep { display: none; }
+    .settings-content .content-scrollable { padding: 1rem; }
+}
+@media (max-width: 768px) {
+    .preview-actions { flex-wrap: wrap; gap: 6px; max-width: 100%; }
+}

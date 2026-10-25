@@ -293,6 +293,24 @@
         updateTime();
         setInterval(updateTime, 1000);
 
+        // Automatic guest data from the server (only if no name was passed in the URL)
+        async function loadFromServer() {
+            try {
+                const r = await fetch('/api/welcome', { cache: 'no-store' });
+                const d = await r.json();
+                if (!d || !d.success) return;
+                if (!guestName) {
+                    const el = document.getElementById('welcome-guest-name');
+                    if (d.guest && d.guest.name) el.textContent = d.guest.name;
+                }
+                if (!phone && d.phone) document.getElementById('welcome-phone').textContent = d.phone;
+            } catch (e) { /* offline: keep what is shown */ }
+        }
+        if (!guestName || !phone) {
+            loadFromServer();
+            setInterval(loadFromServer, 10 * 60 * 1000);
+        }
+
         // App launch buttons
         document.getElementById('btn-launch-waipu').addEventListener('click', () => {
             window.location.href = 'intent://de.exaring.waiputv#Intent;scheme=app;package=de.exaring.waiputv;end';

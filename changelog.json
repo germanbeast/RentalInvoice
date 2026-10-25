@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.11.0",
+    "currentVersion": "1.12.0",
     "releases": [
+        {
+            "version": "1.12.0",
+            "date": "2026-10-25",
+            "title": "Heute-Übersicht, Buchungen-Seite, Handy-Layout, automatischer TV-Willkommensgruß",
+            "features": [
+                "Dashboard: neuer Bereich „Heute“ mit Gästen im Haus, nächsten An-/Abreisen, To-dos und Warnungen (Doppelbuchung, fehlender Türcode, Kalenderfehler) sowie Knopf „Kalender jetzt abfragen“",
+                "Neue Seite „Buchungen“: Liste mit Portal-Kennzeichnung, Code-Status, Filter, Suche, Gastnamen direkt eintragen (benennt den Türcode um) und „Rechnung erstellen“ mit vorausgefüllten Daten",
+                "Einstellungen: „Booking.com & Airbnb“, Statuspunkte für Nuki, Kalender und Telegram",
+                "Handy-Layout: Einstellungen als Vollbild mit wischbarem Menü, Rechnungsseite ohne seitliches Überlaufen",
+                "TV Welcome Screen zeigt den Namen des aktuellen Gastes automatisch (Einstellung welcome_name_mode: first/full/none, Standard Vorname); aktualisiert sich alle 10 Minuten. WLAN-Daten bleiben bewusst in der App/URL"
+            ]
+        },
         {
             "version": "1.11.0",
             "date": "2026-10-25",

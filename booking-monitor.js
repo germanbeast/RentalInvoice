@@ -37,7 +37,8 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
     // -----------------------------------------------------------------------
     // 1. Double booking warning
     // -----------------------------------------------------------------------
-    async function checkOverlaps() {
+    /** Current cross-portal overlaps: [[bookingA, bookingB], ...] (same-day turnover is not an overlap). */
+    function findOverlaps() {
         const today = berlinYmd();
         const rows = db.getDb().prepare(`
             SELECT b.*, g.name AS guest_name
@@ -50,10 +51,14 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
             for (let j = i + 1; j < rows.length; j++) {
                 const a = rows[i], b = rows[j];
                 if (sourceOf(a) === sourceOf(b)) continue; // only cross-portal overlaps
-                // same-day turnover (checkout == checkin) is fine
                 if (a.checkin < b.checkout && b.checkin < a.checkout) found.push([a, b]);
             }
         }
+        return found;
+    }
+
+    async function checkOverlaps() {
+        const found = findOverlaps();
 
         const before = getState('overlap_warnings');
         const state = {};
@@ -206,7 +211,7 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-    return { checkOverlaps, processMissing, checkArrivals, _internal: { cancelBooking } };
+    return { checkOverlaps, findOverlaps, processMissing, checkArrivals, _internal: { cancelBooking } };
 }
 
 module.exports = createMonitor;
