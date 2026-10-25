@@ -388,87 +388,120 @@ function formatDateDE(dateStr) {
     return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-// Job 1: iCal Polling (every 15 minutes)
+// Job 1: iCal Polling (every 15 minutes) - Booking.com and Airbnb feeds
+function getIcalFeeds(allSettings) {
+    const feeds = [];
+    const clean = v => (typeof v === 'string' ? v.trim() : '');
+    if (clean(allSettings.booking_ical)) feeds.push({ source: 'Booking.com', url: clean(allSettings.booking_ical) });
+    if (clean(allSettings.airbnb_ical)) feeds.push({ source: 'Airbnb', url: clean(allSettings.airbnb_ical) });
+    return feeds;
+}
+
+async function pollIcalFeed(feed, todayYmd, adjusted) {
+    const response = await axios.get(feed.url, {
+        timeout: 10000,
+        maxContentLength: 5 * 1024 * 1024,
+        headers: { 'User-Agent': 'RentalInvoice/1.0' }
+    });
+    const data = ical.parseICS(response.data);
+    let newCount = 0;
+
+    for (const k in data) {
+        if (!data.hasOwnProperty(k)) continue;
+        const ev = data[k];
+        if (ev.type !== 'VEVENT' || !ev.uid) continue;
+
+        const rawSummary = String(ev.summary || 'Buchung').substring(0, 500);
+        // Airbnb exports blocked dates as "Airbnb (Not available)" - only "Reserved" are real stays
+        if (feed.source === 'Airbnb' && /not available/i.test(rawSummary)) continue;
+
+        const checkin = icalDateToYmd(ev.start);
+        const checkout = icalDateToYmd(ev.end);
+        if (!checkin || !checkout) continue;
+        const summary = feed.source === 'Airbnb' ? `Airbnb: ${rawSummary}` : rawSummary;
+
+        const existing = db.getBookingByUid(ev.uid);
+        const result = db.upsertBooking({
+            uid: ev.uid,
+            summary,
+            checkin,
+            checkout,
+            description: String(ev.description || '').substring(0, 2000)
+        });
+
+        // Existing booking whose dates changed (booking modified, or corrected date parsing):
+        // keep the already created door code in sync with the new period.
+        if (existing && existing.nuki_auth_id && checkout >= todayYmd &&
+            (existing.checkin !== checkin || existing.checkout !== checkout)) {
+            try {
+                await updateNukiPinDates(existing.nuki_auth_id, checkin, checkout);
+                adjusted.push(`${summary.split('(')[0].trim()}: ${formatDateDE(checkin)} – ${formatDateDE(checkout)}`);
+            } catch (ue) {
+                console.warn(`⚠️ Nuki-Zeitraum für Buchung ${existing.id} konnte nicht angepasst werden:`, ue.message);
+            }
+        }
+
+        if (result.inserted && !existing) {
+            // Stays that are already over (old entries in a freshly connected feed) get no code and no message
+            if (checkout < todayYmd) continue;
+            newCount++;
+
+            // --- Brand New: Auto-Nuki PIN for iCal ---
+            let pinMsg = '';
+            try {
+                // Booking.com: guess guest name from summary (e.g., "Mustermann, Max (12345)")
+                // Airbnb: no guest name in the feed -> unique placeholder per stay
+                const guessedName = summary.split('(')[0].trim().replace('Buchung:', '').trim();
+                const hasRealName = guessedName && !/not available|closed|reserved/i.test(guessedName);
+                const guestName = feed.source === 'Airbnb'
+                    ? `Airbnb ${formatDateDE(checkin).slice(0, 6)}`
+                    : (hasRealName ? guessedName : `Booking ${formatDateDE(checkin).slice(0, 6)}`);
+
+                // Create Nuki PIN
+                const nukiResult = await createNukiPin(checkin, checkout, guestName);
+
+                if (nukiResult.success) {
+                    // Find or create guest to link them
+                    const guest = db.findOrCreateGuest(guestName, null, null);
+
+                    // Update booking with PIN and GuestID
+                    db.updateBookingNukiData(result.id, nukiResult.pin, nukiResult.authId);
+                    // Also link guest_id
+                    db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, result.id);
+
+                    pinMsg = `\n🔑 Tür-Code: *${nukiResult.pin}*`;
+                }
+            } catch (ne) {
+                console.warn('⚠️ Auto-Nuki PIN fehlgeschlagen:', ne.message);
+            }
+
+            const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}`;
+            const sent = await sendToAllRecipients(msg);
+            db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
+        }
+    }
+    return newCount;
+}
+
 cron.schedule('*/15 * * * *', async () => {
     try {
         const allSettings = db.getAllSettings();
-        const icalUrl = allSettings.booking_ical;
-        const waPhone = allSettings.wa_phone;
         const notifyEnabled = allSettings.notifications_enabled;
+        const feeds = getIcalFeeds(allSettings);
 
-        if (!icalUrl || notifyEnabled === 'false') return;
+        if (feeds.length === 0 || notifyEnabled === 'false') return;
 
-        console.log('\ud83d\udcc5 iCal-Polling l\u00e4uft...');
-        const response = await axios.get(icalUrl, {
-            timeout: 10000,
-            maxContentLength: 5 * 1024 * 1024,
-            headers: { 'User-Agent': 'RentalInvoice/1.0' }
-        });
-        const data = ical.parseICS(response.data);
-
-        let newCount = 0;
+        console.log('📅 iCal-Polling läuft...');
         const adjusted = [];
         const todayYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
-        for (const k in data) {
-            if (!data.hasOwnProperty(k)) continue;
-            const ev = data[k];
-            if (ev.type !== 'VEVENT' || !ev.uid) continue;
+        let newCount = 0;
 
-            const checkin = icalDateToYmd(ev.start);
-            const checkout = icalDateToYmd(ev.end);
-            const summary = String(ev.summary || 'Buchung').substring(0, 500);
-
-            const existing = db.getBookingByUid(ev.uid);
-            const result = db.upsertBooking({
-                uid: ev.uid,
-                summary,
-                checkin,
-                checkout,
-                description: String(ev.description || '').substring(0, 2000)
-            });
-
-            // Existing booking whose dates changed (booking modified, or corrected date parsing):
-            // keep the already created door code in sync with the new period.
-            if (existing && existing.nuki_auth_id && checkin && checkout && checkout >= todayYmd &&
-                (existing.checkin !== checkin || existing.checkout !== checkout)) {
-                try {
-                    await updateNukiPinDates(existing.nuki_auth_id, checkin, checkout);
-                    adjusted.push(`${summary.split('(')[0].trim()}: ${formatDateDE(checkin)} – ${formatDateDE(checkout)}`);
-                } catch (ue) {
-                    console.warn(`⚠️ Nuki-Zeitraum für Buchung ${existing.id} konnte nicht angepasst werden:`, ue.message);
-                }
-            }
-
-            if (result.inserted && !existing) {
-                newCount++;
-
-                // --- Brand New: Auto-Nuki PIN for iCal ---
-                let pinMsg = '';
-                try {
-                    // Try to guess guest name from summary (e.g., "Mustermann, Max (12345)")
-                    const guestName = summary.split('(')[0].trim().replace('Buchung:', '').trim() || 'Gast';
-
-                    // Create Nuki PIN
-                    const nukiResult = await createNukiPin(checkin, checkout, guestName);
-
-                    if (nukiResult.success) {
-                        // Find or create guest to link them
-                        const guest = db.findOrCreateGuest(guestName, null, null);
-
-                        // Update booking with PIN and GuestID
-                        db.updateBookingNukiData(result.id, nukiResult.pin, nukiResult.authId);
-                        // Also link guest_id
-                        db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, result.id);
-
-                        pinMsg = `\n🔑 Tür-Code: *${nukiResult.pin}*`;
-                    }
-                } catch (ne) {
-                    console.warn('⚠️ Auto-Nuki PIN fehlgeschlagen:', ne.message);
-                }
-
-                const msg = `🏠 *Neue Buchung!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}`;
-                const sent = await sendToAllRecipients(msg);
-                db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
+        // Each feed is isolated: an error in one calendar does not stop the other
+        for (const feed of feeds) {
+            try {
+                newCount += await pollIcalFeed(feed, todayYmd, adjusted);
+            } catch (fe) {
+                console.error(`❌ iCal-Polling (${feed.source}) Fehler:`, fe.message);
             }
         }
 
@@ -479,49 +512,96 @@ cron.schedule('*/15 * * * *', async () => {
         }
 
         if (newCount > 0) {
-            console.log(`\ud83c\udf89 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
+            console.log(`🎉 ${newCount} neue Buchung(en) erkannt und benachrichtigt.`);
         }
     } catch (e) {
-        console.error('\u274c iCal-Polling Fehler:', e.message);
+        console.error('❌ iCal-Polling Fehler:', e.message);
     }
 });
+
+// Job 1b: delete expired door codes from the Nuki lock (hourly, plus once shortly after start)
+async function cleanupExpiredNukiCodes() {
+    const nuki = db.getAllSettings().nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) return { deleted: [], failed: 0 };
+
+    const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
+    const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
+        headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' },
+        timeout: 15000
+    });
+    const auths = Array.isArray(listRes.data) ? listRes.data : [];
+
+    const now = Date.now();
+    const todayYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+    const deleted = [];
+    let failed = 0;
+
+    for (const a of auths) {
+        // Only keypad codes created by this system ("Gast: ...") whose validity has ended.
+        // Codes without an end date or with other names (e.g. cleaning staff) are never touched.
+        if (a.type !== 13 || !a.allowedUntilDate || !/^gast|^airbnb/i.test(String(a.name || ''))) continue;
+        if (new Date(a.allowedUntilDate).getTime() >= now) continue;
+
+        // Cross-check with the synced iCal booking: never delete while the booking still runs or lies ahead
+        const booking = db.getDb().prepare(
+            "SELECT id, checkout FROM bookings WHERE nuki_auth_id = ? OR (? != '' AND nuki_pin = ?) LIMIT 1"
+        ).get(String(a.id), String(a.code || ''), String(a.code || ''));
+        if (booking && booking.checkout && booking.checkout > todayYmd) continue;
+
+        try {
+            await deleteNukiPin(a.id);
+            if (booking) {
+                db.clearNukiAuth(booking.id);
+                db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(booking.id);
+            }
+            deleted.push(`${a.name} (bis ${formatDateDE(a.allowedUntilDate)})`);
+            await new Promise(r => setTimeout(r, 500)); // be gentle with the Nuki API
+        } catch (de) {
+            failed++;
+            console.warn(`⚠️ Nuki-Code ${a.id} konnte nicht gelöscht werden:`, de.message);
+        }
+    }
+
+    // Bookings whose code is no longer present in Nuki (deleted by hand): drop the stale reference
+    const liveIds = new Set(auths.map(a => String(a.id)));
+    const stale = db.getDb().prepare(
+        "SELECT id, nuki_auth_id FROM bookings WHERE nuki_auth_id IS NOT NULL AND nuki_auth_id != '' AND checkout < ?"
+    ).all(todayYmd);
+    for (const b of stale) {
+        if (!liveIds.has(String(b.nuki_auth_id))) {
+            db.clearNukiAuth(b.id);
+            db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(b.id);
+        }
+    }
+
+    return { deleted, failed };
+}
+
+async function runNukiCleanup() {
+    try {
+        const { deleted, failed } = await cleanupExpiredNukiCodes();
+        if (deleted.length > 0) {
+            console.log(`🧹 ${deleted.length} abgelaufene Nuki-Code(s) gelöscht.`);
+            const msg = `🧹 *${deleted.length} abgelaufene${deleted.length === 1 ? 'r Türcode' : ' Türcodes'} gelöscht*\n${deleted.map(d => '• ' + d).join('\n')}`;
+            const sent = await sendToAllRecipients(msg);
+            db.logNotification('nuki_cleanup', msg, sent ? 'sent' : 'failed');
+        }
+        if (failed > 0) console.warn(`⚠️ ${failed} Nuki-Code(s) konnten nicht gelöscht werden (nächster Versuch in 1 Stunde).`);
+    } catch (e) {
+        console.error('❌ Nuki-Cleanup Fehler:', e.message);
+    }
+}
+
+cron.schedule('10 * * * *', runNukiCleanup);
+setTimeout(runNukiCleanup, 90 * 1000);
 
 // Job 2: Reminder Check (daily at 08:00)
 cron.schedule('0 8 * * *', async () => {
     try {
         console.log('🧹 Nuki-Cleanup & Reminder Job läuft...');
 
-        // 1. Delete Expired Nuki PINs
-        const expired = db.getExpiredNukiAuths();
-        const allSettings = db.getAllSettings();
-        const nuki = allSettings.nuki;
-        for (const booking of expired) {
-            try {
-                let authId = booking.nuki_auth_id;
-                // If no auth_id stored, look it up live by PIN code
-                if (!authId && booking.nuki_pin && nuki && nuki.token && nuki.lockId) {
-                    try {
-                        const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
-                        const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
-                            headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' }
-                        });
-                        const auths = Array.isArray(listRes.data) ? listRes.data : [];
-                        const match = auths.find(a => String(a.code) === String(booking.nuki_pin));
-                        if (match) authId = match.id;
-                    } catch (lookupErr) {
-                        console.warn(`⚠️ Nuki authId Lookup für Buchung ${booking.id} fehlgeschlagen:`, lookupErr.message);
-                    }
-                }
-                if (authId) {
-                    await deleteNukiPin(authId);
-                }
-                db.clearNukiAuth(booking.id);
-                db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(booking.id);
-                console.log(`✅ Nuki-PIN für Buchung ${booking.id} gelöscht.`);
-            } catch (e) {
-                console.warn(`⚠️ Nuki-Cleanup für ${booking.id} fehlgeschlagen:`, e.message);
-            }
-        }
+        // 1. Expired Nuki codes are deleted by the hourly cleanup job (runNukiCleanup)
+        await runNukiCleanup();
 
         // 2. Reminders (existing logic)
         // ...
@@ -633,7 +713,7 @@ async function deleteNukiPin(authId) {
 }
 
 
-console.log('\u2705 Cron-Jobs registriert (iCal: alle 15 Min, Reminder: t\u00e4glich 08:00)');
+console.log('\u2705 Cron-Jobs registriert (iCal Booking.com + Airbnb: alle 15 Min, Nuki-Cleanup: st\u00fcndlich, Reminder: t\u00e4glich 08:00)');
 
 // =======================
 // 2. SECURITY HEADERS (Helmet)

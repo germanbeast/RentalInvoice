@@ -649,6 +649,7 @@
                     kleinunternehmer: $('#kleinunternehmer').checked
                 },
                 booking_ical: $('#booking-ical-url').value || '',
+                airbnb_ical: ($('#airbnb-ical-url')?.value || '').trim(),
                 paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
                 paperless_amount_field: $('#s-pl-amount-field')?.value || '',
                 nuki: {
@@ -753,6 +754,7 @@
                 const url = typeof s.booking_ical === 'string' && s.booking_ical.startsWith('{') ? JSON.parse(s.booking_ical) : s.booking_ical;
                 if (typeof url === 'string') $('#booking-ical-url').value = url;
             }
+            if (typeof s.airbnb_ical === 'string' && $('#airbnb-ical-url')) $('#airbnb-ical-url').value = s.airbnb_ical;
             if (s.paperless_expense_tag) $('#s-pl-expense-tag').value = s.paperless_expense_tag;
             if (s.paperless_amount_field) $('#s-pl-amount-field').value = s.paperless_amount_field;
             // Notifications

@@ -5,6 +5,16 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-10-25
+
+### Hinzugefügt
+- Airbnb iCal URL in den Einstellungen; Buchungen aus Booking.com und Airbnb erhalten automatisch einen Tür-Code
+- Stündliches Löschen abgelaufener Türcodes im Nuki-Schloss mit Telegram-/WhatsApp-Benachrichtigung
+
+### Geändert
+- Gesperrte Airbnb-Tage ("Not available") und bereits vergangene Aufenthalte werden nicht mehr zu Türcodes
+- Neutrale Gastnamen ("Booking TT.MM." / "Airbnb TT.MM.") wenn der Kalender keinen Namen enthält
+
 ## [1.8.2] - 2026-10-25
 
 ### Geändert

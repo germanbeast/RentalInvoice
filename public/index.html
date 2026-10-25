@@ -1634,13 +1634,22 @@
 
                             <!-- BOOKING -->
                             <section id="settings-booking" class="settings-page">
-                                <h2>Booking.com Integration</h2>
+                                <h2>Booking.com &amp; Airbnb Integration</h2>
                                 <div class="card" style="margin-top: 1.5rem;">
                                     <div class="form-group">
                                         <label for="booking-ical-url">Booking.com iCal URL</label>
                                         <input type="url" id="booking-ical-url"
                                             placeholder="https://ical.booking.com/...">
                                     </div>
+                                    <div class="form-group">
+                                        <label for="airbnb-ical-url">Airbnb iCal URL</label>
+                                        <input type="url" id="airbnb-ical-url"
+                                            placeholder="https://www.airbnb.de/calendar/ical/...">
+                                    </div>
+                                    <p style="font-size: 0.85rem; opacity: 0.75; margin-top: 0.5rem;">
+                                        Neue Buchungen aus beiden Kalendern erhalten automatisch einen Tür-Code.
+                                        Abgelaufene Codes werden stündlich aus dem Nuki-Schloss gelöscht.
+                                    </p>
                                 </div>
                             </section>
 

@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.8.2",
+    "currentVersion": "1.9.0",
     "releases": [
+        {
+            "version": "1.9.0",
+            "date": "2026-10-25",
+            "title": "Airbnb-Kalender & automatisches Löschen abgelaufener Türcodes",
+            "features": [
+                "Neues Feld für die Airbnb iCal URL: neue Buchungen aus Booking.com und Airbnb erhalten automatisch einen Tür-Code",
+                "Abgelaufene Türcodes werden stündlich aus dem Nuki-Schloss gelöscht (nur Codes dieses Systems, Abgleich mit der iCal-Buchung)",
+                "Airbnb: gesperrte Tage (Not available) werden ignoriert; alte Buchungen eines neu verbundenen Kalenders erhalten keinen Code",
+                "Benachrichtigung bei gelöschten Türcodes; Gast-Namen 'Booking TT.MM.' / 'Airbnb TT.MM.' statt 'CLOSED - Not available'"
+            ]
+        },
         {
             "version": "1.8.2",
             "date": "2026-10-25",
