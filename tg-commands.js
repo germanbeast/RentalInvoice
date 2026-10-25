@@ -23,12 +23,14 @@ const sessions = new Map();
 // Flow-Definitionen
 // ---------------------------------------------------------------------------
 const FLOWS = {
-    invoice: { title: 'Neue Rechnung', icon: '🧾', steps: ['name', 'address', 'email', 'dates'] },
+    invoice: { title: 'Neue Rechnung', icon: '🧾', steps: ['name', 'address', 'email', 'dates', 'payment'] },
     pin: { title: 'Tür-Code', icon: '🔑', steps: ['name', 'dates'] },
     guestname: { title: 'Gastname eintragen', icon: '👤', steps: ['name'] }
 };
 
-const FIELD_LABELS = { name: 'Name', address: 'Adresse', email: 'E-Mail', dates: 'Zeitraum' };
+const FIELD_LABELS = { name: 'Name', address: 'Adresse', email: 'E-Mail', dates: 'Zeitraum', payment: 'Zahlung' };
+
+const PAY_METHODS = ['Überweisung', 'Bar', 'PayPal', 'Booking.com', 'Airbnb'];
 
 const BACK_WORDS = new Set(['zurück', 'zurueck', 'zurück.', 'back', '/zurück', '/zurueck', '/back']);
 const CANCEL_WORDS = new Set(['abbrechen', 'abbruch', 'cancel', 'stop', '/abbrechen', '/cancel', '/stop']);
@@ -390,6 +392,7 @@ function isFilled(step, data) {
         case 'address': return !!data.gAdresse;
         case 'email': return data.gEmail !== undefined; // null = bewusst übersprungen
         case 'dates': return !!(data.arrival && data.departure);
+        case 'payment': return !!data.zMethode;
         default: return false;
     }
 }
@@ -400,6 +403,7 @@ function valueText(step, data) {
         case 'address': return String(data.gAdresse || '').replace(/\n/g, ', ');
         case 'email': return data.gEmail === null ? '(übersprungen)' : data.gEmail;
         case 'dates': return `${fmtDate(data.arrival)} – ${fmtDate(data.departure)}`;
+        case 'payment': return data.zMethode;
         default: return '';
     }
 }
@@ -410,6 +414,7 @@ function clearSlot(step, data) {
         case 'address': data.gAdresse = ''; break;
         case 'email': delete data.gEmail; break;
         case 'dates': data.arrival = ''; data.departure = ''; break;
+        case 'payment': delete data.zMethode; break;
     }
 }
 
@@ -430,6 +435,7 @@ function promptFor(session, step) {
         case 'address': return head + 'Wie lautet die Adresse des Gastes?\n<i>Straße, PLZ und Ort – gern mehrzeilig.</i>';
         case 'email': return head + 'Wie lautet die E-Mail-Adresse?\n<i>Optional – du kannst auch überspringen.</i>';
         case 'dates': return head + 'Für welchen Zeitraum?\n<i>z.B. 15.03. - 20.03.2026</i>';
+        case 'payment': return head + 'Wie wurde die Rechnung bezahlt?\n<i>Tippe auf eine Zahlungsart.</i>';
         default: return head;
     }
 }
@@ -444,6 +450,11 @@ function stepKeyboard(session, step) {
         top.push(btn(`✅ Behalten: ${short(valueText(step, session.data), 24)}`, 'keep'));
     }
     if (step === 'email') top.push(btn('⏭ Überspringen', 'skip'));
+    if (step === 'payment') {
+        for (let i = 0; i < PAY_METHODS.length; i += 2) {
+            rows.push(PAY_METHODS.slice(i, i + 2).map((m, j) => btn(m, `pay:${i + j}`)));
+        }
+    }
     if (top.length) rows.push(top);
 
     const canGoBack = session.editing || idx > 0;
@@ -524,6 +535,7 @@ async function showConfirm(bot, chatId, session) {
         text += `✉️ <b>E-Mail:</b> ${d.gEmail ? esc(d.gEmail) : '—'}\n`;
     }
     text += `📅 <b>Zeitraum:</b> ${fmtDate(d.arrival)} – ${fmtDate(d.departure)} (${est.nights} ${est.nights === 1 ? 'Nacht' : 'Nächte'})\n`;
+    if (session.flow === 'invoice') text += `💳 <b>Bezahlt via:</b> ${esc(d.zMethode)}\n`;
     if (session.flow === 'invoice' && est.total !== null) {
         text += `💶 <b>Betrag:</b> ${fmtMoney(est.total)}${est.kleinunternehmer ? ' (ohne MwSt.)' : ' (brutto)'}\n`;
     }
@@ -583,6 +595,12 @@ function applyInput(session, step, textRaw) {
                 return { ok: false, error: '⚠️ Ungültige E-Mail-Adresse. Bitte erneut eingeben oder auf „Überspringen“ tippen.' };
             }
             d.gEmail = text;
+            return { ok: true };
+        }
+        case 'payment': {
+            const m = PAY_METHODS.find(x => x.toLowerCase() === text.toLowerCase());
+            if (!m) return { ok: false, error: '⚠️ Bitte eine Zahlungsart über die Tasten wählen (z. B. Überweisung, Bar, PayPal).' };
+            d.zMethode = m;
             return { ok: true };
         }
         case 'dates': {
@@ -988,6 +1006,13 @@ async function processCallback(bot, q) {
                 if (active.step !== 'email') return;
                 active.data.gEmail = null;
                 return advance(bot, chatId, active, 'email');
+            }
+            case data.startsWith('pay:'): {
+                if (active.step !== 'payment') return;
+                const m = PAY_METHODS[parseInt(data.slice(4), 10)];
+                if (!m) return;
+                active.data.zMethode = m;
+                return advance(bot, chatId, active, 'payment');
             }
             case data === 'edit': {
                 active.step = 'edit_menu';

@@ -381,7 +381,7 @@
     function updateSummary() {
         const netto = getSubtotal();
         const rate = getMwstRate();
-        const mwst = netto * (rate / 100);
+        const mwst = $('#kleinunternehmer').checked ? 0 : netto * (rate / 100);
         const total = netto + mwst;
 
         $('#sum-netto').textContent = formatCurrency(netto);
@@ -482,9 +482,9 @@
             // Summary
             const netto = getSubtotal();
             const rate = getMwstRate();
-            const mwst = netto * (rate / 100);
-            const total = netto + mwst;
             const isKleinunternehmer = $('#kleinunternehmer').checked;
+            const mwst = isKleinunternehmer ? 0 : netto * (rate / 100);
+            const total = netto + mwst;
 
             $('#inv-netto').textContent = formatCurrency(netto);
             $('#inv-mwst').textContent = formatCurrency(mwst);
@@ -1298,7 +1298,7 @@
             bIban: $('#b-iban').value,
             bBic: $('#b-bic').value,
             bBank: $('#b-bank').value,
-            totalAmount: getSubtotal() * (1 + getMwstRate() / 100),
+            totalAmount: getSubtotal() * (1 + ($('#kleinunternehmer').checked ? 0 : getMwstRate()) / 100),
             archivedAt: new Date().toISOString()
         };
 
@@ -2726,7 +2726,7 @@
                     </div>
                     <div style="font-weight: 600; margin-bottom: 0.4rem;">${release.title}</div>
                     <ul style="margin: 0; padding-left: 1.2rem; color: var(--text-secondary);">
-                        ${release.features.map(f => `<li style="margin-bottom: 0.2rem;">${f}</li>`).join('')}
+                        ${[...(release.features || []), ...(release.fixes || [])].map(f => `<li style="margin-bottom: 0.2rem;">${f}</li>`).join('')}
                     </ul>
                 `;
                 container.appendChild(div);
@@ -2745,16 +2745,40 @@
         const btn = e.target.closest('#btn-update-check') || e.target.closest('#btn-update');
 
         if (btn) {
-            if (!confirm('Möchtest du jetzt nach Updates suchen und diese installieren?\n\nDer Server startet dabei kurz neu.')) {
-                return;
-            }
-
             const originalContent = btn.innerHTML;
             btn.disabled = true;
 
             // Show Overlay
             updateOverlay.style.display = 'flex';
             updateStatusText.textContent = 'Update wird geprüft...';
+
+            // Erst prüfen, ob es überhaupt etwas Neues gibt
+            let check;
+            try {
+                const checkRes = await fetch('/api/update/check');
+                check = await checkRes.json();
+            } catch (err) {
+                check = { success: false, message: 'Server nicht erreichbar' };
+            }
+            if (!check.success) {
+                updateStatusText.textContent = `Fehler: ${check.message || 'Prüfung fehlgeschlagen'}`;
+                showToast(`Update-Prüfung fehlgeschlagen: ${check.message || ''}`, 'error', 10000);
+                setTimeout(() => { updateOverlay.style.display = 'none'; btn.disabled = false; }, 4000);
+                return;
+            }
+            if (!check.updateAvailable) {
+                updateStatusText.textContent = `Keine Updates verfügbar (Version ${check.currentVersion}).`;
+                showToast(`Du hast bereits die neueste Version ${check.currentVersion}.`, 'info');
+                setTimeout(() => { updateOverlay.style.display = 'none'; btn.disabled = false; }, 2500);
+                return;
+            }
+            updateOverlay.style.display = 'none';
+            if (!confirm(`Update verfügbar: ${check.currentVersion} → ${check.remoteVersion}\n\nJetzt installieren? Der Server startet dabei kurz neu.`)) {
+                btn.disabled = false;
+                return;
+            }
+            updateOverlay.style.display = 'flex';
+            updateStatusText.textContent = 'Update wird installiert...';
 
             const waitForServerAndReload = async () => {
                 updateStatusText.textContent = 'Server startet neu, bitte warten...';
