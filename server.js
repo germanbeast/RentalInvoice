@@ -2654,6 +2654,29 @@ app.get('/api/changelog', (req, res) => {
     }
 });
 
+// Prüft per git fetch, ob auf origin/main neuere Commits liegen (ohne zu installieren)
+app.get('/api/update/check', apiLimiter, (req, res) => {
+    const execOpts = { timeout: 30000, cwd: __dirname };
+    exec('git fetch origin main', execOpts, (fetchErr, _o, fetchStderr) => {
+        if (fetchErr) {
+            const detail = (fetchStderr || fetchErr.message || '').trim();
+            return res.status(500).json({ success: false, message: `Update-Prüfung fehlgeschlagen: ${detail}` });
+        }
+        exec('git rev-list --count HEAD..origin/main', execOpts, (countErr, countOut) => {
+            if (countErr) return res.status(500).json({ success: false, message: countErr.message });
+            const behind = parseInt(String(countOut).trim(), 10) || 0;
+            const currentVersion = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version;
+            exec('git show origin/main:package.json', execOpts, (showErr, showOut) => {
+                let remoteVersion = currentVersion;
+                if (!showErr) {
+                    try { remoteVersion = JSON.parse(showOut).version || currentVersion; } catch (e) { /* ignore */ }
+                }
+                res.json({ success: true, updateAvailable: behind > 0, behind, currentVersion, remoteVersion });
+            });
+        });
+    });
+});
+
 app.post('/api/update', apiLimiter, (req, res) => {
     const execOpts = { timeout: 10000, cwd: __dirname };
 
@@ -2669,6 +2692,12 @@ app.post('/api/update', apiLimiter, (req, res) => {
             }
 
             console.log('Git Pull:', stdout.trim());
+
+            if (/already up[ -]to[ -]date/i.test(stdout)) {
+                return exec('git stash pop', execOpts, () => {
+                    res.json({ success: true, status: 'no_updates', message: 'Bereits auf dem neuesten Stand.' });
+                });
+            }
 
             exec('git stash pop', execOpts, (popErr) => {
                 if (popErr) console.warn('Git Stash Pop Warning:', popErr.message);

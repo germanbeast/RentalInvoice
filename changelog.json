@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.12.3",
+    "currentVersion": "1.12.4",
     "releases": [
+        {
+            "version": "1.12.4",
+            "date": "2026-10-25",
+            "title": "Update-Prüfung und Changelog repariert",
+            "fixes": [
+                "„Update suchen“ prüft jetzt zuerst, ob es eine neuere Version gibt, und zeigt „Version a → b“ an; ohne Update gibt es keinen Neustart mehr",
+                "Der Changelog blieb leer, sobald ein Eintrag „fixes“ statt „features“ enthielt; beides wird jetzt angezeigt"
+            ]
+        },
         {
             "version": "1.12.3",
             "date": "2026-10-25",
