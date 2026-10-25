@@ -70,8 +70,8 @@ function keyboard(rows) {
 function mainMenuKeyboard() {
     return keyboard([
         [btn('🧾 Neue Rechnung', 'new:invoice'), btn('🔑 Nur Tür-Code', 'new:pin')],
-        [btn('📋 Offene Rechnungen', 'open'), btn('📅 Anreisen', 'arrivals')],
-        [btn('❓ Hilfe', 'help')]
+        [btn('🔐 Türcodes', 'codes'), btn('📅 Anreisen', 'arrivals')],
+        [btn('📋 Offene Rechnungen', 'open'), btn('❓ Hilfe', 'help')]
     ]);
 }
 
@@ -146,6 +146,7 @@ async function showHelp(bot, chatId) {
         '• <code>/rechnung</code> – neue Rechnung (inkl. Tür-Code)\n' +
         '• <code>/pin</code> – nur einen Tür-Code erstellen\n' +
         '• <code>/status</code> – offene Rechnungen\n' +
+        '• <code>/codes</code> – angelegte Türcodes anzeigen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
@@ -172,6 +173,36 @@ async function showOpenInvoices(bot, chatId) {
         text += `• <code>${esc(inv.invoice_number)}</code> – ${esc(inv.guest_display_name)}: ${fmtMoney(inv.total_amount)}\n`;
     });
     text += `\n<b>Summe: ${fmtMoney(total)}</b>`;
+    return send(bot, chatId, text, menuOnlyKeyboard());
+}
+
+async function showCodes(bot, chatId) {
+    let rows = [];
+    try {
+        rows = db.getDb().prepare(`
+            SELECT b.summary, b.checkin, b.checkout, b.nuki_pin, g.name AS guest_name
+            FROM bookings b
+            LEFT JOIN guests g ON g.id = b.guest_id
+            WHERE b.nuki_pin IS NOT NULL AND b.nuki_pin != '' AND b.checkout >= date('now')
+            ORDER BY b.checkin ASC
+            LIMIT 25
+        `).all();
+    } catch (e) {
+        console.error('[TG] Türcode-Abfrage:', e.message);
+        return send(bot, chatId, '❌ Türcodes konnten nicht geladen werden.', menuOnlyKeyboard());
+    }
+    if (!rows.length) {
+        return send(bot, chatId, '🔐 Aktuell sind keine Türcodes angelegt.', menuOnlyKeyboard());
+    }
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+    let text = `<b>🔐 Angelegte Türcodes (${rows.length})</b>\n\n`;
+    rows.forEach(r => {
+        const name = short(r.guest_name || String(r.summary || 'Buchung').split('(')[0].replace(/^(Buchung|Gast):/, '').trim() || 'Buchung', 36);
+        const active = r.checkin <= today && today <= r.checkout;
+        text += `${active ? '🟢' : '⏳'} <b>${esc(name)}</b>\n` +
+            `   🔑 <code>${esc(r.nuki_pin)}</code>  ·  ${fmtDate(r.checkin)} – ${fmtDate(r.checkout)}\n`;
+    });
+    text += '\n🟢 aktuell im Haus · ⏳ geplant';
     return send(bot, chatId, text, menuOnlyKeyboard());
 }
 
@@ -565,7 +596,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|status|offen|anreisen|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|codes|türcodes|tuercodes|status|offen|anreisen|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -646,6 +677,10 @@ async function processMessage(bot, msg) {
             case 'status':
             case 'offen':
                 return showOpenInvoices(bot, chatId);
+            case 'codes':
+            case 'türcodes':
+            case 'tuercodes':
+                return showCodes(bot, chatId);
             case 'anreisen':
                 return showArrivals(bot, chatId);
             case 'rechnung':
@@ -761,6 +796,8 @@ async function processCallback(bot, q) {
                 return showOpenInvoices(bot, chatId);
             case data === 'arrivals':
                 return showArrivals(bot, chatId);
+            case data === 'codes':
+                return showCodes(bot, chatId);
             case data === 'new:invoice':
                 return startFlow(bot, chatId, 'invoice', '');
             case data === 'new:pin':
@@ -818,6 +855,7 @@ async function setup(bot) {
             { command: 'menu', description: 'Hauptmenü öffnen' },
             { command: 'rechnung', description: 'Neue Rechnung erstellen' },
             { command: 'pin', description: 'Nur Tür-Code erstellen' },
+            { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },
             { command: 'anreisen', description: 'Kommende Buchungen anzeigen' },
             { command: 'abbrechen', description: 'Aktuellen Vorgang abbrechen' },

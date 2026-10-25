@@ -288,7 +288,12 @@ async function initTelegram() {
 async function sendTelegram(chatId, message) {
     if (!tgBot) return false;
     try {
-        await tgBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        try {
+            await tgBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        } catch (mdErr) {
+            // e.g. names containing _ or * break Markdown parsing -> resend as plain text
+            await tgBot.sendMessage(chatId, message.replace(/[*_`]/g, ''));
+        }
         console.log(`✉️ Telegram gesendet an ${chatId}`);
         return true;
     } catch (e) {
@@ -343,6 +348,40 @@ const pending2FA = new Map(); // sessionId -> { code, username, expiresAt }
 // =======================
 // 1c. SCHEDULED JOBS (Cron)
 // =======================
+// iCal all-day events (VALUE=DATE) are parsed by node-ical as local midnight. Calling
+// toISOString() on them shifts the date one day back on servers west of UTC+0 (e.g. Europe/Berlin).
+function icalDateToYmd(d) {
+    if (!d) return null;
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    if (d.dateOnly) {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const day = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt);
+}
+
+// Adjust the validity period of an existing Nuki keypad code
+async function updateNukiPinDates(authId, arrival, departure) {
+    const nuki = db.getAllSettings().nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+    await axios.put(`https://api.nuki.io/smartlock/auth/${authId}`, {
+        allowedFromDate: `${arrival}T15:00:00.000Z`,
+        allowedUntilDate: `${departure}T11:00:00.000Z`,
+        allowedWeekDays: 127,
+        allowedFromTime: 0,
+        allowedUntilTime: 0
+    }, {
+        headers: {
+            'Authorization': `Bearer ${nuki.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    });
+}
+
 function formatDateDE(dateStr) {
     if (!dateStr) return '\u2014';
     const d = new Date(dateStr);
@@ -368,13 +407,15 @@ cron.schedule('*/15 * * * *', async () => {
         const data = ical.parseICS(response.data);
 
         let newCount = 0;
+        const adjusted = [];
+        const todayYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
         for (const k in data) {
             if (!data.hasOwnProperty(k)) continue;
             const ev = data[k];
             if (ev.type !== 'VEVENT' || !ev.uid) continue;
 
-            const checkin = ev.start ? new Date(ev.start).toISOString().split('T')[0] : null;
-            const checkout = ev.end ? new Date(ev.end).toISOString().split('T')[0] : null;
+            const checkin = icalDateToYmd(ev.start);
+            const checkout = icalDateToYmd(ev.end);
             const summary = String(ev.summary || 'Buchung').substring(0, 500);
 
             const existing = db.getBookingByUid(ev.uid);
@@ -385,6 +426,18 @@ cron.schedule('*/15 * * * *', async () => {
                 checkout,
                 description: String(ev.description || '').substring(0, 2000)
             });
+
+            // Existing booking whose dates changed (booking modified, or corrected date parsing):
+            // keep the already created door code in sync with the new period.
+            if (existing && existing.nuki_auth_id && checkin && checkout && checkout >= todayYmd &&
+                (existing.checkin !== checkin || existing.checkout !== checkout)) {
+                try {
+                    await updateNukiPinDates(existing.nuki_auth_id, checkin, checkout);
+                    adjusted.push(`${summary.split('(')[0].trim()}: ${formatDateDE(checkin)} – ${formatDateDE(checkout)}`);
+                } catch (ue) {
+                    console.warn(`⚠️ Nuki-Zeitraum für Buchung ${existing.id} konnte nicht angepasst werden:`, ue.message);
+                }
+            }
 
             if (result.inserted && !existing) {
                 newCount++;
@@ -417,6 +470,12 @@ cron.schedule('*/15 * * * *', async () => {
                 const sent = await sendToAllRecipients(msg);
                 db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
             }
+        }
+
+        if (adjusted.length > 0) {
+            const adjMsg = `🔧 *Tür-Code-Zeitraum angepasst*\n${adjusted.map(a => '• ' + a).join('\n')}`;
+            const adjSent = await sendToAllRecipients(adjMsg);
+            db.logNotification('booking_adjusted', adjMsg, adjSent ? 'sent' : 'failed');
         }
 
         if (newCount > 0) {

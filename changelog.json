@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.8.0",
+    "currentVersion": "1.8.1",
     "releases": [
+        {
+            "version": "1.8.1",
+            "date": "2026-10-25",
+            "title": "Türcode-Zeitraum korrigiert, Türcodes in Telegram",
+            "features": [
+                "Behebt: Enddatum (und Startdatum) neuer iCal-Buchungen lag einen Tag zu früh",
+                "Bereits angelegte Türcodes werden bei geändertem Zeitraum automatisch angepasst (inkl. Benachrichtigung)",
+                "Neuer Telegram-Befehl /codes: zeigt alle angelegten Türcodes mit Zeitraum",
+                "Telegram-Benachrichtigungen fallen bei Sonderzeichen im Namen auf Klartext zurück"
+            ]
+        },
         {
             "version": "1.8.0",
             "date": "2026-10-25",
