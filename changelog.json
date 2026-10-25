@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.12.2",
+    "currentVersion": "1.12.3",
     "releases": [
+        {
+            "version": "1.12.3",
+            "date": "2026-10-25",
+            "title": "Rechnungs-PDF: Empfänger, Summe, Zahlungsart",
+            "fixes": [
+                "Im PDF fehlten Empfänger und Rechnungsdaten; sie werden jetzt angezeigt",
+                "Bei Kleinunternehmern wurde trotzdem MwSt. aufgeschlagen (150 € wurden 160,50 €); die Summe stimmt jetzt in PDF, Vorschau und Archiv",
+                "Keine Bankverbindung mehr auf Bot-Rechnungen; sie sind als bezahlt markiert",
+                "Telegram fragt bei einer neuen Rechnung die Zahlungsart ab (Überweisung, Bar, PayPal, Booking.com, Airbnb)"
+            ]
+        },
         {
             "version": "1.12.2",
             "date": "2026-10-25",

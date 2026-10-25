@@ -381,7 +381,7 @@
     function updateSummary() {
         const netto = getSubtotal();
         const rate = getMwstRate();
-        const mwst = netto * (rate / 100);
+        const mwst = $('#kleinunternehmer').checked ? 0 : netto * (rate / 100);
         const total = netto + mwst;
 
         $('#sum-netto').textContent = formatCurrency(netto);
@@ -482,9 +482,9 @@
             // Summary
             const netto = getSubtotal();
             const rate = getMwstRate();
-            const mwst = netto * (rate / 100);
-            const total = netto + mwst;
             const isKleinunternehmer = $('#kleinunternehmer').checked;
+            const mwst = isKleinunternehmer ? 0 : netto * (rate / 100);
+            const total = netto + mwst;
 
             $('#inv-netto').textContent = formatCurrency(netto);
             $('#inv-mwst').textContent = formatCurrency(mwst);
@@ -1298,7 +1298,7 @@
             bIban: $('#b-iban').value,
             bBic: $('#b-bic').value,
             bBank: $('#b-bank').value,
-            totalAmount: getSubtotal() * (1 + getMwstRate() / 100),
+            totalAmount: getSubtotal() * (1 + ($('#kleinunternehmer').checked ? 0 : getMwstRate()) / 100),
             archivedAt: new Date().toISOString()
         };
 

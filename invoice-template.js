@@ -29,7 +29,7 @@ function renderInvoiceHtml(data) {
 
     const netto = positions.reduce((sum, p) => sum + (p.qty * p.price), 0);
     const rate = parseFloat(mwstSatz) || 0;
-    const mwst = netto * (rate / 100);
+    const mwst = kleinunternehmer ? 0 : netto * (rate / 100);
     const total = netto + mwst;
 
     const logoHtml = branding && branding.logo_base64
@@ -45,6 +45,13 @@ function renderInvoiceHtml(data) {
     <style>
         ${styles}
         body { background: white !important; padding: 0 !important; margin: 0; font-family: 'Inter', sans-serif; }
+        /* Das Web-Layout blendet Empfänger und Meta aus (steht dort in der Anrede); im PDF zeigen wir sie. */
+        .invoice-page .inv-recipient .inv-label,
+        .invoice-page .inv-meta-item .inv-label { display: block !important; font-size: 7.5pt; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .invoice-page .inv-recipient strong { display: block !important; }
+        .invoice-page .inv-recipient .inv-addr { display: block !important; }
+        .invoice-page .inv-meta { display: flex !important; justify-content: space-between; gap: 8mm; text-align: left !important; }
+        .invoice-page .inv-meta-item { display: block !important; }
         .invoice-page { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; }
         @media print {
             body { margin: 0; }
