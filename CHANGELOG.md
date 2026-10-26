@@ -5,6 +5,12 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-10-26
+
+### Geändert
+- Schneller auf schwachen Geräten: Blur-Effekte entfernt, ungenutzte PDF-Bibliothek (html2pdf) nicht mehr geladen, Chart.js gepinnt (4.4.1) und mit `defer` geladen
+- Kein Polling im Hintergrund-Tab; TV-Uhr zeichnet nur noch minütlich neu
+
 ## [1.13.0] - 2026-10-26
 
 ### Hinzugefügt

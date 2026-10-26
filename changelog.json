@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.13.0",
+    "currentVersion": "1.13.1",
     "releases": [
+        {
+            "version": "1.13.1",
+            "date": "2026-10-26",
+            "title": "Schneller auf schwachen Geräten (TV-Box, alte Handys)",
+            "features": [
+                "Weichzeichner-Effekte (Blur) entfernt: Karten, Kopfzeile, Dialoge und TV-Seite laufen auf schwachen Geräten deutlich flüssiger",
+                "Ungenutzte PDF-Bibliothek (~900 KB) wird nicht mehr geladen; Skripte blockieren den Seitenaufbau nicht mehr",
+                "Dashboard, Buchungen und Ausgaben aktualisieren sich nicht mehr im Hintergrund-Tab, beim Zurückwechseln sofort",
+                "TV-Seite: Uhr wird nur noch einmal pro Minute neu gezeichnet"
+            ]
+        },
         {
             "version": "1.13.0",
             "date": "2026-10-26",

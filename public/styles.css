@@ -222,8 +222,7 @@ body::before {
     justify-content: space-between;
     padding: 1.25rem 2rem;
     border-bottom: 1px solid var(--border);
-    background: rgba(17, 24, 39, 0.6);
-    backdrop-filter: blur(12px);
+    background: rgba(17, 24, 39, 0.95);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -270,7 +269,6 @@ body::before {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1.25rem;
-    backdrop-filter: blur(12px);
     transition: border-color var(--transition), box-shadow var(--transition);
 }
 
@@ -1129,8 +1127,7 @@ select {
     position: fixed;
     inset: 0;
     z-index: 200;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(6px);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1578,7 +1575,6 @@ select {
     inset: 0;
     z-index: 10000;
     background: rgba(11, 17, 32, 0.95);
-    backdrop-filter: blur(10px);
     display: none;
     flex-direction: column;
     align-items: center;
@@ -2350,8 +2346,7 @@ input[type="checkbox"]:focus-visible {
     border-radius: 16px;
     padding: 30px;
     text-align: center;
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    transition: background 0.3s ease, transform 0.3s ease;
 }
 
 .welcome-info-card:hover {
@@ -2707,4 +2702,15 @@ input[type="checkbox"]:focus-visible {
 }
 @media (max-width: 768px) {
     .preview-actions { flex-wrap: wrap; gap: 6px; max-width: 100%; }
+}
+
+/* ===========================
+   SCHWACHE GERÄTE: Animationen aus, wenn das System es wünscht
+   =========================== */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

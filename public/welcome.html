@@ -88,7 +88,6 @@
 
         .welcome-info-card {
             background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 30px;
             text-align: center;
@@ -138,12 +137,11 @@
 
         .welcome-app-btn {
             background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 15px;
             padding: 30px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: background 0.3s ease, transform 0.3s ease;
             text-align: center;
         }
 
@@ -275,23 +273,26 @@
             document.getElementById('welcome-phone').textContent = decodeURIComponent(phone);
         }
 
-        // Update time and date
+        // Update time and date – only touch the DOM when the minute changes,
+        // so weak TV boxes don't repaint the page every second
+        const timeEl = document.getElementById('welcome-time');
+        const dateEl = document.getElementById('welcome-date');
         function updateTime() {
             const now = new Date();
-            document.getElementById('welcome-time').textContent = now.toLocaleTimeString('de-DE', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            document.getElementById('welcome-date').textContent = now.toLocaleDateString('de-DE', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            if (timeEl.textContent !== time) {
+                timeEl.textContent = time;
+                dateEl.textContent = now.toLocaleDateString('de-DE', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+            setTimeout(updateTime, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 50);
         }
 
         updateTime();
-        setInterval(updateTime, 1000);
 
         // Automatic guest data from the server (only if no name was passed in the URL)
         async function loadFromServer() {
