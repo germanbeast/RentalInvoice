@@ -5,6 +5,12 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.2] - 2026-10-26
+
+### Behoben
+- Vergangene Buchungen mit Türcode, der in Nuki nicht mehr existiert, werden beim stündlichen Nuki-Abgleich bereinigt – jetzt auch, wenn nur der PIN ohne `nuki_auth_id` gespeichert war
+- Bereits bestätigt gelöschte Nuki-Codes werden 30 Tage gemerkt; taucht ein Eintrag in der Nuki-Web-Liste wieder auf, wird er still erneut gelöscht statt neu gemeldet
+
 ## [1.13.1] - 2026-10-26
 
 ### Geändert

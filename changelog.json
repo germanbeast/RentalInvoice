@@ -1,6 +1,16 @@
 {
-    "currentVersion": "1.13.1",
+    "currentVersion": "1.13.2",
     "releases": [
+        {
+            "version": "1.13.2",
+            "date": "2026-10-26",
+            "title": "Alte Türcodes verschwinden zuverlässig",
+            "features": [],
+            "fixes": [
+                "Vergangene Buchungen, deren Türcode in Nuki nicht mehr existiert, zeigen keinen Code mehr an – auch wenn beim Anlegen nur der PIN (ohne Nuki-ID) gespeichert wurde",
+                "Ein bereits gelöschter Code, den Nuki kurzzeitig wieder auflistet, wird nicht mehr erneut als „abgelaufener Türcode wird gelöscht“ gemeldet"
+            ]
+        },
         {
             "version": "1.13.1",
             "date": "2026-10-26",
