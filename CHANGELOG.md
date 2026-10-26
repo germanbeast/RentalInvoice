@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.3] - 2026-10-26
+
+### Behoben
+- Update-Knopf und `update.sh` holen `origin/main` per `git fetch` + `git reset --hard` statt `git pull` + `git stash pop`; ein hängengebliebener Merge-Konflikt (z. B. in `package-lock.json`) blockiert Updates nicht mehr. Lokale Änderungen an versionierten Dateien bleiben in `git stash list`.
+
 ## [1.13.2] - 2026-10-26
 
 ### Behoben

@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.13.2",
+    "currentVersion": "1.13.3",
     "releases": [
+        {
+            "version": "1.13.3",
+            "date": "2026-10-26",
+            "title": "Update-Knopf hängt nicht mehr an Git-Konflikten",
+            "features": [],
+            "fixes": [
+                "Der Update-Knopf meldete nach einem früheren Konflikt dauerhaft „noch nicht gemergte Dateien“; das Update setzt den Code jetzt direkt auf den neuesten Stand statt zu mergen (Datenbank und Einstellungen bleiben unberührt)"
+            ]
+        },
         {
             "version": "1.13.2",
             "date": "2026-10-26",

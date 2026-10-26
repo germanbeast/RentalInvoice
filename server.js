@@ -2725,44 +2725,57 @@ app.get('/api/update/check', apiLimiter, (req, res) => {
     });
 });
 
+// The server checkout is a pure deployment copy (database, .env, sessions are git-ignored), so the update
+// does not merge: it fetches origin/main and resets to it. A former `git pull` + `git stash pop` could end in
+// a merge conflict (e.g. package-lock.json changed by npm install) which then blocked every later update
+// ("you have unmerged files"). Local changes to tracked files are kept in `git stash list` for recovery.
 app.post('/api/update', apiLimiter, (req, res) => {
     const execOpts = { timeout: 10000, cwd: __dirname };
-
-    console.log('📥 Update gestartet. Arbeitsverzeichnis:', __dirname);
-    exec('git stash', execOpts, (stashErr) => {
-        if (stashErr) console.warn('Git Stash Warning:', stashErr.message);
-
-        exec('git pull origin main', { ...execOpts, timeout: 60000 }, (pullErr, stdout, stderr) => {
-            if (pullErr) {
-                const detail = stderr || pullErr.message || 'Unbekannter Fehler';
-                console.error('Git Pull Error:', detail);
-                return res.status(500).json({ success: false, message: `Git Pull fehlgeschlagen: ${detail}` });
-            }
-
-            console.log('Git Pull:', stdout.trim());
-
-            if (/already up[ -]to[ -]date/i.test(stdout)) {
-                return exec('git stash pop', execOpts, () => {
-                    res.json({ success: true, status: 'no_updates', message: 'Bereits auf dem neuesten Stand.' });
-                });
-            }
-
-            exec('git stash pop', execOpts, (popErr) => {
-                if (popErr) console.warn('Git Stash Pop Warning:', popErr.message);
-
-                exec('npm install', { ...execOpts, timeout: 120000 }, (npmErr) => {
-                    if (npmErr) console.warn('NPM Install Warning:', npmErr.message);
-
-                    res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
-
-                    setTimeout(() => {
-                        console.log('🔄 Starte Server neu...');
-                        db.close();
-                        process.exit(0);
-                    }, 3000);
-                });
-            });
+    const run = (cmd, opts = {}) => new Promise((resolve, reject) => {
+        exec(cmd, { ...execOpts, ...opts }, (err, stdout, stderr) => {
+            if (err) { err.detail = String(stderr || err.message || '').trim(); return reject(err); }
+            resolve(String(stdout).trim());
         });
+    });
+    const tryRun = (cmd, opts) => run(cmd, opts).catch(e => { console.warn(`Git Warnung (${cmd}):`, e.detail); return null; });
+
+    (async () => {
+        console.log('📥 Update gestartet. Arbeitsverzeichnis:', __dirname);
+        // Leftover conflict from an earlier update -> clear it, otherwise stash and reset refuse to work
+        await tryRun('git reset --merge');
+        await tryRun(`git stash push -m "update ${new Date().toISOString()}"`);
+
+        try {
+            await run('git fetch origin main', { timeout: 60000 });
+        } catch (e) {
+            console.error('Git Fetch Error:', e.detail);
+            return res.status(500).json({ success: false, message: `Git Fetch fehlgeschlagen: ${e.detail}` });
+        }
+
+        const before = await tryRun('git rev-parse HEAD');
+        const target = await run('git rev-parse origin/main');
+        if (before === target) {
+            return res.json({ success: true, status: 'no_updates', message: 'Bereits auf dem neuesten Stand.' });
+        }
+
+        await run('git reset --hard origin/main');
+        console.log(`Git: ${before ? before.slice(0, 7) : '?'} -> ${target.slice(0, 7)}`);
+
+        try {
+            await run('npm install --no-audit --no-fund', { timeout: 120000 });
+        } catch (e) {
+            console.warn('NPM Install Warning:', e.detail);
+        }
+
+        res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
+        setTimeout(() => {
+            console.log('🔄 Starte Server neu...');
+            db.close();
+            process.exit(0);
+        }, 3000);
+    })().catch(e => {
+        console.error('Update Error:', e.detail || e.message);
+        if (!res.headersSent) res.status(500).json({ success: false, message: `Update fehlgeschlagen: ${e.detail || e.message}` });
     });
 });
 
