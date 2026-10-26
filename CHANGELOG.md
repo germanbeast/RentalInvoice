@@ -5,6 +5,14 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-10-26
+
+### Hinzugefügt
+- Installierbare Web-App (PWA) für Android und iOS: Manifest, App-Icons, Service Worker
+- Web-Push-Benachrichtigungen (VAPID, Abhängigkeit `web-push`): neue Buchung, Storno und Doppelbuchung; pro Gerät wahlweise alle Meldungen
+- Einstellungen → „Handy-App & Push“: Gerät aktivieren/deaktivieren, Geräteliste, Test senden
+- Endpunkte `/api/push/*`; Tippen auf eine Buchungs-Meldung öffnet die Buchungsliste (`/?view=bookings`)
+
 ## [1.13.3] - 2026-10-26
 
 ### Behoben

@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.13.3",
+    "currentVersion": "1.14.0",
     "releases": [
+        {
+            "version": "1.14.0",
+            "date": "2026-10-26",
+            "title": "Handy-App mit Push-Benachrichtigung bei neuer Buchung",
+            "features": [
+                "Die Verwaltung lässt sich als App auf dem Handy installieren (iPhone: Safari → Teilen → „Zum Home-Bildschirm“, Android: Chrome → „App installieren“)",
+                "Push-Benachrichtigung aufs Handy, sobald eine neue Buchung von Booking.com oder Airbnb erkannt wird – auch bei Storno und Doppelbuchung",
+                "Einstellungen → „Handy-App & Push“: Gerät aktivieren, Test senden, Geräte verwalten; pro Gerät wählbar „nur Buchungen“ oder „alle Meldungen“",
+                "Tippen auf die Meldung öffnet direkt die Buchungsliste"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.13.3",
             "date": "2026-10-26",

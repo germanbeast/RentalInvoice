@@ -28,6 +28,7 @@ const tgCommands = require('./tg-commands');
 const TelegramBot = require('node-telegram-bot-api');
 const packageJson = require('./package.json');
 const { renderEstateReportHtml } = require('./estate-report-template');
+const push = require('./push')({ db });
 require('dotenv').config();
 
 const app = express();
@@ -339,6 +340,13 @@ async function sendToAllRecipients(message, opts = {}) {
         }
     }
 
+    // Web Push (installed web app on phones)
+    try {
+        if (await push.send(message, opts.type)) anySent = true;
+    } catch (e) {
+        console.error('❌ Push Fehler:', e.message);
+    }
+
     return anySent;
 }
 
@@ -393,10 +401,16 @@ const bookingMonitor = require('./booking-monitor')({
     botLogic: require('./bot-logic'),
     formatDateDE: (d) => formatDateDE(d),
     notify: async (msg, type) => {
-        const sent = await sendToAllRecipients(msg);
+        const sent = await sendToAllRecipients(msg, { type });
         db.logNotification(type, msg, sent ? 'sent' : 'failed');
     }
 });
+
+try {
+    push.init();
+} catch (e) {
+    console.error('❌ Web-Push konnte nicht gestartet werden:', e.message);
+}
 
 async function pollIcalFeed(feed, todayYmd, adjusted) {
     const response = await axios.get(feed.url, {
@@ -492,7 +506,7 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
             const tgKeyboard = needsName
                 ? { inline_keyboard: [[{ text: '👤 Namen eintragen', callback_data: `nm:${result.id}` }]] }
                 : undefined;
-            const sent = await sendToAllRecipients(msg, { tgKeyboard });
+            const sent = await sendToAllRecipients(msg, { tgKeyboard, type: 'new_booking' });
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
         }
     }
@@ -968,6 +982,17 @@ app.get('/api/welcome', (req, res) => {
     }
 });
 
+// Web app (PWA) files: browsers and the OS fetch them without the session cookie
+app.get('/sw.js', (req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(PUBLIC_DIR, 'sw.js'));
+});
+app.get('/manifest.webmanifest', (req, res) => {
+    res.type('application/manifest+json');
+    res.sendFile(path.join(PUBLIC_DIR, 'manifest.webmanifest'));
+});
+app.use('/icons', express.static(path.join(PUBLIC_DIR, 'icons'), { maxAge: '7d' }));
+
 // Serve CSS and JS files without authentication
 app.use('/styles.css', express.static(path.join(PUBLIC_DIR, 'styles.css')));
 app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
@@ -1416,11 +1441,63 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 app.get('/api/settings', apiLimiter, (req, res) => {
     try {
         const settings = db.getAllSettings();
+        delete settings.push_vapid; // private push key stays on the server
         res.json({ success: true, settings });
     } catch (e) {
         console.error('Settings GET Error:', e.message);
         res.status(500).json({ error: 'Einstellungen konnten nicht geladen werden' });
     }
+});
+
+// =======================
+// WEB PUSH (Handy-Benachrichtigungen)
+// =======================
+app.get('/api/push/key', apiLimiter, (req, res) => {
+    const key = push.publicKey();
+    if (!key) return res.status(503).json({ success: false, error: 'Push nicht verfügbar' });
+    res.json({ success: true, publicKey: key });
+});
+
+app.get('/api/push/devices', apiLimiter, (req, res) => {
+    const devices = push.list().map(d => ({
+        id: d.id, label: d.label, mode: d.mode, username: d.username,
+        lastSentAt: d.last_sent_at, createdAt: d.created_at,
+        endpointHash: crypto.createHash('sha256').update(d.endpoint).digest('hex').slice(0, 16)
+    }));
+    res.json({ success: true, devices });
+});
+
+app.post('/api/push/subscribe', apiLimiter, (req, res) => {
+    try {
+        const { subscription, label, mode } = req.body || {};
+        const id = push.subscribe(subscription, { label, mode, username: req.session.user.username });
+        res.json({ success: true, id });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/push/unsubscribe', apiLimiter, (req, res) => {
+    const { endpoint } = req.body || {};
+    if (typeof endpoint !== 'string') return res.status(400).json({ success: false });
+    res.json({ success: true, removed: push.removeByEndpoint(endpoint) });
+});
+
+app.put('/api/push/devices/:id', apiLimiter, (req, res) => {
+    const ok = push.setMode(parseInt(req.params.id, 10), req.body && req.body.mode);
+    res.status(ok ? 200 : 404).json({ success: ok });
+});
+
+app.delete('/api/push/devices/:id', apiLimiter, (req, res) => {
+    const ok = push.removeById(parseInt(req.params.id, 10));
+    res.status(ok ? 200 : 404).json({ success: ok });
+});
+
+app.post('/api/push/test', apiLimiter, async (req, res) => {
+    const id = parseInt(req.body && req.body.id, 10);
+    if (!id) return res.status(400).json({ success: false });
+    const sent = await push.send('🔔 *Test-Benachrichtigung*\nSo sieht eine Meldung bei neuer Buchung aus.', 'test', { only: id });
+    res.json({ success: sent, error: sent ? undefined : 'Zustellung fehlgeschlagen' });
 });
 
 app.put('/api/settings', apiLimiter, (req, res) => {

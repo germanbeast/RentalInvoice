@@ -2019,6 +2019,8 @@
                 const bcPage = $('#settings-current-page');
                 if (bcPage) bcPage.textContent = pageTitle;
 
+                if (targetId === 'settings-push') loadPushSettings();
+
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {
                     settingsModal.classList.add('designer-active');
@@ -3123,9 +3125,173 @@
         // Pre-fetch archive
         fetchArchive();
 
-        // Default to Dashboard view
-        switchView('dashboard');
+        // Default to Dashboard view; a tapped push notification opens /?view=bookings
+        const startView = new URLSearchParams(location.search).get('view');
+        switchView(['bookings', 'expenses', 'invoice'].includes(startView) ? startView : 'dashboard');
+        if (startView) history.replaceState(null, '', '/');
+
+        registerServiceWorker();
     }
+
+    // =======================
+    // Web app & push notifications
+    // =======================
+    const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext;
+    const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+    async function registerServiceWorker() {
+        if (!('serviceWorker' in navigator) || !window.isSecureContext) return null;
+        try {
+            return await navigator.serviceWorker.register('/sw.js');
+        } catch (e) {
+            console.warn('Service Worker:', e.message);
+            return null;
+        }
+    }
+
+    async function currentPushSubscription() {
+        if (!pushSupported()) return null;
+        const reg = await navigator.serviceWorker.getRegistration('/');
+        return reg ? reg.pushManager.getSubscription() : null;
+    }
+
+    async function sha256Hex(text) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function deviceLabel() {
+        const ua = navigator.userAgent;
+        const os = /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) || (isIos() && !/iphone/i.test(ua)) ? 'iPad'
+            : /android/i.test(ua) ? 'Android' : /windows/i.test(ua) ? 'Windows' : /mac os/i.test(ua) ? 'Mac' : /linux/i.test(ua) ? 'Linux' : 'Gerät';
+        const browser = /edg\//i.test(ua) ? 'Edge' : /firefox|fxios/i.test(ua) ? 'Firefox' : /chrome|crios/i.test(ua) ? 'Chrome' : /safari/i.test(ua) ? 'Safari' : '';
+        return `${os}${browser ? ' · ' + browser : ''}${isStandalone() ? ' (App)' : ''}`;
+    }
+
+    async function loadPushSettings() {
+        const status = $('#push-status');
+        const btnOn = $('#btn-push-enable');
+        const btnOff = $('#btn-push-disable');
+        const modeSel = $('#push-mode');
+        if (!status) return;
+
+        let mySub = null;
+        if (!window.isSecureContext) {
+            status.textContent = '⚠️ Die Seite ist nicht über https:// geöffnet. Browser erlauben Push-Meldungen nur über eine sichere Verbindung.';
+            btnOn.disabled = true;
+        } else if (isIos() && !isStandalone()) {
+            status.textContent = '📱 Auf dem iPhone/iPad funktionieren Benachrichtigungen nur in der installierten App: Teilen → „Zum Home-Bildschirm“, dann die App von dort öffnen.';
+            btnOn.disabled = true;
+        } else if (!pushSupported()) {
+            status.textContent = '⚠️ Dieser Browser unterstützt keine Push-Benachrichtigungen.';
+            btnOn.disabled = true;
+        } else if (Notification.permission === 'denied') {
+            status.textContent = '🔕 Benachrichtigungen sind für diese Seite blockiert. Bitte in den Browser-/Systemeinstellungen erlauben.';
+            btnOn.disabled = true;
+        } else {
+            btnOn.disabled = false;
+            mySub = await currentPushSubscription();
+            status.textContent = mySub ? '✅ Dieses Gerät erhält Benachrichtigungen.' : 'Dieses Gerät erhält noch keine Benachrichtigungen.';
+        }
+        btnOn.style.display = mySub ? 'none' : '';
+        btnOff.style.display = mySub ? '' : 'none';
+
+        let devices = [];
+        try {
+            const d = await apiJson('/api/push/devices');
+            devices = d.success ? d.devices : [];
+        } catch (e) { /* list stays empty */ }
+        const myHash = mySub ? (await sha256Hex(mySub.endpoint)).slice(0, 16) : null;
+        const mine = devices.find(d => d.endpointHash === myHash);
+        if (mine) modeSel.value = mine.mode;
+        // Subscribed in the browser but unknown to the server (e.g. removed in the list) -> offer to activate again
+        if (mySub && !mine) {
+            status.textContent = 'Dieses Gerät ist am Server nicht mehr registriert.';
+            btnOn.style.display = '';
+            btnOff.style.display = 'none';
+        }
+
+        const list = $('#push-devices');
+        list.innerHTML = devices.length ? devices.map(d => `
+            <div class="info-row" style="flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+                <span style="flex: 1 1 12rem;">
+                    <strong>${escapeHtml(d.label || 'Gerät')}</strong>${d.endpointHash === myHash ? ' <span class="badge">dieses Gerät</span>' : ''}<br>
+                    <small class="text-muted">${escapeHtml(d.username || '')} · seit ${escapeHtml(fmtDEfull(String(d.createdAt || '').slice(0, 10)))} · ${d.mode === 'all' ? 'alle Meldungen' : 'nur Buchungen'}</small>
+                </span>
+                <button type="button" class="btn btn-ghost btn-sm" data-push-test="${d.id}">Test senden</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-push-remove="${d.id}">Entfernen</button>
+            </div>`).join('') : '<p class="text-muted">Noch kein Gerät.</p>';
+        modeSel.dataset.deviceId = mine ? mine.id : '';
+    }
+
+    function urlBase64ToUint8Array(base64) {
+        const raw = atob(base64.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - base64.length % 4) % 4));
+        return Uint8Array.from(raw, c => c.charCodeAt(0));
+    }
+
+    async function enablePush() {
+        try {
+            // iOS only allows the permission prompt directly inside the tap handler
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                showToast('Benachrichtigungen wurden nicht erlaubt', 'error');
+                return loadPushSettings();
+            }
+            const reg = (await navigator.serviceWorker.getRegistration('/')) || await registerServiceWorker();
+            if (!reg) throw new Error('Service Worker nicht verfügbar');
+            await navigator.serviceWorker.ready;
+            const { publicKey } = await apiJson('/api/push/key');
+            let sub = await reg.pushManager.getSubscription();
+            if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+            const d = await apiJson('/api/push/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscription: sub.toJSON(), label: deviceLabel(), mode: $('#push-mode').value })
+            });
+            if (!d.success) throw new Error(d.error || 'Server hat das Gerät abgelehnt');
+            showToast('Benachrichtigungen aktiviert 🔔', 'success');
+            await apiJson('/api/push/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id }) });
+        } catch (e) {
+            showToast('Aktivieren fehlgeschlagen: ' + e.message, 'error');
+        }
+        loadPushSettings();
+    }
+
+    async function disablePush() {
+        try {
+            const sub = await currentPushSubscription();
+            if (sub) {
+                await apiJson('/api/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+                await sub.unsubscribe();
+            }
+            showToast('Benachrichtigungen auf diesem Gerät aus', 'success');
+        } catch (e) {
+            showToast('Fehler: ' + e.message, 'error');
+        }
+        loadPushSettings();
+    }
+
+    $('#btn-push-enable')?.addEventListener('click', enablePush);
+    $('#btn-push-disable')?.addEventListener('click', disablePush);
+    $('#push-mode')?.addEventListener('change', async e => {
+        const id = e.target.dataset.deviceId;
+        if (!id) return; // not registered yet: the choice is sent on activation
+        const d = await apiJson(`/api/push/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: e.target.value }) });
+        showToast(d.success ? 'Gespeichert' : 'Speichern fehlgeschlagen', d.success ? 'success' : 'error');
+        loadPushSettings();
+    });
+    $('#push-devices')?.addEventListener('click', async e => {
+        const testId = e.target.dataset.pushTest;
+        const removeId = e.target.dataset.pushRemove;
+        if (testId) {
+            const d = await apiJson('/api/push/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: testId }) });
+            showToast(d.success ? 'Test gesendet' : (d.error || 'Test fehlgeschlagen'), d.success ? 'success' : 'error');
+        } else if (removeId) {
+            await apiJson(`/api/push/devices/${removeId}`, { method: 'DELETE' });
+            loadPushSettings();
+        }
+    });
 
     // =======================
     // Guest Autocomplete
