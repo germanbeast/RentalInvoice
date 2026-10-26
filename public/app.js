@@ -1330,20 +1330,30 @@
     // =======================
     let currentView = 'dashboard';
     let viewPollInterval = null;
+    let viewRefresh = null;
 
     function startViewPolling(viewId) {
         clearInterval(viewPollInterval);
         viewPollInterval = null;
         const POLL_MS = 20000;
+        let refresh = null;
         if (viewId === 'dashboard') {
-            viewPollInterval = setInterval(loadDashboard, POLL_MS);
+            refresh = loadDashboard;
         } else if (viewId === 'expenses') {
-            viewPollInterval = setInterval(loadExpenses, POLL_MS);
+            refresh = loadExpenses;
         } else if (viewId === 'bookings') {
-            viewPollInterval = setInterval(() => { if (!document.querySelector('#bookings-list input')) loadBookings(); }, POLL_MS);
+            refresh = () => { if (!document.querySelector('#bookings-list input')) loadBookings(); };
         }
         // 'invoice' view has no background data to poll
+        // Skip refreshes while the tab is hidden (saves CPU/battery on weak devices)
+        viewRefresh = refresh;
+        if (refresh) viewPollInterval = setInterval(() => { if (!document.hidden) refresh(); }, POLL_MS);
     }
+
+    // Catch up immediately when the tab becomes visible again
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && viewRefresh) viewRefresh();
+    });
 
     function switchView(viewId) {
         const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings];
