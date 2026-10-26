@@ -16,3 +16,9 @@ rental.db
 rental.db-wal
 rental.db-shm
 .wwebjs_auth/
+
+# Android build output (TV-Kiosk-App)
+android-tv-kiosk/.gradle/
+android-tv-kiosk/build/
+android-tv-kiosk/app/build/
+android-tv-kiosk/local.properties

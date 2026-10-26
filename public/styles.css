@@ -2631,6 +2631,38 @@ input[type="checkbox"]:focus-visible {
 .booking-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .bookings-empty { color: var(--text-muted); padding: 24px; text-align: center; }
 
+/* ===== Belegungskalender ===== */
+#view-bookings .content-header { display: flex; justify-content: space-between; align-items: center; }
+.occ { padding: 0 24px 24px; }
+.occ-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.occ-head h3 { margin: 0 6px; font-size: 1.1rem; min-width: 150px; text-align: center; }
+.occ-rate { margin-left: auto; color: var(--text-secondary); font-size: .85rem; }
+.occ-legend { display: flex; gap: 14px; color: var(--text-muted); font-size: .78rem; margin-bottom: 10px; }
+.occ-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.occ-dot.booking, .occ-bar.booking { background: rgba(56,189,248,.25); color: var(--accent); }
+.occ-dot.airbnb, .occ-bar.airbnb { background: rgba(248,113,113,.25); color: #f87171; }
+.occ-dot.manual, .occ-bar.manual { background: rgba(148,163,184,.25); color: var(--text-secondary); }
+.occ-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.occ-wd { text-align: center; font-size: .72rem; text-transform: uppercase; color: var(--text-muted); padding: 4px 0; }
+.occ-day { min-height: 74px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.occ-day.blank { background: transparent; border-color: transparent; }
+.occ-day.past { opacity: .55; }
+.occ-day.today { border-color: var(--accent); }
+.occ-day.conflict { border-color: #f87171; box-shadow: inset 0 0 0 1px #f87171; }
+.occ-num { font-size: .75rem; color: var(--text-secondary); }
+.occ-bar { font-size: .72rem; font-weight: 600; padding: 2px 5px; margin: 0 -5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.occ-bar.start { margin-left: 0; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.occ-bar.end { margin-right: 0; border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.occ-out { font-size: .68rem; color: #fbbf24; }
+.occ-gaps { margin-top: 14px; padding: 14px 16px; }
+@media (max-width: 768px) {
+    .occ { padding: 0 12px; }
+    .occ-day { min-height: 54px; padding: 3px; }
+    .occ-bar { font-size: .62rem; padding: 1px 3px; margin: 0 -3px; }
+    .occ-rate { margin-left: 0; width: 100%; }
+    .occ-head h3 { min-width: 0; flex: 1; }
+}
+
 /* ===== Status-Punkte ===== */
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); margin-left: 8px; vertical-align: middle; }
 .status-dot.ok { background: var(--accent-green); }

@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=3.3">
+    <link rel="stylesheet" href="styles.css?v=3.4">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -275,6 +275,29 @@
             <div id="view-bookings" class="content-view" style="display:none;">
                 <div class="content-header">
                     <div class="content-breadcrumb"><h2>Buchungen</h2></div>
+                    <div class="seg" id="bookings-mode">
+                        <button type="button" data-mode="list" class="active">Liste</button>
+                        <button type="button" data-mode="calendar">Kalender</button>
+                    </div>
+                </div>
+                <div id="bookings-calendar" class="occ" style="display:none;">
+                    <div class="occ-head">
+                        <button type="button" class="btn-mini" id="occ-prev" aria-label="Vorheriger Monat">‹</button>
+                        <h3 id="occ-title"></h3>
+                        <button type="button" class="btn-mini" id="occ-next" aria-label="Nächster Monat">›</button>
+                        <button type="button" class="btn-mini" id="occ-today">Heute</button>
+                        <span class="occ-rate" id="occ-rate"></span>
+                    </div>
+                    <div class="occ-legend">
+                        <span><i class="occ-dot booking"></i>Booking.com</span>
+                        <span><i class="occ-dot airbnb"></i>Airbnb</span>
+                        <span><i class="occ-dot manual"></i>Manuell</span>
+                    </div>
+                    <div class="occ-grid" id="occ-grid"></div>
+                    <div class="card occ-gaps">
+                        <div class="today-title">Freie Lücken (nächste 120 Tage)</div>
+                        <div id="occ-gaps" class="today-body"></div>
+                    </div>
                 </div>
                 <div class="bookings-toolbar">
                     <div class="seg" id="bookings-filter">
@@ -1957,7 +1980,7 @@
 
     <!-- html2pdf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
-    <script src="app.js?v=3.3"></script>
+    <script src="app.js?v=3.4"></script>
 </body>
 
 </html>

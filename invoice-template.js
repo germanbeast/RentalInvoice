@@ -24,7 +24,7 @@ function renderInvoiceHtml(data) {
 
     const nights = calcNights(aAnreise, aAbreise);
     const aufenthaltText = aAnreise && aAbreise
-        ? `${formatDate(aAnreise)} – ${formatDate(aAbreise)} (${nights} Nacht${nights !== 1 ? 'e' : ''})`
+        ? `${formatDate(aAnreise)} – ${formatDate(aAbreise)} (${nights} ${nights !== 1 ? 'Nächte' : 'Nacht'})`
         : '—';
 
     const netto = positions.reduce((sum, p) => sum + (p.qty * p.price), 0);

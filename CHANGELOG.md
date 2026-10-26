@@ -5,6 +5,21 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-10-26
+
+### Hinzugefügt
+- Belegungskalender (Buchungen → Kalender) mit Auslastung und freien Lücken der nächsten 120 Tage
+- Endpunkt `GET /api/calendar?month=YYYY-MM`
+
+### Behoben
+- Dashboard zählte Rechnungen gelöschter Gäste weiter mit; Umsatz-Diagramm wurde nicht neu gezeichnet
+- Manuelle Buchungen gelöschter Gäste blieben in der Heute-Übersicht stehen
+- „Nächte“ statt „Nachte“
+- Fehlende Abhängigkeit `multer`
+
+### Entfernt
+- `error.txt`, `fix-db.js`, `repair_db.js`, `test-users-api.js`, Android-Build-Ausgabe, Abhängigkeit `cors`
+
 ## [1.12.1] - 2026-10-25
 
 ### Behoben

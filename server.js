@@ -759,7 +759,6 @@ async function createNukiPin(arrival, departure, guestName) {
     const allowedUntil = `${departure}T11:00:00.000Z`;
     const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
 
-    const axios = require('axios');
     const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
     await axios.put('https://api.nuki.io/smartlock/auth', {
         name: safeName,
@@ -802,7 +801,6 @@ async function deleteNukiPin(authId) {
     const nuki = allSettings.nuki;
     if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
 
-    const axios = require('axios');
     await axios.delete(`https://api.nuki.io/smartlock/${nuki.lockId}/auth/${authId}`, {
         headers: {
             'Authorization': `Bearer ${nuki.token}`,
@@ -842,11 +840,7 @@ app.use(helmet({
 // =======================
 // 0. Init & Config
 // =======================
-console.log('\n\n');
-console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-console.log('!!!       SERVER VERSION 3.2 LOADED            !!!');
-console.log('!!!    (Testing Update & Telegram Auth Fix)    !!!');
-console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n');
+console.log(`🏠 RentalInvoice v${packageJson.version}`);
 
 // =======================
 // 3. RATE LIMITING
@@ -1265,6 +1259,48 @@ app.get('/api/bookings', apiLimiter, (req, res) => {
 });
 
 // Assign a real guest name to a booking (also renames the Nuki code)
+// Occupancy calendar: bookings of one month, occupancy rate and free gaps for the next 120 days
+app.get('/api/calendar', apiLimiter, (req, res) => {
+    try {
+        const today = berlinToday();
+        const month = /^\d{4}-\d{2}$/.test(String(req.query.month || '')) ? req.query.month : today.slice(0, 7);
+        const first = `${month}-01`;
+        const next = addDays(first, 32).slice(0, 7) + '-01';
+        const daysInMonth = nightsBetween(first, next);
+        const all = loadBookingRows();
+
+        const bookings = all.filter(r => r.checkin < next && r.checkout > first)
+            .sort((a, b) => a.checkin.localeCompare(b.checkin));
+        const booked = new Set();
+        bookings.forEach(r => {
+            for (let d = r.checkin < first ? first : r.checkin; d < r.checkout && d < next; d = addDays(d, 1)) booked.add(d);
+        });
+
+        // Gaps between stays from today on; touching or overlapping stays are merged first
+        const horizon = addDays(today, 120);
+        const stays = all.filter(r => r.checkout > today && r.checkin < horizon)
+            .map(r => [r.checkin < today ? today : r.checkin, r.checkout])
+            .sort((a, b) => a[0].localeCompare(b[0]));
+        const gaps = [];
+        let free = today;
+        stays.forEach(([from, to]) => {
+            if (from > free) gaps.push({ from: free, to: from, nights: nightsBetween(free, from), open: false });
+            if (to > free) free = to;
+        });
+        if (free < horizon) gaps.push({ from: free, to: horizon, nights: nightsBetween(free, horizon), open: true });
+
+        res.json({
+            success: true, today, month, first, daysInMonth,
+            bookings,
+            occupancy: { nights: booked.size, days: daysInMonth, rate: Math.round(booked.size / daysInMonth * 100) },
+            gaps
+        });
+    } catch (e) {
+        console.error('Calendar API Error:', e.message);
+        res.status(500).json({ success: false, error: 'Kalender konnte nicht geladen werden' });
+    }
+});
+
 app.put('/api/bookings/:id/guest', apiLimiter, async (req, res) => {
     try {
         const id = parseInt(req.params.id, 10);
@@ -1709,7 +1745,6 @@ app.delete('/api/nuki/pin/:bookingId', apiLimiter, async (req, res) => {
                 const allSettings = db.getAllSettings();
                 const nuki = allSettings.nuki;
                 if (nuki && nuki.token && nuki.lockId) {
-                    const axios = require('axios');
                     const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
                     const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
                         headers: { 'Authorization': `Bearer ${nuki.token}`, 'Accept': 'application/json' }
@@ -1809,8 +1844,7 @@ app.post('/api/nuki/test', apiLimiter, async (req, res) => {
     if (!token || !lockId) return res.status(400).json({ error: 'Token und LockID benötigt' });
 
     try {
-        const ax = require('axios');
-        const response = await ax.get(`https://api.nuki.io/smartlock/${lockId}`, {
+        const response = await axios.get(`https://api.nuki.io/smartlock/${lockId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json'
@@ -1883,7 +1917,7 @@ app.get('/api/invoices/:id/pdf', apiLimiter, async (req, res) => {
 
         const filename = `Rechnung-${(data.rNummer || invoice.invoice_number || 'download').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
         res.download(filePath, filename, (err) => {
-            require('fs').unlink(filePath, () => { });
+            fs.unlink(filePath, () => { });
             if (err && !res.headersSent) {
                 res.status(500).json({ error: 'Download fehlgeschlagen' });
             }
@@ -2640,7 +2674,6 @@ app.post('/api/calendar/fetch', apiLimiter, async (req, res) => {
 // =======================
 app.get('/api/changelog', (req, res) => {
     try {
-        const fs = require('fs');
         const changelogPath = path.join(__dirname, 'changelog.json');
         if (fs.existsSync(changelogPath)) {
             const data = JSON.parse(fs.readFileSync(changelogPath, 'utf8'));
