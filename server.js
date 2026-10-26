@@ -575,6 +575,7 @@ cron.schedule('*/15 * * * *', () => {
 // "stuck" if the lock still has not removed it after STUCK_MS.
 const NUKI_DELETE_RETRY_MS = 6 * 60 * 60 * 1000;
 const NUKI_DELETE_STUCK_MS = 24 * 60 * 60 * 1000;
+const NUKI_DELETE_FORGET_MS = 30 * 24 * 60 * 60 * 1000;
 
 async function cleanupExpiredNukiCodes() {
     const settings = db.getAllSettings();
@@ -597,10 +598,17 @@ async function cleanupExpiredNukiCodes() {
     let failed = 0;
     let confirmed = 0;
 
-    // Requests the lock has completed (entry gone from the list) -> forget them
+    // Requests the lock has completed (entry gone from the list) -> mark them done. They are kept for a
+    // while because Nuki Web sometimes lists an already deleted code again; such a reappearing entry is
+    // then only deleted again silently instead of being reported as a new expired code over and over.
     const liveIds = new Set(auths.map(a => String(a.id)));
+    const liveCodes = new Set(auths.filter(a => a.code !== undefined && a.code !== null && String(a.code) !== '').map(a => String(a.code)));
     for (const id of Object.keys(state)) {
-        if (!liveIds.has(id)) { delete state[id]; confirmed++; }
+        const req = state[id];
+        if (liveIds.has(id)) continue;
+        if (!req || typeof req !== 'object') { delete state[id]; continue; }
+        if (!req.gone) { req.gone = now; confirmed++; }
+        else if (now - req.gone >= NUKI_DELETE_FORGET_MS) delete state[id];
     }
 
     for (const a of auths) {
@@ -620,7 +628,8 @@ async function cleanupExpiredNukiCodes() {
         const label = `${a.name} (bis ${formatDateDE(a.allowedUntilDate)})`;
 
         if (req) {
-            // Delete already requested - waiting for the lock to sync
+            // Delete already requested - waiting for the lock to sync (or the entry showed up again)
+            if (req.gone) { delete req.gone; req.ts = now; req.warned = true; }
             if (now - req.ts >= NUKI_DELETE_STUCK_MS && !req.warned) {
                 req.warned = true;
                 stuck.push(label);
@@ -651,12 +660,18 @@ async function cleanupExpiredNukiCodes() {
         }
     }
 
-    // Bookings whose code is no longer present in Nuki (deleted by hand): drop the stale reference
+    // Past bookings whose code is no longer present in Nuki (deleted by hand or by the lock): drop the
+    // stale reference. Also covers bookings that only kept the PIN (authId lookup failed on creation),
+    // which otherwise stayed visible as "door code" forever.
     const stale = db.getDb().prepare(
-        "SELECT id, nuki_auth_id FROM bookings WHERE nuki_auth_id IS NOT NULL AND nuki_auth_id != '' AND checkout < ?"
+        `SELECT id, nuki_auth_id, nuki_pin FROM bookings
+         WHERE ((nuki_auth_id IS NOT NULL AND nuki_auth_id != '') OR (nuki_pin IS NOT NULL AND nuki_pin != ''))
+           AND checkout < ?`
     ).all(todayYmd);
     for (const b of stale) {
-        if (!liveIds.has(String(b.nuki_auth_id))) {
+        const authLive = b.nuki_auth_id && liveIds.has(String(b.nuki_auth_id));
+        const pinLive = !b.nuki_auth_id && b.nuki_pin && liveCodes.has(String(b.nuki_pin));
+        if (!authLive && !pinLive) {
             db.clearNukiAuth(b.id);
             db.getDb().prepare('UPDATE bookings SET nuki_pin = NULL WHERE id = ?').run(b.id);
         }
