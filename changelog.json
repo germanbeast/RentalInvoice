@@ -1,6 +1,23 @@
 {
-    "currentVersion": "1.12.4",
+    "currentVersion": "1.13.0",
     "releases": [
+        {
+            "version": "1.13.0",
+            "date": "2026-10-26",
+            "title": "Belegungskalender, Dashboard nach Gast-Löschen, Aufräumen",
+            "features": [
+                "Buchungen: Umschalter „Liste / Kalender“; der Kalender zeigt Monat für Monat alle Aufenthalte farbig nach Portal, Doppelbuchungen rot umrandet",
+                "Auslastung des Monats in Prozent und eine Liste freier Lücken der nächsten 120 Tage (kurze Lücken markiert)"
+            ],
+            "fixes": [
+                "Nach dem Löschen eines Gastes zählten Umsatz, Rechnungsanzahl und Diagramm im Dashboard ihn weiter mit; jetzt nicht mehr (die Rechnung bleibt im Archiv)",
+                "Manuelle Buchungen eines gelöschten Gastes werden mitgelöscht und verschwinden aus der Heute-Übersicht; alte Reste werden beim Start entfernt",
+                "Das Umsatz-Diagramm wurde nach dem ersten Laden nicht mehr aktualisiert",
+                "„Nächte“ statt „Nachte“ in Rechnung und App",
+                "Fehlende Abhängigkeit multer ergänzt (Neuinstallation startete sonst nicht), ungenutzte Abhängigkeit cors entfernt",
+                "Aufgeräumt: alte Hilfsskripte (u. a. eines, das das Admin-Passwort auf „admin“ zurücksetzte) und rund 440 Android-Build-Dateien aus dem Repository entfernt"
+            ]
+        },
         {
             "version": "1.12.4",
             "date": "2026-10-25",

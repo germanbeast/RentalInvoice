@@ -166,6 +166,10 @@ function initSchema() {
         console.log('✅ Migration: arrived_at Spalte zu bookings hinzugefügt.');
     }
 
+    // Leftovers of guests deleted before v1.13.0: manual bookings without guest and without door code
+    const orphans = db.prepare("DELETE FROM bookings WHERE uid LIKE 'manual-%' AND guest_id IS NULL AND nuki_auth_id IS NULL").run();
+    if (orphans.changes) console.log(`🧹 ${orphans.changes} verwaiste manuelle Buchung(en) gelöscht.`);
+
     // Estate Management Tables
     db.exec(`
         CREATE TABLE IF NOT EXISTS estate_mileage (
@@ -456,7 +460,13 @@ function updateGuest(id, data) {
 }
 
 function deleteGuest(id) {
-    return getDb().prepare('DELETE FROM guests WHERE id = ?').run(id);
+    const db = getDb();
+    return db.transaction(() => {
+        // Manual bookings (Telegram PIN flow) belong to the guest only; calendar bookings stay
+        // because they still exist at Booking.com/Airbnb and only lose the name (ON DELETE SET NULL).
+        db.prepare("DELETE FROM bookings WHERE guest_id = ? AND uid LIKE 'manual-%'").run(id);
+        return db.prepare('DELETE FROM guests WHERE id = ?').run(id);
+    })();
 }
 
 function findOrCreateGuest(name, email, address) {
@@ -654,7 +664,7 @@ function getStats() {
     const revenueByMonth = db.prepare(`
         SELECT strftime('%Y-%m', invoice_date) as month, SUM(total_amount) as total
         FROM invoices
-        WHERE invoice_date >= date('now', '-12 months')
+        WHERE invoice_date >= date('now', '-12 months') AND guest_id IS NOT NULL
         GROUP BY month
         ORDER BY month ASC
     `).all();
@@ -671,9 +681,9 @@ function getStats() {
     // Key metrics
     const totals = db.prepare(`
         SELECT 
-            (SELECT SUM(total_amount) FROM invoices) as total_revenue,
+            (SELECT SUM(total_amount) FROM invoices WHERE guest_id IS NOT NULL) as total_revenue,
             (SELECT SUM(amount) FROM expenses) as total_expenses,
-            (SELECT COUNT(*) FROM invoices) as invoice_count,
+            (SELECT COUNT(*) FROM invoices WHERE guest_id IS NOT NULL) as invoice_count,
             (SELECT COUNT(*) FROM guests) as guest_count
     `).get();
 

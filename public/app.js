@@ -399,7 +399,7 @@
 
         if (nights > 0) {
             badge.style.display = 'inline-flex';
-            text.textContent = `${nights} Nacht${nights !== 1 ? 'e' : ''}`;
+            text.textContent = `${nights} ${nights !== 1 ? 'Nächte' : 'Nacht'}`;
         } else {
             badge.style.display = 'none';
         }
@@ -456,7 +456,7 @@
             const nights = calcNights(anreise, abreise);
             let aufenthaltText = '—';
             if (anreise && abreise) {
-                aufenthaltText = `${formatDate(anreise)} – ${formatDate(abreise)} (${nights} Nacht${nights !== 1 ? 'e' : ''})`;
+                aufenthaltText = `${formatDate(anreise)} – ${formatDate(abreise)} (${nights} ${nights !== 1 ? 'Nächte' : 'Nacht'})`;
             }
             $('#inv-aufenthalt').textContent = aufenthaltText;
 
@@ -1481,7 +1481,78 @@
     let bookingsQuery = '';
     let bookingsData = [];
 
+    // ---- Belegungskalender
+    let bookingsMode = 'list';
+    let calMonth = null; // 'YYYY-MM', null = current month
+    const ymdAdd = (ymd, n) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+    const monthShift = (ym, n) => ymdAdd(`${ym}-15`, n * 30).slice(0, 7);
+    const nightsTxt = n => `${n} ${n === 1 ? 'Nacht' : 'Nächte'}`;
+
+    function setBookingsMode(mode) {
+        bookingsMode = mode;
+        $$('#bookings-mode button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+        const cal = mode === 'calendar';
+        $('#bookings-calendar').style.display = cal ? 'block' : 'none';
+        $('#bookings-list').style.display = cal ? 'none' : '';
+        $('#view-bookings .bookings-toolbar').style.display = cal ? 'none' : '';
+        loadBookings();
+    }
+
+    async function loadCalendar() {
+        const grid = $('#occ-grid');
+        try {
+            const d = await apiJson('/api/calendar' + (calMonth ? `?month=${calMonth}` : ''));
+            if (!d.success) { grid.innerHTML = '<div class="bookings-empty">Kalender konnte nicht geladen werden.</div>'; return; }
+            calMonth = d.month;
+            renderCalendar(d);
+        } catch (e) {
+            grid.innerHTML = '<div class="bookings-empty">Keine Verbindung zum Server.</div>';
+        }
+    }
+
+    function renderCalendar(d) {
+        const [y, m] = d.month.split('-').map(Number);
+        $('#occ-title').textContent = new Date(y, m - 1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+        $('#occ-rate').textContent = `Auslastung ${d.occupancy.rate} % · ${d.occupancy.nights} von ${d.occupancy.days} Nächten`;
+
+        const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Monday first
+        const cells = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<div class="occ-wd">${w}</div>`);
+        for (let i = 0; i < lead; i++) cells.push('<div class="occ-day blank"></div>');
+        for (let i = 0; i < d.daysInMonth; i++) {
+            const day = ymdAdd(d.first, i);
+            const nights = d.bookings.filter(b => b.checkin <= day && day < b.checkout);
+            const departs = d.bookings.filter(b => b.checkout === day);
+            const cls = ['occ-day'];
+            if (day === d.today) cls.push('today');
+            if (day < d.today) cls.push('past');
+            if (nights.length > 1) cls.push('conflict');
+            const weekStart = (lead + i) % 7 === 0;
+            const bars = nights.map(b => {
+                const start = b.checkin === day;
+                const label = start || weekStart || i === 0;
+                const name = b.name || `${srcLabel(b.source)}-Buchung`;
+                const tip = `${name} · ${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)} · ${nightsTxt(b.nights)}`;
+                return `<div class="occ-bar ${srcClass(b.source)}${start ? ' start' : ''}${ymdAdd(day, 1) === b.checkout ? ' end' : ''}" title="${escapeHtml(tip)}">${label ? escapeHtml(name) : '&nbsp;'}</div>`;
+            }).join('');
+            const out = departs.length && !nights.length ? '<div class="occ-out">Abreise</div>' : '';
+            cells.push(`<div class="${cls.join(' ')}"><span class="occ-num">${i + 1}</span>${bars}${out}</div>`);
+        }
+        $('#occ-grid').innerHTML = cells.join('');
+
+        $('#occ-gaps').innerHTML = d.gaps.length ? d.gaps.map(g => `
+            <div class="today-row"><span>${weekdayDE(g.from)} ${fmtDEfull(g.from)} – ${g.open ? 'offen' : weekdayDE(g.to) + ' ' + fmtDEfull(g.to)}${!g.open && g.nights <= 2 ? '<span class="tag dep">kurz</span>' : ''}</span>
+            <small>${g.open ? 'ab hier frei' : nightsTxt(g.nights)}</small></div>`).join('')
+            : '<div class="today-empty">Keine freien Nächte in den nächsten 120 Tagen.</div>';
+    }
+
+    $$('#bookings-mode button').forEach(btn => btn.addEventListener('click', () => setBookingsMode(btn.dataset.mode)));
+    const occNav = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => { fn(); loadCalendar(); }); };
+    occNav('#occ-prev', () => { calMonth = monthShift(calMonth, -1); });
+    occNav('#occ-next', () => { calMonth = monthShift(calMonth, 1); });
+    occNav('#occ-today', () => { calMonth = null; });
+
     async function loadBookings() {
+        if (bookingsMode === 'calendar') return loadCalendar();
         const list = $('#bookings-list');
         if (!list) return;
         $$('#bookings-filter button').forEach(b => b.classList.toggle('active', b.dataset.filter === bookingsFilter));
@@ -1506,7 +1577,7 @@
                     <div class="booking-name">${b.needsName ? '<span class="booking-noname">❓ Name fehlt</span>' : escapeHtml(b.name)}<span class="src ${srcClass(b.source)}">${escapeHtml(srcLabel(b.source))}</span></div>
                     <div class="booking-sub">${stateTxt}</div>
                 </div>
-                <div><div>${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)}</div><div class="booking-sub">${b.nights} Nacht${b.nights === 1 ? '' : 'e'}</div></div>
+                <div><div>${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)}</div><div class="booking-sub">${nightsTxt(b.nights)}</div></div>
                 <div class="booking-sub">${code}</div>
                 <div class="booking-actions">
                     <button class="btn-mini" data-act="name">${b.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
@@ -1650,6 +1721,8 @@
             return d ? d.total : 0;
         });
 
+        // Chart.js refuses to draw on a canvas that is still in use, so the old chart has to go first
+        if (window.myRevenueChart) window.myRevenueChart.destroy();
         window.myRevenueChart = new Chart(ctx, {
             type: 'bar',
             data: {
