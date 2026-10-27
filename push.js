@@ -3,13 +3,14 @@
  *
  *  - VAPID keys are generated once and stored in setting `push_vapid` (never sent to the browser except the public key)
  *  - Subscriptions live in table push_subscriptions, one row per device/browser
- *  - mode 'bookings': only booking related messages (new booking, cancellation, double booking)
+ *  - mode 'bookings': only important messages (new booking, cancellation, double booking, lock warnings)
  *    mode 'all':      everything that also goes to Telegram/WhatsApp
  */
 
 const webpush = require('web-push');
 
 const BOOKING_TYPES = new Set(['new_booking', 'booking_cancelled', 'overlap_warning', 'cancel_guard']);
+const IMPORTANT_TYPES = new Set([...BOOKING_TYPES, 'nuki_unlocked', 'nuki_battery']);
 const MAX_FAILS = 5; // drop a subscription after this many consecutive non-permanent failures
 
 function createPush({ db }) {
@@ -122,7 +123,7 @@ function createPush({ db }) {
         if (!ready) return false;
         let rows = sql().prepare('SELECT * FROM push_subscriptions').all();
         if (opts.only) rows = rows.filter(r => r.id === opts.only);
-        else rows = rows.filter(r => r.mode === 'all' || BOOKING_TYPES.has(type));
+        else rows = rows.filter(r => r.mode === 'all' || IMPORTANT_TYPES.has(type));
         if (rows.length === 0) return false;
 
         const payload = { ...toPayload(message), url: opts.url || (BOOKING_TYPES.has(type) ? '/?view=bookings' : '/'), tag: opts.tag };

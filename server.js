@@ -271,7 +271,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }) }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied() }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -400,8 +400,8 @@ const bookingMonitor = require('./booking-monitor')({
     deleteNukiPin: (authId) => deleteNukiPin(authId),
     botLogic: require('./bot-logic'),
     formatDateDE: (d) => formatDateDE(d),
-    notify: async (msg, type) => {
-        const sent = await sendToAllRecipients(msg, { type });
+    notify: async (msg, type, opts = {}) => {
+        const sent = await sendToAllRecipients(msg, { ...opts, type });
         db.logNotification(type, msg, sent ? 'sent' : 'failed');
     }
 });
@@ -718,9 +718,10 @@ async function runNukiCleanup() {
 
 cron.schedule('10 * * * *', runNukiCleanup);
 
-// Job 1c: detect first use of a guest's door code (every 10 minutes)
-cron.schedule('*/10 * * * *', () => {
-    bookingMonitor.checkArrivals().catch(e => console.error('\u274c Anreise-Erkennung Fehler:', e.message));
+// Job 1c: detect first use of a guest's door code, then watch the lock (batteries, "not locked") - every 10 minutes
+cron.schedule('*/10 * * * *', async () => {
+    await bookingMonitor.checkArrivals().catch(e => console.error('\u274c Anreise-Erkennung Fehler:', e.message));
+    await bookingMonitor.checkLock().catch(e => console.error('\u274c Schloss-Überwachung Fehler:', e.message));
 });
 setTimeout(runNukiCleanup, 90 * 1000);
 
@@ -911,18 +912,29 @@ if (!process.env.SESSION_SECRET) {
     console.warn('⚠️  Kein SESSION_SECRET in .env gesetzt! Zufälliger Key wird verwendet.');
 }
 
+// Logins live in SQLite so they survive restarts. "Angemeldet bleiben" extends a session to 30 days,
+// otherwise it ends after 8 hours without activity (rolling: every request extends it).
+const SESSION_MS = 8 * 60 * 60 * 1000;
+const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
 app.use(session({
     secret: sessionSecret,
     name: '__sid',
+    store: require('./session-store')(session, db),
     resave: false,
+    rolling: true,
     saveUninitialized: false,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         sameSite: 'strict',
-        maxAge: 8 * 60 * 60 * 1000
+        maxAge: SESSION_MS
     }
 }));
+
+function startUserSession(req, user, remember) {
+    req.session.user = user;
+    req.session.cookie.maxAge = remember ? REMEMBER_MS : SESSION_MS;
+}
 
 app.disable('x-powered-by');
 
@@ -1020,6 +1032,7 @@ app.get('/api/health', (req, res) => {
 // =======================
 app.post('/api/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
+    const remember = req.body.remember === true;
 
     if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
         return res.status(400).json({ success: false, message: 'Ung\u00fcltige Eingabe' });
@@ -1054,6 +1067,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
         pending2FA.set(sessionId, {
             code,
             username: user.username,
+            remember,
             expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
         });
 
@@ -1070,7 +1084,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             // Fallback: skip 2FA if WhatsApp send fails
             return req.session.regenerate((err) => {
                 if (err) return res.status(500).json({ success: false, message: 'Server-Fehler' });
-                req.session.user = { username: user.username, role: user.role };
+                startUserSession(req, { username: user.username, role: user.role }, remember);
                 res.json({ success: true, user: req.session.user });
             });
         }
@@ -1089,7 +1103,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             console.error('Session regeneration error:', err);
             return res.status(500).json({ success: false, message: 'Server-Fehler' });
         }
-        req.session.user = { username: user.username, role: user.role };
+        startUserSession(req, { username: user.username, role: user.role }, remember);
         res.json({ success: true, user: req.session.user });
     });
 });
@@ -1125,7 +1139,7 @@ app.post('/api/login/verify', loginLimiter, (req, res) => {
             console.error('Session regeneration error:', err);
             return res.status(500).json({ success: false, message: 'Server-Fehler' });
         }
-        req.session.user = { id: user.id, username: user.username, role: user.role };
+        startUserSession(req, { id: user.id, username: user.username, role: user.role }, entry.remember);
         res.json({ success: true, user: req.session.user });
     });
 });
@@ -1142,7 +1156,7 @@ app.post('/api/login/recover', loginLimiter, (req, res) => {
         const user = db.getUser(username);
         req.session.regenerate((err) => {
             if (err) return res.status(500).json({ success: false, message: 'Server-Fehler' });
-            req.session.user = { id: user.id, username: user.username, role: user.role };
+            startUserSession(req, { id: user.id, username: user.username, role: user.role }, req.body.remember === true);
             res.json({ success: true, message: 'Wiederherstellung erfolgreich', user: req.session.user });
         });
     } else {

@@ -104,6 +104,9 @@
     }
 
     function showLogin() {
+        // In the installed phone app staying logged in is the expected default
+        const remember = $('#login-remember');
+        if (remember && (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true)) remember.checked = true;
         loginScreen.style.display = 'flex';
         appWrapper.style.display = 'none';
         appWrapper.classList.remove('authenticated');
@@ -129,6 +132,7 @@
         const password = $('#login-pass').value;
         const code = $('#login-2fa').value;
         const recoveryKey = $('#login-recovery').value;
+        const remember = $('#login-remember').checked;
         const loginBtn = $('#btn-login');
 
         const originalBtnText = loginBtn.innerHTML;
@@ -140,7 +144,7 @@
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ username, password, remember })
                 });
                 const data = await response.json();
 
@@ -179,7 +183,7 @@
                 const rRes = await fetch('/api/login/recover', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, recoveryKey })
+                    body: JSON.stringify({ username, recoveryKey, remember })
                 });
                 const rData = await rRes.json();
                 if (rData.success) {
@@ -3217,7 +3221,7 @@
             <div class="info-row" style="flex-wrap: wrap; gap: 0.5rem; align-items: center;">
                 <span style="flex: 1 1 12rem;">
                     <strong>${escapeHtml(d.label || 'Gerät')}</strong>${d.endpointHash === myHash ? ' <span class="badge">dieses Gerät</span>' : ''}<br>
-                    <small class="text-muted">${escapeHtml(d.username || '')} · seit ${escapeHtml(fmtDEfull(String(d.createdAt || '').slice(0, 10)))} · ${d.mode === 'all' ? 'alle Meldungen' : 'nur Buchungen'}</small>
+                    <small class="text-muted">${escapeHtml(d.username || '')} · seit ${escapeHtml(fmtDEfull(String(d.createdAt || '').slice(0, 10)))} · ${d.mode === 'all' ? 'alle Meldungen' : 'nur Wichtiges'}</small>
                 </span>
                 <button type="button" class="btn btn-ghost btn-sm" data-push-test="${d.id}">Test senden</button>
                 <button type="button" class="btn btn-ghost btn-sm" data-push-remove="${d.id}">Entfernen</button>

@@ -4,12 +4,16 @@
         {
             "version": "1.14.0",
             "date": "2026-10-26",
-            "title": "Handy-App mit Push-Benachrichtigung bei neuer Buchung",
+            "title": "Handy-App mit Push, angemeldet bleiben, Nuki-Warnungen und Fernbedienung",
             "features": [
                 "Die Verwaltung lässt sich als App auf dem Handy installieren (iPhone: Safari → Teilen → „Zum Home-Bildschirm“, Android: Chrome → „App installieren“)",
                 "Push-Benachrichtigung aufs Handy, sobald eine neue Buchung von Booking.com oder Airbnb erkannt wird – auch bei Storno und Doppelbuchung",
                 "Einstellungen → „Handy-App & Push“: Gerät aktivieren, Test senden, Geräte verwalten; pro Gerät wählbar „nur Buchungen“ oder „alle Meldungen“",
-                "Tippen auf die Meldung öffnet direkt die Buchungsliste"
+                "Tippen auf die Meldung öffnet direkt die Buchungsliste",
+                "Beim Login „Angemeldet bleiben (30 Tage)“ – in der Handy-App schon vorausgewählt; ein Update oder Neustart meldet niemanden mehr ab",
+                "Nuki: Warnung, wenn die Batterie des Schlosses schwach oder fast leer ist (auch Keypad und Türsensor)",
+                "Nuki: Warnung, wenn die Wohnung 30 Minuten nicht abgeschlossen ist, obwohl gerade kein Gast da ist – mit Knopf „Jetzt abschließen“",
+                "Telegram: /schloss zeigt Status und Batterie, /zu schließt ab, /auf schließt nach Rückfrage auf oder öffnet die Tür"
             ],
             "fixes": []
         },

@@ -75,7 +75,7 @@ function mainMenuKeyboard() {
         [btn('🧾 Neue Rechnung', 'new:invoice'), btn('🔑 Nur Tür-Code', 'new:pin')],
         [btn('🔐 Türcodes', 'codes'), btn('📅 Anreisen', 'arrivals')],
         [btn('🔄 Kalender abfragen', 'sync'), btn('📋 Offene Rechnungen', 'open')],
-        [btn('❓ Hilfe', 'help')]
+        [btn('🚪 Schloss', 'lock:status'), btn('❓ Hilfe', 'help')]
     ]);
 }
 
@@ -154,6 +154,9 @@ async function showHelp(bot, chatId) {
         '• <code>/namen</code> – Gastnamen zu Buchungen nachtragen\n' +
         '• <code>/sync</code> – Booking.com &amp; Airbnb jetzt abfragen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
+        '• <code>/schloss</code> – Schloss-Status und Batterie\n' +
+        '• <code>/zu</code> – Tür abschließen\n' +
+        '• <code>/auf</code> – Tür aufschließen/öffnen (mit Rückfrage)\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
         'Du kannst gleich alles in eine Nachricht schreiben, z.B.\n' +
@@ -349,6 +352,66 @@ async function runSync(bot, chatId) {
         : '\nKeine neuen Buchungen.';
     if (r.adjusted && r.adjusted.length) text += `\n🔧 ${r.adjusted.length} Türcode-Zeitraum angepasst.`;
     return send(bot, chatId, text, keyboard([[btn('🔐 Türcodes', 'codes'), btn('🏠 Hauptmenü', 'menu')]]));
+}
+
+// ---------------------------------------------------------------------------
+// Schloss: Status, /zu, /auf (mit Rückfrage)
+// ---------------------------------------------------------------------------
+const LOCK_CMD_RE = /^\/(auf|zu|schloss|tür|tuer)(?:@\w+)?$/i;
+
+function lockKeyboard() {
+    return keyboard([
+        [btn('🔒 Abschließen', 'lock:zu'), btn('🔓 Aufschließen …', 'lock:auf')],
+        [btn('🔄 Aktualisieren', 'lock:status'), btn('🏠 Hauptmenü', 'menu')]
+    ]);
+}
+
+async function showLockStatus(bot, chatId, intro) {
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    let lock;
+    try {
+        lock = await botLogic.getNukiLock();
+    } catch (e) {
+        return send(bot, chatId, `❌ <b>Schloss-Status nicht verfügbar</b>\n${esc(e.message)}`, menuOnlyKeyboard());
+    }
+    const icon = lock.locked ? '🔒' : lock.unlocked ? '🔓' : '🚪';
+    let battery = lock.battery !== null ? `${lock.battery} %` : (lock.batteryCritical ? 'fast leer' : 'ok');
+    if (lock.batteryCritical) battery = `🪫 ${battery} – bitte tauschen`;
+    if (lock.batteryCharging) battery += ' (lädt)';
+    let text = (intro ? `${intro}\n\n` : '') +
+        `<b>${icon} Schloss: ${esc(lock.lockText)}</b>\n` +
+        (lock.doorText ? `🚪 ${esc(lock.doorText)}\n` : '') +
+        `Batterie: ${esc(battery)}\n`;
+    if (lock.keypadBatteryCritical) text += '🪫 Keypad-Batterie fast leer\n';
+    if (lock.doorsensorBatteryCritical) text += '🪫 Türsensor-Batterie fast leer\n';
+    text += `Gast im Haus: ${hooks.isOccupied && hooks.isOccupied() ? 'ja' : 'nein'}`;
+    return send(bot, chatId, text, lockKeyboard());
+}
+
+async function confirmUnlock(bot, chatId) {
+    return send(bot, chatId,
+        '⚠️ <b>Tür wirklich aus der Ferne öffnen?</b>\n\n' +
+        '🔓 <b>Aufschließen</b>: Schloss geht auf, die Tür bleibt zu, bis jemand sie aufdrückt.\n' +
+        '🚪 <b>Öffnen</b>: aufschließen und Falle ziehen – die Tür springt auf.',
+        keyboard([
+            [btn('🔓 Aufschließen', 'lock:auf!'), btn('🚪 Öffnen', 'lock:open!')],
+            [btn('❌ Abbrechen', 'lock:status')]
+        ]));
+}
+
+async function runLockAction(bot, chatId, action, who) {
+    const labels = { lock: 'abschließen', unlock: 'aufschließen', unlatch: 'öffnen' };
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    try {
+        await botLogic.nukiLockAction(action);
+    } catch (e) {
+        return send(bot, chatId, `❌ <b>Konnte nicht ${labels[action]}</b>\n${esc(e.message)}`, lockKeyboard());
+    }
+    console.log(`🔐 Schloss ${labels[action]} per Telegram (${who || chatId})`);
+    try { db.logNotification('nuki_remote', `Schloss ${labels[action]} per Telegram (${who || chatId})`, 'sent'); } catch (e) { /* log only */ }
+    // The lock needs a few seconds to execute the command and report back to Nuki Web
+    await new Promise(r => setTimeout(r, 8000));
+    return showLockStatus(bot, chatId, `✅ Befehl „${labels[action]}“ an das Schloss gesendet.`);
 }
 
 async function showArrivals(bot, chatId) {
@@ -828,6 +891,16 @@ async function processMessage(bot, msg) {
         return showMenu(bot, chatId);
     }
 
+    // Schloss-Befehle nur mit Schrägstrich, damit kein Freitext versehentlich die Tür bedient
+    const lockCmd = body.match(LOCK_CMD_RE);
+    if (lockCmd) {
+        if (active) await cancelSession(bot, chatId, active, true);
+        const c = lockCmd[1].toLowerCase();
+        if (c === 'zu') return runLockAction(bot, chatId, 'lock', msg.from && (msg.from.username || msg.from.first_name));
+        if (c === 'auf') return confirmUnlock(bot, chatId);
+        return showLockStatus(bot, chatId);
+    }
+
     let cmd = detectCommand(body);
     // Im laufenden Dialog gelten nur echte Slash-Befehle als Befehle - sonst könnte eine Antwort
     // wie "Status Quo" als Name versehentlich einen Befehl auslösen.
@@ -964,6 +1037,7 @@ async function processCallback(bot, q) {
     }
 
     await answer();
+    const who = q.from && (q.from.username || q.from.first_name);
 
     try {
         switch (true) {
@@ -983,6 +1057,21 @@ async function processCallback(bot, q) {
                 return runSync(bot, chatId);
             case data === 'names':
                 return showNamesOpen(bot, chatId);
+            case data === 'lock:status':
+                return showLockStatus(bot, chatId);
+            case data === 'lock:zu':
+                return runLockAction(bot, chatId, 'lock', who);
+            case data === 'lock:auf':
+                return confirmUnlock(bot, chatId);
+            case data === 'lock:auf!':
+            case data === 'lock:open!':
+                // Remove the confirmation buttons so a second tap cannot trigger it again
+                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+                // An old confirmation lying around in the chat must not open the door days later
+                if (!q.message || Date.now() / 1000 - q.message.date > 5 * 60) {
+                    return send(bot, chatId, '⏱ Die Rückfrage ist abgelaufen. Bitte noch einmal <code>/auf</code> senden.', lockKeyboard());
+                }
+                return runLockAction(bot, chatId, data === 'lock:auf!' ? 'unlock' : 'unlatch', who);
             case data.startsWith('nm:'):
                 return startNameFlow(bot, chatId, parseInt(data.slice(3), 10));
             case data.startsWith('inv:'):
@@ -1057,6 +1146,9 @@ async function setup(bot, options = {}) {
             { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },
             { command: 'anreisen', description: 'Kommende Buchungen anzeigen' },
+            { command: 'schloss', description: 'Schloss-Status und Batterie' },
+            { command: 'zu', description: 'Tür abschließen' },
+            { command: 'auf', description: 'Tür aufschließen (mit Rückfrage)' },
             { command: 'abbrechen', description: 'Aktuellen Vorgang abbrechen' },
             { command: 'hilfe', description: 'Hilfe anzeigen' }
         ]);

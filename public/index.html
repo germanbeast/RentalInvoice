@@ -53,6 +53,9 @@
                     <label for="login-recovery">Wiederherstellungscode (Recovery Key)</label>
                     <input type="text" id="login-recovery" placeholder="16-stelliger Code">
                 </div>
+                <label for="login-remember" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; font-size: 0.9rem;">
+                    <input type="checkbox" id="login-remember"> Angemeldet bleiben (30 Tage)
+                </label>
                 <button type="submit" id="btn-login" class="btn btn-primary btn-block">Anmelden</button>
                 <div style="margin-top: 1rem; text-align: center; font-size: 0.85rem;">
                     <a href="#" id="link-show-recovery" style="color: var(--text-muted); text-decoration: none;">Zugang
@@ -1809,7 +1812,7 @@
                                     <div class="form-group" id="push-mode-group">
                                         <label for="push-mode">Benachrichtigen bei</label>
                                         <select id="push-mode">
-                                            <option value="bookings">Neue Buchung, Storno, Doppelbuchung</option>
+                                            <option value="bookings">Wichtigem: Buchung, Storno, Doppelbuchung, Schloss</option>
                                             <option value="all">Allem, was auch per Telegram kommt</option>
                                         </select>
                                     </div>
