@@ -5,6 +5,20 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-10-28
+
+### Hinzugefügt
+- Öffentliche Gäste-Webseite unter `/gast/`: Beschreibung, Bilder, Ausstattung, Belegungskalender (ohne Namen) und Preisberechnung aus „Preise & Gebühren“
+- Buchungsanfragen über die Webseite; Benachrichtigung per Telegram/WhatsApp, Bestätigen/Ablehnen/Stornieren im Admin unter „Webseite“, E-Mails an den Gast über SMTP
+- Bestätigte Direktbuchungen werden als Buchung (Quelle „Direkt“) angelegt und bekommen automatisch einen Nuki-Türcode
+- Gäste-Login mit Buchungscode + Anreisedatum; jede Buchung erhält einen Code (`bookings.guest_code`), Airbnb-Gäste können auch ihren HM-Code nutzen
+- Statusseite für Gäste: Stand der Anfrage, Aufenthaltsdaten, Zahlungsinfos, Anreise-Infos, optional Türcode X Tage vor Anreise; Portal-Gäste können Namen, Kontakt und Ankunftszeit ergänzen
+- „Gastlink“-Knopf bei jeder Buchung kopiert eine fertige Nachricht mit Link und Code für den Booking.com-/Airbnb-Chat
+- iCal-Export der Direktbuchungen zum Import in Booking.com und Airbnb
+
+### Geändert
+- Kalender-Sperren aus Booking.com/Airbnb mit exakt den Daten einer Direktbuchung werden nicht als neue Buchung angelegt (gespiegelte Sperre)
+
 ## [1.13.3] - 2026-10-26
 
 ### Behoben

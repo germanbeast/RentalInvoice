@@ -2637,6 +2637,7 @@ input[type="checkbox"]:focus-visible {
 .occ-dot.booking, .occ-bar.booking { background: rgba(56,189,248,.25); color: var(--accent); }
 .occ-dot.airbnb, .occ-bar.airbnb { background: rgba(248,113,113,.25); color: #f87171; }
 .occ-dot.manual, .occ-bar.manual { background: rgba(148,163,184,.25); color: var(--text-secondary); }
+.occ-dot.direct, .occ-bar.direct { background: rgba(52,211,153,.25); color: var(--accent-green); }
 .occ-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .occ-wd { text-align: center; font-size: .72rem; text-transform: uppercase; color: var(--text-muted); padding: 4px 0; }
 .occ-day { min-height: 74px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -2714,3 +2715,24 @@ input[type="checkbox"]:focus-visible {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ---------- Gäste-Webseite (Admin) ---------- */
+.nav-badge { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: #f87171; color: #fff; font-size: .7rem; font-style: normal; line-height: 18px; text-align: center; }
+.site-pane { display: flex; flex-direction: column; gap: 16px; }
+.site-card textarea, .site-card input[type="text"], .site-card input[type="url"], .site-card input[type="number"], .site-card input[type="time"] { width: 100%; }
+.site-save { align-self: flex-start; }
+.site-photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: .5rem; }
+.site-photo { position: relative; width: 140px; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-hover); }
+.site-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.site-photo .site-photo-actions { position: absolute; inset: auto 4px 4px 4px; display: flex; justify-content: space-between; gap: 4px; }
+.site-photo .btn-mini { padding: 2px 8px; background: rgba(15,23,42,.8); }
+.site-photo.cover::after { content: 'Titelbild'; position: absolute; top: 4px; left: 4px; font-size: .68rem; padding: 1px 6px; border-radius: 6px; background: var(--accent); color: #0b1120; }
+.req-card { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1.4fr) auto; gap: 14px; align-items: start; padding: 14px 16px; }
+.req-card .req-msg { grid-column: 1 / -1; font-size: .85rem; color: var(--text-secondary); white-space: pre-line; }
+.req-status { display: inline-block; font-size: .7rem; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
+.req-status.pending { background: rgba(251,191,36,.15); color: #fbbf24; }
+.req-status.confirmed { background: rgba(52,211,153,.15); color: var(--accent-green); }
+.req-status.declined, .req-status.cancelled { background: rgba(248,113,113,.15); color: #f87171; }
+.req-conflict { color: #f87171; font-size: .8rem; margin-top: 4px; }
+.src.direct { background: rgba(52,211,153,.15); color: var(--accent-green); }
+@media (max-width: 768px) { .req-card { grid-template-columns: 1fr; } }

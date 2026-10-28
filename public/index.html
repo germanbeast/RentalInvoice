@@ -97,6 +97,15 @@
                     </svg>
                     <span>Buchungen</span>
                 </button>
+                <button class="sidebar-item" id="nav-website" title="Gäste-Webseite">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="2" y1="12" x2="22" y2="12" />
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                    <span>Webseite <i class="nav-badge" id="website-badge" hidden></i></span>
+                </button>
                 <button class="sidebar-item active" id="nav-invoice" title="Neue Rechnung">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                         <path d="M4 3h8l4 4v10a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor"
@@ -292,6 +301,7 @@
                         <span><i class="occ-dot booking"></i>Booking.com</span>
                         <span><i class="occ-dot airbnb"></i>Airbnb</span>
                         <span><i class="occ-dot manual"></i>Manuell</span>
+                        <span><i class="occ-dot direct"></i>Direkt</span>
                     </div>
                     <div class="occ-grid" id="occ-grid"></div>
                     <div class="card occ-gaps">
@@ -308,6 +318,83 @@
                     <input type="search" id="bookings-search" placeholder="Suchen (Name, Datum, Portal)">
                 </div>
                 <div id="bookings-list" class="bookings-list"></div>
+            </div>
+
+            <!-- VIEW: GÄSTE-WEBSEITE -->
+            <div id="view-website" class="content-view" style="display:none;">
+                <div class="content-header">
+                    <div class="content-breadcrumb">
+                        <h2>Gäste-Webseite</h2>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            Öffentliche Seite unter <a href="/gast/" target="_blank" rel="noopener" id="site-link" style="color: var(--accent);">/gast/</a> – Anfragen, Texte, Bilder
+                        </p>
+                    </div>
+                    <div class="seg" id="website-tabs">
+                        <button type="button" data-tab="requests" class="active">Anfragen</button>
+                        <button type="button" data-tab="content">Inhalte</button>
+                        <button type="button" data-tab="setup">Einrichtung</button>
+                    </div>
+                </div>
+
+                <div class="site-pane" data-pane="requests">
+                    <div id="site-requests" class="bookings-list"></div>
+                </div>
+
+                <div class="site-pane" data-pane="content" style="display:none;">
+                    <div class="card site-card">
+                        <div class="form-group"><label for="site-title">Titel</label><input type="text" id="site-title" maxlength="120"></div>
+                        <div class="form-group"><label for="site-tagline">Untertitel</label><input type="text" id="site-tagline" maxlength="200" placeholder="z. B. Ruhige 2-Zimmer-Wohnung mit Garten, 5 Min. zum See"></div>
+                        <div class="form-group"><label for="site-description">Beschreibung</label><textarea id="site-description" rows="6"></textarea></div>
+                        <div class="form-group"><label for="site-features">Ausstattung <small>(eine Zeile pro Punkt)</small></label><textarea id="site-features" rows="5" placeholder="WLAN&#10;Voll ausgestattete Küche&#10;Parkplatz"></textarea></div>
+                        <div class="form-group"><label for="site-location">Lage &amp; Adresse</label><textarea id="site-location" rows="3"></textarea></div>
+                        <div class="form-group"><label for="site-house-rules">Hausregeln</label><textarea id="site-house-rules" rows="4"></textarea></div>
+                        <div class="form-group"><label for="site-arrival-info">Anreise-Infos <small>(nur für angemeldete Gäste mit bestätigter Buchung sichtbar)</small></label><textarea id="site-arrival-info" rows="5" placeholder="Parken, Schlüssel / Türcode, WLAN, Müll …"></textarea></div>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Bilder</div>
+                        <p class="text-muted" style="font-size:.85rem">Das erste Bild ist das große Titelbild. Bis zu 12 Bilder (JPEG, PNG, WebP, max. 8 MB).</p>
+                        <div class="site-photos" id="site-photos"></div>
+                        <label class="btn-mini" style="display:inline-block;margin-top:.5rem">+ Bild hochladen<input type="file" id="site-photo-input" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
+                    </div>
+                    <div class="card site-card">
+                        <div class="form-group"><label for="site-imprint">Impressum</label><textarea id="site-imprint" rows="5" placeholder="Name, Anschrift, Kontakt (Pflicht für Webseiten in Deutschland)"></textarea></div>
+                        <div class="form-group"><label for="site-privacy">Datenschutzerklärung</label><textarea id="site-privacy" rows="6"></textarea></div>
+                    </div>
+                    <button type="button" class="btn btn-primary site-save">Speichern</button>
+                </div>
+
+                <div class="site-pane" data-pane="setup" style="display:none;">
+                    <div class="card site-card">
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem"><input type="checkbox" id="site-enabled"> Webseite ist öffentlich erreichbar</label>
+                        <div class="form-group"><label for="site-public-url">Öffentliche Adresse der Webseite <small>(für Links in E-Mails, z. B. https://beckhome.de/gast)</small></label><input type="url" id="site-public-url" placeholder="https://…/gast"></div>
+                        <div class="form-row form-row-3">
+                            <div class="form-group"><label for="site-max-guests">Max. Gäste</label><input type="number" id="site-max-guests" min="1" max="30"></div>
+                            <div class="form-group"><label for="site-min-nights">Mindestnächte</label><input type="number" id="site-min-nights" min="1" max="30"></div>
+                            <div class="form-group"><label for="site-lead-days">Vorlauf (Tage)</label><input type="number" id="site-lead-days" min="0" max="60"></div>
+                        </div>
+                        <div class="form-row form-row-3">
+                            <div class="form-group"><label for="site-checkin">Anreise ab</label><input type="time" id="site-checkin"></div>
+                            <div class="form-group"><label for="site-checkout">Abreise bis</label><input type="time" id="site-checkout"></div>
+                            <div class="form-group"><label for="site-pin-days">Türcode zeigen <small>(Tage vor Anreise, 0 = nie)</small></label><input type="number" id="site-pin-days" min="0" max="30"></div>
+                        </div>
+                        <p class="text-muted" style="font-size:.85rem">Preise kommen aus Einstellungen → Preise &amp; Gebühren (Preis pro Nacht + Endreinigung).</p>
+                        <div class="form-group"><label for="site-payment-info">Zahlungshinweis für Direktbuchungen</label><textarea id="site-payment-info" rows="2"></textarea></div>
+                        <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="site-show-bank"> Bankverbindung (aus Einstellungen) bei bestätigten Direktbuchungen zeigen</label>
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="site-show-contact"> Telefon und E-Mail (Vermieter-Daten) auf der Webseite zeigen</label>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Direktbuchungen in Booking.com &amp; Airbnb sperren</div>
+                        <p style="font-size:.88rem">Diesen Kalender-Link in Booking.com (Kalender → Kalender synchronisieren → importieren) und in Airbnb (Verfügbarkeit → Kalender importieren) eintragen. Dann sind bestätigte Direktbuchungen dort automatisch blockiert.</p>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap"><input type="text" id="site-ical-url" readonly style="flex:1;min-width:220px"><button type="button" class="btn-mini" id="site-ical-copy">Kopieren</button></div>
+                        <p class="text-muted" style="font-size:.82rem;margin-top:.5rem">Der Server muss dafür aus dem Internet erreichbar sein.</p>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Gäste von Booking.com &amp; Airbnb</div>
+                        <p style="font-size:.88rem">Jede Buchung hat einen Buchungscode. Unter <b>Buchungen</b> gibt es bei jeder Buchung den Knopf <b>Gastlink</b>: Er kopiert eine fertige Nachricht mit Link und Code, die du dem Gast über den Booking.com- oder Airbnb-Chat schickst. Airbnb-Gäste können sich auch mit ihrem Airbnb-Code (HM…) anmelden.</p>
+                        <p class="text-muted" style="font-size:.82rem" id="site-smtp-hint"></p>
+                    </div>
+                    <button type="button" class="btn btn-primary site-save">Speichern</button>
+                </div>
             </div>
 
             <div id="view-estate" class="content-view" style="display:none;">

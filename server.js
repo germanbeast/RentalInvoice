@@ -430,6 +430,9 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
         const summary = feed.source === 'Airbnb' ? `Airbnb: ${rawSummary}` : rawSummary;
 
         const existing = db.getBookingByUid(ev.uid);
+        // A direct booking from the guest website imported into the portal comes back as a block with the
+        // exact same dates -> that is our own booking, not a new stay (no second door code)
+        if (!existing && db.getDb().prepare("SELECT 1 FROM bookings WHERE source = 'Direkt' AND checkin = ? AND checkout = ?").get(checkin, checkout)) continue;
         const result = db.upsertBooking({
             uid: ev.uid,
             summary,
@@ -972,6 +975,23 @@ app.get('/api/welcome', (req, res) => {
 app.use('/styles.css', express.static(path.join(PUBLIC_DIR, 'styles.css')));
 app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
 
+// Public guest website (description, availability, booking requests, guest login + status)
+const guestPortal = require('./guest-portal')({
+    express, rateLimit, db, nodemailer, multer,
+    botLogic: require('./bot-logic'),
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg);
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    },
+    createNukiPin: (arrival, departure, name) => createNukiPin(arrival, departure, name),
+    deleteNukiPin: (authId) => deleteNukiPin(authId),
+    berlinToday: () => berlinToday(),
+    addDays: (ymd, n) => addDays(ymd, n),
+    nightsBetween: (a, b) => nightsBetween(a, b),
+    formatDateDE: (d) => formatDateDE(d)
+});
+app.use('/gast', guestPortal.router);
+
 app.use(ensureAuthenticated);
 
 // =======================
@@ -1231,8 +1251,9 @@ function nightsBetween(a, b) {
 }
 
 function loadBookingRows() {
+    guestPortal.ensureGuestCodes();
     const rows = db.getDb().prepare(`
-        SELECT b.id, b.uid, b.summary, b.checkin, b.checkout, b.source, b.nuki_pin, b.nuki_auth_id,
+        SELECT b.id, b.uid, b.summary, b.checkin, b.checkout, b.source, b.nuki_pin, b.nuki_auth_id, b.guest_code,
                b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email
         FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
         WHERE b.checkin IS NOT NULL AND b.checkout IS NOT NULL
@@ -1252,10 +1273,14 @@ function loadBookingRows() {
             id: r.id, source, name: needsName ? '' : name, needsName,
             checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout),
             hasCode: !!(r.nuki_auth_id || r.nuki_pin), pin: r.nuki_pin || null,
-            arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state
+            arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state,
+            guestCode: r.guest_code || null
         };
     });
 }
+
+// Guest website admin: settings, photos, booking requests
+guestPortal.registerAdminRoutes(app, apiLimiter);
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {

@@ -50,6 +50,8 @@
     const viewEstate = $('#view-estate');
     const viewBookings = $('#view-bookings');
     const navBookings = $('#nav-bookings');
+    const viewWebsite = $('#view-website');
+    const navWebsite = $('#nav-website');
 
     const modalSettings = $('#modal-settings');
     const toastContainer = $('#toast-container');
@@ -118,6 +120,7 @@
             updatePreview();
         }, 10);
         init(); // Start the app
+        refreshSiteBadge();
     }
 
     let loginStep = 'credentials'; // 'credentials', '2fa', 'recovery'
@@ -1343,6 +1346,8 @@
             refresh = loadExpenses;
         } else if (viewId === 'bookings') {
             refresh = () => { if (!document.querySelector('#bookings-list input')) loadBookings(); };
+        } else if (viewId === 'website') {
+            refresh = () => { if (siteTab === 'requests' && !document.querySelector('#site-requests input')) loadSiteRequests(); };
         }
         // 'invoice' view has no background data to poll
         // Skip refreshes while the tab is hidden (saves CPU/battery on weak devices)
@@ -1356,8 +1361,8 @@
     });
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1388,6 +1393,10 @@
             viewEstate.style.display = 'flex';
             navEstate.classList.add('active');
             loadEstateData();
+        } else if (viewId === 'website') {
+            viewWebsite.style.display = 'flex';
+            navWebsite.classList.add('active');
+            loadWebsite();
         }
 
         startViewPolling(viewId);
@@ -1403,6 +1412,7 @@
     navExpenses.addEventListener('click', () => switchView('expenses'));
     if (navBookings) navBookings.addEventListener('click', () => switchView('bookings'));
     if (navEstate) navEstate.addEventListener('click', () => switchView('estate'));
+    if (navWebsite) navWebsite.addEventListener('click', () => switchView('website'));
 
     if (navWelcome) {
         navWelcome.addEventListener('click', () => {
@@ -1420,7 +1430,7 @@
     const fmtDE = ymd => ymd ? ymd.split('-').reverse().join('.').slice(0, 6) : '';
     const fmtDEfull = ymd => ymd ? ymd.split('-').reverse().join('.') : '';
     const weekdayDE = ymd => ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(ymd + 'T12:00:00').getDay()];
-    const srcClass = s => /airbnb/i.test(s) ? 'airbnb' : (s === 'manual' ? 'manual' : 'booking');
+    const srcClass = s => /airbnb/i.test(s) ? 'airbnb' : (s === 'manual' ? 'manual' : s === 'Direkt' ? 'direct' : 'booking');
     const srcLabel = s => s === 'manual' ? 'Manuell' : s;
 
     async function apiJson(url, opts) {
@@ -1588,9 +1598,10 @@
                     <div class="booking-sub">${stateTxt}</div>
                 </div>
                 <div><div>${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)}</div><div class="booking-sub">${nightsTxt(b.nights)}</div></div>
-                <div class="booking-sub">${code}</div>
+                <div class="booking-sub">${code}${b.guestCode ? `<br>Gastcode ${escapeHtml(b.guestCode)}` : ''}</div>
                 <div class="booking-actions">
                     <button class="btn-mini" data-act="name">${b.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
+                    ${b.state !== 'past' && b.guestCode ? '<button class="btn-mini" data-act="guestlink" title="Nachricht mit Link und Buchungscode für den Gast kopieren">Gastlink</button>' : ''}
                     <button class="btn-mini" data-act="invoice">Rechnung erstellen</button>
                 </div>
             </div>`;
@@ -1642,6 +1653,7 @@
             const b = bookingsData.find(x => String(x.id) === card.dataset.id);
             if (!b) return;
             if (btn.dataset.act === 'name') startNameEdit(card, b);
+            else if (btn.dataset.act === 'guestlink') copyGuestMessage(b);
             else invoiceFromBooking(b);
         });
         $$('#bookings-filter button').forEach(btn => btn.addEventListener('click', () => { bookingsFilter = btn.dataset.filter; loadBookings(); }));
@@ -1649,6 +1661,216 @@
         const searchEl = $('#bookings-search');
         if (searchEl) searchEl.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { bookingsQuery = searchEl.value.trim(); loadBookings(); }, 250); });
     }
+
+    // =======================
+    // Gäste-Webseite (Anfragen, Inhalte, Einrichtung)
+    // =======================
+    let siteTab = 'requests';
+    let siteData = null;
+    let siteRequests = [];
+
+    async function copyText(text) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            const ok = document.execCommand('copy'); ta.remove(); return ok;
+        }
+    }
+
+    async function copyGuestMessage(b) {
+        try {
+            const d = await apiJson(`/api/site/guest-message/${b.id}`);
+            if (!d.success) return showToast('Gastlink nicht verfügbar', 'error');
+            if (await copyText(d.text)) showToast(`Nachricht mit Code ${d.code} kopiert – im Portal-Chat einfügen`, 'success', 5000);
+            else window.prompt('Nachricht kopieren:', d.text);
+        } catch (e) { showToast('Gastlink nicht verfügbar', 'error'); }
+    }
+
+    async function refreshSiteBadge() {
+        try {
+            const d = await apiJson('/api/site/requests');
+            const badge = $('#website-badge');
+            if (!badge || !d.success) return;
+            badge.textContent = d.pending;
+            badge.hidden = !d.pending;
+            siteRequests = d.requests;
+        } catch (e) { /* badge stays */ }
+    }
+    setInterval(() => { if (!document.hidden && appWrapper.classList.contains('authenticated')) refreshSiteBadge(); }, 60000);
+
+    function setSiteTab(tab) {
+        siteTab = tab;
+        $$('#website-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        $$('#view-website .site-pane').forEach(p => { p.style.display = p.dataset.pane === tab ? 'flex' : 'none'; });
+    }
+    $$('#website-tabs button').forEach(b => b.addEventListener('click', () => setSiteTab(b.dataset.tab)));
+
+    async function loadWebsite() {
+        setSiteTab(siteTab);
+        loadSiteRequests();
+        try {
+            const d = await apiJson('/api/site/settings');
+            if (!d.success) return;
+            siteData = d.site;
+            fillSiteForm(d);
+        } catch (e) { showToast('Webseiten-Einstellungen konnten nicht geladen werden', 'error'); }
+    }
+
+    const SITE_FIELDS = {
+        title: '#site-title', tagline: '#site-tagline', description: '#site-description', features: '#site-features',
+        location: '#site-location', house_rules: '#site-house-rules', arrival_info: '#site-arrival-info',
+        imprint: '#site-imprint', privacy: '#site-privacy', public_url: '#site-public-url',
+        max_guests: '#site-max-guests', min_nights: '#site-min-nights', lead_days: '#site-lead-days',
+        checkin_time: '#site-checkin', checkout_time: '#site-checkout', pin_days: '#site-pin-days', payment_info: '#site-payment-info'
+    };
+    const SITE_CHECKS = { enabled: '#site-enabled', show_bank: '#site-show-bank', show_contact: '#site-show-contact' };
+
+    function fillSiteForm(d) {
+        const s = d.site;
+        Object.entries(SITE_FIELDS).forEach(([k, sel]) => { const el = $(sel); if (el) el.value = s[k] == null ? '' : s[k]; });
+        Object.entries(SITE_CHECKS).forEach(([k, sel]) => { const el = $(sel); if (el) el.checked = !!s[k]; });
+        const base = s.public_url ? s.public_url.replace(/\/gast$/, '') : location.origin;
+        $('#site-ical-url').value = base + d.icalPath;
+        $('#site-link').href = s.public_url ? s.public_url + '/' : '/gast/';
+        $('#site-smtp-hint').textContent = d.smtpReady
+            ? 'E-Mails an Gäste (Eingangsbestätigung, Zusage, Absage) werden über dein SMTP-Konto verschickt.'
+            : 'Hinweis: Ohne E-Mail-Einstellungen (SMTP) bekommen Gäste keine E-Mails. Sie sehen den Stand dann nur auf der Webseite.';
+        renderSitePhotos();
+    }
+
+    function renderSitePhotos() {
+        const photos = (siteData && siteData.photos) || [];
+        $('#site-photos').innerHTML = photos.length ? photos.map((f, i) => `
+            <div class="site-photo${i === 0 ? ' cover' : ''}" data-file="${escapeHtml(f)}">
+                <img src="/api/site/photo/${encodeURIComponent(f)}" alt="">
+                <div class="site-photo-actions">
+                    ${i > 0 ? '<button type="button" class="btn-mini" data-ph="up" title="Nach vorne">◀</button>' : '<span></span>'}
+                    <button type="button" class="btn-mini" data-ph="del" title="Löschen">✕</button>
+                </div>
+            </div>`).join('') : '<div class="text-muted" style="font-size:.85rem">Noch keine Bilder.</div>';
+    }
+
+    $('#site-photos').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-ph]');
+        if (!btn) return;
+        const file = btn.closest('.site-photo').dataset.file;
+        let d;
+        if (btn.dataset.ph === 'del') {
+            if (!confirm('Bild löschen?')) return;
+            d = await apiJson(`/api/site/photos/${encodeURIComponent(file)}`, { method: 'DELETE' });
+        } else {
+            const order = siteData.photos.slice();
+            const i = order.indexOf(file);
+            [order[i - 1], order[i]] = [order[i], order[i - 1]];
+            d = await apiJson('/api/site/photos/order', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: order }) });
+        }
+        if (d && d.success) { siteData.photos = d.photos; renderSitePhotos(); }
+        else showToast('Aktion fehlgeschlagen', 'error');
+    });
+
+    $('#site-photo-input').addEventListener('change', async e => {
+        for (const file of Array.from(e.target.files || [])) {
+            const fd = new FormData();
+            fd.append('photo', file);
+            try {
+                const d = await apiJson('/api/site/photos', { method: 'POST', body: fd });
+                if (d.success) { siteData.photos = d.photos; renderSitePhotos(); }
+                else showToast(d.error || 'Upload fehlgeschlagen', 'error');
+            } catch (x) { showToast('Upload fehlgeschlagen', 'error'); }
+        }
+        e.target.value = '';
+    });
+
+    $$('#view-website .site-save').forEach(btn => btn.addEventListener('click', async () => {
+        const site = {};
+        Object.entries(SITE_FIELDS).forEach(([k, sel]) => { site[k] = $(sel).value; });
+        Object.entries(SITE_CHECKS).forEach(([k, sel]) => { site[k] = $(sel).checked; });
+        try {
+            const d = await apiJson('/api/site/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site }) });
+            if (d.success) { siteData = d.site; showToast('Webseite gespeichert', 'success'); loadWebsite(); }
+            else showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+        } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
+    }));
+
+    $('#site-ical-copy').addEventListener('click', async () => {
+        if (await copyText($('#site-ical-url').value)) showToast('Kalender-Link kopiert', 'success');
+    });
+
+    async function loadSiteRequests() {
+        const list = $('#site-requests');
+        try {
+            const d = await apiJson('/api/site/requests');
+            if (!d.success) { list.innerHTML = '<div class="bookings-empty">Anfragen konnten nicht geladen werden.</div>'; return; }
+            siteRequests = d.requests;
+            const badge = $('#website-badge');
+            if (badge) { badge.textContent = d.pending; badge.hidden = !d.pending; }
+            renderSiteRequests();
+        } catch (e) { list.innerHTML = '<div class="bookings-empty">Keine Verbindung zum Server.</div>'; }
+    }
+
+    const REQ_STATUS = { pending: 'Offen', confirmed: 'Bestätigt', declined: 'Abgelehnt', cancelled: 'Storniert' };
+
+    function renderSiteRequests() {
+        const list = $('#site-requests');
+        if (!siteRequests.length) {
+            list.innerHTML = '<div class="bookings-empty">Noch keine Anfragen über die Webseite.</div>';
+            return;
+        }
+        list.innerHTML = siteRequests.map(r => {
+            const guests = `${r.adults} Erw.${r.children ? ` + ${r.children} Kind${r.children === 1 ? '' : 'er'}` : ''}`;
+            const actions = r.status === 'pending'
+                ? `<button class="btn-mini" data-req="confirm">Bestätigen</button><button class="btn-mini" data-req="decline">Ablehnen</button>`
+                : r.status === 'confirmed' ? `<button class="btn-mini" data-req="cancel">Stornieren</button>` : '';
+            return `<div class="card req-card" data-id="${r.id}">
+                <div>
+                    <div class="booking-name">${escapeHtml(r.name)}<span class="req-status ${r.status}">${REQ_STATUS[r.status] || r.status}</span></div>
+                    <div class="booking-sub">${escapeHtml(r.email)}${r.phone ? ' · ' + escapeHtml(r.phone) : ''}</div>
+                    <div class="booking-sub">Code ${escapeHtml(r.code)} · angefragt ${new Date(r.created_at.replace(' ', 'T') + 'Z').toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                </div>
+                <div>
+                    <div>${fmtDEfull(r.checkin)} – ${fmtDEfull(r.checkout)}</div>
+                    <div class="booking-sub">${nightsTxt(r.nights)} · ${guests}${r.price_total ? ' · ' + formatCurrency(r.price_total) : ''}</div>
+                    ${r.conflict ? `<div class="req-conflict">⚠️ Belegt durch ${escapeHtml(r.conflict.source)} (${fmtDEfull(r.conflict.checkin)} – ${fmtDEfull(r.conflict.checkout)})</div>` : ''}
+                </div>
+                <div class="booking-actions">${actions}</div>
+                ${r.message ? `<div class="req-msg">💬 ${escapeHtml(r.message)}</div>` : ''}
+                ${r.host_note ? `<div class="req-msg">↪ ${escapeHtml(r.host_note)}</div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    $('#site-requests').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-req]');
+        if (!btn) return;
+        const r = siteRequests.find(x => String(x.id) === btn.closest('.req-card').dataset.id);
+        if (!r) return;
+        const act = btn.dataset.req;
+        const body = {};
+        if (act === 'confirm') {
+            const price = prompt(`Buchung von ${r.name} bestätigen.\n\nGesamtpreis in € (leer lassen = ${r.price_total ? formatCurrency(r.price_total) : 'kein Preis'}):`, '');
+            if (price === null) return;
+            if (price.trim()) body.price = parseFloat(price.replace(',', '.'));
+            const note = prompt('Optionale Nachricht an den Gast (erscheint in der E-Mail und auf der Webseite):', '');
+            if (note === null) return;
+            body.note = note;
+        } else if (act === 'decline') {
+            const note = prompt(`Anfrage von ${r.name} ablehnen.\n\nOptionale Nachricht an den Gast:`, '');
+            if (note === null) return;
+            body.note = note;
+        } else if (act === 'cancel') {
+            if (!confirm(`Direktbuchung von ${r.name} (${fmtDEfull(r.checkin)} – ${fmtDEfull(r.checkout)}) stornieren?\nDer Zeitraum wird wieder frei und der Türcode gelöscht. Der Gast bekommt keine automatische E-Mail.`)) return;
+        }
+        btn.disabled = true;
+        try {
+            const d = await apiJson(`/api/site/requests/${r.id}/${act}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (d.success) {
+                const msg = act === 'confirm' ? `Buchung bestätigt${d.pin ? ` – Türcode ${d.pin}` : ''}${d.mailed ? ' – E-Mail an Gast gesendet' : ''}`
+                    : act === 'decline' ? `Anfrage abgelehnt${d.mailed ? ' – E-Mail an Gast gesendet' : ''}` : 'Buchung storniert';
+                showToast(msg, 'success', 5000);
+            } else showToast(d.error || 'Aktion fehlgeschlagen', 'error', 6000);
+        } catch (x) { showToast('Aktion fehlgeschlagen', 'error'); }
+        loadSiteRequests();
+    });
 
     // ---- Verbindungsstatus (Punkte in den Einstellungen)
     async function loadStatusDots(refresh) {

@@ -73,7 +73,7 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
         for (const [a, b] of fresh) {
             const identical = a.checkin === b.checkin && a.checkout === b.checkout;
             const msg = identical
-                ? `⚠️ *Gleicher Zeitraum in Booking.com und Airbnb*\n` +
+                ? `⚠️ *Gleicher Zeitraum in ${sourceOf(a)} und ${sourceOf(b)}*\n` +
                   `• ${sourceOf(a)}: ${nameOf(a)} (${period(a)})\n• ${sourceOf(b)}: ${nameOf(b)} (${period(b)})\n` +
                   `Vermutlich ist ein Kalender mit dem anderen verknüpft (gespiegelte Sperre) – dann ist es *eine* Buchung und es gibt evtl. zwei Türcodes. Bitte prüfen.`
                 : `🚨 *Mögliche Doppelbuchung!*\n` +
