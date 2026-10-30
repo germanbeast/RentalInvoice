@@ -12,6 +12,11 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Nach einer Direktanfrage landet der Gast automatisch angemeldet auf der neuen Seite
 - Links in E-Mails, im Gastlink und alte Lesezeichen auf `#status` führen auf die neue Seite
 
+## [1.17.1] - 2026-10-30
+
+### Behoben
+- Rechnung: Empfänger (Name und Anschrift des Gastes) fehlte in Vorschau, Druck, E-Mail-PDF und Paperless-PDF, weil das Web-Layout den Block per CSS ausblendete. Die Anschrift steht jetzt über der Anrede.
+
 ## [1.17.0] - 2026-10-30
 
 ### Geändert
