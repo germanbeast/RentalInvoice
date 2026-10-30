@@ -120,15 +120,8 @@
                 parts.push(`<div class="info-block"><h4>Zahlung</h4><div class="prose">${esc(s.payment.text)}</div>
                     ${s.payment.bank ? `<div class="note prose" style="margin-top:.6rem">${esc(s.payment.bank)}\nVerwendungszweck: ${esc(s.payment.reference)}</div>` : ''}</div>`);
             }
-            if (s.pin) {
-                parts.push(`<div class="info-block"><h4>Ihr Türcode</h4><div class="pin">${esc(s.pin)}</div>
-                    <p class="fine" style="text-align:left">Gültig ab Anreisetag ${esc(s.checkinTime)} Uhr bis Abreisetag ${esc(s.checkoutTime)} Uhr. Code eingeben und mit der Taste bestätigen.</p></div>`);
-            } else if (s.pinLater) {
-                parts.push(`<div class="info-block"><h4>Ihr Türcode</h4><p>Ihr persönlicher Türcode erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise.</p></div>`);
-            }
-            if (s.arrivalInfo && s.state !== 'past') parts.push(`<div class="info-block"><h4>Anreise</h4><div class="prose">${esc(s.arrivalInfo)}</div></div>`);
-            if (s.location && s.state !== 'past') parts.push(`<div class="info-block"><h4>Adresse &amp; Lage</h4><div class="prose">${esc(s.location)}</div></div>`);
-            if (s.houseRules && s.state !== 'past') parts.push(`<div class="info-block"><h4>Hausregeln</h4><div class="prose">${esc(s.houseRules)}</div></div>`);
+            if (s.state !== 'past') parts.push(guideHtml(s));
+            parts.push(invoiceHtml(s));
 
             if (s.kind === 'booking' && s.state !== 'past') {
                 const dt = s.details || {};
@@ -156,6 +149,124 @@
         return `<div class="status-card">${parts.join('')}</div>`;
     }
 
+    const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg>';
+
+    // Guest folder: everything a guest needs on site, door code first
+    function guideHtml(s) {
+        const items = [];
+        if (s.pin) {
+            items.push(`<section class="guide-item guide-pin"><h4>Ihr Türcode</h4><div class="pin">${esc(s.pin)}</div>
+                <p class="guide-fine">Gültig ab Anreisetag ${esc(s.checkinTime)} Uhr bis Abreisetag ${esc(s.checkoutTime)} Uhr. Code eingeben und mit der Taste bestätigen.</p></section>`);
+        } else if (s.pinLater) {
+            items.push(`<section class="guide-item guide-pin"><h4>Ihr Türcode</h4>
+                <p>Ihr persönlicher Türcode erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise${s.daysUntil > s.pinLater ? `, also ab ${fmt(addDays(s.checkin, -s.pinLater))}` : ''}.</p></section>`);
+        }
+        if (s.wifi) {
+            items.push(`<section class="guide-item"><h4>WLAN</h4>
+                <dl class="guide-dl"><div><dt>Netzwerk</dt><dd>${esc(s.wifi.name)}</dd></div>
+                ${s.wifi.password ? `<div><dt>Passwort</dt><dd><span class="mono-ish">${esc(s.wifi.password)}</span>
+                    <button type="button" class="copy-btn" data-copy="${esc(s.wifi.password)}">${COPY_ICON}<span>Kopieren</span></button></dd></div>` : ''}</dl></section>`);
+        }
+        items.push(`<section class="guide-item"><h4>An- &amp; Abreise</h4>
+            <dl class="guide-dl"><div><dt>Anreise</dt><dd>${fmt(s.checkin)}, ab ${esc(s.checkinTime)} Uhr</dd></div>
+            <div><dt>Abreise</dt><dd>${fmt(s.checkout)}, bis ${esc(s.checkoutTime)} Uhr</dd></div></dl>
+            ${s.arrivalInfo ? `<div class="prose">${esc(s.arrivalInfo)}</div>` : ''}</section>`);
+        if (s.location) {
+            const q = encodeURIComponent(s.location.split('\n').slice(0, 3).join(', '));
+            items.push(`<section class="guide-item"><h4>Adresse</h4><div class="prose">${esc(s.location)}</div>
+                <a class="text-link" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">In Google Maps öffnen</a></section>`);
+        }
+        if (s.parking) items.push(`<section class="guide-item"><h4>Parken</h4><div class="prose">${esc(s.parking)}</div></section>`);
+        if (s.houseRules) items.push(`<section class="guide-item"><h4>Hausregeln</h4><div class="prose">${esc(s.houseRules)}</div></section>`);
+        (s.guide || []).forEach(g => items.push(`<section class="guide-item"><h4>${esc(g.title)}</h4><div class="prose">${esc(g.text)}</div></section>`));
+        return `<div class="guide"><div class="guide-head"><h3>Ihre Gästemappe</h3><p>Alles für Ihren Aufenthalt an einem Ort.</p></div>
+            <div class="guide-grid">${items.join('')}</div></div>`;
+    }
+
+    // Existing invoice: download + correction request. Otherwise the guest can create it once.
+    function invoiceHtml(s) {
+        const inv = s.invoice;
+        if (inv) {
+            return `<div class="info-block"><div class="invoice-row">
+                <div><h4>Rechnung</h4><p>Nr. ${esc(inv.number)}${inv.date ? ` vom ${new Date(inv.date + 'T12:00:00').toLocaleDateString('de-DE')}` : ''} · ${inv.paid ? 'bezahlt' : 'offen'}</p></div>
+                <div class="invoice-action"><button type="button" class="btn btn-ghost btn-small" data-invoice>Als PDF herunterladen</button>
+                <div class="form-error" id="invoice-error" hidden></div></div></div>
+                <button type="button" class="link-btn" data-toggle="invoice-fix-form">Etwas stimmt nicht? Korrektur anfragen</button>
+                <form id="invoice-fix-form" class="invoice-form" novalidate hidden>
+                    <p class="guide-fine">Eine erstellte Rechnung können Sie nicht mehr selbst ändern. Schreiben Sie uns, was falsch ist. Wir korrigieren die Rechnung und melden uns.</p>
+                    <label>Was soll geändert werden?<textarea name="text" rows="3" maxlength="1000" required></textarea></label>
+                    <div class="form-error" id="invoice-fix-error" hidden></div>
+                    <button type="submit" class="btn btn-ghost btn-small">Anfrage senden</button><span class="saved" id="invoice-fix-saved" hidden>Gesendet, wir melden uns.</span>
+                </form></div>`;
+        }
+        const o = s.invoiceOffer;
+        if (!o) return '';
+        const lines = o.positions.map(p => `<div><span>${p.qty > 1 ? `${p.qty} × ` : ''}${esc(p.desc)}${p.qty > 1 ? ` à ${money(p.price)}` : ''}</span><span>${money(p.qty * p.price)}</span></div>`).join('');
+        return `<div class="info-block"><h4>Rechnung</h4>
+            <p>Sie brauchen eine Rechnung? Ergänzen Sie Ihre Rechnungsdaten. Danach können Sie die Rechnung sofort als PDF herunterladen.</p>
+            <button type="button" class="btn btn-dark btn-small" data-toggle="invoice-form">Rechnungsdaten eingeben</button>
+            <form id="invoice-form" class="invoice-form" novalidate hidden>
+                <label>Vor- und Nachname<input type="text" name="name" maxlength="80" autocomplete="name" value="${esc(o.name)}" required></label>
+                <label>Firma <small>optional, nur für Firmenrechnungen</small><input type="text" name="company" maxlength="120" autocomplete="organization"></label>
+                <label>Straße und Hausnummer<input type="text" name="street" maxlength="120" autocomplete="street-address" required></label>
+                <div class="row">
+                    <label>PLZ<input type="text" name="zip" maxlength="10" autocomplete="postal-code" required></label>
+                    <label>Ort<input type="text" name="city" maxlength="80" autocomplete="address-level2" required></label>
+                </div>
+                <div class="row">
+                    <label>Land<input type="text" name="country" maxlength="60" autocomplete="country-name" value="Deutschland"></label>
+                    <label>USt-IdNr. <small>optional</small><input type="text" name="vatId" maxlength="20" placeholder="z. B. DE123456789"></label>
+                </div>
+                <div class="invoice-sum">${lines}
+                    <div class="invoice-total"><span>Gesamtbetrag${o.mwstRate ? ` inkl. ${o.mwstRate} % MwSt.` : ''}</span><span>${money(o.total)}</span></div>
+                    <p>${o.paid ? `Bereits bezahlt über ${esc(s.source)}.` : 'Zahlung per Überweisung, die Bankverbindung steht auf der Rechnung.'}</p>
+                </div>
+                <label class="check"><input type="checkbox" name="confirm" required> Meine Angaben stimmen. Danach kann ich die Rechnung nicht mehr selbst ändern.</label>
+                <div class="form-error" id="invoice-form-error" hidden></div>
+                <button type="submit" class="btn btn-dark btn-small">Rechnung erstellen</button>
+            </form></div>`;
+    }
+
+    function addDays(ymd, n) {
+        const d = new Date(ymd + 'T12:00:00');
+        d.setDate(d.getDate() + n);
+        return d.toISOString().slice(0, 10);
+    }
+
+    async function copyText(text) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fallback below */ }
+        const t = document.createElement('textarea');
+        t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+        document.body.appendChild(t); t.select();
+        const ok = document.execCommand('copy');
+        t.remove();
+        return ok;
+    }
+
+    async function downloadInvoice(btn) {
+        const err = $('#invoice-error');
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Wird erstellt …';
+        showError(err, '');
+        try {
+            const r = await fetch('api/me/rechnung', { credentials: 'same-origin' });
+            if (!r.ok) throw new Error(await r.text().catch(() => '') || 'Download fehlgeschlagen.');
+            const blob = await r.blob();
+            const name = (/filename="?([^";]+)"?/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'Rechnung.pdf';
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        } catch (e) {
+            showError(err, e.message.length < 200 ? e.message : 'Download fehlgeschlagen.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = label;
+        }
+    }
+
     function contactHtml(c) {
         if (!c || (!c.phone && !c.email)) return '';
         return `<div class="info-block"><h4>Kontakt</h4><p>${c.name ? esc(c.name) + '<br>' : ''}${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : ''}${c.phone && c.email ? ' · ' : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</p></div>`;
@@ -165,6 +276,49 @@
         const box = $('#guest-box');
         const out = box.querySelector('[data-logout]');
         if (out) out.addEventListener('click', async () => { await api('logout', {}); loadMe(); });
+        box.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+            const span = b.querySelector('span');
+            span.textContent = (await copyText(b.dataset.copy)) ? 'Kopiert' : 'Bitte manuell kopieren';
+            b.classList.add('done');
+            setTimeout(() => { span.textContent = 'Kopieren'; b.classList.remove('done'); }, 2000);
+        }));
+        const inv = box.querySelector('[data-invoice]');
+        if (inv) inv.addEventListener('click', () => downloadInvoice(inv));
+        box.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => {
+            const f = document.getElementById(b.dataset.toggle);
+            f.hidden = !f.hidden;
+            if (!f.hidden) { const first = f.querySelector('input:not([value]), input[value=""], textarea'); if (first) first.focus(); }
+        }));
+        const invForm = box.querySelector('#invoice-form');
+        if (invForm) {
+            invForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                const err = $('#invoice-form-error');
+                const btn = invForm.querySelector('[type=submit]');
+                const body = Object.fromEntries(new FormData(invForm).entries());
+                body.confirm = invForm.elements.confirm.checked;
+                btn.disabled = true;
+                btn.textContent = 'Wird erstellt …';
+                const d = await api('me/rechnung', body).catch(() => ({}));
+                if (!d.success) {
+                    btn.disabled = false;
+                    btn.textContent = 'Rechnung erstellen';
+                    return showError(err, d.error || 'Das hat nicht geklappt. Bitte erneut versuchen.');
+                }
+                await loadMe();
+                const dl = $('#guest-box [data-invoice]');
+                if (dl) downloadInvoice(dl);
+            });
+        }
+        const fixForm = box.querySelector('#invoice-fix-form');
+        if (fixForm) {
+            fixForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                const d = await api('me/rechnung/korrektur', { text: fixForm.elements.text.value }).catch(() => ({}));
+                showError($('#invoice-fix-error'), d.success ? '' : (d.error || 'Senden fehlgeschlagen.'));
+                if (d.success) { fixForm.elements.text.value = ''; $('#invoice-fix-saved').hidden = false; }
+            });
+        }
         const form = box.querySelector('#details-form');
         if (form) {
             form.addEventListener('submit', async e => {

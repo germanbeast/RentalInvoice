@@ -1,248 +1,226 @@
 const fs = require('fs');
 const path = require('path');
 
+const PUBLIC_DIR = path.join(__dirname, 'public');
+
 /**
- * Renders a 1:1 identical invoice HTML as the frontend.
- * @param {Object} data Invoice data (guest, dates, positions, branding, etc.)
- * @returns {string} Full HTML string with embedded CSS
+ * Renders an invoice exactly like the admin app: the markup is the #invoice-page block from
+ * public/index.html, the styles are public/styles.css plus the saved invoice template
+ * (Rechnungs-Template), and it is filled the same way as updatePreview() in public/app.js.
+ * @param {Object} data Invoice data (guest, dates, positions, branding with template_config, etc.)
+ * @returns {string} Full HTML string
  */
 function renderInvoiceHtml(data) {
-    const stylesPath = path.join(__dirname, 'public', 'styles.css');
-    const styles = fs.readFileSync(stylesPath, 'utf8');
+    const styles = fs.readFileSync(path.join(PUBLIC_DIR, 'styles.css'), 'utf8');
+    const page = invoicePageMarkup(fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8'));
+    const tpl = templateConfig(data.branding);
 
-    const {
-        vName, vAdresse, vTelefon, vEmail, vSteuernr,
-        gName, gAdresse,
-        rNummer, rDatum, aAnreise, aAbreise,
-        mwstSatz, kleinunternehmer,
-        zBezahlt, zMethode, zDatum, zShowBank,
-        bInhaber, bIban, bBic, bBank,
-        nukiPin,
-        positions,
-        branding // { logo_base64, primary_color }
-    } = data;
+    const fill = {
+        vName: data.vName, vAdresse: data.vAdresse, vTelefon: data.vTelefon, vEmail: data.vEmail, vSteuernr: data.vSteuernr,
+        gName: data.gName, gAdresse: data.gAdresse,
+        rNummer: data.rNummer, rDatum: data.rDatum, aAnreise: data.aAnreise, aAbreise: data.aAbreise,
+        mwstSatz: data.mwstSatz, kleinunternehmer: !!data.kleinunternehmer,
+        zBezahlt: !!data.zBezahlt, zMethode: data.zMethode || '', zDatum: data.zDatum || '', zShowBank: !!data.zShowBank,
+        bInhaber: data.bInhaber, bIban: data.bIban, bBic: data.bBic, bBank: data.bBank,
+        nukiPin: data.nukiPin || '',
+        positions: data.positions || [],
+        // Company invoice made by the guest: greet the person, not the company
+        greetingName: (data.guestInvoice && data.guestInvoice.company && data.guestInvoice.name) || '',
+        greeting: tpl.greeting, introText: tpl.introText
+    };
+    // JSON inside <script>: "</script>" or "<!--" in a name must not break out
+    const json = JSON.stringify(fill).replace(/</g, '\\u003c');
 
-    const nights = calcNights(aAnreise, aAbreise);
-    const aufenthaltText = aAnreise && aAbreise
-        ? `${formatDate(aAnreise)} – ${formatDate(aAbreise)} (${nights} ${nights !== 1 ? 'Nächte' : 'Nacht'})`
-        : '—';
-
-    const netto = positions.reduce((sum, p) => sum + (p.qty * p.price), 0);
-    const rate = parseFloat(mwstSatz) || 0;
-    const mwst = kleinunternehmer ? 0 : netto * (rate / 100);
-    const total = netto + mwst;
-
-    const logoHtml = branding && branding.logo_base64
-        ? `<img src="${branding.logo_base64}" style="max-height: 80px; margin-bottom: 20px;">`
-        : '';
-
-    // Replicate the HTML from index.html #invoice-page
-    return `
-<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        ${styles}
-        body { background: white !important; padding: 0 !important; margin: 0; font-family: 'Inter', sans-serif; }
-        /* Das Web-Layout blendet Empfänger und Meta aus (steht dort in der Anrede); im PDF zeigen wir sie. */
-        .invoice-page .inv-recipient .inv-label,
-        .invoice-page .inv-meta-item .inv-label { display: block !important; font-size: 7.5pt; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-        .invoice-page .inv-recipient strong { display: block !important; }
-        .invoice-page .inv-recipient .inv-addr { display: block !important; }
-        .invoice-page .inv-meta { display: flex !important; justify-content: space-between; gap: 8mm; text-align: left !important; }
-        .invoice-page .inv-meta-item { display: block !important; }
-        .invoice-page { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; }
-        @media print {
-            body { margin: 0; }
-            .invoice-page { border: none; }
-        }
+${styles}
+        body { background: white !important; margin: 0; padding: 0; }
+        .invoice-page { transform: none !important; box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; }
+        /* PDF only: Rechnungs-Nr., Datum und Aufenthalt must be on the invoice (§ 14 UStG); the admin preview hides them.
+           Slightly tighter spacing so a normal invoice fits on one A4 page. */
+        .inv-header { margin-bottom: 10mm; }
+        .inv-recipient { margin-bottom: 2mm; }
+        .inv-recipient-address { margin-bottom: 5mm; }
+        .inv-intro-text { margin-bottom: 4mm; }
+        .inv-meta { display: flex; justify-content: space-between; gap: 6mm; text-align: left; margin-bottom: 6mm; padding: 3mm 4mm; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .inv-meta-item { display: block; font-size: 9pt; }
+        .inv-meta .inv-label { display: block; font-size: 7pt; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1mm; }
+        .inv-title { margin-bottom: 6mm; }
+        .inv-summary { margin-top: 4mm; margin-bottom: 8mm; }
+        .inv-payment-status { margin-bottom: .5rem; }
+        .inv-footer { margin-top: 4mm; }
+        .inv-payment { margin-top: 3mm; }
+        .inv-paid-badge.unpaid { border-color: #d97706 !important; background: #fffbeb !important; color: #b45309 !important; }
+        .inv-paid-badge.unpaid svg { display: none; }
+        /* Never cut anything off: a very long invoice continues on a second page */
+        @media print { .invoice-page { padding: 12mm 20mm !important; height: auto !important; max-height: none !important; min-height: 296mm !important; overflow: visible !important; page-break-inside: auto !important; } }
     </style>
+    <style>${templateStyles(tpl)}</style>
 </head>
 <body>
-    <div class="invoice-page">
-        <!-- FALTMARKEN -->
-        <div class="inv-markers">
-            <div class="inv-marker inv-marker-fold-1"></div>
-            <div class="inv-marker inv-marker-fold-2"></div>
-        </div>
-        
-        <!-- HEADER -->
-        <div class="inv-header">
-            <div class="inv-logo">${logoHtml}</div>
-            <div class="inv-sender">
-                <strong>${vName || 'Vermieter Name'}</strong>
-                <div class="inv-addr">${nl2br(vAdresse || 'Adresse')}</div>
-                <div class="inv-contact">
-                    <span>${vTelefon || ''}</span>
-                    <span>${vEmail || ''}</span>
-                </div>
-                <div class="inv-tax">${vSteuernr ? `St.-Nr.: ${vSteuernr}` : ''}</div>
-            </div>
-        </div>
-
-        <!-- RECIPIENT -->
-        <div class="inv-recipient">
-            <div class="inv-label">Rechnung an</div>
-            <strong>${gName || 'Gast Name'}</strong>
-            <div class="inv-addr">${nl2br(gAdresse || '')}</div>
-        </div>
-
-        <!-- META -->
-        <div class="inv-meta">
-            <div class="inv-meta-item">
-                <span class="inv-label">Rechnungs-Nr.</span>
-                <span>${rNummer || '—'}</span>
-            </div>
-            <div class="inv-meta-item">
-                <span class="inv-label">Datum</span>
-                <span>${formatDate(rDatum)}</span>
-            </div>
-            <div class="inv-meta-item">
-                <span class="inv-label">Aufenthalt</span>
-                <span>${aufenthaltText}</span>
-            </div>
-        </div>
-
-        <h2 class="inv-title">Rechnung</h2>
-
-        <!-- TABLE -->
-        <table class="inv-table">
-            <thead>
-                <tr>
-                    <th>Pos.</th>
-                    <th>Bezeichnung</th>
-                    <th class="text-right">Anzahl</th>
-                    <th class="text-right">Einzelpreis</th>
-                    <th class="text-right">Gesamt</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${positions.length === 0 ? '<tr class="inv-empty-row"><td colspan="5">Keine Positionen</td></tr>' :
-            positions.map((pos, idx) => `
-                    <tr>
-                        <td>${idx + 1}</td>
-                        <td>${escapeHtml(pos.desc) || '—'}</td>
-                        <td class="text-right">${pos.qty}</td>
-                        <td class="text-right">${formatCurrency(pos.price)}</td>
-                        <td class="text-right">${formatCurrency(pos.qty * pos.price)}</td>
-                    </tr>
-                    `).join('')}
-            </tbody>
-        </table>
-
-        <!-- SUMMARY -->
-        <div class="inv-summary">
-            ${kleinunternehmer ? '' : `
-            <div class="inv-summary-line">
-                <span>Nettobetrag</span>
-                <span>${formatCurrency(netto)}</span>
-            </div>
-            <div class="inv-summary-line">
-                <span>MwSt. ${rate}%</span>
-                <span>${formatCurrency(mwst)}</span>
-            </div>
-            `}
-            <div class="inv-summary-line inv-summary-total">
-                <span>Gesamtbetrag</span>
-                <span>${formatCurrency(total)}</span>
-            </div>
-        </div>
-
-        <!-- BOTTOM WRAPPER -->
-        <div class="inv-bottom">
-            <!-- PAYMENT STATUS -->
-            <div class="inv-payment-status">
-                <div class="inv-paid-badge ${zBezahlt ? 'paid' : 'unpaid'}">
-                    ${zBezahlt ? `
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    <span>Bezahlt via ${zMethode}${zDatum ? ` am ${formatDate(zDatum)}` : ''}</span>
-                    ` : `
-                    <span>Offen – noch nicht bezahlt</span>
-                    `}
-                </div>
-            </div>
-
-            <!-- NUKI -->
-            ${nukiPin ? `
-            <div class="inv-nuki-pin">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="inv-nuki-icon">
-                    <path d="M6.5 9.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5" />
-                    <path d="M8.5 7.5L14 7.5V9.5M11.5 7.5V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                </svg>
-                <div class="inv-nuki-content">
-                    <span class="inv-nuki-label">Ihr Zugangscode:</span>
-                    <span class="inv-nuki-code">${nukiPin}</span>
-                    <span class="inv-nuki-period">Gültig: ${formatDate(aAnreise)} bis ${formatDate(aAbreise)}</span>
-                </div>
-            </div>
-            ` : ''}
-
-            <!-- FOOTER -->
-            <div class="inv-footer">
-                ${kleinunternehmer ? `
-                <div class="inv-legal-notice">
-                    Kleinunternehmer (MwSt.-Befreiung nach § 19 UStG) — Der Rechnungsbetrag enthält gemäß § 19 UStG keine Umsatzsteuer.
-                </div>
-                ` : ''}
-                <div class="inv-footer-text">
-                    ${zBezahlt ? `Betrag wurde bezahlt via ${zMethode}. Vielen Dank!` : (zShowBank ? 'Bitte überweisen Sie den Betrag innerhalb eines Monats auf das angegebene Konto.' : 'Vielen Dank für Ihren Aufenthalt!')}
-                </div>
-            </div>
-
-            <!-- BANK -->
-            ${zShowBank ? `
-            <div class="inv-payment">
-                <div class="inv-label">Bankverbindung</div>
-                <div class="inv-bank-grid">
-                    <span>Kontoinhaber:</span><span>${bInhaber || '–'}</span>
-                    <span>IBAN:</span><span>${bIban || '–'}</span>
-                    <span>BIC:</span><span>${bBic || '–'}</span>
-                    <span>Bank:</span><span>${bBank || '–'}</span>
-                </div>
-            </div>
-            ` : ''}
-        </div>
-    </div>
+${page}
+<script>(${fillInvoice.toString()})(${json});</script>
 </body>
-</html>
+</html>`;
+}
+
+/** The <div class="invoice-page" id="invoice-page"> … </div> block of the admin page. */
+function invoicePageMarkup(html) {
+    const start = html.indexOf('<div class="invoice-page" id="invoice-page">');
+    if (start < 0) throw new Error('Rechnungs-Layout in public/index.html nicht gefunden');
+    const tag = /<\/?div\b[^>]*>/g;
+    tag.lastIndex = start;
+    let depth = 0;
+    let m;
+    while ((m = tag.exec(html))) {
+        depth += m[0][1] === '/' ? -1 : 1;
+        if (depth === 0) return html.slice(start, tag.lastIndex);
+    }
+    throw new Error('Rechnungs-Layout in public/index.html ist unvollständig');
+}
+
+// Same defaults as defaultTemplateConfig in public/app.js
+const DEFAULT_TEMPLATE = {
+    logoText: 'Ferienwohnung Beckhome',
+    logoImage: null,
+    greeting: 'SEHR GEEHRTE/R',
+    introText: 'Ich bedanke mich herzlich für die Zusammenarbeit und Ihr entgegengebrachtes Vertrauen. Anbei die Rechnung für das gemeinsame Projekt:',
+    colorPrimary: '#0f172a',
+    colorTableBg: '#f5f1e8',
+    colorTableHeader: '#e8e1d0',
+    colorText: '#2d2721',
+    fontLogo: 'Georgia, serif',
+    fontBody: "'Inter', sans-serif",
+    showLogo: true,
+    showTax: true,
+    showDateHeader: true,
+    showFoldMarks: false
+};
+
+function templateConfig(branding) {
+    const saved = branding && branding.template_config && typeof branding.template_config === 'object' ? branding.template_config : {};
+    return { ...DEFAULT_TEMPLATE, ...saved };
+}
+
+/** Same CSS as applyTemplateStyles() in public/app.js. */
+function templateStyles(c) {
+    const css = v => String(v == null ? '' : v).replace(/[<>{};\\]/g, '');
+    const logo = c.logoImage && /^data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+$/.test(c.logoImage)
+        ? `content: ''; background-image: url(${c.logoImage}); background-size: contain; background-repeat: no-repeat; width: 150px; height: 60px;`
+        : `content: '${css(c.logoText || 'Ferienwohnung Beckhome').replace(/'/g, "\\'")}'; font-family: ${css(c.fontLogo) || 'Georgia, serif'};`;
+    return `
+        .invoice-page { font-family: ${css(c.fontBody) || "'Inter', sans-serif"} !important; color: ${css(c.colorText) || '#2d2721'} !important; }
+        .inv-sender::before { ${logo} display: ${c.showLogo ? 'block' : 'none'} !important; }
+        .inv-location-date #inv-location { display: ${c.showDateHeader ? 'block' : 'none'} !important; }
+        .inv-location-date #inv-r-datum-header { display: ${c.showDateHeader ? 'block' : 'none'} !important; }
+        .inv-tax { display: ${c.showTax ? 'block' : 'none'} !important; }
+        .inv-title { color: ${css(c.colorPrimary) || '#0f172a'} !important; }
+        .inv-table { background: ${css(c.colorTableBg) || '#f5f1e8'} !important; }
+        .inv-table thead { background: ${css(c.colorTableHeader) || '#e8e1d0'} !important; }
+        .inv-table td { background: ${css(c.colorTableBg) || '#f5f1e8'} !important; color: ${css(c.colorText) || '#2d2721'} !important; }
+        .inv-table th { color: ${css(c.colorText) || '#2d2721'} !important; }
+        .inv-payment { background: ${css(c.colorTableBg) || '#f5f1e8'} !important; border-top-color: ${css(c.colorTableHeader) || '#e8e1d0'} !important; }
+        .inv-summary-total { color: ${css(c.colorPrimary) || '#0f172a'} !important; }
+        .inv-markers { display: ${c.showFoldMarks ? 'block' : 'none'} !important; }
     `;
 }
 
-// Helpers
-function formatDate(date) {
-    if (!date) return '—';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return date;
-    return d.toLocaleDateString('de-DE');
-}
+/** Runs in the PDF browser: fills the invoice like updatePreview() in public/app.js. */
+function fillInvoice(d) {
+    const $ = s => document.querySelector(s);
+    const text = (sel, v) => { const el = $(sel); if (el) el.textContent = v; };
+    const lines = (sel, v) => {
+        const el = $(sel);
+        if (!el) return;
+        el.textContent = '';
+        String(v || '').split('\n').forEach((line, i) => {
+            if (i) el.appendChild(document.createElement('br'));
+            el.appendChild(document.createTextNode(line));
+        });
+    };
+    const show = (sel, display) => { const el = $(sel); if (el) el.style.display = display; };
+    const formatDate = s => s ? new Date(s).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+    const formatCurrency = v => Number(v).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+    const nightsOf = (a, b) => a && b ? Math.max(0, Math.ceil((new Date(b) - new Date(a)) / 86400000)) : 0;
 
-function calcNights(anreise, abreise) {
-    if (!anreise || !abreise) return 0;
-    const start = new Date(anreise);
-    const end = new Date(abreise);
-    const diff = end - start;
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
+    // Vermieter
+    text('#inv-v-name', d.vName || 'Vermieter Name');
+    lines('#inv-v-adresse', d.vAdresse || 'Adresse');
+    text('#inv-v-telefon', d.vTelefon || '');
+    text('#inv-v-email', d.vEmail || '');
+    text('#inv-v-steuernr', d.vSteuernr ? `St.-Nr.: ${d.vSteuernr}` : '');
 
-function formatCurrency(val) {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val);
-}
+    // Gast
+    const guestName = d.gName || 'Gast Name';
+    text('#inv-g-name', guestName);
+    lines('#inv-g-adresse', d.gAdresse || '');
+    text('#inv-greeting', `${d.greeting || 'SEHR GEEHRTE/R'} ${(d.greetingName || guestName).split(' ').pop().toUpperCase()},`);
+    if (d.introText) text('#inv-intro-text', d.introText);
 
-function nl2br(str) {
-    if (!str) return '';
-    return str.replace(/\n/g, '<br>');
-}
+    // Meta
+    text('#inv-r-nummer', d.rNummer || '—');
+    text('#inv-r-datum', formatDate(d.rDatum));
+    const cityMatch = String(d.vAdresse || '').match(/\d{5}\s+(.+)/);
+    text('#inv-location', cityMatch ? cityMatch[1].split('\n')[0].trim() : '');
+    text('#inv-r-datum-header', formatDate(d.rDatum));
+    const nights = nightsOf(d.aAnreise, d.aAbreise);
+    text('#inv-aufenthalt', d.aAnreise && d.aAbreise
+        ? `${formatDate(d.aAnreise)} – ${formatDate(d.aAbreise)} (${nights} ${nights !== 1 ? 'Nächte' : 'Nacht'})` : '—');
 
-function escapeHtml(unsafe) {
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    // Positions
+    const body = $('#inv-positions-body');
+    body.textContent = '';
+    if (!d.positions.length) body.innerHTML = '<tr class="inv-empty-row"><td colspan="5">Keine Positionen</td></tr>';
+    d.positions.forEach((pos, idx) => {
+        const tr = document.createElement('tr');
+        [String(idx + 1), pos.desc || '—', String(pos.qty), formatCurrency(pos.price), formatCurrency(pos.qty * pos.price)].forEach((v, i) => {
+            const td = document.createElement('td');
+            if (i >= 2) td.className = 'text-right';
+            td.textContent = v;
+            tr.appendChild(td);
+        });
+        body.appendChild(tr);
+    });
+
+    // Summary
+    const netto = d.positions.reduce((sum, p) => sum + p.qty * p.price, 0);
+    const rate = parseFloat(d.mwstSatz) || 0;
+    const mwst = d.kleinunternehmer ? 0 : netto * (rate / 100);
+    text('#inv-netto', formatCurrency(netto));
+    text('#inv-mwst', formatCurrency(mwst));
+    text('#inv-mwst-pct', String(rate));
+    text('#inv-total', formatCurrency(netto + mwst));
+    $('#inv-mwst').closest('.inv-summary-line').style.display = d.kleinunternehmer ? 'none' : 'flex';
+    $('#inv-netto').closest('.inv-summary-line').style.display = d.kleinunternehmer ? 'none' : 'flex';
+    show('#inv-kleinunternehmer-notice', d.kleinunternehmer ? 'block' : 'none');
+
+    // Payment
+    show('#inv-payment-status', 'block');
+    $('#inv-paid-badge').className = `inv-paid-badge ${d.zBezahlt ? 'paid' : 'unpaid'}`;
+    text('#inv-paid-text', d.zBezahlt
+        ? `Bezahlt via ${d.zMethode}${d.zDatum ? ` am ${formatDate(d.zDatum)}` : ''}` : 'Offen – noch nicht bezahlt');
+    show('#inv-payment', d.zShowBank ? 'block' : 'none');
+    if (d.zShowBank) {
+        text('#inv-b-inhaber', d.bInhaber || '–');
+        text('#inv-b-iban', d.bIban || '–');
+        text('#inv-b-bic', d.bBic || '–');
+        text('#inv-b-bank', d.bBank || '–');
+    }
+    text('#inv-footer-text', d.zBezahlt ? `Betrag wurde bezahlt via ${d.zMethode}. Vielen Dank!`
+        : d.zShowBank ? 'Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf das angegebene Konto.'
+            : 'Vielen Dank für Ihren Aufenthalt!');
+
+    // Door code
+    show('#inv-nuki-pin', d.nukiPin ? 'block' : 'none');
+    if (d.nukiPin) {
+        text('#inv-nuki-pin-code', d.nukiPin);
+        text('#inv-nuki-from', formatDate(d.aAnreise));
+        text('#inv-nuki-to', formatDate(d.aAbreise));
+    }
 }
 
 module.exports = { renderInvoiceHtml };
