@@ -271,7 +271,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied() }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), guestMessage: () => guestMessage }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -303,6 +303,27 @@ async function sendTelegram(chatId, message, replyMarkup) {
     }
 }
 
+function telegramIds(allSettings) {
+    let tgIds = [];
+    const rawTgIds = allSettings.tg_ids;
+    if (Array.isArray(rawTgIds)) {
+        tgIds = rawTgIds.map(String);
+    } else {
+        try { tgIds = JSON.parse(rawTgIds || '[]'); } catch (e) {
+            if (allSettings.tg_id) tgIds = [allSettings.tg_id];
+        }
+    }
+    return tgIds.map(id => String(id || '').trim()).filter(Boolean);
+}
+
+// Ready-to-copy guest message (Telegram only: it contains the guest's personal link and door code)
+async function sendGuestMessageToTelegram(bookingId) {
+    if (!tgBot) return;
+    for (const id of telegramIds(db.getAllSettings())) {
+        await tgCommands.showGuestMessage(tgBot, id, bookingId).catch(e => console.error('❌ Gästenachricht Telegram:', e.message));
+    }
+}
+
 // Send to all configured notification recipients
 async function sendToAllRecipients(message, opts = {}) {
     const allSettings = db.getAllSettings();
@@ -325,19 +346,8 @@ async function sendToAllRecipients(message, opts = {}) {
     }
 
     // Telegram Notifications
-    let tgIds = [];
-    const rawTgIds = allSettings.tg_ids;
-    if (Array.isArray(rawTgIds)) {
-        tgIds = rawTgIds.map(String);
-    } else {
-        try { tgIds = JSON.parse(rawTgIds || '[]'); } catch (e) {
-            if (allSettings.tg_id) tgIds = [allSettings.tg_id];
-        }
-    }
-    for (const id of tgIds) {
-        if (id && String(id).trim()) {
-            if (await sendTelegram(String(id).trim(), message, opts.tgKeyboard)) anySent = true;
-        }
+    for (const id of telegramIds(allSettings)) {
+        if (await sendTelegram(id, message, opts.tgKeyboard)) anySent = true;
     }
 
     // Web Push (installed web app on phones)
@@ -511,6 +521,7 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
                 : undefined;
             const sent = await sendToAllRecipients(msg, { tgKeyboard, type: 'new_booking' });
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
+            await sendGuestMessageToTelegram(result.id);
         }
     }
     return { newCount, events, seen };
@@ -1047,6 +1058,16 @@ const emergencyDoor = require('./emergency-door')({
         db.logNotification(type, msg, sent ? 'sent' : 'failed');
     }
 });
+// Ready-to-copy guest message for Telegram + personal direct link without login (see guest-message.js)
+const guestMessage = require('./guest-message')({
+    express, rateLimit, db, emergencyDoor,
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortal.getSite(),
+    ensureGuestCodes: () => guestPortal.ensureGuestCodes(),
+    berlinToday: () => berlinToday(),
+    addDays: (ymd, n) => addDays(ymd, n)
+});
+app.use('/gast', guestMessage.router);
 app.use('/gast', emergencyDoor.router);
 app.use('/gast', guestPortal.router);
 

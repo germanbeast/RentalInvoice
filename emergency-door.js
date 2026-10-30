@@ -236,7 +236,7 @@ function createEmergencyDoor({ express, rateLimit, db, botLogic, qrcode, notify,
         });
     }
 
-    return { router, registerAdminRoutes };
+    return { router, registerAdminRoutes, getConfig };
 }
 
 module.exports = createEmergencyDoor;
