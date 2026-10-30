@@ -13,6 +13,11 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Jede Öffnung (und jeder Fehlschlag) wird in `door_emergency_log` protokolliert und sofort per Telegram und Push gemeldet (Push-Typ `nuki_emergency`, gilt als wichtig)
 - Admin → Webseite → Einrichtung: Karte „Notfall-Öffnen“ mit Schalter, druckbarem QR-Aushang (A5), „Neuen QR-Code erzeugen“ (alter Aushang wird ungültig) und Protokoll der letzten Versuche
 
+## [1.18.1] - 2026-10-30
+
+### Sicherheit
+- `/api/whatsapp/qr` stand auf der Auth-Whitelist. Damit konnte jeder ohne Login den QR-Code abrufen und ein eigenes WhatsApp-Konto mit dem Server koppeln. Der Endpunkt verlangt jetzt eine Admin-Sitzung wie `/api/whatsapp/status` und `/api/whatsapp/logout`. Die Kopplung in den Einstellungen läuft unverändert, weil sie nur nach dem Login abgefragt wird.
+
 ## [1.18.0] - 2026-10-30
 
 ### Geändert
