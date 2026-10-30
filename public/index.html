@@ -404,6 +404,17 @@
                         <div style="display:flex;gap:.5rem;flex-wrap:wrap"><input type="text" id="site-ical-url" readonly style="flex:1;min-width:220px"><button type="button" class="btn-mini" id="site-ical-copy">Kopieren</button></div>
                         <p class="text-muted" style="font-size:.82rem;margin-top:.5rem">Der Server muss dafür aus dem Internet erreichbar sein.</p>
                     </div>
+                    <div class="card site-card" id="door-card">
+                        <div class="today-title">Notfall-Öffnen (Tastenfeld defekt)</div>
+                        <p style="font-size:.88rem">Gäste scannen den QR-Code an der Tür, melden sich mit Buchungscode und Anreisedatum an und können das Nuki-Schloss öffnen. Nur vom Anreisetag ab Anreisezeit bis zum Abreisetag zur Abreisezeit, höchstens 3-mal pro Stunde. Jede Öffnung kommt sofort per Telegram und Push.</p>
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem"><input type="checkbox" id="door-enabled"> Notfall-Öffnen für Gäste erlauben</label>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                            <a class="btn-mini" id="door-print" href="/api/notfall/aushang" target="_blank" rel="noopener">QR-Aushang drucken</a>
+                            <button type="button" class="btn-mini" id="door-new-key">Neuen QR-Code erzeugen</button>
+                        </div>
+                        <p class="text-muted" style="font-size:.82rem;margin-top:.5rem" id="door-hint"></p>
+                        <div id="door-log" style="font-size:.85rem;margin-top:.5rem"></div>
+                    </div>
                     <div class="card site-card">
                         <div class="today-title">Gäste von Booking.com &amp; Airbnb</div>
                         <p style="font-size:.88rem">Jede Buchung hat einen Buchungscode. Unter <b>Buchungen</b> gibt es bei jeder Buchung den Knopf <b>Gastlink</b>: Er kopiert eine fertige Nachricht mit Link und Code, die du dem Gast über den Booking.com- oder Airbnb-Chat schickst. Airbnb-Gäste können sich auch mit ihrem Airbnb-Code (HM…) anmelden.</p>
