@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.15.0",
+    "currentVersion": "1.16.0",
     "releases": [
+        {
+            "version": "1.16.0",
+            "date": "2026-10-30",
+            "title": "Gäste-Webseite im Boutique-Stil",
+            "features": [
+                "Die Gäste-Webseite hat ein neues, ruhiges Design: großes Titelbild, elegante Schrift, Bildstrecke und Galerie mit Vor/Zurück",
+                "Die Webseite nutzt jetzt auch große Bildschirme voll aus",
+                "Dezente Effekte: Fotos öffnen sich beim Scrollen wie ein Vorhang, das Titelbild bekommt leichte Tiefe",
+                "Neu unter Webseite → Inhalte: Wohnfläche, Schlafzimmer und Gästestimmen"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.15.0",
             "date": "2026-10-28",

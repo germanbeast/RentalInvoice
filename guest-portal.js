@@ -40,6 +40,9 @@ const SITE_DEFAULTS = {
     pin_days: 0,          // show the door code this many days before arrival (0 = never)
     imprint: '',
     privacy: '',
+    testimonials: '',     // one per line: "Text | Name"
+    bedrooms: 0,
+    size_sqm: 0,
     photos: []
 };
 
@@ -276,6 +279,11 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             photos: (s.photos || []).map(f => `bilder/${encodeURIComponent(f)}`),
             contact: s.show_contact ? contactInfo(settings) : null,
             imprint: s.imprint || '', privacy: s.privacy || '',
+            bedrooms: Number(s.bedrooms) || 0, sizeSqm: Number(s.size_sqm) || 0,
+            testimonials: String(s.testimonials || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+                const i = l.lastIndexOf('|');
+                return i > 0 ? { text: l.slice(0, i).trim(), name: l.slice(i + 1).trim() } : { text: l, name: '' };
+            }),
             today: berlinToday()
         });
     });
@@ -515,6 +523,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 tagline: str(inp.tagline, 200), description: str(inp.description, 5000), features: str(inp.features, 3000),
                 location: str(inp.location, 1000), house_rules: str(inp.house_rules, 3000), arrival_info: str(inp.arrival_info, 5000),
                 payment_info: str(inp.payment_info, 1000), imprint: str(inp.imprint, 5000), privacy: str(inp.privacy, 20000),
+                testimonials: str(inp.testimonials, 5000),
+                bedrooms: int(inp.bedrooms, 0, 20, 0), size_sqm: int(inp.size_sqm, 0, 1000, 0),
                 max_guests: int(inp.max_guests, 1, 30, cur.max_guests), min_nights: int(inp.min_nights, 1, 30, cur.min_nights),
                 lead_days: int(inp.lead_days, 0, 60, cur.lead_days), pin_days: int(inp.pin_days, 0, 30, 0),
                 checkin_time: time(inp.checkin_time, cur.checkin_time), checkout_time: time(inp.checkout_time, cur.checkout_time),
