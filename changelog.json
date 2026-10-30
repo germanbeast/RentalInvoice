@@ -1,6 +1,20 @@
 {
-    "currentVersion": "1.15.0",
+    "currentVersion": "1.17.0",
     "releases": [
+        {
+            "version": "1.17.0",
+            "date": "2026-10-30",
+            "title": "Invoice Beckhome im Design der Gäste-Webseite",
+            "features": [
+                "Die Verwaltung sieht jetzt aus wie die Gäste-Webseite: warmer Papierton, Rost als Akzent, elegante Überschriften",
+                "Passt sich dem Bildschirm an: auf großen Monitoren wird die Schrift größer und der Inhalt steht mittig",
+                "TV-Willkommensseite, Login und Einstellungen im neuen Stil"
+            ],
+            "fixes": [
+                "Gäste-Verwaltung war ohne Abstände",
+                "Einstellungs-Menü lief bei kleinen Fenstern über den Rand"
+            ]
+        },
         {
             "version": "1.15.0",
             "date": "2026-10-28",

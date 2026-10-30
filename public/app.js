@@ -1959,6 +1959,10 @@
 
         // Chart.js refuses to draw on a canvas that is still in use, so the old chart has to go first
         if (window.myRevenueChart) window.myRevenueChart.destroy();
+        // Schrift und Linien wie im restlichen Design
+        Chart.defaults.font.family = "'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif";
+        Chart.defaults.color = '#675e52';
+        Chart.defaults.borderColor = '#e4dccf';
         window.myRevenueChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1971,14 +1975,14 @@
                     {
                         label: 'Umsatz',
                         data: revValues,
-                        backgroundColor: 'rgba(99, 102, 241, 0.8)',
-                        borderRadius: 4
+                        backgroundColor: '#8a4b2a',
+                        borderRadius: 1
                     },
                     {
                         label: 'Ausgaben',
                         data: expValues,
-                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
-                        borderRadius: 4
+                        backgroundColor: '#c4b8a5',
+                        borderRadius: 1
                     }
                 ]
             },
@@ -3205,8 +3209,8 @@
                 html += history.map(req => {
                     const isApproved = req.status === 'approved';
                     const badge = isApproved
-                        ? `<span style="background:var(--accent-green,#22c55e);color:#000;padding:2px 8px;border-radius:12px;font-size:11px;">Aktiv</span>`
-                        : `<span style="background:var(--danger,#ef4444);color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">Abgelehnt</span>`;
+                        ? `<span style="background:var(--ok-soft);color:var(--ok);padding:2px 8px;border-radius:12px;font-size:11px;">Aktiv</span>`
+                        : `<span style="background:var(--bad-soft);color:var(--bad);padding:2px 8px;border-radius:12px;font-size:11px;">Abgelehnt</span>`;
                     // Approved: show Revoke button. Denied: show Delete button (enables re-registration)
                     const actionBtn = isApproved
                         ? `<button type="button" class="btn btn-sm btn-danger btn-revoke-tg" data-chatid="${escapeHtml(String(req.chat_id))}" style="margin-left:8px; font-size:11px; padding:2px 8px;">Entziehen</button>`
@@ -3744,8 +3748,8 @@
                     const amount = inv.total_amount || d.totalAmount || 0;
                     const paid = inv.paid || d.zBezahlt;
                     const paidBadge = paid
-                        ? `<span style="background:var(--accent-green,#34d399);color:#000;padding:1px 6px;border-radius:10px;font-size:10px;">Bezahlt</span>`
-                        : `<span style="background:var(--warning,#f59e0b);color:#000;padding:1px 6px;border-radius:10px;font-size:10px;">Offen</span>`;
+                        ? `<span style="background:var(--ok-soft);color:var(--ok);padding:1px 6px;border-radius:10px;font-size:10px;">Bezahlt</span>`
+                        : `<span style="background:var(--warn-soft);color:var(--warn);padding:1px 6px;border-radius:10px;font-size:10px;">Offen</span>`;
                     return `
                         <div class="guest-invoice-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); gap:6px; flex-wrap:wrap;">
                             <div style="display:flex;align-items:center;gap:6px;min-width:0;">
@@ -3784,8 +3788,8 @@
                     nukiList.innerHTML = activePins.map(b => {
                         const expired = b.checkout && b.checkout < now;
                         const statusBadge = expired
-                            ? `<span style="background:var(--danger,#ef4444);color:#fff;padding:1px 7px;border-radius:12px;font-size:11px;">Abgelaufen</span>`
-                            : `<span style="background:var(--accent-green,#34d399);color:#000;padding:1px 7px;border-radius:12px;font-size:11px;">Aktiv</span>`;
+                            ? `<span style="background:var(--bad-soft);color:var(--bad);padding:1px 7px;border-radius:12px;font-size:11px;">Abgelaufen</span>`
+                            : `<span style="background:var(--ok-soft);color:var(--ok);padding:1px 7px;border-radius:12px;font-size:11px;">Aktiv</span>`;
                         const extendBtn = `<button type="button" class="btn btn-sm btn-outline btn-extend-nuki-pin" data-booking-id="${b.id}" data-checkin="${b.checkin || ''}" data-checkout="${b.checkout || ''}" style="font-size:11px;padding:2px 8px;">Verlängern</button>`;
                         const deleteBtn = `<button type="button" class="btn btn-sm btn-danger btn-delete-nuki-pin" data-booking-id="${b.id}" style="font-size:11px;padding:2px 8px;">Löschen</button>`;
                         return `
