@@ -19,6 +19,18 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Geändert
 - Kalender-Sperren aus Booking.com/Airbnb mit exakt den Daten einer Direktbuchung werden nicht als neue Buchung angelegt (gespiegelte Sperre)
 
+## [1.14.0] - 2026-10-26
+
+### Hinzugefügt
+- Installierbare Web-App (PWA) für Android und iOS: Manifest, App-Icons, Service Worker
+- Web-Push-Benachrichtigungen (VAPID, Abhängigkeit `web-push`): neue Buchung, Storno und Doppelbuchung; pro Gerät wahlweise alle Meldungen
+- Einstellungen → „Handy-App & Push“: Gerät aktivieren/deaktivieren, Geräteliste, Test senden
+- Endpunkte `/api/push/*`; Tippen auf eine Buchungs-Meldung öffnet die Buchungsliste (`/?view=bookings`)
+- Login: „Angemeldet bleiben (30 Tage)“ (in der installierten App vorausgewählt); Sitzungen liegen in SQLite (Tabelle `sessions`) und überstehen Neustarts/Updates; ohne Häkchen endet die Sitzung nach 8 Stunden ohne Aktivität
+- Nuki-Überwachung alle 10 Minuten: Warnung bei schwacher (≤ 25 %) und fast leerer Schloss-Batterie sowie leerer Keypad-/Türsensor-Batterie
+- Warnung „Wohnung ist nicht abgeschlossen“, wenn das Schloss 30 Minuten offen ist und gerade kein Gast da ist (Anreisetag ab 15 Uhr bzw. erstem Zutritt, Abreisetag bis 11 Uhr), mit Telegram-Knopf „Jetzt abschließen“
+- Telegram: `/schloss` (Status, Batterie), `/zu` (abschließen), `/auf` (aufschließen oder öffnen, nur nach Rückfrage, die nach 5 Minuten verfällt); Knopf „🚪 Schloss“ im Hauptmenü
+
 ## [1.13.3] - 2026-10-26
 
 ### Behoben

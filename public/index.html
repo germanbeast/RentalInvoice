@@ -7,6 +7,13 @@
     <meta name="description"
         content="Rechnungsgenerator für Ferienwohnungen – Rechnungen erstellen, drucken und an Paperless NGX exportieren.">
     <title>Ferienwohnung Rechnung</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0b1120">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Beckhome">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -46,6 +53,9 @@
                     <label for="login-recovery">Wiederherstellungscode (Recovery Key)</label>
                     <input type="text" id="login-recovery" placeholder="16-stelliger Code">
                 </div>
+                <label for="login-remember" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; font-size: 0.9rem;">
+                    <input type="checkbox" id="login-remember"> Angemeldet bleiben (30 Tage)
+                </label>
                 <button type="submit" id="btn-login" class="btn btn-primary btn-block">Anmelden</button>
                 <div style="margin-top: 1rem; text-align: center; font-size: 0.85rem;">
                     <a href="#" id="link-show-recovery" style="color: var(--text-muted); text-decoration: none;">Zugang
@@ -1314,6 +1324,7 @@
                             <a href="#" class="nav-item" data-target="settings-booking">Booking.com &amp; Airbnb <i class="status-dot" data-status="calendars"></i></a>
                             <a href="#" class="nav-item" data-target="settings-whatsapp">WhatsApp Web</a>
                             <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot <i class="status-dot" data-status="telegram"></i></a>
+                            <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
                             <a href="#" class="nav-item" data-target="settings-users">Benutzer (2FA)</a>
                             <a href="#" class="nav-item" data-target="settings-system">System & Update</a>
                         </nav>
@@ -1874,6 +1885,40 @@
                                             hinzufügen</button>
                                     </div>
                                     <p><small>Tipp: Sende <code>ping</code> an deinen Bot für deine ID.</small></p>
+                                </div>
+                            </section>
+
+                            <!-- PUSH / WEB APP -->
+                            <section id="settings-push" class="settings-page">
+                                <h2>Handy-App &amp; Push</h2>
+                                <p class="text-muted">Diese Seite lässt sich als App auf dem Handy installieren und meldet neue Buchungen direkt als Benachrichtigung – zusätzlich zu Telegram/WhatsApp.</p>
+
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <h3 style="margin-top: 0;">Dieses Gerät</h3>
+                                    <p id="push-status" class="text-muted">Wird geprüft…</p>
+                                    <div class="form-group" id="push-mode-group">
+                                        <label for="push-mode">Benachrichtigen bei</label>
+                                        <select id="push-mode">
+                                            <option value="bookings">Wichtigem: Buchung, Storno, Doppelbuchung, Schloss</option>
+                                            <option value="all">Allem, was auch per Telegram kommt</option>
+                                        </select>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                        <button type="button" id="btn-push-enable" class="btn btn-primary">Auf diesem Gerät aktivieren</button>
+                                        <button type="button" id="btn-push-disable" class="btn btn-outline" style="display:none;">Auf diesem Gerät deaktivieren</button>
+                                    </div>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 style="margin-top: 0;">Registrierte Geräte</h3>
+                                    <div id="push-devices"><p class="text-muted">Noch kein Gerät.</p></div>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 style="margin-top: 0;">So installierst du die App</h3>
+                                    <p><strong>iPhone/iPad (ab iOS 16.4):</strong> Seite in Safari öffnen → Teilen-Symbol → „Zum Home-Bildschirm“. Danach die App vom Home-Bildschirm starten, anmelden und hier „Aktivieren“ tippen. In Safari selbst gibt es auf dem iPhone keine Push-Meldungen.</p>
+                                    <p><strong>Android:</strong> Seite in Chrome öffnen → Menü ⋮ → „App installieren“ (oder „Zum Startbildschirm hinzufügen“). Aktivieren geht auch direkt im Browser.</p>
+                                    <p class="text-muted" style="margin-bottom: 0;"><small>Voraussetzung: Die App ist über <strong>https://</strong> erreichbar (z. B. über deinen Reverse-Proxy oder Tunnel). Über eine reine http-Adresse im Heimnetz erlauben Browser keine Push-Meldungen.</small></p>
                                 </div>
                             </section>
 

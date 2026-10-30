@@ -6,15 +6,22 @@
  *                            for several consecutive successful polls -> delete the door code, remove the
  *                            booking, notify. Guarded against empty/broken feeds.
  *  3. checkArrivals()      - reports the first use of a guest's keypad code (Nuki activity log)
+ *  4. checkLock()          - battery warnings (lock, keypad, door sensor) and "flat empty but not locked"
  */
 
 const MISSING_THRESHOLD = 3;          // consecutive successful polls a booking must be absent (3 x 15 min)
 const CANCEL_GUARD_RATIO = 0.5;       // if more than this share of future bookings vanishes at once -> do not act
 const CANCEL_GUARD_MIN = 3;           // ... and at least this many bookings vanish
 const STALE_ARRIVAL_MS = 36 * 60 * 60 * 1000; // first use older than this is marked silently (no late alert)
+const BATTERY_LOW = 25;               // % -> "battery low" warning
+const BATTERY_OK = 40;                // % -> warning re-armed (batteries replaced / charged)
+const UNLOCKED_ALERT_MS = 30 * 60 * 1000; // flat empty and unlocked at least this long -> warning
+const CHECKIN_HOUR = 15;              // stays count as occupied from 15:00 on arrival day ...
+const CHECKOUT_HOUR = 11;             // ... until 11:00 on departure day (same as the door code validity)
 
 function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateDE }) {
     let nukiLogUnavailable = false;
+    let lockStateUnavailable = false;
 
     const berlinYmd = (d = new Date()) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(d);
     const berlinTime = d => new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }).format(d);
@@ -209,9 +216,94 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
         return { checked: rows.length, arrivals };
     }
 
+    // -----------------------------------------------------------------------
+    // 4. Lock watch: batteries and "flat empty but unlocked"
+    // -----------------------------------------------------------------------
+    const berlinHour = (d = new Date()) => parseInt(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).format(d), 10);
+
+    /** Is a guest expected in the flat right now? (arrival day from 15:00 or after the first door use, until 11:00 on departure day) */
+    function isOccupied(now = new Date()) {
+        const today = berlinYmd(now);
+        const hour = berlinHour(now);
+        const rows = db.getDb().prepare(
+            'SELECT checkin, checkout, arrived_at FROM bookings WHERE checkin <= ? AND checkout >= ?'
+        ).all(today, today);
+        return rows.some(b => {
+            if (b.checkin === today && hour < CHECKIN_HOUR && !b.arrived_at) return false;
+            if (b.checkout === today && hour >= CHECKOUT_HOUR) return false;
+            return true;
+        });
+    }
+
+    async function checkLock(now = new Date()) {
+        if (lockStateUnavailable) return { checked: false };
+        const nuki = db.getAllSettings().nuki;
+        if (!nuki || !nuki.token || !nuki.lockId) return { checked: false };
+
+        let lock;
+        try {
+            lock = await botLogic.getNukiLock();
+        } catch (e) {
+            if (e.permission) {
+                lockStateUnavailable = true;
+                console.warn('⚠️ Nuki-Schlossstatus nicht verfügbar:', e.message);
+                await notify('ℹ️ *Schloss-Überwachung nicht möglich*\n' + e.message + '\n(Batterie- und „nicht abgeschlossen“-Warnungen sind aus. Die Meldung kommt nur einmal.)', 'lock_unavailable');
+            } else {
+                console.warn('⚠️ Nuki-Schlossstatus:', e.message);
+            }
+            return { checked: false };
+        }
+
+        const before = getState('nuki_lock_watch');
+        const state = { ...before };
+        const sent = [];
+
+        // Battery of the lock: warn when it gets low and again when it becomes critical; re-arm after replacing
+        const rank = { ok: 0, low: 1, critical: 2 };
+        const level = lock.batteryCritical ? 'critical' : (lock.battery !== null && lock.battery <= BATTERY_LOW ? 'low' : 'ok');
+        if (rank[level] > rank[state.battery || 'ok']) {
+            state.battery = level;
+            const pct = lock.battery !== null ? ` (${lock.battery} %)` : '';
+            await notify(level === 'critical'
+                ? `🪫 *Nuki-Batterie fast leer*${pct}\nBitte die Batterien des Schlosses bald tauschen – sonst lässt sich die Tür nicht mehr per Code öffnen.`
+                : `🔋 *Nuki-Batterie wird schwach*${pct}\nBitte Ersatzbatterien bereitlegen.`, 'nuki_battery');
+            sent.push('battery');
+        } else if (level === 'ok' && (lock.battery === null || lock.battery >= BATTERY_OK)) {
+            state.battery = 'ok';
+        }
+        for (const [key, label] of [['keypadBatteryCritical', 'Keypad'], ['doorsensorBatteryCritical', 'Türsensor']]) {
+            if (lock[key] && !state[key]) {
+                await notify(`🪫 *Batterie ${label} fast leer*\nBitte die Batterie ${label === 'Keypad' ? 'des Keypads' : 'des Türsensors'} tauschen.`, 'nuki_battery');
+                sent.push(key);
+            }
+            state[key] = lock[key];
+        }
+
+        // Unlocked while nobody should be in the flat -> one warning per unlocked phase
+        if (lock.unlocked) {
+            if (!state.unlockedSince) state.unlockedSince = now.getTime();
+            if (!state.unlockedWarned && now.getTime() - state.unlockedSince >= UNLOCKED_ALERT_MS && !isOccupied(now)) {
+                state.unlockedWarned = true;
+                const mins = Math.round((now.getTime() - state.unlockedSince) / 60000);
+                await notify(
+                    `🔓 *Wohnung ist nicht abgeschlossen*\nDas Schloss steht seit mindestens ${mins} Minuten auf „${lock.lockText}“` +
+                    `${lock.doorText ? ` (${lock.doorText})` : ''}, aber gerade ist kein Gast da.`,
+                    'nuki_unlocked',
+                    { tgKeyboard: { inline_keyboard: [[{ text: '🔒 Jetzt abschließen', callback_data: 'lock:zu' }]] } });
+                sent.push('unlocked');
+            }
+        } else if (lock.locked) {
+            delete state.unlockedSince;
+            delete state.unlockedWarned;
+        }
+
+        saveState('nuki_lock_watch', state, before);
+        return { checked: true, lock, sent };
+    }
+
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-    return { checkOverlaps, findOverlaps, processMissing, checkArrivals, _internal: { cancelBooking } };
+    return { checkOverlaps, findOverlaps, processMissing, checkArrivals, checkLock, isOccupied, _internal: { cancelBooking } };
 }
 
 module.exports = createMonitor;

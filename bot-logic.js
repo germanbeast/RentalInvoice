@@ -307,6 +307,83 @@ async function updateNukiAuth(authId, patch) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Smart lock state and remote actions (Nuki Web API)
+// ---------------------------------------------------------------------------
+const LOCK_STATES = {
+    0: 'nicht kalibriert', 1: 'abgeschlossen', 2: 'wird aufgeschlossen', 3: 'aufgeschlossen', 4: 'wird abgeschlossen',
+    5: 'Falle gezogen', 6: 'aufgeschlossen (Lock ’n’ Go)', 7: 'Falle wird gezogen', 254: 'Motor blockiert', 255: 'unbekannt'
+};
+const DOOR_STATES = { 2: 'Tür zu', 3: 'Tür offen' };
+const NUKI_ACTIONS = { unlock: 1, lock: 2, unlatch: 3 };
+
+function nukiCredentials() {
+    const nuki = db.getAllSettings().nuki;
+    if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
+    return { token: nuki.token, lockId: parseInt(nuki.lockId, 10) || nuki.lockId };
+}
+
+function nukiError(e, what) {
+    const status = e.response && e.response.status;
+    if (status === 401 || status === 403) {
+        const err = new Error(`Der Nuki-Token darf ${what} nicht (${status}). Bitte beim Token in Nuki Web die passende Berechtigung aktivieren.`);
+        err.permission = true;
+        return err;
+    }
+    if (status === 429) return new Error('Nuki-API: zu viele Anfragen (429) – bitte kurz warten');
+    if (status) return new Error(`Nuki-API ${status}`);
+    return new Error('Nuki-API nicht erreichbar: ' + e.message);
+}
+
+/**
+ * Current lock state from Nuki Web (the lock reports changes to Nuki Web itself, so this is live enough).
+ * Returns { lockState, lockText, locked, unlocked, doorState, doorText, battery, batteryCritical,
+ *           batteryCharging, keypadBatteryCritical, doorsensorBatteryCritical, name }
+ */
+async function getNukiLock() {
+    const { token, lockId } = nukiCredentials();
+    let res;
+    try {
+        res = await axios.get(`https://api.nuki.io/smartlock/${lockId}`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+            timeout: 15000
+        });
+    } catch (e) {
+        throw nukiError(e, 'den Schloss-Status lesen');
+    }
+    const st = (res.data && res.data.state) || {};
+    const lockState = typeof st.state === 'number' ? st.state : 255;
+    return {
+        name: res.data && res.data.name,
+        lockState,
+        lockText: LOCK_STATES[lockState] || `Status ${lockState}`,
+        locked: lockState === 1,
+        unlocked: [3, 5, 6].includes(lockState),
+        doorState: st.doorState,
+        doorText: DOOR_STATES[st.doorState] || null,
+        battery: typeof st.batteryCharge === 'number' ? st.batteryCharge : null,
+        batteryCritical: !!st.batteryCritical,
+        batteryCharging: !!st.batteryCharging,
+        keypadBatteryCritical: !!st.keypadBatteryCritical,
+        doorsensorBatteryCritical: !!st.doorsensorBatteryCritical
+    };
+}
+
+/** action: 'lock' | 'unlock' | 'unlatch'. Nuki answers 204 once the command is queued for the lock. */
+async function nukiLockAction(action) {
+    const code = NUKI_ACTIONS[action];
+    if (!code) throw new Error('Unbekannte Aktion');
+    const { token, lockId } = nukiCredentials();
+    try {
+        await axios.post(`https://api.nuki.io/smartlock/${lockId}/action`, { action: code }, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            timeout: 15000
+        });
+    } catch (e) {
+        throw nukiError(e, 'das Schloss bedienen');
+    }
+}
+
 // True for the neutral names created when the calendar contains no real guest name
 function isPlaceholderGuestName(name) {
     const n = String(name || '').trim();
@@ -490,6 +567,8 @@ module.exports = {
     createNukiPinDirect,
     listNukiCodes,
     updateNukiAuth,
+    getNukiLock,
+    nukiLockAction,
     applyGuestName,
     isPlaceholderGuestName,
     cleanupPlaceholderGuest
