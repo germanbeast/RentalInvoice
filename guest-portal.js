@@ -37,7 +37,11 @@ const SITE_DEFAULTS = {
     payment_info: 'Bitte überweisen Sie den Betrag nach unserer Bestätigung innerhalb von 7 Tagen.',
     show_bank: true,
     show_contact: true,
-    pin_days: 0,          // show the door code this many days before arrival (0 = never)
+    pin_days: 2,          // show the door code this many days before arrival (0 = never)
+    wifi_name: '',
+    wifi_password: '',
+    parking: '',
+    guide: '',            // guest folder: blocks separated by a blank line, first line = heading
     imprint: '',
     privacy: '',
     testimonials: '',     // one per line: "Text | Name"
@@ -50,6 +54,14 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
     if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
     const sql = () => db.getDb();
+
+    // One-time: the guest folder shows the door code 2 days ahead unless the host chooses otherwise
+    (() => {
+        const s = db.getAllSettings().site;
+        if (s && typeof s === 'object' && !s.guide_init) {
+            db.setSetting('site', { ...s, pin_days: Number(s.pin_days) > 0 ? s.pin_days : 2, guide_init: true });
+        }
+    })();
 
     // -----------------------------------------------------------------------
     // Settings & helpers
@@ -181,6 +193,13 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             pinLater: !showPin && Number(site.pin_days) > 0 && !!b.nuki_pin && state === 'upcoming' ? Number(site.pin_days) : null,
             contact: site.show_contact ? contactInfo(settings) : null
         };
+        if (state !== 'past') {
+            v.wifi = site.wifi_name ? { name: site.wifi_name, password: site.wifi_password || '' } : null;
+            v.parking = site.parking || '';
+            v.guide = guideSections(site.guide);
+        }
+        const inv = invoiceFor(b);
+        if (inv) v.invoice = { number: inv.invoice_number, date: inv.invoice_date, paid: !!inv.is_paid };
         if (request) {
             v.guests = { adults: request.adults, children: request.children };
             v.priceTotal = request.price_total || null;
@@ -188,6 +207,23 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             if (site.show_bank && request.price_total) v.payment = { text: site.payment_info || '', bank: bankText(), reference: b.guest_code };
         }
         return v;
+    }
+
+    function guideSections(text) {
+        return String(text || '').split(/\n\s*\n/).map(block => {
+            const lines = block.trim().split('\n');
+            const title = (lines.shift() || '').replace(/^#+\s*/, '').trim();
+            return { title, text: lines.join('\n').trim() };
+        }).filter(g => g.title && g.text);
+    }
+
+    /** Newest invoice for this stay (same dates; same guest when both are known). */
+    function invoiceFor(b) {
+        return sql().prepare(
+            `SELECT id, invoice_number, invoice_date, is_paid FROM invoices
+             WHERE arrival = ? AND departure = ? AND (? IS NULL OR guest_id IS NULL OR guest_id = ?)
+             ORDER BY created_at DESC, id DESC LIMIT 1`
+        ).get(b.checkin, b.checkout, b.guest_id || null, b.guest_id || null);
     }
 
     function requestView(r) {
@@ -422,6 +458,31 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         res.json({ success: true, status: st });
     });
 
+    const invoiceLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false,
+        message: { success: false, error: 'Zu viele Downloads. Bitte warten Sie kurz.' }
+    });
+
+    router.get('/api/me/rechnung', invoiceLimiter, async (req, res) => {
+        try {
+            const sess = req.session && req.session.guest;
+            const st = currentStatus(sess, req);
+            if (!st || st.kind !== 'booking' || st.status !== 'confirmed') return res.status(401).send('Bitte erneut anmelden.');
+            const b = sql().prepare('SELECT * FROM bookings WHERE guest_code = ?').get(st.code);
+            const inv = b && invoiceFor(b);
+            if (!inv) return res.status(404).send('Für diese Buchung gibt es noch keine Rechnung.');
+            const row = sql().prepare('SELECT invoice_number, data FROM invoices WHERE id = ?').get(inv.id);
+            const data = typeof row.data === 'string' ? JSON.parse(row.data) : (row.data || {});
+            const { filePath } = await botLogic.generateInvoicePdf(data);
+            const filename = `Rechnung-${String(row.invoice_number || 'Beckhome').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
+            res.set('Cache-Control', 'no-store');
+            res.download(filePath, filename, () => fs.unlink(filePath, () => { }));
+        } catch (e) {
+            console.error('Gäste-Webseite Rechnung Fehler:', e.message);
+            if (!res.headersSent) res.status(500).send('Die Rechnung konnte gerade nicht erstellt werden. Bitte später erneut versuchen.');
+        }
+    });
+
     // Portal guests add their name and contact details (the calendar feeds contain none)
     router.post('/api/me/details', async (req, res) => {
         try {
@@ -528,6 +589,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 bedrooms: int(inp.bedrooms, 0, 20, 0), size_sqm: int(inp.size_sqm, 0, 1000, 0),
                 max_guests: int(inp.max_guests, 1, 30, cur.max_guests), min_nights: int(inp.min_nights, 1, 30, cur.min_nights),
                 lead_days: int(inp.lead_days, 0, 60, cur.lead_days), pin_days: int(inp.pin_days, 0, 30, 0),
+                wifi_name: str(inp.wifi_name, 100).trim(), wifi_password: str(inp.wifi_password, 100).trim(),
+                parking: str(inp.parking, 2000), guide: str(inp.guide, 10000),
                 checkin_time: time(inp.checkin_time, cur.checkin_time), checkout_time: time(inp.checkout_time, cur.checkout_time),
                 show_bank: !!inp.show_bank, show_contact: !!inp.show_contact,
                 public_url: /^https?:\/\/[^\s]+$/i.test(url) ? url.replace(/\/+$/, '') : ''

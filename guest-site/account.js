@@ -116,15 +116,8 @@
                 parts.push(`<div class="info-block"><h4>Zahlung</h4><div class="prose">${esc(s.payment.text)}</div>
                     ${s.payment.bank ? `<div class="note prose" style="margin-top:.6rem">${esc(s.payment.bank)}\nVerwendungszweck: ${esc(s.payment.reference)}</div>` : ''}</div>`);
             }
-            if (s.pin) {
-                parts.push(`<div class="info-block"><h4>Ihr Türcode</h4><div class="pin">${esc(s.pin)}</div>
-                    <p class="fine" style="text-align:left">Gültig ab Anreisetag ${esc(s.checkinTime)} Uhr bis Abreisetag ${esc(s.checkoutTime)} Uhr. Code eingeben und mit der Taste bestätigen.</p></div>`);
-            } else if (s.pinLater) {
-                parts.push(`<div class="info-block"><h4>Ihr Türcode</h4><p>Ihr persönlicher Türcode erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise.</p></div>`);
-            }
-            if (s.arrivalInfo && s.state !== 'past') parts.push(`<div class="info-block"><h4>Anreise</h4><div class="prose">${esc(s.arrivalInfo)}</div></div>`);
-            if (s.location && s.state !== 'past') parts.push(`<div class="info-block"><h4>Adresse &amp; Lage</h4><div class="prose">${esc(s.location)}</div></div>`);
-            if (s.houseRules && s.state !== 'past') parts.push(`<div class="info-block"><h4>Hausregeln</h4><div class="prose">${esc(s.houseRules)}</div></div>`);
+            if (s.state !== 'past') parts.push(guideHtml(s));
+            if (s.invoice) parts.push(invoiceHtml(s.invoice));
 
             if (s.kind === 'booking' && s.state !== 'past') {
                 const dt = s.details || {};
@@ -152,6 +145,87 @@
         return `<div class="status-card">${parts.join('')}</div>`;
     }
 
+    const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg>';
+
+    // Guest folder: everything a guest needs on site, door code first
+    function guideHtml(s) {
+        const items = [];
+        if (s.pin) {
+            items.push(`<section class="guide-item guide-pin"><h4>Ihr Türcode</h4><div class="pin">${esc(s.pin)}</div>
+                <p class="guide-fine">Gültig ab Anreisetag ${esc(s.checkinTime)} Uhr bis Abreisetag ${esc(s.checkoutTime)} Uhr. Code eingeben und mit der Taste bestätigen.</p></section>`);
+        } else if (s.pinLater) {
+            items.push(`<section class="guide-item guide-pin"><h4>Ihr Türcode</h4>
+                <p>Ihr persönlicher Türcode erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise${s.daysUntil > s.pinLater ? `, also ab ${fmt(addDays(s.checkin, -s.pinLater))}` : ''}.</p></section>`);
+        }
+        if (s.wifi) {
+            items.push(`<section class="guide-item"><h4>WLAN</h4>
+                <dl class="guide-dl"><div><dt>Netzwerk</dt><dd>${esc(s.wifi.name)}</dd></div>
+                ${s.wifi.password ? `<div><dt>Passwort</dt><dd><span class="mono-ish">${esc(s.wifi.password)}</span>
+                    <button type="button" class="copy-btn" data-copy="${esc(s.wifi.password)}">${COPY_ICON}<span>Kopieren</span></button></dd></div>` : ''}</dl></section>`);
+        }
+        items.push(`<section class="guide-item"><h4>An- &amp; Abreise</h4>
+            <dl class="guide-dl"><div><dt>Anreise</dt><dd>${fmt(s.checkin)}, ab ${esc(s.checkinTime)} Uhr</dd></div>
+            <div><dt>Abreise</dt><dd>${fmt(s.checkout)}, bis ${esc(s.checkoutTime)} Uhr</dd></div></dl>
+            ${s.arrivalInfo ? `<div class="prose">${esc(s.arrivalInfo)}</div>` : ''}</section>`);
+        if (s.location) {
+            const q = encodeURIComponent(s.location.split('\n').slice(0, 3).join(', '));
+            items.push(`<section class="guide-item"><h4>Adresse</h4><div class="prose">${esc(s.location)}</div>
+                <a class="text-link" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">In Google Maps öffnen</a></section>`);
+        }
+        if (s.parking) items.push(`<section class="guide-item"><h4>Parken</h4><div class="prose">${esc(s.parking)}</div></section>`);
+        if (s.houseRules) items.push(`<section class="guide-item"><h4>Hausregeln</h4><div class="prose">${esc(s.houseRules)}</div></section>`);
+        (s.guide || []).forEach(g => items.push(`<section class="guide-item"><h4>${esc(g.title)}</h4><div class="prose">${esc(g.text)}</div></section>`));
+        return `<div class="guide"><div class="guide-head"><h3>Ihre Gästemappe</h3><p>Alles für Ihren Aufenthalt an einem Ort.</p></div>
+            <div class="guide-grid">${items.join('')}</div></div>`;
+    }
+
+    function invoiceHtml(inv) {
+        return `<div class="info-block invoice-row">
+            <div><h4>Rechnung</h4><p>Nr. ${esc(inv.number)}${inv.date ? ` vom ${new Date(inv.date + 'T12:00:00').toLocaleDateString('de-DE')}` : ''} · ${inv.paid ? 'bezahlt' : 'offen'}</p></div>
+            <div class="invoice-action"><button type="button" class="btn btn-ghost btn-small" data-invoice>Als PDF herunterladen</button>
+            <div class="form-error" id="invoice-error" hidden></div></div></div>`;
+    }
+
+    function addDays(ymd, n) {
+        const d = new Date(ymd + 'T12:00:00');
+        d.setDate(d.getDate() + n);
+        return d.toISOString().slice(0, 10);
+    }
+
+    async function copyText(text) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fallback below */ }
+        const t = document.createElement('textarea');
+        t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+        document.body.appendChild(t); t.select();
+        const ok = document.execCommand('copy');
+        t.remove();
+        return ok;
+    }
+
+    async function downloadInvoice(btn) {
+        const err = $('#invoice-error');
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Wird erstellt …';
+        showError(err, '');
+        try {
+            const r = await fetch('api/me/rechnung', { credentials: 'same-origin' });
+            if (!r.ok) throw new Error(await r.text().catch(() => '') || 'Download fehlgeschlagen.');
+            const blob = await r.blob();
+            const name = (/filename="?([^";]+)"?/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'Rechnung.pdf';
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        } catch (e) {
+            showError(err, e.message.length < 200 ? e.message : 'Download fehlgeschlagen.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = label;
+        }
+    }
+
     function contactHtml(c) {
         if (!c || (!c.phone && !c.email)) return '';
         return `<div class="info-block"><h4>Kontakt</h4><p>${c.name ? esc(c.name) + '<br>' : ''}${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : ''}${c.phone && c.email ? ' · ' : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</p></div>`;
@@ -161,6 +235,14 @@
         const box = $('#guest-box');
         const out = box.querySelector('[data-logout]');
         if (out) out.addEventListener('click', async () => { await api('logout', {}); loadMe(); });
+        box.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+            const span = b.querySelector('span');
+            span.textContent = (await copyText(b.dataset.copy)) ? 'Kopiert' : 'Bitte manuell kopieren';
+            b.classList.add('done');
+            setTimeout(() => { span.textContent = 'Kopieren'; b.classList.remove('done'); }, 2000);
+        }));
+        const inv = box.querySelector('[data-invoice]');
+        if (inv) inv.addEventListener('click', () => downloadInvoice(inv));
         const form = box.querySelector('#details-form');
         if (form) {
             form.addEventListener('submit', async e => {

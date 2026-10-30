@@ -5,6 +5,16 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-10-30
+
+### Neu
+- Gästemappe auf „Meine Buchung“: Türcode, WLAN (Passwort mit Kopieren-Knopf), An- und Abreise, Adresse mit Google-Maps-Link, Parken, Hausregeln und frei gestaltbare Abschnitte („Gut zu wissen“). Sichtbar für bestätigte Buchungen bis zum Abreisetag
+- Rechnung zum Download: Gibt es zu einer Buchung eine Rechnung (gleiche Daten, gleicher Gast), kann der Gast sie auf seiner Buchungsseite als PDF herunterladen
+- Verwaltung → Webseite: neuer Bereich „Gästemappe“ mit WLAN-Name, WLAN-Passwort, Anreise & Schlüssel, Parken und „Gut zu wissen“
+
+### Geändert
+- Türcode wird standardmäßig 2 Tage vor Anreise gezeigt (einmalig gesetzt, wenn bisher „nie“ eingestellt war; unter Webseite → Einrichtung änderbar)
+
 ## [1.18.0] - 2026-10-30
 
 ### Geändert

@@ -364,7 +364,17 @@
                             <div class="form-group"><label for="site-bedrooms">Schlafzimmer <small>(0 = ausblenden)</small></label><input type="number" id="site-bedrooms" min="0" max="20"></div>
                         </div>
                         <div class="form-group"><label for="site-testimonials">Gästestimmen <small>(eine pro Zeile: „Text | Name“, z. B. aus Booking.com-Bewertungen)</small></label><textarea id="site-testimonials" rows="4" placeholder="Wunderschöne Wohnung, wir kommen wieder! | Familie M."></textarea></div>
-                        <div class="form-group"><label for="site-arrival-info">Anreise-Infos <small>(nur für angemeldete Gäste mit bestätigter Buchung sichtbar)</small></label><textarea id="site-arrival-info" rows="5" placeholder="Parken, Schlüssel / Türcode, WLAN, Müll …"></textarea></div>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Gästemappe</div>
+                        <p class="text-muted" style="font-size:.85rem">Sehen nur angemeldete Gäste mit bestätigter Buchung, bis zum Abreisetag. Den Türcode zeigt die Seite ab der unter „Einrichtung“ eingestellten Zahl an Tagen vor Anreise.</p>
+                        <div class="form-row">
+                            <div class="form-group"><label for="site-wifi-name">WLAN-Name</label><input type="text" id="site-wifi-name" maxlength="100" autocomplete="off"></div>
+                            <div class="form-group"><label for="site-wifi-password">WLAN-Passwort</label><input type="text" id="site-wifi-password" maxlength="100" autocomplete="off"></div>
+                        </div>
+                        <div class="form-group"><label for="site-arrival-info">Anreise &amp; Schlüssel</label><textarea id="site-arrival-info" rows="4" placeholder="Wie finde ich die Wohnung, wo ist der Eingang, wie funktioniert das Türschloss …"></textarea></div>
+                        <div class="form-group"><label for="site-parking">Parken</label><textarea id="site-parking" rows="2" placeholder="z. B. Stellplatz Nr. 3 im Hof, kostenlos"></textarea></div>
+                        <div class="form-group"><label for="site-guide">Gut zu wissen <small>(Abschnitte durch eine Leerzeile trennen, erste Zeile ist die Überschrift)</small></label><textarea id="site-guide" rows="8" placeholder="Müll&#10;Restmüll und Gelbe Tonne stehen rechts neben dem Eingang.&#10;&#10;Heizung&#10;Thermostat im Flur, bitte beim Lüften herunterdrehen.&#10;&#10;Unsere Tipps&#10;Bäcker Schmidt, 3 Min. zu Fuß, ab 6 Uhr geöffnet."></textarea></div>
                     </div>
                     <div class="card site-card">
                         <div class="today-title">Bilder</div>

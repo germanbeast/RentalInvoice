@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.18.0",
+    "currentVersion": "1.19.0",
     "releases": [
+        {
+            "version": "1.19.0",
+            "date": "2026-10-30",
+            "title": "Gästemappe und Rechnung für Gäste",
+            "features": [
+                "Gäste sehen nach dem Login ihre Gästemappe: Türcode, WLAN, Anreise, Adresse, Parken, Hausregeln und eigene Tipps",
+                "Gäste können ihre Rechnung selbst als PDF herunterladen",
+                "WLAN, Parken und „Gut zu wissen“ pflegst du unter Webseite → Inhalte → Gästemappe"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.18.0",
             "date": "2026-10-30",
