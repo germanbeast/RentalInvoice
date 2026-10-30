@@ -258,7 +258,7 @@ function getUser(username) {
 }
 
 function getAllUsers() {
-    return getDb().prepare('SELECT id, username, role, phone, recovery_key, created_at FROM users ORDER BY created_at').all();
+    return getDb().prepare('SELECT id, username, role, phone, recovery_key IS NOT NULL AS has_recovery_key, created_at FROM users ORDER BY created_at').all();
 }
 
 function getUserByPhone(phone) {
@@ -320,17 +320,37 @@ function isTelegramIdAuthorized(tgId) {
     return false;
 }
 
+// Recovery keys are stored only as a hash; the plain key is shown once when it is created
+function newRecoveryKey() {
+    return require('crypto').randomBytes(12).toString('hex'); // 24 chars
+}
+
+function hashRecoveryKey(key) {
+    return 'sha256:' + require('crypto').createHash('sha256').update(String(key).trim().toLowerCase()).digest('hex');
+}
+
+/** Creates the user and returns the plain recovery key. */
 function createUser(username, hashedPassword, role = 'admin', phone = '', telegramId = '') {
-    const recoveryKey = require('crypto').randomBytes(8).toString('hex'); // 16 chars
-    return getDb().prepare(
+    const recoveryKey = newRecoveryKey();
+    getDb().prepare(
         'INSERT OR REPLACE INTO users (username, password, role, phone, telegram_id, recovery_key) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(username, hashedPassword, role, phone, telegramId, recoveryKey);
+    ).run(username, hashedPassword, role, phone, telegramId, hashRecoveryKey(recoveryKey));
+    return recoveryKey;
+}
+
+/** Replaces the user's recovery key and returns the new plain key (null when the user does not exist). */
+function resetRecoveryKey(id) {
+    const recoveryKey = newRecoveryKey();
+    const r = getDb().prepare('UPDATE users SET recovery_key = ? WHERE id = ?').run(hashRecoveryKey(recoveryKey), id);
+    return r.changes ? recoveryKey : null;
 }
 
 function verifyRecoveryKey(username, key) {
     const user = getUser(username);
-    if (!user || !user.recovery_key) return false;
-    return user.recovery_key.toLowerCase() === key.trim().toLowerCase();
+    if (!user || !user.recovery_key || typeof key !== 'string') return false;
+    const given = Buffer.from(hashRecoveryKey(key));
+    const expected = Buffer.from(user.recovery_key);
+    return given.length === expected.length && require('crypto').timingSafeEqual(given, expected);
 }
 
 function updateUserPassword(username, hashedPassword) {
@@ -360,8 +380,8 @@ function initDefaultUser() {
 
     if (!existing) {
         const hashed = bcrypt.hashSync(defaultPassword, 12);
-        createUser('admin', hashed, 'admin');
-        console.log('✅ Standard-Benutzer "admin" erstellt.');
+        const recoveryKey = createUser('admin', hashed, 'admin');
+        console.log(`✅ Standard-Benutzer "admin" erstellt. Wiederherstellungs-Schlüssel (nur jetzt sichtbar): ${recoveryKey}`);
     } else {
         // Sync password if ADMIN_PASSWORD env var changed
         if (!bcrypt.compareSync(defaultPassword, existing.password)) {
@@ -383,13 +403,13 @@ function initDefaultUser() {
     } catch (e) {
         getDb().exec("ALTER TABLE users ADD COLUMN recovery_key TEXT");
         console.log('🔄 Spalte "recovery_key" zur User-Tabelle hinzugefügt.');
-        // Generate keys for existing users
-        const users = getAllUsers();
-        for (const u of users) {
-            const k = require('crypto').randomBytes(8).toString('hex');
-            getDb().prepare("UPDATE users SET recovery_key = ? WHERE id = ?").run(k, u.id);
-        }
     }
+    // Older versions stored recovery keys in plain text: hash them (the existing keys keep working)
+    const plain = getDb().prepare("SELECT id, recovery_key FROM users WHERE recovery_key IS NOT NULL AND recovery_key NOT LIKE 'sha256:%'").all();
+    for (const u of plain) {
+        getDb().prepare('UPDATE users SET recovery_key = ? WHERE id = ?').run(hashRecoveryKey(u.recovery_key), u.id);
+    }
+    if (plain.length) console.log(`🔐 ${plain.length} Wiederherstellungs-Schlüssel verschlüsselt gespeichert.`);
 }
 
 // Migrate from users.json if it exists
@@ -1111,6 +1131,7 @@ module.exports = {
     updateUser,
     deleteUser,
     verifyRecoveryKey,
+    resetRecoveryKey,
     // Settings
     getSetting,
     setSetting,

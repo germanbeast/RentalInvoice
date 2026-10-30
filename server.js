@@ -941,6 +941,13 @@ function startUserSession(req, user, remember) {
 
 app.disable('x-powered-by');
 
+// Behind a reverse proxy or tunnel (nginx, Caddy, cloudflared …) every request arrives from the proxy's address.
+// Trusting proxies on this machine and in the local network gives rate limits and logs the visitor's real IP
+// (otherwise one visitor's failed logins lock out everyone). Override with TRUST_PROXY in .env, e.g. "1" or "false".
+const trustProxy = process.env.TRUST_PROXY;
+app.set('trust proxy', trustProxy === undefined || trustProxy === '' ? 'loopback, linklocal, uniquelocal'
+    : trustProxy === 'false' ? false : trustProxy === 'true' ? true : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+
 // =======================
 // 5. AUTHENTICATION
 // =======================
@@ -1182,7 +1189,7 @@ app.post('/api/login/verify', loginLimiter, (req, res) => {
 app.post('/api/login/recover', loginLimiter, (req, res) => {
     const { username, recoveryKey } = req.body;
 
-    if (!username || !recoveryKey) {
+    if (!username || !recoveryKey || typeof username !== 'string' || typeof recoveryKey !== 'string') {
         return res.status(400).json({ success: false, message: 'Benutzername und Recovery-Key erforderlich' });
     }
 
@@ -1250,8 +1257,8 @@ app.post('/api/users', loginLimiter, (req, res) => {
 
     try {
         const hashed = bcrypt.hashSync(password, 12);
-        db.createUser(username, hashed, role || 'admin', phone || '');
-        res.json({ success: true, message: 'Benutzer erstellt' });
+        const recoveryKey = db.createUser(username, hashed, role || 'admin', phone || '');
+        res.json({ success: true, message: 'Benutzer erstellt', recoveryKey });
     } catch (e) {
         res.status(500).json({ error: 'Benutzer konnte nicht erstellt werden' });
     }
@@ -1271,6 +1278,18 @@ app.put('/api/users/:id', (req, res) => {
         res.json({ success: true, message: 'Benutzer aktualisiert' });
     } catch (e) {
         res.status(500).json({ error: 'Benutzer konnte nicht aktualisiert werden' });
+    }
+});
+
+// New recovery key; the plain key is returned only in this response
+app.post('/api/users/:id/recovery-key', loginLimiter, (req, res) => {
+    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
+    try {
+        const recoveryKey = db.resetRecoveryKey(req.params.id);
+        if (!recoveryKey) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+        res.json({ success: true, recoveryKey });
+    } catch (e) {
+        res.status(500).json({ error: 'Schlüssel konnte nicht erzeugt werden' });
     }
 });
 
@@ -1492,10 +1511,50 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 // =======================
 // 8. SETTINGS API
 // =======================
+// Passwords and tokens never go back to the browser: a stored one is sent as SECRET_MASK, and the form sends
+// the mask back unchanged when it was not edited. Server-only settings are neither sent nor accepted.
+const SECRET_MASK = '••••••••';
+const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
+const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests'];
+
+function secretPath(settings, [key, field]) {
+    const holder = field ? settings[key] : settings;
+    const name = field || key;
+    return holder && typeof holder === 'object' ? { holder, name } : null;
+}
+
+function maskSettings(settings) {
+    for (const key of SERVER_ONLY_SETTINGS) delete settings[key];
+    for (const p of SECRET_SETTINGS) {
+        const at = secretPath(settings, p);
+        if (at && at.holder[at.name]) at.holder[at.name] = SECRET_MASK;
+    }
+    return settings;
+}
+
+/** Replaces masks in incoming settings with the stored secret and drops server-only keys. */
+function unmaskSettings(incoming) {
+    const stored = db.getAllSettings();
+    for (const key of SERVER_ONLY_SETTINGS) delete incoming[key];
+    for (const p of SECRET_SETTINGS) {
+        const at = secretPath(incoming, p);
+        if (!at || at.holder[at.name] !== SECRET_MASK) continue;
+        const old = secretPath(stored, p);
+        at.holder[at.name] = old ? old.holder[old.name] || '' : '';
+    }
+    return incoming;
+}
+
+/** A token from a test form: the mask stands for the stored token. */
+function formSecret(value, ...p) {
+    if (value !== SECRET_MASK) return value;
+    const at = secretPath(db.getAllSettings(), p);
+    return at ? at.holder[at.name] : '';
+}
+
 app.get('/api/settings', apiLimiter, (req, res) => {
     try {
-        const settings = db.getAllSettings();
-        delete settings.push_vapid; // private push key stays on the server
+        const settings = maskSettings(db.getAllSettings());
         res.json({ success: true, settings });
     } catch (e) {
         console.error('Settings GET Error:', e.message);
@@ -1557,10 +1616,10 @@ app.post('/api/push/test', apiLimiter, async (req, res) => {
 app.put('/api/settings', apiLimiter, (req, res) => {
     try {
         const { settings } = req.body;
-        if (!settings || typeof settings !== 'object') {
+        if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
             return res.status(400).json({ error: 'Ungültige Einstellungen' });
         }
-        db.setAllSettings(settings);
+        db.setAllSettings(unmaskSettings(settings));
 
         // Re-init Telegram if token changed
         if (settings.tg_token) {
@@ -1743,7 +1802,8 @@ app.delete('/api/settings/paperless/cert', apiLimiter, (req, res) => {
 // Test Paperless connection (server-side proxy to use custom cert)
 app.post('/api/settings/paperless/test', apiLimiter, async (req, res) => {
     try {
-        const { url, token } = req.body;
+        const { url } = req.body;
+        const token = formSecret(req.body.token, 'paperless', 'token');
         if (!url || !token) {
             return res.status(400).json({ error: 'URL und Token erforderlich' });
         }
@@ -1986,7 +2046,8 @@ app.put('/api/nuki/pin/:bookingId/extend', apiLimiter, async (req, res) => {
 // =======================
 
 app.post('/api/nuki/test', apiLimiter, async (req, res) => {
-    const { token, lockId } = req.body;
+    const { lockId } = req.body;
+    const token = formSecret(req.body.token, 'nuki', 'token');
     if (!token || !lockId) return res.status(400).json({ error: 'Token und LockID benötigt' });
 
     try {
@@ -2106,7 +2167,13 @@ app.post('/api/branding', apiLimiter, (req, res) => {
             return res.status(400).json({ error: 'Logo ist zu groß (max 2MB)' });
         }
 
-        db.saveBranding({ logo_base64, primary_color, template_config });
+        // Only overwrite what was sent: saving the settings sends just the logo and must keep the invoice template
+        const current = db.getBranding() || {};
+        db.saveBranding({
+            logo_base64: logo_base64 !== undefined ? logo_base64 : current.logo_base64,
+            primary_color: primary_color !== undefined ? primary_color : current.primary_color,
+            template_config: template_config !== undefined ? template_config : current.template_config
+        });
         res.json({ success: true, message: 'Branding gespeichert' });
     } catch (e) {
         console.error('Branding POST Error:', e.message);
@@ -2684,7 +2751,10 @@ app.post('/api/nuki/delete-pin-by-code', apiLimiter, async (req, res) => {
 // API: Send Email
 app.post('/api/send-email', apiLimiter, async (req, res) => {
     try {
-        const { to, subject, body, pdfBuffer, fileName, smtpConfig } = req.body;
+        const { to, subject, body, pdfBuffer, fileName } = req.body;
+        // The SMTP access saved in the settings wins; the password never has to come from the browser
+        const stored = db.getAllSettings().smtp;
+        const smtpConfig = stored && stored.host ? stored : req.body.smtpConfig;
 
         if (!to || !subject || !smtpConfig || !smtpConfig.host) {
             return res.status(400).json({ error: 'Pflichtfelder fehlen' });

@@ -5,6 +5,18 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-10-30
+
+### Sicherheit
+- Sperren nach Fehlversuchen gelten pro Besucher: Die App vertraut jetzt Proxys/Tunneln auf demselben Rechner und im Heimnetz (`trust proxy`) und sieht so die echte IP. Vorher konnte ein Fremder mit ein paar falschen Versuchen Admin-Login, Gast-Login und Notfall-Öffnen für alle sperren. Anpassbar mit `TRUST_PROXY` in der `.env`
+- Wiederherstellungs-Schlüssel (Recovery-Key) werden nur noch als Hash gespeichert (vorhandene Schlüssel gelten weiter) und nicht mehr in der Benutzerliste angezeigt. Neue Schlüssel sind 24 Zeichen lang und werden nur einmal angezeigt: beim Anlegen eines Benutzers oder über „Neuer Recovery-Key“
+- Passwörter und Tokens (Paperless, SMTP, Nuki, Telegram) gehen nicht mehr an den Browser. Die Einstellungen zeigen `••••••••`; unverändert gespeichert bleibt der alte Wert. Notfall-QR-Schlüssel, iCal-Export-Token und Push-Schlüssel lassen sich über die Einstellungen weder lesen noch überschreiben
+- Abhängigkeiten aktualisiert (`npm audit fix`, nodemailer 10), bekannte Lücken von 31 auf 20
+
+### Behoben
+- Das Rechnungstemplate wurde beim Speichern der Einstellungen auf die Standardwerte zurückgesetzt (das Logo-Speichern überschrieb das Template mit `{}`)
+- Die Check-in-E-Mail nutzt die SMTP-Zugangsdaten aus den Einstellungen
+
 ## [1.20.1] - 2026-10-30
 
 ### Behoben
