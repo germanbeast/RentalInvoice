@@ -121,7 +121,7 @@
                     ${s.payment.bank ? `<div class="note prose" style="margin-top:.6rem">${esc(s.payment.bank)}\nVerwendungszweck: ${esc(s.payment.reference)}</div>` : ''}</div>`);
             }
             if (s.state !== 'past') parts.push(guideHtml(s));
-            if (s.invoice) parts.push(invoiceHtml(s.invoice));
+            parts.push(invoiceHtml(s));
 
             if (s.kind === 'booking' && s.state !== 'past') {
                 const dt = s.details || {};
@@ -183,11 +183,48 @@
             <div class="guide-grid">${items.join('')}</div></div>`;
     }
 
-    function invoiceHtml(inv) {
-        return `<div class="info-block invoice-row">
-            <div><h4>Rechnung</h4><p>Nr. ${esc(inv.number)}${inv.date ? ` vom ${new Date(inv.date + 'T12:00:00').toLocaleDateString('de-DE')}` : ''} · ${inv.paid ? 'bezahlt' : 'offen'}</p></div>
-            <div class="invoice-action"><button type="button" class="btn btn-ghost btn-small" data-invoice>Als PDF herunterladen</button>
-            <div class="form-error" id="invoice-error" hidden></div></div></div>`;
+    // Existing invoice: download + correction request. Otherwise the guest can create it once.
+    function invoiceHtml(s) {
+        const inv = s.invoice;
+        if (inv) {
+            return `<div class="info-block"><div class="invoice-row">
+                <div><h4>Rechnung</h4><p>Nr. ${esc(inv.number)}${inv.date ? ` vom ${new Date(inv.date + 'T12:00:00').toLocaleDateString('de-DE')}` : ''} · ${inv.paid ? 'bezahlt' : 'offen'}</p></div>
+                <div class="invoice-action"><button type="button" class="btn btn-ghost btn-small" data-invoice>Als PDF herunterladen</button>
+                <div class="form-error" id="invoice-error" hidden></div></div></div>
+                <button type="button" class="link-btn" data-toggle="invoice-fix-form">Etwas stimmt nicht? Korrektur anfragen</button>
+                <form id="invoice-fix-form" class="invoice-form" novalidate hidden>
+                    <p class="guide-fine">Eine erstellte Rechnung können Sie nicht mehr selbst ändern. Schreiben Sie uns, was falsch ist. Wir korrigieren die Rechnung und melden uns.</p>
+                    <label>Was soll geändert werden?<textarea name="text" rows="3" maxlength="1000" required></textarea></label>
+                    <div class="form-error" id="invoice-fix-error" hidden></div>
+                    <button type="submit" class="btn btn-ghost btn-small">Anfrage senden</button><span class="saved" id="invoice-fix-saved" hidden>Gesendet, wir melden uns.</span>
+                </form></div>`;
+        }
+        const o = s.invoiceOffer;
+        if (!o) return '';
+        const lines = o.positions.map(p => `<div><span>${p.qty > 1 ? `${p.qty} × ` : ''}${esc(p.desc)}${p.qty > 1 ? ` à ${money(p.price)}` : ''}</span><span>${money(p.qty * p.price)}</span></div>`).join('');
+        return `<div class="info-block"><h4>Rechnung</h4>
+            <p>Sie brauchen eine Rechnung? Ergänzen Sie Ihre Rechnungsdaten. Danach können Sie die Rechnung sofort als PDF herunterladen.</p>
+            <button type="button" class="btn btn-dark btn-small" data-toggle="invoice-form">Rechnungsdaten eingeben</button>
+            <form id="invoice-form" class="invoice-form" novalidate hidden>
+                <label>Vor- und Nachname<input type="text" name="name" maxlength="80" autocomplete="name" value="${esc(o.name)}" required></label>
+                <label>Firma <small>optional, nur für Firmenrechnungen</small><input type="text" name="company" maxlength="120" autocomplete="organization"></label>
+                <label>Straße und Hausnummer<input type="text" name="street" maxlength="120" autocomplete="street-address" required></label>
+                <div class="row">
+                    <label>PLZ<input type="text" name="zip" maxlength="10" autocomplete="postal-code" required></label>
+                    <label>Ort<input type="text" name="city" maxlength="80" autocomplete="address-level2" required></label>
+                </div>
+                <div class="row">
+                    <label>Land<input type="text" name="country" maxlength="60" autocomplete="country-name" value="Deutschland"></label>
+                    <label>USt-IdNr. <small>optional</small><input type="text" name="vatId" maxlength="20" placeholder="z. B. DE123456789"></label>
+                </div>
+                <div class="invoice-sum">${lines}
+                    <div class="invoice-total"><span>Gesamtbetrag${o.mwstRate ? ` inkl. ${o.mwstRate} % MwSt.` : ''}</span><span>${money(o.total)}</span></div>
+                    <p>${o.paid ? `Bereits bezahlt über ${esc(s.source)}.` : 'Zahlung per Überweisung, die Bankverbindung steht auf der Rechnung.'}</p>
+                </div>
+                <label class="check"><input type="checkbox" name="confirm" required> Meine Angaben stimmen. Danach kann ich die Rechnung nicht mehr selbst ändern.</label>
+                <div class="form-error" id="invoice-form-error" hidden></div>
+                <button type="submit" class="btn btn-dark btn-small">Rechnung erstellen</button>
+            </form></div>`;
     }
 
     function addDays(ymd, n) {
@@ -247,6 +284,41 @@
         }));
         const inv = box.querySelector('[data-invoice]');
         if (inv) inv.addEventListener('click', () => downloadInvoice(inv));
+        box.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => {
+            const f = document.getElementById(b.dataset.toggle);
+            f.hidden = !f.hidden;
+            if (!f.hidden) { const first = f.querySelector('input:not([value]), input[value=""], textarea'); if (first) first.focus(); }
+        }));
+        const invForm = box.querySelector('#invoice-form');
+        if (invForm) {
+            invForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                const err = $('#invoice-form-error');
+                const btn = invForm.querySelector('[type=submit]');
+                const body = Object.fromEntries(new FormData(invForm).entries());
+                body.confirm = invForm.elements.confirm.checked;
+                btn.disabled = true;
+                btn.textContent = 'Wird erstellt …';
+                const d = await api('me/rechnung', body).catch(() => ({}));
+                if (!d.success) {
+                    btn.disabled = false;
+                    btn.textContent = 'Rechnung erstellen';
+                    return showError(err, d.error || 'Das hat nicht geklappt. Bitte erneut versuchen.');
+                }
+                await loadMe();
+                const dl = $('#guest-box [data-invoice]');
+                if (dl) downloadInvoice(dl);
+            });
+        }
+        const fixForm = box.querySelector('#invoice-fix-form');
+        if (fixForm) {
+            fixForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                const d = await api('me/rechnung/korrektur', { text: fixForm.elements.text.value }).catch(() => ({}));
+                showError($('#invoice-fix-error'), d.success ? '' : (d.error || 'Senden fehlgeschlagen.'));
+                if (d.success) { fixForm.elements.text.value = ''; $('#invoice-fix-saved').hidden = false; }
+            });
+        }
         const form = box.querySelector('#details-form');
         if (form) {
             form.addEventListener('submit', async e => {

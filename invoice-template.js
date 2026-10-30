@@ -84,8 +84,8 @@ function renderInvoiceHtml(data) {
         <!-- RECIPIENT -->
         <div class="inv-recipient">
             <div class="inv-label">Rechnung an</div>
-            <strong>${gName || 'Gast Name'}</strong>
-            <div class="inv-addr">${nl2br(gAdresse || '')}</div>
+            <strong>${escapeHtml(String(gName || 'Gast Name'))}</strong>
+            <div class="inv-addr">${nl2br(escapeHtml(String(gAdresse || '')))}</div>
         </div>
 
         <!-- META -->

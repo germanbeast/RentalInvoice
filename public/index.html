@@ -449,6 +449,13 @@
                         <div class="form-group"><label for="site-payment-info">Zahlungshinweis für Direktbuchungen</label><textarea id="site-payment-info" rows="2"></textarea></div>
                         <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="site-show-bank"> Bankverbindung (aus Einstellungen) bei bestätigten Direktbuchungen zeigen</label>
                         <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="site-show-contact"> Telefon und E-Mail (Vermieter-Daten) auf der Webseite zeigen</label>
+                        <div class="form-group" style="margin-top:1rem"><label for="site-guest-invoice">Gäste erstellen ihre Rechnung selbst</label>
+                            <select id="site-guest-invoice">
+                                <option value="all">Bei allen Buchungen</option>
+                                <option value="direct">Nur bei Direktbuchungen</option>
+                                <option value="off">Aus – ich erstelle Rechnungen selbst</option>
+                            </select></div>
+                        <p class="text-muted" style="font-size:.85rem">Auf „Meine Buchung“ ergänzt der Gast Adresse, Firma und ggf. USt-IdNr. und lädt die Rechnung sofort herunter. Beträge wie im Telegram-Bot aus Preise &amp; Gebühren (Direktbuchungen: vereinbarter Preis). Du bekommst eine Nachricht. Danach kann der Gast nichts mehr ändern, nur eine Korrektur anfragen.</p>
                     </div>
                     <div class="card site-card">
                         <div class="today-title">Direktbuchungen in Booking.com &amp; Airbnb sperren</div>

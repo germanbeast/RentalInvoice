@@ -431,7 +431,7 @@
             // Gast
             const guestName = $('#g-name').value || 'Gast Name';
             $('#inv-g-name').textContent = guestName;
-            $('#inv-g-adresse').innerHTML = nl2br($('#g-adresse').value);
+            $('#inv-g-adresse').innerHTML = nl2br(escapeHtml($('#g-adresse').value));
 
             // Greeting (use template config if available)
             const lastName = guestName.split(' ').pop().toUpperCase();
@@ -1747,7 +1747,8 @@
         max_guests: '#site-max-guests', min_nights: '#site-min-nights', lead_days: '#site-lead-days',
         checkin_time: '#site-checkin', checkout_time: '#site-checkout', pin_days: '#site-pin-days', payment_info: '#site-payment-info',
         testimonials: '#site-testimonials', bedrooms: '#site-bedrooms', size_sqm: '#site-size',
-        wifi_name: '#site-wifi-name', wifi_password: '#site-wifi-password', parking: '#site-parking', guide: '#site-guide'
+        wifi_name: '#site-wifi-name', wifi_password: '#site-wifi-password', parking: '#site-parking', guide: '#site-guide',
+        guest_invoice: '#site-guest-invoice'
     };
     const SITE_CHECKS = { enabled: '#site-enabled', show_bank: '#site-show-bank', show_contact: '#site-show-contact' };
 

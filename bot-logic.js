@@ -438,7 +438,11 @@ async function applyGuestName(bookingId, fullName) {
     return { guestId: guest.id, name, nukiRenamed, nukiError, booking };
 }
 
-async function finalizeInvoiceData(data) {
+/**
+ * Invoice data from the settings (landlord, bank, prices) without a door code.
+ * data: gName, gAdresse, arrival, departure; optional positions, zMethode, zBezahlt, zShowBank, extra.
+ */
+function buildInvoiceData(data) {
     const allSettings = db.getAllSettings();
     const vermieter = allSettings.vermieter || {};
     const bank = allSettings.bank || {};
@@ -460,25 +464,31 @@ async function finalizeInvoiceData(data) {
         aAbreise: data.departure,
         mwstSatz: pricing.mwst_rate,
         kleinunternehmer: pricing.kleinunternehmer,
-        zBezahlt: true,
+        zBezahlt: data.zBezahlt !== false,
         zMethode: data.zMethode || 'Überweisung',
-        zDatum: '',
-        zShowBank: false,
+        zDatum: data.zDatum || '',
+        zShowBank: !!data.zShowBank,
         bInhaber: bank.inhaber,
         bIban: bank.iban,
         bBic: bank.bic,
         bBank: bank.name,
-        positions: [
+        positions: data.positions || [
             { desc: 'Übernachtung', qty: nights, price: pricing.price_per_night },
             { desc: 'Endreinigung', qty: 1, price: pricing.cleaning_fee }
         ],
-        branding: db.getBranding()
+        branding: db.getBranding(),
+        ...(data.extra || {})
     };
 
     // Calculate totalAmount for correct DB storage
     const subtotal = invoiceData.positions.reduce((sum, p) => sum + (p.qty * p.price), 0);
     const mwst = invoiceData.kleinunternehmer ? 0 : subtotal * ((invoiceData.mwstSatz || 0) / 100);
     invoiceData.totalAmount = subtotal + mwst;
+    return invoiceData;
+}
+
+async function finalizeInvoiceData(data) {
+    const invoiceData = buildInvoiceData(data);
 
     // Nuki Logic
     const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
@@ -558,6 +568,7 @@ async function generateInvoicePdf(invoiceData) {
 }
 
 module.exports = {
+    buildInvoiceData,
     parseDates,
     calcNights,
     parseInvoiceText,

@@ -5,7 +5,19 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<<<<<<< HEAD
+## [1.25.0] - 2026-10-30
+
+### Neu
+- Rechnung selbst erstellen: Auf „Meine Buchung“ (auch über den Direktlink ohne Anmeldung) ergänzt der Gast Name, Adresse und bei Bedarf Firma und USt-IdNr. Die Rechnung wird sofort erstellt und als PDF heruntergeladen. Vorher sieht der Gast Positionen und Gesamtbetrag
+- Beträge wie im Telegram-Bot aus Einstellungen → Preise & Gebühren, bei Direktbuchungen der vereinbarte Preis. Booking.com- und Airbnb-Buchungen gelten als „bezahlt via Booking.com/Airbnb“, Direktbuchungen als offen mit Bankverbindung
+- Telegram-Nachricht an dich bei jeder vom Gast erstellten Rechnung (Nummer, Betrag, Empfänger, Aufenthalt)
+- Nach dem Erstellen sind die Daten fest (GoBD). Der Gast kann nur noch „Korrektur anfragen“, das kommt als Telegram-Nachricht bei dir an
+- Einstellung unter Webseite → Einrichtung: „Gäste erstellen ihre Rechnung selbst“ bei allen Buchungen, nur bei Direktbuchungen oder aus
+- Enthält die Gästemappe und den Rechnungs-Download aus PR #16: Türcode, WLAN, An- und Abreise, Adresse, Parken, Hausregeln und eigene Abschnitte auf „Meine Buchung“
+
+### Sicherheit
+- Name und Adresse auf der Rechnung werden im PDF und in der Vorschau im Admin als Text ausgegeben, nicht als HTML
+
 ## [1.24.0] - 2026-10-30
 
 ### Neu
@@ -20,7 +32,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Begrenzung gegen Durchprobieren (20 falsche Links pro 15 Minuten und Besucher), neue Sitzung bei jedem Öffnen
 - Die Tür lässt sich weiterhin nur von der Anreise-Uhrzeit bis zur Abreise-Uhrzeit öffnen
 - Die Gästenachricht geht nur an Telegram, nicht an WhatsApp oder Push
-=======
+
 ## [1.23.0] - 2026-10-30
 
 ### Hinzugefügt
@@ -29,7 +41,6 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Grundriss: eigenes Bild (Webseite → Inhalte → Grundriss), öffnet über den Knopf „Grundriss“ im Vollbild auf weißem Grund
 - Abschnitt „Lage & Umgebung“: Adresse mit „Route planen“ (Google Maps), Anfahrt, Ausflugstipps (Name, Entfernung, Beschreibung, Link) und eine Google-Maps-Karte ohne API-Schlüssel. Die Karte lädt erst nach Klick auf „Karte laden“, vorher wird nichts an Google übertragen (DSGVO). Dafür erlaubt die Content-Security-Policy jetzt Frames von google.com
 - Hausregeln stehen jetzt in einem eigenen Abschnitt unter „Lage & Umgebung“
->>>>>>> origin/main
 
 ## [1.22.0] - 2026-10-30
 
