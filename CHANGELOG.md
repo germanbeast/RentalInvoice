@@ -5,6 +5,18 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-10-30
+
+### Geändert
+- Admin-Oberfläche („Invoice Beckhome“) im gleichen Boutique-/Magazin-Design wie die Gäste-Webseite: Papierton, Tinte und Rost als Farben, Instrument Serif für Titel und Zahlen, Hanken Grotesk für Text, feine Linien statt Schatten, eckige Knöpfe
+- Oberfläche passt sich der Bildschirmgröße an: Schrift wächst auf großen Monitoren mit (16–20 px), Inhalt steht mittig mit max. 1680 px Breite und mitwachsenden Rändern, auf sehr breiten Monitoren bekommt die Rechnungsvorschau mehr Platz
+- TV-Willkommensseite, Login, Einstellungen und Gäste-Verwaltung im neuen Stil; Diagrammfarben angepasst
+- Weniger Rechenlast auf schwachen Geräten: keine großen Unschärfe-Schatten und Farbverläufe mehr
+
+### Behoben
+- Gäste-Verwaltung: Kopfzeile und Inhalt hatten keinen Innenabstand
+- Einstellungen: Menüspalte lief bei kleineren Fensterhöhen über den Rand hinaus
+- Knöpfe nutzten teils die Browser-Standardschrift statt der App-Schrift
 ## [1.16.0] - 2026-10-30
 
 ### Geändert
