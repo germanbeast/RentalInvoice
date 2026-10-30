@@ -5,6 +5,15 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-10-30
+
+### Hinzugefügt
+- Gäste-Webseite, Bewertungen: Gesamtnoten von Booking.com (von 10), Airbnb und Google (von 5) mit Sternen und Anzahl, verlinkbar auf die Plattform, dazu einzelne Bewertungen mit Sternen, Plattform, Name und Monat. Ab sieben Bewertungen gibt es „Alle Bewertungen“. Die Plattformen haben keine offene Schnittstelle, deshalb werden Noten und Texte im Admin unter Webseite → Inhalte → Bewertungen gepflegt. Die bisherigen „Gästestimmen“ werden weiter angezeigt
+- Vollbild-Galerie: „Alle Fotos“ unter den Bildern, Vorschaubilder unten, Wischen auf dem Handy, Pfeiltasten, Vergrößern (Lupe oder Doppelklick), echtes Vollbild wo der Browser es erlaubt; Nachbarbilder werden vorgeladen
+- Grundriss: eigenes Bild (Webseite → Inhalte → Grundriss), öffnet über den Knopf „Grundriss“ im Vollbild auf weißem Grund
+- Abschnitt „Lage & Umgebung“: Adresse mit „Route planen“ (Google Maps), Anfahrt, Ausflugstipps (Name, Entfernung, Beschreibung, Link) und eine Google-Maps-Karte ohne API-Schlüssel. Die Karte lädt erst nach Klick auf „Karte laden“, vorher wird nichts an Google übertragen (DSGVO). Dafür erlaubt die Content-Security-Policy jetzt Frames von google.com
+- Hausregeln stehen jetzt in einem eigenen Abschnitt unter „Lage & Umgebung“
+
 ## [1.22.0] - 2026-10-30
 
 ### Sicherheit
