@@ -2745,6 +2745,22 @@ input[type="checkbox"]:focus-visible {
 .site-photo .site-photo-actions { position: absolute; inset: auto 4px 4px 4px; display: flex; justify-content: space-between; gap: 4px; }
 .site-photo .btn-mini { padding: 2px 8px; background: rgba(251, 248, 243, .8); }
 .site-photo.cover::after { content: 'Titelbild'; position: absolute; top: 4px; left: 4px; font-size: .68rem; padding: 1px 6px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); }
+.site-photo.plan { width: 220px; background: #fff; }
+.site-photo.plan img { object-fit: contain; }
+.rating-rows { margin: .6rem 0 1rem; }
+.rating-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); align-items: end; }
+.list-editor { display: flex; flex-direction: column; gap: 10px; margin-bottom: .6rem; }
+.list-editor:empty { display: none; }
+.list-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; }
+.list-item .li-wide { grid-column: 1 / -1; }
+.list-item label { display: block; font-size: .75rem; color: var(--text-secondary); margin-bottom: 2px; }
+.list-item input, .list-item select, .list-item textarea { width: 100%; }
+.list-item .li-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 6px; }
+@media (max-width: 760px) {
+    .rating-row { grid-template-columns: 1fr 1fr; }
+    .rating-row > :last-child { grid-column: 1 / -1; }
+    .list-item { grid-template-columns: 1fr 1fr; }
+}
 .req-card { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1.4fr) auto; gap: 14px; align-items: start; padding: 14px 16px; }
 .req-card .req-msg { grid-column: 1 / -1; font-size: .85rem; color: var(--text-secondary); white-space: pre-line; }
 .req-status { display: inline-block; font-size: .7rem; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }

@@ -14,6 +14,18 @@
             "fixes": []
         },
         {
+            "version": "1.23.0",
+            "date": "2026-10-30",
+            "title": "Bewertungen, Vollbild-Galerie und Lage mit Karte",
+            "features": [
+                "Gäste-Webseite zeigt deine Noten von Booking.com, Airbnb und Google mit Sternen und deine schönsten Bewertungen (pflegst du unter Webseite → Inhalte)",
+                "Fotos öffnen sich im Vollbild mit Vorschaubildern, lassen sich auf dem Handy durchwischen und vergrößern",
+                "Grundriss hochladen: erscheint als Knopf „Grundriss“ unter den Fotos",
+                "Neuer Abschnitt „Lage & Umgebung“ mit Google-Maps-Karte (lädt erst nach Klick, wegen Datenschutz), Route planen, Anfahrt und Ausflugstipps"
+            ],
+            "fixes": []
+        },
+        {
             "version": "1.22.0",
             "date": "2026-10-30",
             "title": "Mehr Sicherheit und Rechnungsvorlage bleibt erhalten",
