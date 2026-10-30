@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.17.0",
+    "currentVersion": "1.17.1",
     "releases": [
+        {
+            "version": "1.17.1",
+            "date": "2026-10-30",
+            "title": "Empfänger steht wieder auf der Rechnung",
+            "features": [],
+            "fixes": [
+                "Name und Anschrift des Gastes stehen jetzt auf der Rechnung (Vorschau, Drucken, E-Mail und Paperless), oberhalb der Anrede"
+            ]
+        },
         {
             "version": "1.17.0",
             "date": "2026-10-30",

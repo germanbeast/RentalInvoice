@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1] - 2026-10-30
+
+### Behoben
+- Rechnung: Empfänger (Name und Anschrift des Gastes) fehlte in Vorschau, Druck, E-Mail-PDF und Paperless-PDF, weil das Web-Layout den Block per CSS ausblendete. Die Anschrift steht jetzt über der Anrede.
+
 ## [1.17.0] - 2026-10-30
 
 ### Geändert
