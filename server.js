@@ -945,7 +945,7 @@ app.disable('x-powered-by');
 // 5. AUTHENTICATION
 // =======================
 function ensureAuthenticated(req, res, next) {
-    const whitelist = ['/api/login', '/api/login/verify', '/api/login/recover', '/api/whatsapp/qr', '/api/health'];
+    const whitelist = ['/api/login', '/api/login/verify', '/api/login/recover', '/api/health'];
     if (whitelist.includes(req.path)) return next();
 
     if (req.session && req.session.user) return next();

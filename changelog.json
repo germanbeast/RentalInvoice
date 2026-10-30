@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.17.2",
+    "currentVersion": "1.17.3",
     "releases": [
+        {
+            "version": "1.17.3",
+            "date": "2026-10-30",
+            "title": "WhatsApp-Kopplung nur noch mit Login",
+            "features": [],
+            "fixes": [
+                "Der QR-Code zum Koppeln von WhatsApp ist nur noch nach dem Anmelden abrufbar. Vorher konnte jeder, der die Adresse kannte, sein WhatsApp mit der App verbinden"
+            ]
+        },
         {
             "version": "1.17.2",
             "date": "2026-10-30",
