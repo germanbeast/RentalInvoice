@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-10-30
+
+### Sicherheit
+- `/api/whatsapp/qr` stand auf der Auth-Whitelist. Damit konnte jeder ohne Login den QR-Code abrufen und ein eigenes WhatsApp-Konto mit dem Server koppeln. Der Endpunkt verlangt jetzt eine Admin-Sitzung wie `/api/whatsapp/status` und `/api/whatsapp/logout`. Die Kopplung in den Einstellungen läuft unverändert, weil sie nur nach dem Login abgefragt wird.
+
 ## [1.18.0] - 2026-10-30
 
 ### Geändert
