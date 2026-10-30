@@ -15,6 +15,9 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Einstellung unter Webseite → Einrichtung: „Gäste erstellen ihre Rechnung selbst“ bei allen Buchungen, nur bei Direktbuchungen oder aus
 - Enthält die Gästemappe und den Rechnungs-Download aus PR #16: Türcode, WLAN, An- und Abreise, Adresse, Parken, Hausregeln und eigene Abschnitte auf „Meine Buchung“
 
+### Geändert
+- Rechnungs-PDFs (Gast-Download und Telegram-Bot) haben jetzt dasselbe Layout wie die Rechnung im Admin: Aufbau aus der Rechnungsvorschau, Farben, Schriften, Logo-Text, Anrede und Einleitung aus dem Rechnungs-Template. Zusätzlich stehen im PDF Rechnungs-Nr., Datum und Aufenthalt sowie Netto und MwSt. (Pflichtangaben). Bei Firmenrechnungen wird die Person angesprochen, nicht die Firma. „Offen“ wird orange statt grün angezeigt. Nichts wird mehr unten abgeschnitten
+
 ### Sicherheit
 - Name und Adresse auf der Rechnung werden im PDF und in der Vorschau im Admin als Text ausgegeben, nicht als HTML
 

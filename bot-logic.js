@@ -520,7 +520,8 @@ async function finalizeInvoiceData(data) {
 }
 
 async function generateInvoicePdf(invoiceData) {
-    const html = renderInvoiceHtml(invoiceData);
+    // Current invoice template from the settings, like the admin app shows it
+    const html = renderInvoiceHtml({ ...invoiceData, branding: db.getBranding() });
 
     const browser = await puppeteer.launch({
         headless: 'new',
@@ -540,19 +541,27 @@ async function generateInvoicePdf(invoiceData) {
         const page = await browser.newPage();
         await page.setRequestInterception(true);
         page.on('request', (request) => {
-            if (request.resourceType() === 'document' || request.url().startsWith('data:')) {
+            // Only the page itself, inline data and the fonts of the admin app (Google Fonts)
+            const url = request.url();
+            if (request.resourceType() === 'document' || url.startsWith('data:') ||
+                /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(url)) {
                 request.continue();
             } else {
                 request.abort();
             }
         });
-        await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
+        try {
+            await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+        } catch (e) {
+            // Offline: fonts missing, the invoice is still rendered with fallback fonts
+            console.warn('⚠️ Rechnung: Schriften nicht geladen:', e.message);
+        }
+        await page.evaluate(() => document.fonts.ready);
         pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
             margin: { top: '0', right: '0', bottom: '0', left: '0' },
-            preferCSSPageSize: true,
-            scale: 0.85
+            preferCSSPageSize: true
         });
     } finally {
         await browser.close();
