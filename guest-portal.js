@@ -254,6 +254,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         if (!req.originalUrl.split('?')[0].endsWith('/')) return res.redirect(301, `${req.baseUrl}/`);
         res.sendFile(path.join(SITE_DIR, 'index.html'));
     });
+    router.get('/meine-buchung', (req, res) => res.sendFile(path.join(SITE_DIR, 'account.html')));
     router.use(express.static(SITE_DIR, { index: false, dotfiles: 'deny' }));
 
     router.get('/bilder/:file', (req, res) => {
@@ -366,7 +367,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             await sendMail(email, `Ihre Anfrage bei ${site.title} (${code})`,
                 `Guten Tag ${name},\n\nvielen Dank für Ihre Anfrage für den Zeitraum ${period}.\n` +
                 `${q.total ? `Voraussichtlicher Preis: ${money(q.total)}\n` : ''}\n` +
-                `Wir melden uns so schnell wie möglich. Den Stand Ihrer Anfrage sehen Sie jederzeit hier:\n${siteUrl(req)}/#status\n\n` +
+                `Wir melden uns so schnell wie möglich. Den Stand Ihrer Anfrage sehen Sie jederzeit hier:\n${siteUrl(req)}/meine-buchung\n\n` +
                 `Ihr Buchungscode: ${code}\nAnreisedatum: ${formatDateDE(checkin)}\n\nViele Grüße\n${site.title}`);
 
             res.json({ success: true, code, emailSent: smtpReady() });
@@ -622,7 +623,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                     `Anreise ab ${site.checkin_time} Uhr, Abreise bis ${site.checkout_time} Uhr.\n` +
                     `${price ? `\nGesamtpreis: ${money(price)}\n` : ''}` +
                     `${bank ? `${site.payment_info ? `${site.payment_info}\n` : ''}${bank}\nVerwendungszweck: ${r.code}\n` : ''}` +
-                    `${note ? `\n${note}\n` : ''}\nAlle Details und später die Anreiseinformationen finden Sie hier:\n${siteUrl(req)}/#status\n` +
+                    `${note ? `\n${note}\n` : ''}\nAlle Details und später die Anreiseinformationen finden Sie hier:\n${siteUrl(req)}/meine-buchung\n` +
                     `Buchungscode: ${r.code} · Anreisedatum: ${formatDateDE(r.checkin)}\n\nViele Grüße\n${site.title}`);
 
                 res.json({ success: true, bookingId, pin, mailed });
@@ -672,7 +673,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             res.json({
                 success: true, code: b.guest_code, url,
                 text: `Hallo und vielen Dank für Ihre Buchung!\n\nAuf unserer Gäste-Seite finden Sie alle Infos zu Ihrem Aufenthalt und rechtzeitig vor der Anreise die Anreisedetails:\n` +
-                    `${url}/#status\n\nIhr Buchungscode: ${b.guest_code}\nAnreisedatum: ${formatDateDE(b.checkin)}\n\n` +
+                    `${url}/meine-buchung\n\nIhr Buchungscode: ${b.guest_code}\nAnreisedatum: ${formatDateDE(b.checkin)}\n\n` +
                     `Bitte tragen Sie dort kurz Ihren Namen und Ihre Ankunftszeit ein. Wir freuen uns auf Sie!\n${site.title}`
             });
         });
