@@ -121,8 +121,10 @@ function createEmergencyDoor({ express, rateLimit, db, botLogic, qrcode, notify,
         if (c.window) {
             out.from = c.window.from;
             out.until = c.window.until;
-            out.code = c.booking.guest_code;
         }
+        // Shown with the logout link, also when the door cannot be opened right now
+        const b = c.booking || guestBooking(req.session && req.session.guest);
+        if (b) out.code = b.guest_code;
         res.json(out);
     });
 

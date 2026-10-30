@@ -34,9 +34,22 @@
         limit: 'Die Tür wurde in der letzten Stunde schon mehrfach geöffnet. Bitte rufen Sie uns an.'
     };
 
+    function signedIn(code) {
+        $('#mast-logout').hidden = !code;
+        $('#door-who').hidden = !code;
+        $('#door-who').innerHTML = code ? `Angemeldet mit Buchung ${esc(code)} · <button type="button" data-logout>Abmelden</button>` : '';
+    }
+    async function logout() {
+        await api('logout', {});
+        refresh();
+    }
+    $('#mast-logout').addEventListener('click', logout);
+    $('#door-who').addEventListener('click', e => { if (e.target.closest('[data-logout]')) logout(); });
+
     async function refresh() {
         $('#login-box').hidden = true;
         const d = await api('notfall/status', { key });
+        signedIn(d.success && d.code ? d.code : null);
         if (d.status === 429) return show(`<p class="door-msg">${esc(d.error || 'Zu viele Versuche. Bitte später erneut versuchen.')}</p>`);
         if (!d.success) return show('<p class="door-msg">Gerade nicht erreichbar. Bitte rufen Sie uns an.</p>');
         if (d.allowed) return showOpen();

@@ -1,6 +1,16 @@
 {
-    "currentVersion": "1.20.0",
+    "currentVersion": "1.20.1",
     "releases": [
+        {
+            "version": "1.20.1",
+            "date": "2026-10-30",
+            "title": "Abmelden für Gäste leichter",
+            "features": [],
+            "fixes": [
+                "Auf „Meine Buchung“ steht nach dem Anmelden oben rechts „Abmelden“ statt „Zur Startseite“",
+                "Die Notfall-Seite zeigt, mit welcher Buchung man angemeldet ist, und hat einen Abmelde-Knopf"
+            ]
+        },
         {
             "version": "1.20.0",
             "date": "2026-10-30",
