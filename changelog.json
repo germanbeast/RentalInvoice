@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.23.0",
+    "currentVersion": "1.24.0",
     "releases": [
+        {
+            "version": "1.24.0",
+            "date": "2026-10-30",
+            "title": "Fertige Gästenachricht per Telegram",
+            "features": [
+                "Bei jeder neuen Buchung schickt der Telegram-Bot eine fertige Nachricht für den Gast: antippen, kopieren, bei Booking.com oder Airbnb einfügen",
+                "Die Nachricht enthält An- und Abreise, den Türcode, einen persönlichen Link zu „Meine Buchung“ ohne Anmeldung und den Link zum Notfall-Öffnen",
+                "Jederzeit abrufbar mit /nachricht oder „✉️ Gästenachricht“ im Menü, auch auf Englisch",
+                "Der persönliche Link gilt bis einen Tag nach der Abreise und lässt sich im Bot sperren oder durch einen neuen ersetzen"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.23.0",
             "date": "2026-10-30",

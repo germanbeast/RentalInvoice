@@ -74,8 +74,9 @@ function mainMenuKeyboard() {
     return keyboard([
         [btn('🧾 Neue Rechnung', 'new:invoice'), btn('🔑 Nur Tür-Code', 'new:pin')],
         [btn('🔐 Türcodes', 'codes'), btn('📅 Anreisen', 'arrivals')],
-        [btn('🔄 Kalender abfragen', 'sync'), btn('📋 Offene Rechnungen', 'open')],
-        [btn('🚪 Schloss', 'lock:status'), btn('❓ Hilfe', 'help')]
+        [btn('✉️ Gästenachricht', 'gm'), btn('📋 Offene Rechnungen', 'open')],
+        [btn('🔄 Kalender abfragen', 'sync'), btn('🚪 Schloss', 'lock:status')],
+        [btn('❓ Hilfe', 'help')]
     ]);
 }
 
@@ -154,6 +155,7 @@ async function showHelp(bot, chatId) {
         '• <code>/namen</code> – Gastnamen zu Buchungen nachtragen\n' +
         '• <code>/sync</code> – Booking.com &amp; Airbnb jetzt abfragen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
+        '• <code>/nachricht</code> – fertige Nachricht für den Gast (zum Kopieren)\n' +
         '• <code>/schloss</code> – Schloss-Status und Batterie\n' +
         '• <code>/zu</code> – Tür abschließen\n' +
         '• <code>/auf</code> – Tür aufschließen/öffnen (mit Rückfrage)\n' +
@@ -289,7 +291,10 @@ async function executeGuestName(bot, chatId, session) {
         const rows = [[btn('🧾 Rechnung erstellen', `inv:${session.bookingId}`)]];
         if (left > 0) rows.push([btn(`👤 Weitere Namen offen (${left})`, 'names')]);
         rows.push([btn('🔐 Türcodes', 'codes'), btn('🏠 Hauptmenü', 'menu')]);
-        return send(bot, chatId, text, keyboard(rows));
+        await send(bot, chatId, text, keyboard(rows));
+        // The guest message now greets the guest by name
+        if (r.booking.checkout >= new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date())) await showGuestMessage(bot, chatId, session.bookingId);
+        return;
     } catch (e) {
         console.error('[TG] Gastname speichern:', e);
         session.busy = false;
@@ -444,6 +449,81 @@ async function showArrivals(bot, chatId) {
     if (missingCount > 0) kb.push([btn(`👤 Namen eintragen (${missingCount})`, 'names')]);
     kb.push([btn('🏠 Hauptmenü', 'menu')]);
     return send(bot, chatId, text, keyboard(kb));
+}
+
+// ---------------------------------------------------------------------------
+// Gästenachricht: fertiger Text zum Kopieren in Booking.com / Airbnb
+// ---------------------------------------------------------------------------
+function guestMessageApi() {
+    return hooks.guestMessage ? hooks.guestMessage() : null;
+}
+
+async function showGuestMessageList(bot, chatId) {
+    const api = guestMessageApi();
+    if (!api) return send(bot, chatId, '❌ Die Gästenachricht ist nicht verfügbar.', menuOnlyKeyboard());
+    let rows;
+    try { rows = api.upcoming(8); } catch (e) {
+        console.error('[TG] Gästenachricht-Liste:', e.message);
+        return send(bot, chatId, '❌ Buchungen konnten nicht geladen werden.', menuOnlyKeyboard());
+    }
+    if (!rows.length) return send(bot, chatId, '📅 Keine aktuellen oder kommenden Buchungen.', menuOnlyKeyboard());
+    const kb = rows.map(r => {
+        const real = r.guest_name || guessNameFromSummary(r.summary);
+        const name = botLogic.isPlaceholderGuestName(real) ? 'Name fehlt' : short(real, 22);
+        return [btn(`✉️ ${fmtDate(r.checkin).slice(0, 6)}–${fmtDate(r.checkout).slice(0, 6)} · ${name}`, `gm:${r.id}`)];
+    });
+    kb.push([btn('🏠 Hauptmenü', 'menu')]);
+    return send(bot, chatId, '<b>✉️ Gästenachricht</b>\nFür welche Buchung?', keyboard(kb));
+}
+
+async function showGuestMessage(bot, chatId, bookingId, lang = 'de') {
+    const api = guestMessageApi();
+    if (!api) return send(bot, chatId, '❌ Die Gästenachricht ist nicht verfügbar.', menuOnlyKeyboard());
+    const m = api.compose(bookingId, lang);
+    if (!m) return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard());
+
+    const b = m.booking;
+    const who = m.name ? esc(short(m.name, 30)) : 'Gast';
+    let text = `✉️ <b>Gästenachricht${lang === 'en' ? ' (English)' : ''}: ${who}</b> · ${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)}\n` +
+        'Tippe auf den Text, um ihn zu kopieren, und füge ihn bei Booking.com oder Airbnb ein.\n';
+    if (m.link) text += `<i>Der Link gilt bis ${fmtDate(m.linkUntil)}.</i>\n`;
+    m.warnings.forEach(w => { text += `⚠️ ${esc(w)}\n`; });
+    text += `\n<pre>${esc(m.text)}</pre>`;
+
+    const rows = [];
+    const first = [];
+    if (m.link) first.push({ text: '📋 Nur Link kopieren', copy_text: { text: m.link } });
+    first.push(lang === 'en' ? btn('🇩🇪 Deutsch', `gm:${b.id}`) : btn('🇬🇧 English', `gm:en:${b.id}`));
+    rows.push(first);
+    if (m.link) rows.push([btn('🔁 Neuer Link', `gl:new?:${b.id}`), btn('🔒 Link sperren', `gl:off:${b.id}`)]);
+    if (!m.name) rows.push([btn('👤 Namen eintragen', `nm:${b.id}`)]);
+    rows.push([btn('🏠 Hauptmenü', 'menu')]);
+    return send(bot, chatId, text, keyboard(rows));
+}
+
+async function confirmNewGuestLink(bot, chatId, bookingId) {
+    return send(bot, chatId,
+        '🔁 <b>Neuen Link erstellen?</b>\n\nDer bisherige Link funktioniert dann nicht mehr. ' +
+        'Schick dem Gast danach die neue Nachricht.',
+        keyboard([[btn('🔁 Ja, neuer Link', `gl:new!:${bookingId}`), btn('❌ Abbrechen', `gm:${bookingId}`)]]));
+}
+
+async function renewGuestLink(bot, chatId, bookingId) {
+    const api = guestMessageApi();
+    if (!api || !api.ensureLink(bookingId, true)) return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard());
+    console.log(`🔁 Gäste-Link für Buchung ${bookingId} erneuert (Telegram ${chatId})`);
+    await send(bot, chatId, '✅ Neuer Link erstellt. Der alte Link funktioniert nicht mehr.');
+    return showGuestMessage(bot, chatId, bookingId);
+}
+
+async function blockGuestLink(bot, chatId, bookingId) {
+    const api = guestMessageApi();
+    if (!api || !api.revokeLink(bookingId)) return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard());
+    console.log(`🔒 Gäste-Link für Buchung ${bookingId} gesperrt (Telegram ${chatId})`);
+    return send(bot, chatId,
+        '🔒 <b>Link gesperrt.</b>\nDer Gast kommt damit nicht mehr in „Meine Buchung“ und nicht mehr zum Notfall-Öffnen. ' +
+        'Anmelden mit Buchungscode und Anreisedatum geht weiterhin.',
+        keyboard([[btn('🔁 Neuen Link erstellen', `gm:${bookingId}`), btn('🏠 Hauptmenü', 'menu')]]));
 }
 
 // ---------------------------------------------------------------------------
@@ -836,7 +916,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -937,6 +1017,8 @@ async function processMessage(bot, msg) {
                 return showCodes(bot, chatId);
             case 'anreisen':
                 return showArrivals(bot, chatId);
+            case 'nachricht':
+                return showGuestMessageList(bot, chatId);
             case 'rechnung':
                 return startFlow(bot, chatId, 'invoice', cmd.rest);
             case 'pin':
@@ -1072,6 +1154,19 @@ async function processCallback(bot, q) {
                     return send(bot, chatId, '⏱ Die Rückfrage ist abgelaufen. Bitte noch einmal <code>/auf</code> senden.', lockKeyboard());
                 }
                 return runLockAction(bot, chatId, data === 'lock:auf!' ? 'unlock' : 'unlatch', who);
+            case data === 'gm':
+                return showGuestMessageList(bot, chatId);
+            case data.startsWith('gm:en:'):
+                return showGuestMessage(bot, chatId, parseInt(data.slice(6), 10), 'en');
+            case data.startsWith('gm:'):
+                return showGuestMessage(bot, chatId, parseInt(data.slice(3), 10));
+            case data.startsWith('gl:new?:'):
+                return confirmNewGuestLink(bot, chatId, parseInt(data.slice(8), 10));
+            case data.startsWith('gl:new!:'):
+                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+                return renewGuestLink(bot, chatId, parseInt(data.slice(8), 10));
+            case data.startsWith('gl:off:'):
+                return blockGuestLink(bot, chatId, parseInt(data.slice(7), 10));
             case data.startsWith('nm:'):
                 return startNameFlow(bot, chatId, parseInt(data.slice(3), 10));
             case data.startsWith('inv:'):
@@ -1146,6 +1241,7 @@ async function setup(bot, options = {}) {
             { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },
             { command: 'anreisen', description: 'Kommende Buchungen anzeigen' },
+            { command: 'nachricht', description: 'Fertige Nachricht für den Gast' },
             { command: 'schloss', description: 'Schloss-Status und Batterie' },
             { command: 'zu', description: 'Tür abschließen' },
             { command: 'auf', description: 'Tür aufschließen (mit Rückfrage)' },
@@ -1161,6 +1257,7 @@ module.exports = {
     processMessage,
     processCallback,
     setup,
+    showGuestMessage,
     // für Tests
     _internal: { sessions, detectCommand, applyInput, FLOWS }
 };

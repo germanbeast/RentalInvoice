@@ -5,6 +5,22 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+<<<<<<< HEAD
+## [1.24.0] - 2026-10-30
+
+### Neu
+- Fertige Gästenachricht per Telegram: Bei jeder neuen Buchung aus Booking.com oder Airbnb schickt der Bot zusätzlich einen kopierfertigen Text für den Gast (antippen kopiert ihn). Inhalt: Anrede mit Vorname, An- und Abreise mit Uhrzeit, Türcode, persönlicher Link zu „Meine Buchung“, Link zum Notfall-Öffnen, Buchungscode, Telefonnummer
+- Abrufbar mit `/nachricht` oder „✉️ Gästenachricht“ im Hauptmenü, Knopf „🇬🇧 English“ für die englische Version, „📋 Nur Link kopieren“
+- Nach „Namen eintragen“ kommt die Nachricht automatisch noch einmal mit dem Namen des Gastes
+- Persönlicher Direktlink `/gast/b/<token>`: meldet den Gast ohne Buchungscode an. Der Link `/gast/b/<token>/notfall` öffnet direkt die Notfall-Seite
+
+### Sicherheit
+- Pro Buchung ein zufälliger Schlüssel (43 Zeichen), gültig bis einen Tag nach der Abreise; bei Storno endet er sofort
+- Im Bot „🔒 Link sperren“ oder „🔁 Neuer Link“: Wer mit dem alten Link angemeldet ist, wird abgemeldet
+- Begrenzung gegen Durchprobieren (20 falsche Links pro 15 Minuten und Besucher), neue Sitzung bei jedem Öffnen
+- Die Tür lässt sich weiterhin nur von der Anreise-Uhrzeit bis zur Abreise-Uhrzeit öffnen
+- Die Gästenachricht geht nur an Telegram, nicht an WhatsApp oder Push
+=======
 ## [1.23.0] - 2026-10-30
 
 ### Hinzugefügt
@@ -13,6 +29,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Grundriss: eigenes Bild (Webseite → Inhalte → Grundriss), öffnet über den Knopf „Grundriss“ im Vollbild auf weißem Grund
 - Abschnitt „Lage & Umgebung“: Adresse mit „Route planen“ (Google Maps), Anfahrt, Ausflugstipps (Name, Entfernung, Beschreibung, Link) und eine Google-Maps-Karte ohne API-Schlüssel. Die Karte lädt erst nach Klick auf „Karte laden“, vorher wird nichts an Google übertragen (DSGVO). Dafür erlaubt die Content-Security-Policy jetzt Frames von google.com
 - Hausregeln stehen jetzt in einem eigenen Abschnitt unter „Lage & Umgebung“
+>>>>>>> origin/main
 
 ## [1.22.0] - 2026-10-30
 
