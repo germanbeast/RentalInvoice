@@ -17,6 +17,7 @@
     const nightsTxt = n => `${n} ${n === 1 ? 'Nacht' : 'Nächte'}`;
 
     let info = null;
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let photos = [];
     let lbIndex = 0;
     let booked = [];
@@ -65,6 +66,8 @@
         const rest = photos.slice(4);
         $('#strip').innerHTML = rest.map((p, i) => thumb(p, i + 4)).join('');
         $('#gallery-wrap').hidden = !rest.length;
+
+        observeReveals();
 
         $('#voices-list').innerHTML = (d.testimonials || []).map(t => `<figure><blockquote>${esc(t.text)}</blockquote>${t.name ? `<figcaption>${esc(t.name)}</figcaption>` : ''}</figure>`).join('');
         $('#voices').hidden = !(d.testimonials || []).length;
@@ -185,6 +188,7 @@
             return;
         }
         q.hidden = !d.total;
+        q.classList.remove('q-in'); void q.offsetWidth; q.classList.add('q-in');
         if (d.total) {
             q.innerHTML = `
                 <div class="q-row"><span>${nightsTxt(d.nights)} × ${money(d.night)}</span><span>${money(d.nights * d.night)}</span></div>
@@ -393,7 +397,11 @@
 
     function showPhoto(i) {
         lbIndex = (i + photos.length) % photos.length;
-        $('#lightbox-img').src = photos[lbIndex];
+        const img = $('#lightbox-img');
+        if (img.getAttribute('src') && !reduceMotion) {
+            img.classList.add('swap');
+            setTimeout(() => { img.src = photos[lbIndex]; }, 180);
+        } else img.src = photos[lbIndex];
         $('#lightbox-count').textContent = `${lbIndex + 1} / ${photos.length}`;
         $('#lightbox-prev').hidden = $('#lightbox-next').hidden = photos.length < 2;
     }
@@ -412,6 +420,40 @@
         if (e.key === 'ArrowLeft') showPhoto(lbIndex - 1);
         if (e.key === 'ArrowRight') showPhoto(lbIndex + 1);
     });
+
+    $('#lightbox-img').addEventListener('load', e => e.target.classList.remove('swap'));
+
+    // Photos open like a curtain the first time they scroll into view
+    function observeReveals() {
+        if (reduceMotion || !('IntersectionObserver' in window)) return;
+        const io = new IntersectionObserver(entries => entries.forEach(e => {
+            if (!e.isIntersecting) return;
+            e.target.classList.remove('pending');
+            io.unobserve(e.target);
+        }), { rootMargin: '0px 0px -12% 0px' });
+        document.querySelectorAll('#gallery button, #strip button').forEach((el, i) => {
+            const r = el.getBoundingClientRect();
+            if (r.top < innerHeight) return; // already on screen: no wipe
+            el.classList.add('reveal', 'pending');
+            el.style.transitionDelay = `${(i % 3) * 90}ms`;
+            io.observe(el);
+        });
+    }
+
+    // Cover drifts a little slower than the page
+    const coverMedia = $('#hero-media');
+    if (!reduceMotion) {
+        let ticking = false;
+        addEventListener('scroll', () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+                const y = Math.min(scrollY, innerHeight);
+                coverMedia.style.transform = `translate3d(0, ${y * 0.25}px, 0)`;
+                ticking = false;
+            });
+        }, { passive: true });
+    }
 
     // Masthead turns solid once the cover has scrolled away
     const mast = $('#masthead');
