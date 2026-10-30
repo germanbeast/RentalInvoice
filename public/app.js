@@ -1484,11 +1484,23 @@
             const todo = [];
             if (d.namesMissing > 0) todo.push(`<div class="today-warn">❓ ${d.namesMissing} Buchung${d.namesMissing === 1 ? '' : 'en'} ohne Namen – <button class="today-link" data-goto="noname">jetzt eintragen</button></div>`);
             if (d.openInvoices.count > 0) todo.push(`<div>🧾 ${d.openInvoices.count} offene Rechnung${d.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(d.openInvoices.total)})</div>`);
-            d.warnings.forEach(w => todo.push(`<div class="${w.type === 'overlap' || w.type === 'sync' ? 'today-bad' : 'today-warn'}">⚠️ ${escapeHtml(w.text)}</div>`));
+            d.warnings.forEach(w => {
+                const bad = w.type === 'overlap' || w.type === 'sync' || w.bad;
+                const icon = w.type === 'lock' ? '🔋' : '⚠️';
+                const ack = w.type === 'overlap' && w.key ? ` <button class="today-link" data-ack="${escapeHtml(w.key)}">ist in Ordnung</button>` : '';
+                todo.push(`<div class="${bad ? 'today-bad' : 'today-warn'}">${icon} ${escapeHtml(w.text)}${ack}</div>`);
+            });
             $('#today-todo').innerHTML = todo.length ? todo.join('') : '<div class="today-empty">✅ Alles erledigt – nichts offen.</div>';
             $('#today-todo').querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => {
                 bookingsFilter = 'noname';
                 switchView('bookings');
+            }));
+            $('#today-todo').querySelectorAll('[data-ack]').forEach(b => b.addEventListener('click', async () => {
+                if (!confirm('Überschneidung geprüft und in Ordnung? Danach kommt dazu keine Erinnerung mehr.')) return;
+                try {
+                    await apiJson('/api/overlaps/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.ack }) });
+                } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
+                loadOverview();
             }));
 
             const st = $('#today-status');
@@ -2066,6 +2078,7 @@
 
     async function loadDashboard() {
         loadOverview();
+        loadReview(reviewYear);
         try {
             const res = await fetch('/api/stats');
             const data = await res.json();
@@ -2171,6 +2184,172 @@
             }
         });
     }
+
+    // =======================
+    // Jahresrückblick
+    // =======================
+    const MONTHS_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    const MONTHS_LONG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    let reviewYear = null;
+    let reviewMap = null;
+    let reviewMarkers = null;
+    let reviewGeoRun = 0;
+    const numDE = (n, d = 0) => Number(n || 0).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+    async function loadReview(year) {
+        const sec = $('#review-section');
+        if (!sec) return;
+        try {
+            const d = await apiJson('/api/review' + (year ? `?year=${year}` : ''));
+            if (!d.success) { $('#review-note').textContent = d.error || 'Rückblick konnte nicht geladen werden'; return; }
+            renderReview(d.review);
+        } catch (e) {
+            $('#review-note').textContent = 'Keine Verbindung zum Server.';
+        }
+    }
+
+    function renderReview(r) {
+        reviewYear = r.year;
+        const sel = $('#review-year');
+        sel.innerHTML = r.years.map(y => `<option value="${y}"${y === r.year ? ' selected' : ''}>${y}</option>`).join('');
+        const running = r.today.slice(0, 4) === String(r.year);
+        $('#review-note').textContent = running ? `Stand heute – bereits gebuchte Nächte bis Jahresende zählen mit` : '';
+
+        const p = r.previous;
+        const delta = (cur, prev, pts) => {
+            if (!p || prev == null || (!pts && !prev)) return '';
+            const v = pts ? Math.round((cur - prev) * 10) / 10 : Math.round((cur - prev) / prev * 100);
+            if (!v) return `<span class="review-delta">wie ${r.year - 1}</span>`;
+            return `<span class="review-delta ${v > 0 ? 'up' : 'down'}">${v > 0 ? '▲ +' : '▼ '}${numDE(v, pts ? 1 : 0)}${pts ? ' Pkt.' : ' %'} ggü. ${r.year - 1}</span>`;
+        };
+        const tile = (label, value, sub, d) => `
+            <div class="card stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>
+            ${sub ? `<div class="review-sub">${sub}</div>` : ''}${d || ''}</div>`;
+        $('#review-kpis').innerHTML = [
+            tile('Auslastung', `${numDE(r.occupancy, 1)} %`, `${r.nights} von ${r.days} Nächten`, delta(r.occupancy, p && p.occupancy, true)),
+            tile('Aufenthalte', r.stays, `Ø ${numDE(r.avgStay, 1)} Nächte · längster ${r.longestStay}`, delta(r.stays, p && p.stays)),
+            tile('Umsatz', formatCurrency(r.revenue), r.openRevenue ? `davon offen ${formatCurrency(r.openRevenue)}` : `${r.invoices} Rechnung${r.invoices === 1 ? '' : 'en'}`, delta(r.revenue, p && p.revenue)),
+            tile('Pro belegter Nacht', r.perNight ? formatCurrency(r.perNight) : '–', 'Umsatz ÷ Nächte', delta(r.perNight, p && p.perNight)),
+            tile('Ergebnis', formatCurrency(r.result), `Ausgaben ${formatCurrency(r.expenses)}`, delta(r.result, p && p.result)),
+            tile('Gäste', r.guests, r.guests ? `davon ${r.returning} ${r.returning === 1 ? 'Stammgast' : 'Stammgäste'}` : 'mit Namen erfasst', '')
+        ].join('');
+
+        renderReviewMonths(r);
+
+        const maxN = Math.max(1, ...r.channels.map(c => c.nights));
+        $('#review-channels').innerHTML = r.channels.length ? r.channels.map(c => `
+            <div class="review-bar">
+                <div class="review-bar-head"><span>${escapeHtml(c.label)}</span><small>${c.stays}× · ${c.nights} Nächte</small></div>
+                <div class="review-bar-track"><div class="review-bar-fill" style="width:${Math.round(c.nights / maxN * 100)}%"></div></div>
+            </div>`).join('') + (r.busiestMonth ? `<p class="review-hint">Stärkster Monat: ${MONTHS_LONG[r.busiestMonth - 1]} (${r.months[r.busiestMonth - 1]} Nächte)</p>` : '')
+            : '<div class="today-empty">Keine Aufenthalte in diesem Jahr.</div>';
+
+        renderReviewOrigins(r.origins);
+        if (r.origins.pending) geocodeReview(r.year);
+    }
+
+    function renderReviewMonths(r) {
+        const canvas = $('#reviewMonthsChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+        if (window.myReviewChart) window.myReviewChart.destroy();
+        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: '#8a4b2a', borderRadius: 1 }];
+        if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        window.myReviewChart = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: { labels: MONTHS_SHORT, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, suggestedMax: 31, ticks: { precision: 0 } } },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6 } },
+                    tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} Nächte` } }
+                }
+            }
+        });
+    }
+
+    function renderReviewOrigins(o) {
+        const list = (title, rows) => rows.length ? `<h4>${title}</h4><ul>${rows.join('')}</ul>` : '';
+        $('#review-countries').innerHTML = list('Länder', o.countries.map(c =>
+            `<li><span>${c.flag ? c.flag + ' ' : ''}${escapeHtml(c.name)}</span><span>${c.stays}</span></li>`));
+        $('#review-places').innerHTML = list('Orte', o.places.filter(p => p.city).slice(0, 8).map(p =>
+            `<li><span>${escapeHtml(p.city)}${p.cc && p.cc !== 'DE' ? ` <small>(${escapeHtml(p.country)})</small>` : ''}</span><span>${p.stays}</span></li>`));
+        const notes = [];
+        if (o.known) notes.push(`${o.known} Aufenthalt${o.known === 1 ? '' : 'e'} mit Adresse`);
+        if (o.unknown) notes.push(`${o.unknown} ohne Adresse (z. B. Booking.com/Airbnb ohne Rechnung)`);
+        if (o.pending) notes.push(`${o.pending} Ort${o.pending === 1 ? ' wird' : 'e werden'} noch auf der Karte gesucht …`);
+        $('#review-origin-note').textContent = notes.join(' · ');
+        drawReviewMap(o.places.filter(p => p.lat != null && p.lon != null));
+    }
+
+    let leafletLoading = null;
+    function loadLeaflet() {
+        if (window.L) return Promise.resolve();
+        if (leafletLoading) return leafletLoading;
+        leafletLoading = new Promise((resolve, reject) => {
+            const css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+            document.head.appendChild(css);
+            const js = document.createElement('script');
+            js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+            js.onload = resolve;
+            js.onerror = () => { leafletLoading = null; reject(new Error('Karte konnte nicht geladen werden')); };
+            document.head.appendChild(js);
+        });
+        return leafletLoading;
+    }
+
+    async function drawReviewMap(points) {
+        const el = $('#review-map');
+        if (!points.length) {
+            if (reviewMap) { reviewMap.remove(); reviewMap = null; }
+            el.innerHTML = '<div class="review-map-empty">Noch keine Herkunftsorte. Sie kommen aus den Adressen der Gäste und Rechnungen.</div>';
+            return;
+        }
+        try { await loadLeaflet(); } catch (e) {
+            el.innerHTML = `<div class="review-map-empty">${escapeHtml(e.message)}</div>`;
+            return;
+        }
+        if (!reviewMap) {
+            el.innerHTML = '';
+            reviewMap = L.map(el, { scrollWheelZoom: false, worldCopyJump: true });
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 12, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+            }).addTo(reviewMap);
+            reviewMarkers = L.layerGroup().addTo(reviewMap);
+        }
+        reviewMarkers.clearLayers();
+        const max = Math.max(...points.map(p => p.stays));
+        points.forEach(p => {
+            const label = p.city ? `${p.zip ? p.zip + ' ' : ''}${p.city}${p.country && p.cc !== 'DE' ? ', ' + p.country : ''}` : `${p.country} (Ort unbekannt)`;
+            L.circleMarker([p.lat, p.lon], {
+                radius: 6 + Math.round(10 * Math.sqrt(p.stays / max)),
+                color: '#fbf8f3', weight: 2, fillColor: p.city ? '#8a4b2a' : '#675e52', fillOpacity: .85
+            }).bindTooltip(`${escapeHtml(label)}: ${p.stays} Aufenthalt${p.stays === 1 ? '' : 'e'}`).addTo(reviewMarkers);
+        });
+        const bounds = L.latLngBounds(points.map(p => [p.lat, p.lon]));
+        reviewMap.invalidateSize();
+        reviewMap.fitBounds(bounds.pad(0.25), { maxZoom: 8 });
+    }
+
+    // Looks up the remaining places step by step (the server asks OpenStreetMap at most once per second)
+    async function geocodeReview(year) {
+        const run = ++reviewGeoRun;
+        for (let i = 0; i < 15; i++) {
+            let d;
+            try {
+                d = await apiJson('/api/review/geo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year }) });
+            } catch (e) { return; }
+            if (run !== reviewGeoRun || reviewYear !== year || !d.success) return;
+            if (d.busy) { await new Promise(r => setTimeout(r, 3000)); continue; }
+            renderReviewOrigins(d.origins);
+            if (!d.remaining || !d.looked) return;
+        }
+    }
+
+    const reviewYearSel = $('#review-year');
+    if (reviewYearSel) reviewYearSel.addEventListener('change', () => loadReview(parseInt(reviewYearSel.value, 10)));
 
     // =======================
     // Expenses Module

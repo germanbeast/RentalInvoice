@@ -10,7 +10,7 @@
 const webpush = require('web-push');
 
 const BOOKING_TYPES = new Set(['new_booking', 'booking_cancelled', 'overlap_warning', 'cancel_guard']);
-const IMPORTANT_TYPES = new Set([...BOOKING_TYPES, 'nuki_unlocked', 'nuki_battery', 'nuki_emergency']);
+const IMPORTANT_TYPES = new Set([...BOOKING_TYPES, 'nuki_unlocked', 'nuki_battery', 'nuki_offline', 'nuki_emergency']);
 const MAX_FAILS = 5; // drop a subscription after this many consecutive non-permanent failures
 
 function createPush({ db }) {

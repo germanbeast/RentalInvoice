@@ -271,7 +271,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), guestMessage: () => guestMessage }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -747,6 +747,13 @@ cron.schedule('0 8 * * *', async () => {
         // 1. Expired Nuki codes are deleted by the hourly cleanup job (runNukiCleanup)
         await runNukiCleanup();
 
+        // 1b. Double bookings that are still open -> remind once a day
+        try {
+            await bookingMonitor.remindOverlaps();
+        } catch (oe) {
+            console.error('\u274c Doppelbuchungs-Erinnerung Fehler:', oe.message);
+        }
+
         // 2. Reminders (existing logic)
         // ...
         try {
@@ -865,9 +872,9 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"], // Leaflet (map in the year review)
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "blob:"],
+            imgSrc: ["'self'", "data:", "blob:", "https://tile.openstreetmap.org"], // map tiles of the year review
             connectSrc: ["'self'", "https://cdnjs.cloudflare.com"],
             frameSrc: ["https://www.google.com", "https://maps.google.com"], // map on the guest website (loads only after a click)
             objectSrc: ["'none'"],
@@ -1468,9 +1475,15 @@ app.get('/api/overview', apiLimiter, (req, res) => {
 
         const warnings = [];
         try {
-            bookingMonitor.findOverlaps().forEach(([a, b]) => {
-                warnings.push({ type: 'overlap', text: `Überschneidung: ${a.source || 'Booking.com'} ${formatDateDE(a.checkin)}–${formatDateDE(a.checkout)} ↔ ${b.source || 'Airbnb'} ${formatDateDE(b.checkin)}–${formatDateDE(b.checkout)}` });
+            bookingMonitor.openOverlaps().forEach(({ a, b, key, identical }) => {
+                warnings.push({
+                    type: 'overlap', key,
+                    text: `${identical ? 'Gleicher Zeitraum' : 'Mögliche Doppelbuchung'}: ${a.source || 'Booking.com'} ${formatDateDE(a.checkin)}–${formatDateDE(a.checkout)} ↔ ${b.source || 'Airbnb'} ${formatDateDE(b.checkin)}–${formatDateDE(b.checkout)}`
+                });
             });
+        } catch (e) { /* ignore */ }
+        try {
+            bookingMonitor.lockWarnings().forEach(w => warnings.push(w));
         } catch (e) { /* ignore */ }
         active.filter(r => !r.hasCode && r.source !== 'manual' && r.checkin <= addDays(today, 7) && r.state !== 'departing').forEach(r => {
             warnings.push({ type: 'nocode', text: `Kein Türcode für ${r.name || r.source + '-Buchung'} (${formatDateDE(r.checkin)})` });
@@ -1491,6 +1504,13 @@ app.get('/api/overview', apiLimiter, (req, res) => {
         console.error('Overview API Error:', e.message);
         res.status(500).json({ success: false, error: 'Übersicht konnte nicht geladen werden' });
     }
+});
+
+// Double booking checked and in order (e.g. calendars linked): no more reminders, hidden on the dashboard
+app.post('/api/overlaps/ack', apiLimiter, (req, res) => {
+    const key = String((req.body && req.body.key) || '');
+    if (!/^\d+-\d+(:|$)/.test(key)) return res.status(400).json({ success: false, error: 'Ungültige Angabe' });
+    res.json({ success: true, changed: bookingMonitor.ackOverlap(key) });
 });
 
 // Connection status (Nuki is cached for 2 minutes to spare the API)
@@ -2340,6 +2360,33 @@ app.get('/api/stats', apiLimiter, (req, res) => {
     } catch (e) {
         console.error('Stats GET Error:', e.message);
         res.status(500).json({ error: 'Statistiken konnten nicht geladen werden' });
+    }
+});
+
+// Jahresrückblick: key figures of one year, guest origins for the map
+const yearReview = require('./year-review')({ db, axios });
+const reviewYear = q => {
+    const y = parseInt(q, 10);
+    const now = new Date().getFullYear();
+    return y >= 2000 && y <= now + 1 ? y : now;
+};
+app.get('/api/review', apiLimiter, (req, res) => {
+    try {
+        res.json({ success: true, review: yearReview.build(reviewYear(req.query.year)) });
+    } catch (e) {
+        console.error('Jahresrückblick Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Jahresrückblick konnte nicht erstellt werden' });
+    }
+});
+// Looks up a few more places on the map (OpenStreetMap, only postcode + town are sent), then returns the origins
+app.post('/api/review/geo', apiLimiter, async (req, res) => {
+    try {
+        const year = reviewYear(req.body && req.body.year);
+        const r = await yearReview.geocode(year);
+        res.json({ success: true, ...r, origins: yearReview.build(year).origins });
+    } catch (e) {
+        console.error('Jahresrückblick Karte Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Orte konnten nicht gesucht werden' });
     }
 });
 

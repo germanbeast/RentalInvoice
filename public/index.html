@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=4.0">
+    <link rel="stylesheet" href="styles.css?v=4.1">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 </head>
 
@@ -252,6 +252,37 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Jahresrückblick -->
+                <section class="review-section" id="review-section">
+                    <div class="today-head">
+                        <h3>Jahresrückblick</h3>
+                        <select id="review-year" class="review-year" aria-label="Jahr"></select>
+                        <span class="today-status" id="review-note"></span>
+                    </div>
+                    <div class="review-kpis" id="review-kpis"></div>
+                    <div class="review-grid">
+                        <div class="card chart-card">
+                            <div class="card-title">Belegte Nächte pro Monat</div>
+                            <div class="card-body review-chart"><canvas id="reviewMonthsChart"></canvas></div>
+                        </div>
+                        <div class="card chart-card">
+                            <div class="card-title">Buchungskanäle</div>
+                            <div class="card-body" id="review-channels"></div>
+                        </div>
+                    </div>
+                    <div class="card review-origin">
+                        <div class="card-title">Woher die Gäste kommen</div>
+                        <div class="review-origin-body">
+                            <div id="review-map" class="review-map" aria-label="Karte der Herkunftsorte"></div>
+                            <div class="review-origin-list">
+                                <div id="review-countries"></div>
+                                <div id="review-places"></div>
+                                <p class="review-hint" id="review-origin-note"></p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <!-- VIEW: EXPENSES -->
@@ -2188,7 +2219,7 @@
     <!-- TOAST -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script defer src="app.js?v=3.5"></script>
+    <script defer src="app.js?v=3.6"></script>
 </body>
 
 </html>
