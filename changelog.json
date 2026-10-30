@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.17.1",
+    "currentVersion": "1.17.2",
     "releases": [
+        {
+            "version": "1.17.2",
+            "date": "2026-10-30",
+            "title": "Druckansicht der Rechnung repariert",
+            "features": [],
+            "fixes": [
+                "Beim Drucken ist die Rechnung wieder sauber auf einer Seite: kein Rahmen, nicht mehr nach rechts verschoben, keine leere zweite Seite"
+            ]
+        },
         {
             "version": "1.17.1",
             "date": "2026-10-30",
