@@ -5,6 +5,14 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-10-30
+
+### Hinzugefügt
+- Notfall-Öffnen über die Gäste-Webseite: Ist das Tastenfeld an der Tür defekt, scannt der Gast den Notfall-QR-Code, meldet sich mit Buchungscode und Anreisedatum an und lässt das Nuki-Schloss die Tür öffnen (Falle ziehen). Seite `/gast/notfall`, Modul `emergency-door.js`
+- Sicherheit: standardmäßig ausgeschaltet; der QR-Link enthält einen geheimen Schlüssel (ohne Scan kein Öffnen-Knopf), nur bestätigte Buchungen, nur vom Anreisetag ab Check-in-Zeit bis Abreisetag zur Check-out-Zeit, Rückfrage vor dem Öffnen, höchstens 3 Öffnungen pro Stunde und Buchung, zusätzlich Sperre pro IP
+- Jede Öffnung (und jeder Fehlschlag) wird in `door_emergency_log` protokolliert und sofort per Telegram und Push gemeldet (Push-Typ `nuki_emergency`, gilt als wichtig)
+- Admin → Webseite → Einrichtung: Karte „Notfall-Öffnen“ mit Schalter, druckbarem QR-Aushang (A5), „Neuen QR-Code erzeugen“ (alter Aushang wird ungültig) und Protokoll der letzten Versuche
+
 ## [1.18.1] - 2026-10-30
 
 ### Sicherheit
