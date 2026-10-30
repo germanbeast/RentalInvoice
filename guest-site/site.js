@@ -19,6 +19,7 @@
     let info = null;
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let photos = [];
+    let lbList = [];      // what the lightbox shows: the photos, or the floor plan
     let lbIndex = 0;
     let booked = [];
     let today = new Date().toISOString().slice(0, 10);
@@ -66,17 +67,18 @@
         const rest = photos.slice(4);
         $('#strip').innerHTML = rest.map((p, i) => thumb(p, i + 4)).join('');
         $('#gallery-wrap').hidden = !rest.length;
+        $('#all-photos-label').textContent = `Alle ${photos.length} Fotos`;
+        $('#all-photos').hidden = photos.length < 2;
+        $('#floorplan-btn').hidden = !d.floorplan;
+        $('#gallery-actions').hidden = photos.length < 2 && !d.floorplan;
 
         observeReveals();
 
-        $('#voices-list').innerHTML = (d.testimonials || []).map(t => `<figure><blockquote>${esc(t.text)}</blockquote>${t.name ? `<figcaption>${esc(t.name)}</figcaption>` : ''}</figure>`).join('');
-        $('#voices').hidden = !(d.testimonials || []).length;
-
-        $('#location-block').hidden = !d.location;
-        $('#site-location').textContent = d.location || '';
+        renderReviews(d);
+        renderPlace(d);
         $('#rules-block').hidden = !d.houseRules;
         $('#site-rules').textContent = d.houseRules || '';
-        $('#lage').hidden = !d.location && !d.houseRules;
+        $('#regeln').hidden = !d.houseRules;
 
         if (d.contact && (d.contact.phone || d.contact.email)) {
             $('#footer-contact').innerHTML = [
@@ -91,6 +93,80 @@
         $('#f-adults').value = String(Math.min(2, d.maxGuests));
         $('#f-children').innerHTML = opts(Math.max(0, d.maxGuests - 1), 0);
     }
+
+    // ------------------------------------------------------------------
+    // Reviews (typed in by the host: the platforms have no open interface)
+    // ------------------------------------------------------------------
+    const dec = n => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+    const stars = (r, max = 5) => {
+        const five = Math.max(0, Math.min(5, r * 5 / max));
+        return `<span class="stars" style="--fill:${(five / 5 * 100).toFixed(1)}%" role="img" aria-label="${dec(five)} von 5 Sternen"></span>`;
+    };
+    const monthTxt = ym => ym ? new Date(ym + '-15T12:00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }) : '';
+    const REVIEWS_SHOWN = 6;
+
+    function renderReviews(d) {
+        const ratings = d.ratings || [];
+        $('#scores').innerHTML = ratings.map(r => {
+            const inner = `
+                <span class="score-platform">${esc(r.name)}</span>
+                <span class="score-num">${dec(r.score)}<small>/${r.max}</small></span>
+                ${stars(r.score, r.max)}
+                ${r.count ? `<span class="score-count">${r.count.toLocaleString('de-DE')} Bewertungen</span>` : ''}`;
+            return r.url ? `<a class="score" href="${esc(r.url)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="score">${inner}</div>`;
+        }).join('');
+        const items = [
+            ...(d.reviews || []).map(r => ({ ...r, meta: [r.name, monthTxt(r.date)].filter(Boolean).join(' · ') })),
+            ...(d.testimonials || []).map(t => ({ text: t.text, meta: t.name }))
+        ];
+        $('#voices-list').innerHTML = items.map((r, i) => `
+            <figure${i >= REVIEWS_SHOWN ? ' class="more" hidden' : ''}>
+                ${r.rating || r.platformName ? `<div class="voice-top">${r.rating ? stars(r.rating) : ''}${r.platform && r.platform !== 'direct' ? `<span class="voice-src">${esc(r.platformName)}</span>` : ''}</div>` : ''}
+                <blockquote>${esc(r.text)}</blockquote>
+                ${r.meta ? `<figcaption>${esc(r.meta)}</figcaption>` : ''}
+            </figure>`).join('');
+        $('#voices-more').hidden = items.length <= REVIEWS_SHOWN;
+        $('#voices-more').textContent = `Alle ${items.length} Bewertungen`;
+        $('#voices').hidden = !items.length && !ratings.length;
+    }
+    $('#voices-more').addEventListener('click', e => {
+        document.querySelectorAll('#voices-list .more').forEach(f => { f.hidden = false; });
+        e.target.hidden = true;
+    });
+
+    // ------------------------------------------------------------------
+    // Location: map (loads only after a click), route, excursion tips
+    // ------------------------------------------------------------------
+    function renderPlace(d) {
+        $('#site-location').textContent = d.location || '';
+        $('#site-address').textContent = d.address || '';
+        $('#address-block').hidden = !d.address;
+        $('#route-link').href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(d.address || '')}`;
+        $('#map').hidden = !d.showMap;
+        $('#site-directions').textContent = d.directions || '';
+        $('#directions-block').hidden = !d.directions;
+        $('#place-grid').hidden = !d.address && !d.directions;
+        $('#place-grid').classList.toggle('no-map', !d.showMap);
+        const tips = d.tips || [];
+        $('#tips-list').innerHTML = tips.map(t => `
+            <li>
+                <div class="tip-head"><h4>${esc(t.name)}</h4>${t.distance ? `<span class="tip-dist">${esc(t.distance)}</span>` : ''}</div>
+                ${t.text ? `<p>${esc(t.text)}</p>` : ''}
+                ${t.url ? `<a class="tip-link" href="${esc(t.url)}" target="_blank" rel="noopener">Mehr erfahren</a>` : ''}
+            </li>`).join('');
+        $('#tips-block').hidden = !tips.length;
+        $('#lage').hidden = !d.location && !d.address && !d.directions && !tips.length;
+    }
+
+    $('#map-load').addEventListener('click', () => {
+        const frame = document.createElement('iframe');
+        frame.src = `https://maps.google.com/maps?q=${encodeURIComponent(info.address)}&z=14&hl=de&output=embed`;
+        frame.title = 'Karte: Lage der Ferienwohnung';
+        frame.referrerPolicy = 'strict-origin-when-cross-origin';
+        frame.allowFullscreen = true;
+        $('#map').replaceChildren(frame);
+        $('#map').classList.add('loaded');
+    });
 
     // ------------------------------------------------------------------
     // Availability calendar
@@ -255,33 +331,107 @@
     $('#legal-close').addEventListener('click', () => $('#legal-overlay').close());
     document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
 
+    const lb = $('#lightbox');
+    const lbImg = $('#lightbox-img');
+    const lbStage = $('#lightbox-stage');
+
+    function setZoom(on) {
+        lb.classList.toggle('zoomed', on);
+        $('#lightbox-zoom').setAttribute('aria-label', on ? 'Verkleinern' : 'Vergrößern');
+        if (on) requestAnimationFrame(() => {
+            lbStage.scrollLeft = (lbStage.scrollWidth - lbStage.clientWidth) / 2;
+            lbStage.scrollTop = (lbStage.scrollHeight - lbStage.clientHeight) / 2;
+        });
+    }
+
     function showPhoto(i) {
-        lbIndex = (i + photos.length) % photos.length;
-        const img = $('#lightbox-img');
-        if (img.getAttribute('src') && !reduceMotion) {
-            img.classList.add('swap');
-            setTimeout(() => { img.src = photos[lbIndex]; }, 180);
-        } else img.src = photos[lbIndex];
-        $('#lightbox-count').textContent = `${lbIndex + 1} / ${photos.length}`;
-        $('#lightbox-prev').hidden = $('#lightbox-next').hidden = photos.length < 2;
+        lbIndex = (i + lbList.length) % lbList.length;
+        setZoom(false);
+        const src = lbList[lbIndex];
+        if (lbImg.getAttribute('src') && !reduceMotion) {
+            lbImg.classList.add('swap');
+            setTimeout(() => { lbImg.src = src; }, 180);
+        } else lbImg.src = src;
+        const many = lbList.length > 1;
+        $('#lightbox-count').textContent = many ? `${lbIndex + 1} / ${lbList.length}` : '';
+        $('#lightbox-prev').hidden = $('#lightbox-next').hidden = !many;
+        document.querySelectorAll('#lightbox-thumbs button').forEach((b, n) => {
+            b.classList.toggle('active', n === lbIndex);
+            if (n === lbIndex) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+        });
+        // Load the neighbours in the background so swiping feels instant
+        if (many) [1, -1].forEach(n => { new Image().src = lbList[(lbIndex + n + lbList.length) % lbList.length]; });
+    }
+    function openLightbox(list, i, label, plan) {
+        lbList = list;
+        lb.setAttribute('aria-label', label);
+        lb.classList.toggle('plan', !!plan);
+        $('#lightbox-thumbs').innerHTML = list.length > 1
+            ? list.map((p, n) => `<button type="button" data-n="${n}" aria-label="Foto ${n + 1}"><img src="${esc(p)}" alt="" loading="lazy"></button>`).join('')
+            : '';
+        if (!lb.open) lb.showModal();
+        showPhoto(i);
     }
     function openPhoto(e) {
         const b = e.target.closest('[data-idx]');
-        if (!b) return;
-        showPhoto(Number(b.dataset.idx));
-        $('#lightbox').showModal();
+        if (b) openLightbox(photos, Number(b.dataset.idx), 'Fotos');
     }
     $('#gallery').addEventListener('click', openPhoto);
     $('#strip').addEventListener('click', openPhoto);
-    $('#lightbox-close').addEventListener('click', () => $('#lightbox').close());
+    $('#all-photos').addEventListener('click', () => openLightbox(photos, 0, 'Fotos'));
+    $('#floorplan-btn').addEventListener('click', () => openLightbox([info.floorplan], 0, 'Grundriss', true));
+    $('#lightbox-thumbs').addEventListener('click', e => { const b = e.target.closest('[data-n]'); if (b) showPhoto(Number(b.dataset.n)); });
+    $('#lightbox-close').addEventListener('click', () => lb.close());
     $('#lightbox-prev').addEventListener('click', () => showPhoto(lbIndex - 1));
     $('#lightbox-next').addEventListener('click', () => showPhoto(lbIndex + 1));
-    $('#lightbox').addEventListener('keydown', e => {
+    $('#lightbox-zoom').addEventListener('click', () => setZoom(!lb.classList.contains('zoomed')));
+    lbImg.addEventListener('dblclick', () => setZoom(!lb.classList.contains('zoomed')));
+    lb.addEventListener('keydown', e => {
         if (e.key === 'ArrowLeft') showPhoto(lbIndex - 1);
         if (e.key === 'ArrowRight') showPhoto(lbIndex + 1);
     });
+    lb.addEventListener('close', () => {
+        setZoom(false);
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
+    });
+    // A click on the dark area around the photo closes it (the dialog itself is the full screen)
+    let swiped = false;
+    lbStage.addEventListener('click', e => { if (e.target === lbStage && !swiped && !lb.classList.contains('zoomed')) lb.close(); });
 
-    $('#lightbox-img').addEventListener('load', e => e.target.classList.remove('swap'));
+    // Swipe left/right to change the photo (not while zoomed: then the finger pans)
+    let swipe = null;
+    lbStage.addEventListener('pointerdown', e => {
+        if (lb.classList.contains('zoomed') || lbList.length < 2 || !e.isPrimary) return;
+        swipe = { x: e.clientX, y: e.clientY, dx: 0 };
+    });
+    lbStage.addEventListener('pointermove', e => {
+        if (!swipe) return;
+        swipe.dx = e.clientX - swipe.x;
+        if (Math.abs(swipe.dx) > Math.abs(e.clientY - swipe.y)) { lbImg.style.transition = 'none'; lbImg.style.translate = `${swipe.dx * .6}px 0`; }
+    });
+    const endSwipe = () => {
+        if (!swipe) return;
+        const dx = swipe.dx;
+        swipe = null;
+        lbImg.style.transition = '';
+        lbImg.style.translate = '';
+        if (Math.abs(dx) > 10) { swiped = true; setTimeout(() => { swiped = false; }, 60); }
+        if (Math.abs(dx) > 50) showPhoto(lbIndex + (dx < 0 ? 1 : -1));
+    };
+    lbStage.addEventListener('pointerup', endSwipe);
+    lbStage.addEventListener('pointercancel', endSwipe);
+    lbStage.addEventListener('pointerleave', endSwipe);
+
+    // Real full screen where the browser allows it (not on iPhone; the dialog already fills the screen there)
+    if (lb.requestFullscreen && document.fullscreenEnabled) {
+        $('#lightbox-full').hidden = false;
+        $('#lightbox-full').addEventListener('click', () => {
+            if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
+            else lb.requestFullscreen().catch(() => { });
+        });
+    }
+
+    lbImg.addEventListener('load', () => lbImg.classList.remove('swap'));
 
     // Photos open like a curtain the first time they scroll into view
     function observeReveals() {

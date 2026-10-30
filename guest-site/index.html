@@ -52,7 +52,13 @@
 
         <!-- SPREAD: photos + description -->
         <section class="spread" id="spread">
-            <div class="spread-photos" id="gallery"></div>
+            <div class="spread-media">
+                <div class="spread-photos" id="gallery"></div>
+                <div class="gallery-actions" id="gallery-actions" hidden>
+                    <button type="button" class="btn btn-ghost btn-small" id="all-photos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span id="all-photos-label">Alle Fotos</span></button>
+                    <button type="button" class="btn btn-ghost btn-small" id="floorplan-btn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v18H3zM3 12h7M14 3v8h7M10 12v9"/></svg>Grundriss</button>
+                </div>
+            </div>
             <div class="spread-text">
                 <div class="prose" id="site-description"></div>
                 <div class="amenities" id="amenities" hidden>
@@ -69,16 +75,47 @@
 
         <!-- TESTIMONIALS -->
         <section class="voices" id="voices" hidden>
-            <h2>Was Gäste sagen</h2>
+            <div class="voices-head">
+                <h2>Was Gäste sagen</h2>
+                <div class="scores" id="scores"></div>
+            </div>
             <div class="voices-list" id="voices-list"></div>
+            <button type="button" class="btn btn-ghost btn-small voices-more" id="voices-more" hidden>Weitere Bewertungen</button>
         </section>
 
         <!-- LOCATION / RULES -->
-        <section class="columns" id="lage" hidden>
-            <div id="location-block" hidden>
-                <h2>Lage</h2>
-                <div class="prose" id="site-location"></div>
+        <section class="place" id="lage" hidden>
+            <header class="section-head">
+                <h2>Lage &amp; Umgebung</h2>
+                <p class="prose" id="site-location"></p>
+            </header>
+            <div class="place-grid" id="place-grid">
+                <div class="map" id="map" hidden>
+                    <div class="map-consent" id="map-consent">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+                        <p>Die Karte kommt von Google Maps. Erst wenn Sie sie laden, werden Daten wie Ihre IP-Adresse an Google übertragen (<a href="#datenschutz">Datenschutz</a>).</p>
+                        <button type="button" class="btn btn-dark btn-small" id="map-load">Karte laden</button>
+                    </div>
+                </div>
+                <div class="place-side">
+                    <div id="address-block" hidden>
+                        <h3>Adresse</h3>
+                        <p class="place-address" id="site-address"></p>
+                        <a class="btn btn-ghost btn-small btn-arrow" id="route-link" target="_blank" rel="noopener">Route planen<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                    </div>
+                    <div id="directions-block" hidden>
+                        <h3>Anfahrt</h3>
+                        <div class="prose" id="site-directions"></div>
+                    </div>
+                </div>
             </div>
+            <div class="tips" id="tips-block" hidden>
+                <h3>Ausflugstipps</h3>
+                <ol class="tips-list" id="tips-list"></ol>
+            </div>
+        </section>
+
+        <section class="columns" id="regeln" hidden>
             <div id="rules-block" hidden>
                 <h2>Hausregeln</h2>
                 <div class="prose" id="site-rules"></div>
@@ -172,11 +209,20 @@
     </dialog>
 
     <dialog class="lightbox" id="lightbox" aria-label="Fotos">
-        <button type="button" class="icon-btn lb-close" id="lightbox-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <div class="lb-stage" id="lightbox-stage">
+            <img id="lightbox-img" alt="" draggable="false">
+        </div>
+        <div class="lb-bar">
+            <span class="lb-count" id="lightbox-count"></span>
+            <div class="lb-tools">
+                <button type="button" class="icon-btn" id="lightbox-zoom" aria-label="Vergrößern"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4M11 8v6M8 11h6"/></svg></button>
+                <button type="button" class="icon-btn" id="lightbox-full" aria-label="Vollbild" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+                <button type="button" class="icon-btn" id="lightbox-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+            </div>
+        </div>
         <button type="button" class="icon-btn lb-prev" id="lightbox-prev" aria-label="Vorheriges Foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <img id="lightbox-img" alt="">
         <button type="button" class="icon-btn lb-next" id="lightbox-next" aria-label="Nächstes Foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
-        <span class="lb-count" id="lightbox-count"></span>
+        <div class="lb-thumbs" id="lightbox-thumbs"></div>
     </dialog>
 
     <script src="site.js"></script>

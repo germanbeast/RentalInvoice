@@ -357,7 +357,7 @@
                         <div class="form-group"><label for="site-tagline">Untertitel</label><input type="text" id="site-tagline" maxlength="200" placeholder="z. B. Ruhige 2-Zimmer-Wohnung mit Garten, 5 Min. zum See"></div>
                         <div class="form-group"><label for="site-description">Beschreibung</label><textarea id="site-description" rows="6"></textarea></div>
                         <div class="form-group"><label for="site-features">Ausstattung <small>(eine Zeile pro Punkt)</small></label><textarea id="site-features" rows="5" placeholder="WLAN&#10;Voll ausgestattete Küche&#10;Parkplatz"></textarea></div>
-                        <div class="form-group"><label for="site-location">Lage &amp; Adresse</label><textarea id="site-location" rows="3"></textarea></div>
+                        <div class="form-group"><label for="site-location">Lage <small>(kurzer Text über die Umgebung, die Adresse für die Karte steht weiter unten)</small></label><textarea id="site-location" rows="3"></textarea></div>
                         <div class="form-group"><label for="site-house-rules">Hausregeln</label><textarea id="site-house-rules" rows="4"></textarea></div>
                         <div class="form-row">
                             <div class="form-group"><label for="site-size">Wohnfläche (m²) <small>(0 = ausblenden)</small></label><input type="number" id="site-size" min="0" max="1000"></div>
@@ -371,6 +371,48 @@
                         <p class="text-muted" style="font-size:.85rem">Das erste Bild ist das große Titelbild. Bis zu 12 Bilder (JPEG, PNG, WebP, max. 8 MB).</p>
                         <div class="site-photos" id="site-photos"></div>
                         <label class="btn-mini" style="display:inline-block;margin-top:.5rem">+ Bild hochladen<input type="file" id="site-photo-input" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Grundriss</div>
+                        <p class="text-muted" style="font-size:.85rem">Erscheint als Knopf „Grundriss“ unter den Fotos und öffnet sich im Vollbild. Am besten ein Bild mit hellem Hintergrund (JPEG, PNG, WebP, max. 8 MB).</p>
+                        <div class="site-photos" id="site-floorplan"></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
+                            <label class="btn-mini" style="display:inline-block">Grundriss hochladen<input type="file" id="site-floorplan-input" accept="image/jpeg,image/png,image/webp" hidden></label>
+                            <button type="button" class="btn-mini" id="site-floorplan-del" hidden>Entfernen</button>
+                        </div>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Bewertungen</div>
+                        <p class="text-muted" style="font-size:.85rem">Booking.com und Airbnb bieten keine offene Schnittstelle, über die wir Bewertungen automatisch abholen könnten. Trag deshalb hier deine Gesamtnote ein und kopiere deine schönsten Bewertungen. Leere Plattformen werden nicht angezeigt.</p>
+                        <div class="rating-rows">
+                            <div class="form-row rating-row" data-platform="booking">
+                                <div class="form-group"><label>Booking.com Note <small>(von 10)</small></label><input type="text" inputmode="decimal" data-r="score" placeholder="z. B. 9,4"></div>
+                                <div class="form-group"><label>Anzahl Bewertungen</label><input type="number" min="0" data-r="count"></div>
+                                <div class="form-group"><label>Link zur Unterkunft <small>(optional)</small></label><input type="url" data-r="url" placeholder="https://www.booking.com/hotel/…"></div>
+                            </div>
+                            <div class="form-row rating-row" data-platform="airbnb">
+                                <div class="form-group"><label>Airbnb Note <small>(von 5)</small></label><input type="text" inputmode="decimal" data-r="score" placeholder="z. B. 4,9"></div>
+                                <div class="form-group"><label>Anzahl Bewertungen</label><input type="number" min="0" data-r="count"></div>
+                                <div class="form-group"><label>Link zur Unterkunft <small>(optional)</small></label><input type="url" data-r="url" placeholder="https://www.airbnb.de/rooms/…"></div>
+                            </div>
+                            <div class="form-row rating-row" data-platform="google">
+                                <div class="form-group"><label>Google Note <small>(von 5, optional)</small></label><input type="text" inputmode="decimal" data-r="score" placeholder="z. B. 4,8"></div>
+                                <div class="form-group"><label>Anzahl Bewertungen</label><input type="number" min="0" data-r="count"></div>
+                                <div class="form-group"><label>Link <small>(optional)</small></label><input type="url" data-r="url" placeholder="https://maps.app.goo.gl/…"></div>
+                            </div>
+                        </div>
+                        <div class="list-editor" id="site-reviews"></div>
+                        <button type="button" class="btn-mini" id="site-review-add" style="align-self:flex-start">+ Bewertung hinzufügen</button>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Lage &amp; Umgebung</div>
+                        <p class="text-muted" style="font-size:.85rem">Der Text „Lage“ von oben steht als Einleitung darüber. Die Karte lädt erst, wenn der Gast auf „Karte laden“ klickt. Bis dahin wird nichts an Google übertragen.</p>
+                        <div class="form-group"><label for="site-address">Adresse für Karte und Route <small>(wenn die Hausnummer nicht öffentlich sein soll, nur Straße und Ort)</small></label><input type="text" id="site-address" maxlength="200" placeholder="Musterstraße 1, 12345 Musterstadt"></div>
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem"><input type="checkbox" id="site-show-map"> Google-Maps-Karte zeigen</label>
+                        <div class="form-group"><label for="site-directions">Anfahrt</label><textarea id="site-directions" rows="4" placeholder="Mit dem Auto: A7 Ausfahrt …, kostenloser Parkplatz am Haus.&#10;Mit der Bahn: Bahnhof … ist 10 Minuten zu Fuß entfernt."></textarea></div>
+                        <div class="form-group" style="margin-bottom:.4rem"><label>Ausflugstipps</label></div>
+                        <div class="list-editor" id="site-tips"></div>
+                        <button type="button" class="btn-mini" id="site-tip-add" style="align-self:flex-start">+ Ausflugstipp hinzufügen</button>
                     </div>
                     <div class="card site-card">
                         <div class="form-group"><label for="site-imprint">Impressum</label><textarea id="site-imprint" rows="5" placeholder="Name, Anschrift, Kontakt (Pflicht für Webseiten in Deutschland)"></textarea></div>

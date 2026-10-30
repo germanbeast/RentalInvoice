@@ -858,7 +858,7 @@ app.use(helmet({
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
             connectSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-            frameSrc: ["'none'"],
+            frameSrc: ["https://www.google.com", "https://maps.google.com"], // map on the guest website (loads only after a click)
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
             formAction: ["'self'"],

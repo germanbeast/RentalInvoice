@@ -1761,6 +1761,7 @@
             ? 'E-Mails an Gäste (Eingangsbestätigung, Zusage, Absage) werden über dein SMTP-Konto verschickt.'
             : 'Hinweis: Ohne E-Mail-Einstellungen (SMTP) bekommen Gäste keine E-Mails. Sie sehen den Stand dann nur auf der Webseite.';
         renderSitePhotos();
+        fillSiteExtras(s);
     }
 
     function renderSitePhotos() {
@@ -1806,10 +1807,117 @@
         e.target.value = '';
     });
 
+    // Floor plan, reviews, location and excursion tips
+    function renderFloorplan() {
+        const f = siteData && siteData.floorplan;
+        $('#site-floorplan').innerHTML = f
+            ? `<div class="site-photo plan"><img src="/api/site/photo/${encodeURIComponent(f)}" alt="Grundriss"></div>`
+            : '<div class="text-muted" style="font-size:.85rem">Noch kein Grundriss.</div>';
+        $('#site-floorplan-del').hidden = !f;
+    }
+
+    $('#site-floorplan-input').addEventListener('change', async e => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('photo', file);
+        try {
+            const d = await apiJson('/api/site/floorplan', { method: 'POST', body: fd });
+            if (d.success) { siteData.floorplan = d.floorplan; renderFloorplan(); }
+            else showToast(d.error || 'Upload fehlgeschlagen', 'error');
+        } catch (x) { showToast('Upload fehlgeschlagen', 'error'); }
+    });
+
+    $('#site-floorplan-del').addEventListener('click', async () => {
+        if (!confirm('Grundriss entfernen?')) return;
+        const d = await apiJson('/api/site/floorplan', { method: 'DELETE' });
+        if (d && d.success) { siteData.floorplan = ''; renderFloorplan(); }
+        else showToast('Aktion fehlgeschlagen', 'error');
+    });
+
+    const REVIEW_PLATFORMS = { booking: 'Booking.com', airbnb: 'Airbnb', google: 'Google', direct: 'Direkt' };
+    const decDE = n => (n ? String(n).replace('.', ',') : '');
+
+    function reviewRow(r = {}) {
+        const opt = (val, label, cur) => `<option value="${val}"${String(cur) === String(val) ? ' selected' : ''}>${label}</option>`;
+        const starOpts = ['', 5, 4.5, 4, 3.5, 3, 2, 1].map(v => opt(v, v ? `${decDE(v)} ★` : 'keine', r.rating || '')).join('');
+        return `<div class="list-item" data-kind="review">
+            <div><label>Name</label><input type="text" data-f="name" maxlength="80" value="${escapeHtml(r.name || '')}" placeholder="z. B. Familie M."></div>
+            <div><label>Plattform</label><select data-f="platform">${Object.entries(REVIEW_PLATFORMS).map(([k, v]) => opt(k, v, r.platform || 'booking')).join('')}</select></div>
+            <div><label>Sterne</label><select data-f="rating">${starOpts}</select></div>
+            <div><label>Monat</label><input type="month" data-f="date" value="${escapeHtml(r.date || '')}"></div>
+            <div class="li-wide"><label>Text</label><textarea data-f="text" rows="3" maxlength="1500">${escapeHtml(r.text || '')}</textarea></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function tipRow(t = {}) {
+        return `<div class="list-item" data-kind="tip">
+            <div style="grid-column:span 2"><label>Name</label><input type="text" data-f="name" maxlength="100" value="${escapeHtml(t.name || '')}" placeholder="z. B. Burg Altena"></div>
+            <div><label>Entfernung</label><input type="text" data-f="distance" maxlength="40" value="${escapeHtml(t.distance || '')}" placeholder="z. B. 15 Min. mit dem Auto"></div>
+            <div><label>Link <small>(optional)</small></label><input type="url" data-f="url" maxlength="500" value="${escapeHtml(t.url || '')}" placeholder="https://…"></div>
+            <div class="li-wide"><label>Beschreibung</label><textarea data-f="text" rows="2" maxlength="800">${escapeHtml(t.text || '')}</textarea></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function fillSiteExtras(s) {
+        renderFloorplan();
+        $$('#view-website .rating-row').forEach(row => {
+            const r = (s.ratings || {})[row.dataset.platform] || {};
+            row.querySelector('[data-r="score"]').value = decDE(r.score);
+            row.querySelector('[data-r="count"]').value = r.count || '';
+            row.querySelector('[data-r="url"]').value = r.url || '';
+        });
+        $('#site-reviews').innerHTML = (s.reviews || []).map(reviewRow).join('');
+        $('#site-tips').innerHTML = (s.tips || []).map(tipRow).join('');
+        $('#site-address').value = s.address || '';
+        $('#site-show-map').checked = s.show_map !== false;
+        $('#site-directions').value = s.directions || '';
+    }
+
+    function collectSiteExtras() {
+        const ratings = {};
+        $$('#view-website .rating-row').forEach(row => {
+            ratings[row.dataset.platform] = {
+                score: row.querySelector('[data-r="score"]').value,
+                count: row.querySelector('[data-r="count"]').value,
+                url: row.querySelector('[data-r="url"]').value
+            };
+        });
+        const rows = sel => Array.from($$(`${sel} .list-item`)).map(item => {
+            const o = {};
+            item.querySelectorAll('[data-f]').forEach(el => { o[el.dataset.f] = el.value; });
+            return o;
+        });
+        return {
+            ratings, reviews: rows('#site-reviews'), tips: rows('#site-tips'),
+            address: $('#site-address').value, show_map: $('#site-show-map').checked, directions: $('#site-directions').value
+        };
+    }
+
+    $('#site-review-add').addEventListener('click', () => {
+        $('#site-reviews').insertAdjacentHTML('beforeend', reviewRow());
+        $('#site-reviews').lastElementChild.querySelector('textarea').focus();
+    });
+    $('#site-tip-add').addEventListener('click', () => {
+        $('#site-tips').insertAdjacentHTML('beforeend', tipRow());
+        $('#site-tips').lastElementChild.querySelector('input').focus();
+    });
+    ['#site-reviews', '#site-tips'].forEach(sel => $(sel).addEventListener('click', e => {
+        const btn = e.target.closest('[data-li]');
+        if (!btn) return;
+        const item = btn.closest('.list-item');
+        if (btn.dataset.li === 'del') item.remove();
+        else if (item.previousElementSibling) item.parentNode.insertBefore(item, item.previousElementSibling);
+    }));
+
     $$('#view-website .site-save').forEach(btn => btn.addEventListener('click', async () => {
         const site = {};
         Object.entries(SITE_FIELDS).forEach(([k, sel]) => { site[k] = $(sel).value; });
         Object.entries(SITE_CHECKS).forEach(([k, sel]) => { site[k] = $(sel).checked; });
+        Object.assign(site, collectSiteExtras());
         try {
             const d = await apiJson('/api/site/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site }) });
             if (d.success) { siteData = d.site; showToast('Webseite gespeichert', 'success'); loadWebsite(); }

@@ -43,8 +43,19 @@ const SITE_DEFAULTS = {
     testimonials: '',     // one per line: "Text | Name"
     bedrooms: 0,
     size_sqm: 0,
-    photos: []
+    photos: [],
+    floorplan: '',        // floor plan image (file in uploads/site, not part of the photo list)
+    ratings: {},          // { booking|airbnb|google: { score, count, url } }, typed in by the host
+    reviews: [],          // [{ name, platform, rating, date: 'YYYY-MM', text }]
+    address: '',          // for the map and the route link
+    show_map: true,
+    directions: '',
+    tips: []              // excursion tips: [{ name, distance, text, url }]
 };
+
+const RATING_PLATFORMS = { booking: { name: 'Booking.com', max: 10 }, airbnb: { name: 'Airbnb', max: 5 }, google: { name: 'Google', max: 5 } };
+const MAX_REVIEWS = 40;
+const MAX_TIPS = 24;
 
 function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, createNukiPin, deleteNukiPin, berlinToday, addDays, nightsBetween, formatDateDE }) {
     if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
@@ -209,6 +220,31 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         return { name: v.name || '', phone: v.telefon || '', email: v.email || '' };
     }
 
+    const httpUrl = v => { const u = String(v || '').trim(); return /^https?:\/\/[^\s"'<>]+$/i.test(u) ? u.substring(0, 500) : ''; };
+    const num = (v, max) => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.min(max, Math.round(n * 100) / 100) : 0; };
+
+    /** Cleans reviews, platform scores, map and excursion tips sent by the admin form. */
+    function cleanExtras(inp) {
+        const str = (v, max) => String(v == null ? '' : v).trim().substring(0, max);
+        const ratings = {};
+        Object.entries(RATING_PLATFORMS).forEach(([key, p]) => {
+            const r = (inp.ratings && inp.ratings[key]) || {};
+            const score = num(r.score, p.max);
+            if (score) ratings[key] = { score, count: Math.min(100000, parseInt(r.count, 10) || 0), url: httpUrl(r.url) };
+        });
+        const reviews = (Array.isArray(inp.reviews) ? inp.reviews : []).map(r => ({
+            name: str(r && r.name, 80),
+            platform: RATING_PLATFORMS[r && r.platform] ? r.platform : 'direct',
+            rating: num(r && r.rating, 5),
+            date: /^\d{4}-\d{2}$/.test(String(r && r.date)) ? r.date : '',
+            text: str(r && r.text, 1500)
+        })).filter(r => r.text).slice(0, MAX_REVIEWS);
+        const tips = (Array.isArray(inp.tips) ? inp.tips : []).map(t => ({
+            name: str(t && t.name, 100), distance: str(t && t.distance, 40), text: str(t && t.text, 800), url: httpUrl(t && t.url)
+        })).filter(t => t.name).slice(0, MAX_TIPS);
+        return { ratings, reviews, tips, address: str(inp.address, 200), show_map: inp.show_map !== false, directions: str(inp.directions, 3000) };
+    }
+
     /** Resolves the session to the current status; null when the booking is gone (e.g. cancelled). */
     function currentStatus(sess, req) {
         if (!sess) return null;
@@ -268,7 +304,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
 
     router.get('/bilder/:file', (req, res) => {
         const file = path.basename(String(req.params.file));
-        if (!getSite().photos.includes(file)) return res.status(404).end();
+        const site = getSite();
+        if (!site.photos.includes(file) && file !== site.floorplan) return res.status(404).end();
         res.set('Cache-Control', 'public, max-age=86400');
         res.sendFile(path.join(PHOTO_DIR, file));
     });
@@ -294,6 +331,12 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 const i = l.lastIndexOf('|');
                 return i > 0 ? { text: l.slice(0, i).trim(), name: l.slice(i + 1).trim() } : { text: l, name: '' };
             }),
+            floorplan: s.floorplan ? `bilder/${encodeURIComponent(s.floorplan)}` : null,
+            ratings: Object.entries(s.ratings || {}).filter(([k, r]) => RATING_PLATFORMS[k] && r && r.score)
+                .map(([k, r]) => ({ platform: k, name: RATING_PLATFORMS[k].name, max: RATING_PLATFORMS[k].max, score: r.score, count: r.count || 0, url: r.url || '' })),
+            reviews: (s.reviews || []).map(r => ({ ...r, platformName: (RATING_PLATFORMS[r.platform] || { name: 'Direkt' }).name })),
+            address: s.address || '', showMap: s.show_map !== false && !!s.address, directions: s.directions || '',
+            tips: s.tips || [],
             today: berlinToday()
         });
     });
@@ -541,6 +584,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 show_bank: !!inp.show_bank, show_contact: !!inp.show_contact,
                 public_url: /^https?:\/\/[^\s]+$/i.test(url) ? url.replace(/\/+$/, '') : ''
             };
+            Object.assign(site, cleanExtras(inp));
             db.setSetting('site', site);
             res.json({ success: true, site });
         });
@@ -579,9 +623,33 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             res.json({ success: true, photos: site.photos });
         });
 
+        // Floor plan: one image, replaced on every upload
+        app.post('/api/site/floorplan', apiLimiter, (req, res) => {
+            photoUpload.single('photo')(req, res, err => {
+                if (err) return res.status(400).json({ success: false, error: err.message });
+                if (!req.file) return res.status(400).json({ success: false, error: 'Keine Datei' });
+                const site = getSite();
+                const old = site.floorplan;
+                site.floorplan = req.file.filename;
+                db.setSetting('site', site);
+                if (old) fs.unlink(path.join(PHOTO_DIR, path.basename(old)), () => { });
+                res.json({ success: true, floorplan: site.floorplan });
+            });
+        });
+
+        app.delete('/api/site/floorplan', apiLimiter, (req, res) => {
+            const site = getSite();
+            const old = site.floorplan;
+            site.floorplan = '';
+            db.setSetting('site', site);
+            if (old) fs.unlink(path.join(PHOTO_DIR, path.basename(old)), () => { });
+            res.json({ success: true, floorplan: '' });
+        });
+
         app.get('/api/site/photo/:file', apiLimiter, (req, res) => {
             const file = path.basename(String(req.params.file));
-            if (!getSite().photos.includes(file)) return res.status(404).end();
+            const site = getSite();
+            if (!site.photos.includes(file) && file !== site.floorplan) return res.status(404).end();
             res.sendFile(path.join(PHOTO_DIR, file));
         });
 
