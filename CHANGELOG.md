@@ -5,6 +5,16 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-10-30
+
+### Geändert
+- Gäste-Webseite neu gestaltet im Boutique-/Magazin-Stil: ganzseitiges Titelbild, Serifenschrift (Instrument Serif + Hanken Grotesk), warmer Papierton, Bildstrecke, Ausstattung als Liste, dunkler Fußbereich
+- Bildergalerie mit Vor/Zurück und Tastatursteuerung; Impressum, Datenschutz und Galerie als native `<dialog>`
+- Kopfzeile liegt transparent über dem Titelbild und wird beim Scrollen fest
+
+### Hinzugefügt
+- Einstellungen unter „Webseite → Inhalte“: Wohnfläche, Schlafzimmer und Gästestimmen („Text | Name“)
+
 ## [1.15.0] - 2026-10-28
 
 ### Hinzugefügt

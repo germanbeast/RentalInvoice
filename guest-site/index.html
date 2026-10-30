@@ -3,189 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
     <title>Ferienwohnung Beckhome</title>
     <meta name="description" content="Ferienwohnung Beckhome – Verfügbarkeit prüfen, direkt anfragen und den Stand Ihrer Buchung abrufen.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="site.css">
 </head>
 <body>
-    <header class="topbar">
+    <header class="masthead" id="masthead">
         <a href="#" class="brand" id="brand">Ferienwohnung Beckhome</a>
-        <nav class="topnav">
-            <a href="#wohnung">Wohnung</a>
+        <nav class="mast-nav" aria-label="Hauptnavigation">
+            <a href="#wohnung">Die Wohnung</a>
+            <a href="#lage">Lage</a>
             <a href="#buchen">Verfügbarkeit</a>
-            <a href="#status" class="topnav-cta" id="nav-status">Meine Buchung</a>
+            <a href="#status" class="mast-cta">Meine Buchung</a>
         </nav>
     </header>
 
     <main>
-        <!-- HERO -->
-        <section class="hero" id="hero">
-            <div class="hero-media" id="hero-media"></div>
-            <div class="hero-text">
+        <!-- COVER -->
+        <section class="cover" id="hero">
+            <div class="cover-media" id="hero-media"></div>
+            <div class="cover-text">
                 <h1 id="site-title">Ferienwohnung Beckhome</h1>
-                <p id="site-tagline" class="hero-tagline"></p>
-                <div class="hero-actions">
-                    <a href="#buchen" class="btn btn-primary">Verfügbarkeit prüfen</a>
-                    <a href="#status" class="btn btn-ghost">Buchung abrufen</a>
+                <p id="site-tagline" class="cover-tagline"></p>
+                <div class="cover-actions">
+                    <a href="#buchen" class="btn btn-light">Verfügbarkeit ansehen</a>
+                    <span class="cover-price" id="hero-price"></span>
                 </div>
-                <p class="hero-price" id="hero-price"></p>
             </div>
         </section>
 
-        <!-- GALLERY -->
-        <section class="gallery-wrap" id="gallery-wrap" hidden>
-            <div class="gallery" id="gallery"></div>
+        <!-- INTRO -->
+        <section class="intro" id="wohnung">
+            <h2 class="sr-only">Die Wohnung</h2>
+            <div class="intro-lede" id="site-lede"></div>
+            <dl class="facts" id="facts">
+                <div><dt>Gäste</dt><dd id="fact-guests">–</dd></div>
+                <div id="fact-size-wrap" hidden><dt>Wohnfläche</dt><dd id="fact-size">–</dd></div>
+                <div id="fact-bedrooms-wrap" hidden><dt>Schlafzimmer</dt><dd id="fact-bedrooms">–</dd></div>
+                <div><dt>Mindestaufenthalt</dt><dd id="fact-min">–</dd></div>
+                <div><dt>Anreise</dt><dd id="fact-checkin">–</dd></div>
+                <div><dt>Abreise</dt><dd id="fact-checkout">–</dd></div>
+            </dl>
         </section>
 
-        <!-- ABOUT -->
-        <section class="section" id="wohnung">
-            <div class="section-inner two-col">
-                <div>
-                    <h2>Die Wohnung</h2>
-                    <div class="prose" id="site-description"></div>
-                </div>
-                <aside class="facts">
-                    <div class="fact"><span>Gäste</span><strong id="fact-guests">–</strong></div>
-                    <div class="fact"><span>Mindestaufenthalt</span><strong id="fact-min">–</strong></div>
-                    <div class="fact"><span>Anreise</span><strong id="fact-checkin">–</strong></div>
-                    <div class="fact"><span>Abreise</span><strong id="fact-checkout">–</strong></div>
+        <!-- SPREAD: photos + description -->
+        <section class="spread" id="spread">
+            <div class="spread-photos" id="gallery"></div>
+            <div class="spread-text">
+                <div class="prose" id="site-description"></div>
+                <div class="amenities" id="amenities" hidden>
+                    <h2>Ausstattung</h2>
                     <ul class="features" id="site-features"></ul>
-                </aside>
+                </div>
+            </div>
+        </section>
+
+        <!-- MORE PHOTOS -->
+        <section class="strip-wrap" id="gallery-wrap" hidden>
+            <div class="strip" id="strip"></div>
+        </section>
+
+        <!-- TESTIMONIALS -->
+        <section class="voices" id="voices" hidden>
+            <h2>Was Gäste sagen</h2>
+            <div class="voices-list" id="voices-list"></div>
+        </section>
+
+        <!-- LOCATION / RULES -->
+        <section class="columns" id="lage" hidden>
+            <div id="location-block" hidden>
+                <h2>Lage</h2>
+                <div class="prose" id="site-location"></div>
+            </div>
+            <div id="rules-block" hidden>
+                <h2>Hausregeln</h2>
+                <div class="prose" id="site-rules"></div>
             </div>
         </section>
 
         <!-- BOOKING -->
-        <section class="section section-alt" id="buchen">
-            <div class="section-inner">
+        <section class="booking" id="buchen">
+            <header class="section-head">
                 <h2>Verfügbarkeit &amp; Anfrage</h2>
-                <p class="lead">Wählen Sie Ihren Anreise- und Abreisetag im Kalender. Wir bestätigen Ihre Anfrage persönlich, in der Regel innerhalb eines Tages.</p>
+                <p>Wählen Sie Anreise und Abreise im Kalender. Wir bestätigen jede Anfrage persönlich, meist innerhalb eines Tages. Bezahlt wird erst nach unserer Zusage.</p>
+            </header>
 
-                <div class="booking-grid">
-                    <div class="card cal-card">
-                        <div class="cal-head">
-                            <button type="button" class="icon-btn" id="cal-prev" aria-label="Vorheriger Monat">‹</button>
-                            <span class="cal-hint" id="cal-hint">Anreisetag wählen</span>
-                            <button type="button" class="icon-btn" id="cal-next" aria-label="Nächster Monat">›</button>
-                        </div>
-                        <div class="cal-months" id="cal-months"></div>
-                        <div class="cal-legend">
-                            <span><i class="lg free"></i>frei</span>
-                            <span><i class="lg taken"></i>belegt</span>
-                            <span><i class="lg sel"></i>Ihr Zeitraum</span>
-                        </div>
+            <div class="booking-grid">
+                <div class="cal-panel">
+                    <div class="cal-head">
+                        <button type="button" class="icon-btn" id="cal-prev" aria-label="Vorheriger Monat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+                        <span class="cal-hint" id="cal-hint" aria-live="polite">Anreisetag wählen</span>
+                        <button type="button" class="icon-btn" id="cal-next" aria-label="Nächster Monat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
                     </div>
-
-                    <form class="card form-card" id="request-form" novalidate>
-                        <div class="sel-summary" id="sel-summary">
-                            <div><span>Anreise</span><strong id="sel-in">–</strong></div>
-                            <div><span>Abreise</span><strong id="sel-out">–</strong></div>
-                            <div><span>Nächte</span><strong id="sel-nights">–</strong></div>
-                        </div>
-                        <div class="quote" id="quote" hidden></div>
-
-                        <div class="row">
-                            <label>Erwachsene
-                                <select name="adults" id="f-adults"></select>
-                            </label>
-                            <label>Kinder
-                                <select name="children" id="f-children"></select>
-                            </label>
-                        </div>
-                        <label>Vor- und Nachname
-                            <input type="text" name="name" autocomplete="name" maxlength="80" required>
-                        </label>
-                        <div class="row">
-                            <label>E-Mail
-                                <input type="email" name="email" autocomplete="email" maxlength="120" required>
-                            </label>
-                            <label>Telefon <small>(optional)</small>
-                                <input type="tel" name="phone" autocomplete="tel" maxlength="40">
-                            </label>
-                        </div>
-                        <label>Nachricht <small>(optional)</small>
-                            <textarea name="message" rows="3" maxlength="2000" placeholder="Fragen, Ankunftszeit, Haustier …"></textarea>
-                        </label>
-                        <label class="hp" aria-hidden="true">Webseite <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
-                        <label class="check">
-                            <input type="checkbox" name="privacy" required>
-                            <span>Ich bin einverstanden, dass meine Angaben zur Bearbeitung der Anfrage gespeichert werden (<a href="#datenschutz">Datenschutz</a>).</span>
-                        </label>
-                        <div class="form-error" id="request-error" hidden></div>
-                        <button type="submit" class="btn btn-primary btn-block" id="request-submit" disabled>Unverbindlich anfragen</button>
-                        <p class="fine">Die Anfrage ist kostenlos und unverbindlich. Bezahlt wird erst nach unserer Bestätigung.</p>
-                    </form>
+                    <div class="cal-months" id="cal-months"></div>
+                    <div class="cal-legend">
+                        <span><i class="lg free"></i>frei</span>
+                        <span><i class="lg taken"></i>belegt</span>
+                        <span><i class="lg sel"></i>Ihr Zeitraum</span>
+                    </div>
                 </div>
-            </div>
-        </section>
 
-        <!-- LOCATION / RULES -->
-        <section class="section" id="lage" hidden>
-            <div class="section-inner two-col">
-                <div id="location-block" hidden>
-                    <h2>Lage</h2>
-                    <div class="prose" id="site-location"></div>
-                </div>
-                <div id="rules-block" hidden>
-                    <h2>Hausregeln</h2>
-                    <div class="prose" id="site-rules"></div>
-                </div>
+                <form class="request" id="request-form" novalidate>
+                    <div class="sel-summary">
+                        <div><span>Anreise</span><strong id="sel-in">–</strong></div>
+                        <div><span>Abreise</span><strong id="sel-out">–</strong></div>
+                        <div><span>Nächte</span><strong id="sel-nights">–</strong></div>
+                    </div>
+                    <div class="quote" id="quote" hidden></div>
+
+                    <div class="row">
+                        <label>Erwachsene
+                            <select name="adults" id="f-adults"></select>
+                        </label>
+                        <label>Kinder
+                            <select name="children" id="f-children"></select>
+                        </label>
+                    </div>
+                    <label>Vor- und Nachname
+                        <input type="text" name="name" autocomplete="name" maxlength="80" required>
+                    </label>
+                    <div class="row">
+                        <label>E-Mail
+                            <input type="email" name="email" autocomplete="email" maxlength="120" required>
+                        </label>
+                        <label>Telefon <small>optional</small>
+                            <input type="tel" name="phone" autocomplete="tel" maxlength="40">
+                        </label>
+                    </div>
+                    <label>Nachricht <small>optional</small>
+                        <textarea name="message" rows="3" maxlength="2000" placeholder="Fragen, Ankunftszeit, Haustier …"></textarea>
+                    </label>
+                    <label class="hp" aria-hidden="true">Webseite <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+                    <label class="check">
+                        <input type="checkbox" name="privacy" required>
+                        <span>Ich bin einverstanden, dass meine Angaben zur Bearbeitung der Anfrage gespeichert werden (<a href="#datenschutz">Datenschutz</a>).</span>
+                    </label>
+                    <div class="form-error" id="request-error" role="alert" hidden></div>
+                    <button type="submit" class="btn btn-dark btn-block" id="request-submit" disabled>Unverbindlich anfragen</button>
+                    <p class="fine">Kostenlos und unverbindlich.</p>
+                </form>
             </div>
         </section>
 
         <!-- GUEST AREA -->
-        <section class="section section-alt" id="status">
-            <div class="section-inner narrow">
+        <section class="guest" id="status">
+            <header class="section-head">
                 <h2>Meine Buchung</h2>
+            </header>
 
-                <div id="login-box">
-                    <p class="lead">Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer E-Mail oder in der Nachricht über Booking.com bzw. Airbnb. Airbnb-Gäste können auch ihren Airbnb-Bestätigungscode (HM…) verwenden.</p>
-                    <form class="card login-card" id="login-form" novalidate>
-                        <div class="row">
-                            <label>Buchungscode
-                                <input type="text" name="code" placeholder="BH-XXXXXX" autocomplete="off" autocapitalize="characters" maxlength="20" required>
-                            </label>
-                            <label>Anreisedatum
-                                <input type="date" name="arrival" required>
-                            </label>
-                        </div>
-                        <div class="form-error" id="login-error" hidden></div>
-                        <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
-                    </form>
-                </div>
-
-                <div id="guest-box" hidden></div>
+            <div id="login-box">
+                <p class="guest-lead">Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer E-Mail oder in der Nachricht über Booking.com bzw. Airbnb. Airbnb-Gäste können auch ihren Airbnb-Bestätigungscode (HM…) verwenden.</p>
+                <form class="login" id="login-form" novalidate>
+                    <div class="row">
+                        <label>Buchungscode
+                            <input type="text" name="code" placeholder="BH-XXXXXX" autocomplete="off" autocapitalize="characters" maxlength="20" required>
+                        </label>
+                        <label>Anreisedatum
+                            <input type="date" name="arrival" required>
+                        </label>
+                    </div>
+                    <div class="form-error" id="login-error" role="alert" hidden></div>
+                    <button type="submit" class="btn btn-dark">Anmelden</button>
+                </form>
             </div>
+
+            <div id="guest-box" hidden></div>
         </section>
     </main>
 
-    <footer class="footer">
-        <div class="footer-inner">
+    <footer class="colophon">
+        <div class="colophon-inner">
             <div>
-                <strong id="footer-title">Ferienwohnung Beckhome</strong>
-                <div id="footer-contact"></div>
+                <p class="colophon-title" id="footer-title">Ferienwohnung Beckhome</p>
+                <p id="footer-contact"></p>
             </div>
-            <nav>
+            <nav aria-label="Rechtliches">
+                <a href="#status">Meine Buchung</a>
                 <a href="#impressum">Impressum</a>
                 <a href="#datenschutz">Datenschutz</a>
             </nav>
         </div>
     </footer>
 
-    <div class="overlay" id="legal-overlay" hidden>
-        <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="legal-title">
-            <button type="button" class="icon-btn overlay-close" id="legal-close" aria-label="Schließen">×</button>
-            <h2 id="legal-title"></h2>
-            <div class="prose" id="legal-body"></div>
-        </div>
-    </div>
+    <dialog class="sheet" id="legal-overlay" aria-labelledby="legal-title">
+        <button type="button" class="icon-btn sheet-close" id="legal-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <h2 id="legal-title"></h2>
+        <div class="prose" id="legal-body"></div>
+    </dialog>
 
-    <div class="overlay" id="lightbox" hidden>
-        <button type="button" class="icon-btn overlay-close" id="lightbox-close" aria-label="Schließen">×</button>
+    <dialog class="lightbox" id="lightbox" aria-label="Fotos">
+        <button type="button" class="icon-btn lb-close" id="lightbox-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button type="button" class="icon-btn lb-prev" id="lightbox-prev" aria-label="Vorheriges Foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <img id="lightbox-img" alt="">
-    </div>
+        <button type="button" class="icon-btn lb-next" id="lightbox-next" aria-label="Nächstes Foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+        <span class="lb-count" id="lightbox-count"></span>
+    </dialog>
 
     <script src="site.js"></script>
 </body>
