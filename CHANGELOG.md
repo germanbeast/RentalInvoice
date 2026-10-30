@@ -5,7 +5,7 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.23.0] - 2026-10-30
+## [1.24.0] - 2026-10-30
 
 ### Neu
 - Fertige Gästenachricht per Telegram: Bei jeder neuen Buchung aus Booking.com oder Airbnb schickt der Bot zusätzlich einen kopierfertigen Text für den Gast (antippen kopiert ihn). Inhalt: Anrede mit Vorname, An- und Abreise mit Uhrzeit, Türcode, persönlicher Link zu „Meine Buchung“, Link zum Notfall-Öffnen, Buchungscode, Telefonnummer
