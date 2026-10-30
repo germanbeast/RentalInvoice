@@ -1,6 +1,20 @@
 {
-    "currentVersion": "1.20.1",
+    "currentVersion": "1.22.0",
     "releases": [
+        {
+            "version": "1.22.0",
+            "date": "2026-10-30",
+            "title": "Mehr Sicherheit und Rechnungsvorlage bleibt erhalten",
+            "features": [
+                "Sperren nach falschen Login-Versuchen gelten nur noch für den Besucher, der sich vertippt, nicht für alle",
+                "Wiederherstellungs-Schlüssel werden verschlüsselt gespeichert und nur einmal angezeigt („Neuer Recovery-Key“ in der Benutzerverwaltung)",
+                "Passwörter und Tokens bleiben auf dem Server und werden in den Einstellungen nur als •••••••• angezeigt",
+                "Abhängigkeiten mit bekannten Sicherheitslücken aktualisiert"
+            ],
+            "fixes": [
+                "Die Rechnungsvorlage wird beim Speichern der Einstellungen nicht mehr auf Standard zurückgesetzt"
+            ]
+        },
         {
             "version": "1.20.1",
             "date": "2026-10-30",

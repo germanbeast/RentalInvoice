@@ -1021,14 +1021,16 @@
                     <div style="flex:1">
                         <strong>${user.username}</strong> (${user.role})<br>
                         <small>📱 2FA: ${user.phone || 'Nicht gesetzt'}</small><br>
-                        <small style="color:var(--primary-color);">🔑 Recovery: <code>${user.recovery_key || '---'}</code></small>
+                        <small style="color:var(--primary-color);">🔑 Recovery: ${user.has_recovery_key ? 'eingerichtet' : 'keiner'}</small>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline btn-sm recovery-user-btn" data-id="${user.id}">Neuer Recovery-Key</button>
                         <button class="btn btn-outline btn-sm edit-user-btn" data-id="${user.id}">Edit</button>
                         <button class="btn btn-outline btn-sm delete-user-btn" data-id="${user.id}" style="color:red;">Del</button>
                     </div>
                 `;
 
+                div.querySelector('.recovery-user-btn').onclick = () => newRecoveryKey(user);
                 div.querySelector('.edit-user-btn').onclick = () => editUser(user);
                 div.querySelector('.delete-user-btn').onclick = () => deleteUser(user.id, user.username);
 
@@ -1038,6 +1040,22 @@
             console.error('User list error:', e);
             container.innerHTML = '<p>Fehler beim Laden der Benutzer.</p>';
         }
+    }
+
+    // The server keeps only a hash: the key is visible this one time
+    function showRecoveryKey(username, key) {
+        prompt(`Wiederherstellungs-Schlüssel für ${username}. Jetzt notieren, er wird nur dieses eine Mal angezeigt:`, key);
+    }
+
+    async function newRecoveryKey(user) {
+        if (!confirm(`Neuen Recovery-Key für ${user.username} erzeugen? Der alte Schlüssel gilt dann nicht mehr.`)) return;
+        try {
+            const res = await fetch(`/api/users/${user.id}/recovery-key`, { method: 'POST' });
+            const data = await res.json();
+            if (!data.success) return showToast(data.error || 'Fehler', 'error');
+            showRecoveryKey(user.username, data.recoveryKey);
+            loadUsers();
+        } catch (e) { showToast('Fehler', 'error'); }
     }
 
     async function editUser(user) {
@@ -1089,6 +1107,7 @@
                 const data = await res.json();
                 if (data.success) {
                     showToast('Benutzer erstellt!', 'success');
+                    if (data.recoveryKey) showRecoveryKey(username, data.recoveryKey);
                     loadUsers();
                 } else {
                     showToast(data.error || 'Fehler', 'error');
@@ -2628,13 +2647,9 @@
             return;
         }
 
+        // The server uses the SMTP access from the settings; an old browser-saved one is only a fallback
         const smtpRaw = localStorage.getItem(STORAGE_KEYS.smtp);
-        if (!smtpRaw) {
-            showToast('Bitte SMTP-Einstellungen konfigurieren!', 'error');
-            btnSettings.click();
-            return;
-        }
-        const smtpConfig = JSON.parse(smtpRaw);
+        const smtpConfig = smtpRaw ? JSON.parse(smtpRaw) : undefined;
 
         btnEmail.disabled = true;
         const originalText = btnEmail.textContent;
