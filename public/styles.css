@@ -915,14 +915,33 @@ select {
     /* Hide "Rechnung an" label */
 }
 
+/* Empfängeranschrift über der Anrede (muss auf jeder Rechnung stehen) */
+.inv-recipient-address {
+    margin-bottom: 8mm;
+}
+
+.inv-recipient .inv-label {
+    display: block;
+    font-size: 7pt;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1mm;
+}
+
 .inv-recipient strong {
-    display: none;
-    /* Hide guest name, shown in greeting */
+    display: block;
+    font-size: 9.5pt;
+    color: #0f172a;
+    font-weight: 600;
+    margin-bottom: 1mm;
 }
 
 .inv-recipient .inv-addr {
-    display: none;
-    /* Hide address in new design */
+    display: block;
+    font-size: 9pt;
+    color: #334155;
+    line-height: 1.5;
 }
 
 /* Meta - Above Title */
