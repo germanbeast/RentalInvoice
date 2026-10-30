@@ -1,14 +1,25 @@
 {
-    "currentVersion": "1.17.3",
+    "currentVersion": "1.18.1",
     "releases": [
         {
-            "version": "1.17.3",
+            "version": "1.18.1",
             "date": "2026-10-30",
             "title": "WhatsApp-Kopplung nur noch mit Login",
             "features": [],
             "fixes": [
                 "Der QR-Code zum Koppeln von WhatsApp ist nur noch nach dem Anmelden abrufbar. Vorher konnte jeder, der die Adresse kannte, sein WhatsApp mit der App verbinden"
             ]
+        },
+        {
+            "version": "1.18.0",
+            "date": "2026-10-30",
+            "title": "Eigene Login-Seite für Gäste",
+            "features": [
+                "„Meine Buchung“ öffnet sich auf einer eigenen Seite mit Anmeldung statt unten auf der Startseite",
+                "Nach einer Anfrage ist der Gast direkt auf seiner Buchungsseite angemeldet",
+                "Links in E-Mails führen direkt zur neuen Seite"
+            ],
+            "fixes": []
         },
         {
             "version": "1.17.2",

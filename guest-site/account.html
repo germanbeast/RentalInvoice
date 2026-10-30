@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <meta name="robots" content="noindex">
+    <title>Meine Buchung</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="site.css">
+</head>
+<body class="account-page">
+    <header class="masthead solid">
+        <a href="./" class="brand" id="brand">Ferienwohnung Beckhome</a>
+        <nav class="mast-nav" aria-label="Hauptnavigation">
+            <a href="./#wohnung">Die Wohnung</a>
+            <a href="./#buchen">Verfügbarkeit</a>
+            <a href="./" class="mast-cta">Zur Startseite</a>
+        </nav>
+    </header>
+
+    <main class="account">
+        <div class="account-media" id="account-media" aria-hidden="true"></div>
+
+        <div class="account-panel">
+            <div id="login-box" hidden>
+                <h1>Meine Buchung</h1>
+                <p class="guest-lead">Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer E-Mail oder in der Nachricht über Booking.com bzw. Airbnb. Airbnb-Gäste können auch ihren Airbnb-Bestätigungscode (HM…) verwenden.</p>
+                <form class="login" id="login-form" novalidate>
+                    <label>Buchungscode
+                        <input type="text" name="code" placeholder="BH-XXXXXX" autocomplete="off" autocapitalize="characters" maxlength="20" required autofocus>
+                    </label>
+                    <label>Anreisedatum
+                        <input type="date" name="arrival" required>
+                    </label>
+                    <div class="form-error" id="login-error" role="alert" hidden></div>
+                    <button type="submit" class="btn btn-dark btn-block">Anmelden</button>
+                </form>
+                <p class="account-help">Noch nicht gebucht? <a href="./#buchen">Verfügbarkeit ansehen</a></p>
+            </div>
+
+            <div id="guest-box" hidden></div>
+        </div>
+    </main>
+
+    <footer class="colophon">
+        <div class="colophon-inner">
+            <div>
+                <p class="colophon-title" id="footer-title">Ferienwohnung Beckhome</p>
+                <p id="footer-contact"></p>
+            </div>
+            <nav aria-label="Rechtliches">
+                <a href="./">Startseite</a>
+                <a href="#impressum">Impressum</a>
+                <a href="#datenschutz">Datenschutz</a>
+            </nav>
+        </div>
+    </footer>
+
+    <dialog class="sheet" id="legal-overlay" aria-labelledby="legal-title">
+        <button type="button" class="icon-btn sheet-close" id="legal-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <h2 id="legal-title"></h2>
+        <div class="prose" id="legal-body"></div>
+    </dialog>
+
+    <script src="account.js"></script>
+</body>
+</html>
