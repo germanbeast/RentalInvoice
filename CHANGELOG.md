@@ -12,6 +12,11 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Nach einer Direktanfrage landet der Gast automatisch angemeldet auf der neuen Seite
 - Links in E-Mails, im Gastlink und alte Lesezeichen auf `#status` führen auf die neue Seite
 
+## [1.17.2] - 2026-10-30
+
+### Behoben
+- Druckansicht der Rechnung: Seit dem Admin-Design (1.17.0) liefen Ränder, Abstände und der Rahmen der Vorschau in den Druck. Die Rechnung war nach rechts verschoben, rechts abgeschnitten, hatte einen beigen Rahmen und es kam eine leere zweite Seite. Eigene Druckregeln am Ende von styles.css setzen das zurück.
+
 ## [1.17.1] - 2026-10-30
 
 ### Behoben
