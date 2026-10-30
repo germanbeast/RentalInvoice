@@ -2920,3 +2920,34 @@ button, input, select, textarea { font-family: inherit; }
     .modal-lg { height: 100dvh; max-height: 100dvh; }
     .settings-sidebar { overflow: visible; }
 }
+
+/* Druck: das Admin-Layout (Ränder, Abstände, Rahmen der Vorschau) darf nicht
+   auf die gedruckte Rechnung durchschlagen. Steht am Ende, damit es die
+   Boutique-Regeln oben überstimmt. */
+@media print {
+    .dashboard,
+    .content-area {
+        min-height: 0 !important;
+    }
+
+    .content-view {
+        padding: 0 !important;
+        gap: 0 !important;
+        animation: none !important;
+    }
+
+    .content-view > :not(.content-header) {
+        width: auto !important;
+        margin: 0 !important;
+    }
+
+    .preview-sticky {
+        position: static !important;
+    }
+
+    .invoice-preview,
+    .invoice-preview:hover {
+        border: none !important;
+        box-shadow: none !important;
+    }
+}
