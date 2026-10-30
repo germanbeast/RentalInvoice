@@ -37,6 +37,8 @@
     // ------------------------------------------------------------------
     // Guest login & status
     // ------------------------------------------------------------------
+    $('#mast-logout').addEventListener('click', async () => { await api('logout', {}); loadMe(); });
+
     $('#login-form').addEventListener('submit', async e => {
         e.preventDefault();
         const f = e.target;
@@ -60,6 +62,8 @@
         const d = await api('me');
         const box = $('#guest-box');
         document.body.classList.toggle('signed-in', !!d.success);
+        $('#mast-home').hidden = !!d.success;
+        $('#mast-logout').hidden = !d.success;
         if (!d.success) {
             $('#login-box').hidden = false;
             box.hidden = true;

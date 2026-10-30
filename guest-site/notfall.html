@@ -20,12 +20,17 @@
         .door-ok { background: var(--ok-soft); color: var(--ok); padding: 1rem 1.1rem; border-radius: 2px; font-weight: 500; }
         .door-msg { background: var(--warn-soft); color: var(--warn); padding: 1rem 1.1rem; border-radius: 2px; }
         .door-contact { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .95rem; color: var(--ink-soft); }
+        .door-who { margin: 1.4rem 0 0; font-size: .92rem; color: var(--ink-soft); }
+        .door-who button { font: inherit; color: var(--ink); background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
         .door-contact a { font-weight: 600; color: var(--ink); }
     </style>
 </head>
 <body>
     <header class="masthead solid">
         <a href="./" class="brand" id="brand">Ferienwohnung Beckhome</a>
+        <nav class="mast-nav" aria-label="Konto">
+            <button type="button" class="mast-cta mast-logout" id="mast-logout" hidden>Abmelden</button>
+        </nav>
     </header>
 
     <main class="door">
@@ -47,6 +52,7 @@
             </form>
         </div>
 
+        <p class="door-who" id="door-who" hidden></p>
         <div class="door-contact" id="door-contact" hidden></div>
     </main>
 

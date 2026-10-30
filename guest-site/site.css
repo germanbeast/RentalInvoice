@@ -94,6 +94,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .mast-nav .mast-cta { padding: .55rem 1rem; border: 1px solid currentColor; border-radius: 2px; white-space: nowrap; }
 .mast-nav .mast-cta:hover { text-decoration: none; background: var(--paper); color: var(--ink); border-color: var(--paper); }
 .masthead.solid .mast-cta:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.mast-logout { font: inherit; color: inherit; background: none; cursor: pointer; }
 @media (max-width: 760px) { .mast-nav a:not(.mast-cta) { display: none; } .brand { font-size: 1.25rem; } }
 
 /* ---------- Cover ---------- */

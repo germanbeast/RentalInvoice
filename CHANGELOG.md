@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1] - 2026-10-30
+
+### Behoben
+- Gäste-Webseite: Abmelden war nur ganz unten auf „Meine Buchung“ möglich und auf der Notfall-Seite gar nicht. Jetzt steht „Abmelden“ nach dem Login oben rechts in der Kopfzeile (auf „Meine Buchung“ anstelle von „Zur Startseite“). Die Notfall-Seite zeigt zusätzlich „Angemeldet mit Buchung BH-…“ mit Abmelde-Link
+
 ## [1.20.0] - 2026-10-30
 
 ### Hinzugefügt
