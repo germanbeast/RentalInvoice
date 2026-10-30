@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <meta name="robots" content="noindex">
+    <meta name="referrer" content="no-referrer">
+    <title>Tür öffnen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="site.css">
+    <style>
+        .door { width: min(100% - 2 * var(--gutter), 520px); margin: 0 auto; padding: calc(72px + clamp(2rem, 10vh, 6rem)) 0 4rem; }
+        .door h1 { font-size: clamp(2.6rem, 9vw, 4rem); margin-bottom: 1rem; }
+        .door-kicker { font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: .6rem; }
+        .door-open { width: 100%; padding: 1.6rem 1rem; font-size: 1.25rem; }
+        .door-confirm { display: grid; gap: .75rem; margin-top: 1rem; }
+        .door-ok { background: var(--ok-soft); color: var(--ok); padding: 1rem 1.1rem; border-radius: 2px; font-weight: 500; }
+        .door-msg { background: var(--warn-soft); color: var(--warn); padding: 1rem 1.1rem; border-radius: 2px; }
+        .door-contact { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .95rem; color: var(--ink-soft); }
+        .door-contact a { font-weight: 600; color: var(--ink); }
+    </style>
+</head>
+<body>
+    <header class="masthead solid">
+        <a href="./" class="brand" id="brand">Ferienwohnung Beckhome</a>
+    </header>
+
+    <main class="door">
+        <p class="door-kicker">Notfall-Zugang</p>
+        <h1>Tür öffnen</h1>
+        <div id="door-box" aria-live="polite"><p>Einen Moment …</p></div>
+
+        <div id="login-box" hidden>
+            <p class="guest-lead">Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer Nachricht über Booking.com, Airbnb oder per E-Mail.</p>
+            <form class="login" id="login-form" novalidate>
+                <label>Buchungscode
+                    <input type="text" name="code" placeholder="BH-XXXXXX" autocomplete="off" autocapitalize="characters" maxlength="20" required>
+                </label>
+                <label>Anreisedatum
+                    <input type="date" name="arrival" required>
+                </label>
+                <div class="form-error" id="login-error" role="alert" hidden></div>
+                <button type="submit" class="btn btn-dark btn-block">Anmelden</button>
+            </form>
+        </div>
+
+        <div class="door-contact" id="door-contact" hidden></div>
+    </main>
+
+    <script src="notfall.js"></script>
+</body>
+</html>

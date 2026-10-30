@@ -1712,6 +1712,7 @@
     async function loadWebsite() {
         setSiteTab(siteTab);
         loadSiteRequests();
+        loadDoorCard();
         try {
             const d = await apiJson('/api/site/settings');
             if (!d.success) return;
@@ -1797,6 +1798,40 @@
             else showToast(d.error || 'Speichern fehlgeschlagen', 'error');
         } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
     }));
+
+    // Emergency door opening (QR code at the door)
+    const DOOR_RESULTS = { opened: 'geöffnet', denied: 'abgelehnt', error: 'Fehler' };
+    const DOOR_REASONS = { early: 'zu früh', late: 'Aufenthalt vorbei', limit: 'Limit erreicht', disabled: 'ausgeschaltet', key: 'falscher QR-Code', login: 'nicht angemeldet' };
+    async function loadDoorCard() {
+        try {
+            const d = await apiJson('/api/notfall/settings');
+            if (!d.success) return;
+            $('#door-enabled').checked = d.enabled;
+            $('#door-hint').textContent = d.hasPublicUrl
+                ? 'Nach „Neuen QR-Code erzeugen“ funktioniert der alte Aushang nicht mehr. Dann bitte neu drucken.'
+                : 'Hinweis: Bitte zuerst oben die öffentliche Adresse der Webseite eintragen, sonst zeigt der QR-Code auf die interne Adresse.';
+            $('#door-log').innerHTML = d.log.length
+                ? '<div class="today-title" style="margin-top:.5rem">Protokoll</div>' + d.log.map(l => {
+                    const t = new Date(l.created_at.replace(' ', 'T') + 'Z').toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+                    const why = l.result === 'denied' ? ` (${DOOR_REASONS[l.detail] || l.detail})` : l.result === 'error' ? ` (${l.detail || ''})` : '';
+                    return `<div>${escapeHtml(t)} · ${escapeHtml(l.guest_code || '–')} · <b>${escapeHtml(DOOR_RESULTS[l.result] || l.result)}</b>${escapeHtml(why)}</div>`;
+                }).join('')
+                : '';
+        } catch (e) { /* card stays */ }
+    }
+    $('#door-enabled').addEventListener('change', async e => {
+        try {
+            const d = await apiJson('/api/notfall/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: e.target.checked }) });
+            if (d.success) showToast(d.enabled ? 'Notfall-Öffnen eingeschaltet' : 'Notfall-Öffnen ausgeschaltet', 'success');
+        } catch (err) { showToast('Speichern fehlgeschlagen', 'error'); }
+    });
+    $('#door-new-key').addEventListener('click', async () => {
+        if (!confirm('Neuen QR-Code erzeugen? Der aufgehängte Aushang funktioniert danach nicht mehr und muss neu gedruckt werden.')) return;
+        try {
+            const d = await apiJson('/api/notfall/new-key', { method: 'POST' });
+            if (d.success) showToast('Neuer QR-Code erzeugt. Bitte Aushang neu drucken.', 'success');
+        } catch (e) { showToast('Fehlgeschlagen', 'error'); }
+    });
 
     $('#site-ical-copy').addEventListener('click', async () => {
         if (await copyText($('#site-ical-url').value)) showToast('Kalender-Link kopiert', 'success');

@@ -1,8 +1,8 @@
 {
-    "currentVersion": "1.19.0",
+    "currentVersion": "1.21.0",
     "releases": [
         {
-            "version": "1.19.0",
+            "version": "1.21.0",
             "date": "2026-10-30",
             "title": "Gästemappe und Rechnung für Gäste",
             "features": [
@@ -11,6 +11,27 @@
                 "WLAN, Parken und „Gut zu wissen“ pflegst du unter Webseite → Inhalte → Gästemappe"
             ],
             "fixes": []
+        },
+        {
+            "version": "1.20.0",
+            "date": "2026-10-30",
+            "title": "Notfall-Öffnen für Gäste",
+            "features": [
+                "Fällt das Tastenfeld aus, scannt der Gast den Notfall-QR-Code an der Tür und öffnet die Tür nach dem Login selbst",
+                "Nur während des Aufenthalts (Anreise ab Check-in-Zeit bis Abreise zur Check-out-Zeit), höchstens 3-mal pro Stunde",
+                "Jede Öffnung kommt sofort per Telegram und Push, mit Protokoll unter Webseite → Einrichtung",
+                "Druckbarer QR-Aushang, neuer QR-Code jederzeit erzeugbar"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.18.1",
+            "date": "2026-10-30",
+            "title": "WhatsApp-Kopplung nur noch mit Login",
+            "features": [],
+            "fixes": [
+                "Der QR-Code zum Koppeln von WhatsApp ist nur noch nach dem Anmelden abrufbar. Vorher konnte jeder, der die Adresse kannte, sein WhatsApp mit der App verbinden"
+            ]
         },
         {
             "version": "1.18.0",

@@ -264,6 +264,15 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         return requestView(r);
     }
 
+    /** Booking row of a logged-in guest (also for a confirmed direct request); null otherwise. */
+    function guestBooking(sess) {
+        if (!sess) return null;
+        if (sess.kind === 'booking') return sql().prepare('SELECT * FROM bookings WHERE id = ?').get(sess.id) || null;
+        const r = sql().prepare('SELECT * FROM booking_requests WHERE id = ?').get(sess.id);
+        if (!r || r.status !== 'confirmed' || !r.booking_id) return null;
+        return sql().prepare('SELECT * FROM bookings WHERE id = ?').get(r.booking_id) || null;
+    }
+
     // -----------------------------------------------------------------------
     // Public router (/gast)
     // -----------------------------------------------------------------------
@@ -742,7 +751,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         });
     }
 
-    return { router, registerAdminRoutes, ensureGuestCodes };
+    return { router, registerAdminRoutes, ensureGuestCodes, getSite, guestBooking };
 }
 
 module.exports = createGuestPortal;

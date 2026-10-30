@@ -945,7 +945,7 @@ app.disable('x-powered-by');
 // 5. AUTHENTICATION
 // =======================
 function ensureAuthenticated(req, res, next) {
-    const whitelist = ['/api/login', '/api/login/verify', '/api/login/recover', '/api/whatsapp/qr', '/api/health'];
+    const whitelist = ['/api/login', '/api/login/verify', '/api/login/recover', '/api/health'];
     if (whitelist.includes(req.path)) return next();
 
     if (req.session && req.session.user) return next();
@@ -1027,6 +1027,20 @@ const guestPortal = require('./guest-portal')({
     nightsBetween: (a, b) => nightsBetween(a, b),
     formatDateDE: (d) => formatDateDE(d)
 });
+
+// Emergency door opening for guests (QR code at the door, see emergency-door.js)
+const emergencyDoor = require('./emergency-door')({
+    express, rateLimit, db, qrcode,
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortal.getSite(),
+    guestBooking: (sess) => guestPortal.guestBooking(sess),
+    formatDateDE: (d) => formatDateDE(d),
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg, { type });
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    }
+});
+app.use('/gast', emergencyDoor.router);
 app.use('/gast', guestPortal.router);
 
 app.use(ensureAuthenticated);
@@ -1320,6 +1334,7 @@ function loadBookingRows() {
 
 // Guest website admin: settings, photos, booking requests
 guestPortal.registerAdminRoutes(app, apiLimiter);
+emergencyDoor.registerAdminRoutes(app, apiLimiter);
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {
