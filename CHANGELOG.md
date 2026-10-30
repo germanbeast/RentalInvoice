@@ -5,6 +5,13 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-10-30
+
+### Geändert
+- Gäste-Webseite: „Meine Buchung“ ist jetzt eine eigene Login-Seite unter `/gast/meine-buchung` statt eines Bereichs unten auf der Startseite (geteilte Ansicht mit Foto und Anmeldeformular, nach dem Login Buchungsstatus in voller Breite)
+- Nach einer Direktanfrage landet der Gast automatisch angemeldet auf der neuen Seite
+- Links in E-Mails, im Gastlink und alte Lesezeichen auf `#status` führen auf die neue Seite
+
 ## [1.17.2] - 2026-10-30
 
 ### Behoben

@@ -216,9 +216,23 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .quote .q-total { font-weight: 600; border-top: 1px solid var(--line); margin-top: .5rem; padding-top: .55rem; }
 .quote.q-error { background: var(--bad-soft); color: var(--bad); }
 
-/* ---------- Guest area ---------- */
-.guest { width: min(1080px, 100% - 2 * var(--gutter)); margin: 0 auto; padding: clamp(64px, 10vw, 128px) 0; }
-.guest .section-head { grid-template-columns: 1fr; }
+/* ---------- Meine Buchung (eigene Seite) ---------- */
+.account { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100svh; }
+.account-media { position: relative; overflow: hidden; background: radial-gradient(120% 90% at 20% 10%, #8a6e52, #3a3027 70%); }
+.account-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: settle 2.2s var(--ease) both; }
+.account-panel { display: flex; flex-direction: column; justify-content: center; padding: calc(96px + 2rem) clamp(24px, 6vw, 120px) clamp(48px, 8vw, 96px); }
+.account-panel h1 { font-size: clamp(2.8rem, 5vw, 4.5rem); margin-bottom: 1.2rem; }
+.account-panel #login-box { width: min(100%, 520px); }
+.account-help { margin-top: 1.4rem; font-size: .92rem; color: var(--ink-soft); }
+body.signed-in .account { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+body.signed-in .account-media { height: clamp(180px, 30vh, 340px); }
+body.signed-in .account-panel { width: min(1080px, 100% - 2 * var(--gutter)); margin: 0 auto; padding: clamp(32px, 5vw, 64px) 0 clamp(64px, 10vw, 128px); }
+@media (max-width: 860px) {
+    .account { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+    .account-media { height: clamp(180px, 34vh, 300px); }
+    .account-panel { padding: clamp(32px, 6vw, 48px) var(--gutter) clamp(56px, 10vw, 96px); }
+}
+@media (prefers-reduced-motion: reduce) { .account-media img { animation: none; } }
 .guest-lead { color: var(--ink-soft); max-width: 62ch; margin-bottom: 1.6rem; }
 .login { max-width: 600px; }
 .status-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
@@ -303,3 +317,6 @@ dialog[open] { animation: rise .35s var(--ease); }
     .reveal.pending img { transform: none; }
     .quote.q-in, .status-card, dialog[open] { animation: none; }
 }
+.account .login { background: none; border: 0; padding: 0; max-width: none; }
+.account-help a { text-decoration: none; background: linear-gradient(currentColor, currentColor) no-repeat 0 100% / 100% 1px; padding-bottom: 2px; transition: background-size .45s var(--ease); }
+.account-help a:hover { background-size: 0 1px; }
