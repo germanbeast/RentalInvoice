@@ -166,6 +166,35 @@ function initSchema() {
         console.log('✅ Migration: arrived_at Spalte zu bookings hinzugefügt.');
     }
 
+    // Migration: guest code for the public guest website (login with code + arrival date)
+    if (!bookingCols.includes('guest_code')) {
+        db.exec("ALTER TABLE bookings ADD COLUMN guest_code TEXT");
+        console.log('✅ Migration: guest_code Spalte zu bookings hinzugefügt.');
+    }
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_guest_code ON bookings(guest_code)");
+
+    // Booking requests from the public guest website (direct bookings)
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS booking_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT,
+            adults INTEGER DEFAULT 1,
+            children INTEGER DEFAULT 0,
+            checkin DATE NOT NULL,
+            checkout DATE NOT NULL,
+            message TEXT,
+            price_total REAL DEFAULT 0,
+            status TEXT DEFAULT 'pending',
+            host_note TEXT,
+            booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
     // Leftovers of guests deleted before v1.13.0: manual bookings without guest and without door code
     const orphans = db.prepare("DELETE FROM bookings WHERE uid LIKE 'manual-%' AND guest_id IS NULL AND nuki_auth_id IS NULL").run();
     if (orphans.changes) console.log(`🧹 ${orphans.changes} verwaiste manuelle Buchung(en) gelöscht.`);

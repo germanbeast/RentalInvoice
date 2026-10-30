@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.14.0",
+    "currentVersion": "1.15.0",
     "releases": [
+        {
+            "version": "1.15.0",
+            "date": "2026-10-28",
+            "title": "Gäste-Webseite mit Buchungsanfrage und Gäste-Login",
+            "features": [
+                "Neue öffentliche Webseite für Gäste unter /gast/ mit Bildern, Beschreibung, Belegungskalender und Preis",
+                "Gäste können direkt anfragen; du bestätigst oder lehnst im Menü „Webseite“ ab, der Gast bekommt eine E-Mail und einen Türcode",
+                "Gäste melden sich mit Buchungscode und Anreisedatum an und sehen den Stand ihrer Buchung, auch bei Booking.com und Airbnb",
+                "Knopf „Gastlink“ bei jeder Buchung: kopiert eine fertige Nachricht mit Link und Code für den Portal-Chat",
+                "Kalender-Link für Booking.com und Airbnb, damit Direktbuchungen dort automatisch gesperrt sind"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.14.0",
             "date": "2026-10-26",
