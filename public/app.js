@@ -1725,7 +1725,8 @@
         location: '#site-location', house_rules: '#site-house-rules', arrival_info: '#site-arrival-info',
         imprint: '#site-imprint', privacy: '#site-privacy', public_url: '#site-public-url',
         max_guests: '#site-max-guests', min_nights: '#site-min-nights', lead_days: '#site-lead-days',
-        checkin_time: '#site-checkin', checkout_time: '#site-checkout', pin_days: '#site-pin-days', payment_info: '#site-payment-info'
+        checkin_time: '#site-checkin', checkout_time: '#site-checkout', pin_days: '#site-pin-days', payment_info: '#site-payment-info',
+        testimonials: '#site-testimonials', bedrooms: '#site-bedrooms', size_sqm: '#site-size'
     };
     const SITE_CHECKS = { enabled: '#site-enabled', show_bank: '#site-show-bank', show_contact: '#site-show-contact' };
 

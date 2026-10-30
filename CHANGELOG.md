@@ -17,6 +17,17 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Gäste-Verwaltung: Kopfzeile und Inhalt hatten keinen Innenabstand
 - Einstellungen: Menüspalte lief bei kleineren Fensterhöhen über den Rand hinaus
 - Knöpfe nutzten teils die Browser-Standardschrift statt der App-Schrift
+## [1.16.0] - 2026-10-30
+
+### Geändert
+- Gäste-Webseite neu gestaltet im Boutique-/Magazin-Stil: ganzseitiges Titelbild, Serifenschrift (Instrument Serif + Hanken Grotesk), warmer Papierton, Bildstrecke, Ausstattung als Liste, dunkler Fußbereich
+- Bildergalerie mit Vor/Zurück und Tastatursteuerung; Impressum, Datenschutz und Galerie als native `<dialog>`
+- Kopfzeile liegt transparent über dem Titelbild und wird beim Scrollen fest
+- Ruhige Bewegung: Fotos öffnen sich beim ersten Hineinscrollen wie ein Vorhang, Titelbild mit leichter Tiefe beim Scrollen, gezeichnete Unterstreichungen, weiche Bildwechsel in der Galerie; bei „Bewegung reduzieren“ alles aus
+- Layout wächst auf großen Bildschirmen mit (Inhaltsbreite bis 1920 px, Schriftgröße skaliert mit der Fensterbreite)
+
+### Hinzugefügt
+- Einstellungen unter „Webseite → Inhalte“: Wohnfläche, Schlafzimmer und Gästestimmen („Text | Name“)
 
 ## [1.15.0] - 2026-10-28
 

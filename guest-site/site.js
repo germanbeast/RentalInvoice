@@ -17,6 +17,9 @@
     const nightsTxt = n => `${n} ${n === 1 ? 'Nacht' : 'Nächte'}`;
 
     let info = null;
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let photos = [];
+    let lbIndex = 0;
     let booked = [];
     let today = new Date().toISOString().slice(0, 10);
     let horizon = addDays(today, 540);
@@ -35,21 +38,39 @@
         document.title = d.title;
         ['#brand', '#site-title', '#footer-title'].forEach(s => { $(s).textContent = d.title; });
         $('#site-tagline').textContent = d.tagline || '';
-        $('#site-description').textContent = d.description || 'Eine Beschreibung folgt in Kürze.';
+        // First paragraph becomes the large lede, the rest the body copy
+        const paras = String(d.description || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+        $('#site-lede').textContent = paras[0] || '';
+        $('#site-description').textContent = paras.slice(1).join('\n\n');
         $('#fact-guests').textContent = `bis ${d.maxGuests} Personen`;
+        $('#fact-size-wrap').hidden = !d.sizeSqm;
+        $('#fact-size').textContent = `${d.sizeSqm} m²`;
+        $('#fact-bedrooms-wrap').hidden = !d.bedrooms;
+        $('#fact-bedrooms').textContent = d.bedrooms;
         $('#fact-min').textContent = nightsTxt(d.minNights);
         $('#fact-checkin').textContent = `ab ${d.checkinTime} Uhr`;
         $('#fact-checkout').textContent = `bis ${d.checkoutTime} Uhr`;
         $('#site-features').innerHTML = d.features.map(f => `<li>${esc(f)}</li>`).join('');
+        $('#amenities').hidden = !d.features.length;
         if (d.pricePerNight) {
-            $('#hero-price').textContent = `ab ${money(d.pricePerNight)} pro Nacht${d.cleaningFee ? ` zzgl. ${money(d.cleaningFee)} Endreinigung` : ''}`;
+            $('#hero-price').textContent = `ab ${money(d.pricePerNight)} pro Nacht`;
         }
 
-        if (d.photos.length) {
-            $('#hero-media').innerHTML = `<img src="${esc(d.photos[0])}" alt="">`;
-            $('#gallery').innerHTML = d.photos.map((p, i) => `<button type="button" data-src="${esc(p)}"><img src="${esc(p)}" alt="Foto ${i + 1}" loading="lazy"></button>`).join('');
-            $('#gallery-wrap').hidden = d.photos.length < 2;
-        }
+        photos = d.photos;
+        const thumb = (p, i) => `<button type="button" data-idx="${i}" aria-label="Foto ${i + 1} vergrößern"><img src="${esc(p)}" alt="" loading="lazy"></button>`;
+        if (photos.length) $('#hero-media').innerHTML = `<img src="${esc(photos[0])}" alt="">`;
+        // Spread: the next three photos (or the cover again when there is only one); the rest go into the strip
+        const spread = photos.length > 1 ? photos.slice(1, 4).map((p, i) => thumb(p, i + 1)) : photos.map(thumb);
+        $('#gallery').innerHTML = spread.join('');
+        $('#spread').classList.toggle('no-photos', !photos.length);
+        const rest = photos.slice(4);
+        $('#strip').innerHTML = rest.map((p, i) => thumb(p, i + 4)).join('');
+        $('#gallery-wrap').hidden = !rest.length;
+
+        observeReveals();
+
+        $('#voices-list').innerHTML = (d.testimonials || []).map(t => `<figure><blockquote>${esc(t.text)}</blockquote>${t.name ? `<figcaption>${esc(t.name)}</figcaption>` : ''}</figure>`).join('');
+        $('#voices').hidden = !(d.testimonials || []).length;
 
         $('#location-block').hidden = !d.location;
         $('#site-location').textContent = d.location || '';
@@ -159,6 +180,7 @@
     async function updateQuote() {
         const q = $('#quote');
         const d = await api('quote', { checkin: selIn, checkout: selOut });
+        q.classList.toggle('q-error', !d.success);
         if (!d.success) {
             q.hidden = false;
             q.innerHTML = esc(d.error || 'Zeitraum nicht verfügbar.');
@@ -166,6 +188,7 @@
             return;
         }
         q.hidden = !d.total;
+        q.classList.remove('q-in'); void q.offsetWidth; q.classList.add('q-in');
         if (d.total) {
             q.innerHTML = `
                 <div class="q-row"><span>${nightsTxt(d.nights)} × ${money(d.night)}</span><span>${money(d.nights * d.night)}</span></div>
@@ -259,7 +282,7 @@
     function renderStatus(s, newCode) {
         const [cls, label] = STATUS[s.status] || STATUS.pending;
         if (s.status === 'gone') {
-            return `<div class="card"><div class="status-head"><h3>Buchung ${esc(s.code || '')}</h3><span class="badge ${cls}">${label}</span></div>
+            return `<div class="status-card"><div class="status-head"><h3>Buchung ${esc(s.code || '')}</h3><span class="badge ${cls}">${label}</span></div>
                 <p>Diese Buchung finden wir nicht mehr. Möglicherweise wurde sie über das Buchungsportal storniert. Bei Fragen melden Sie sich gerne bei uns.</p>
                 ${contactHtml(s.contact)}<div class="guest-actions"><button type="button" class="btn btn-ghost btn-small" data-logout>Abmelden</button></div></div>`;
         }
@@ -308,15 +331,15 @@
                     <form id="details-form" novalidate>
                         <label>Vor- und Nachname<input type="text" name="name" maxlength="80" value="${esc(dt.name)}" required></label>
                         <div class="row">
-                            <label>E-Mail <small>(optional)</small><input type="email" name="email" maxlength="120" value="${esc(dt.email)}"></label>
-                            <label>Telefon <small>(optional)</small><input type="tel" name="phone" maxlength="40" value="${esc(dt.phone)}"></label>
+                            <label>E-Mail <small>optional</small><input type="email" name="email" maxlength="120" value="${esc(dt.email)}"></label>
+                            <label>Telefon <small>optional</small><input type="tel" name="phone" maxlength="40" value="${esc(dt.phone)}"></label>
                         </div>
                         <div class="row">
-                            <label>Ankunft ca. <small>(optional)</small><input type="text" name="arrivalTime" maxlength="40" placeholder="z. B. 17:30 Uhr"></label>
-                            <label>Nachricht <small>(optional)</small><input type="text" name="note" maxlength="1000"></label>
+                            <label>Ankunft ca. <small>optional</small><input type="text" name="arrivalTime" maxlength="40" placeholder="z. B. 17:30 Uhr"></label>
+                            <label>Nachricht <small>optional</small><input type="text" name="note" maxlength="1000"></label>
                         </div>
                         <div class="form-error" id="details-error" hidden></div>
-                        <button type="submit" class="btn btn-primary btn-small">Speichern</button><span class="saved" id="details-saved" hidden>Gespeichert, danke!</span>
+                        <button type="submit" class="btn btn-dark btn-small">Speichern</button><span class="saved" id="details-saved" hidden>Gespeichert, danke!</span>
                     </form></div>`);
             }
         }
@@ -324,7 +347,7 @@
         if (s.status === 'cancelled') parts.push('<p>Diese Buchung wurde storniert. Bei Fragen melden Sie sich gerne bei uns.</p>');
         parts.push(contactHtml(s.contact));
         parts.push('<div class="guest-actions"><button type="button" class="btn btn-ghost btn-small" data-logout>Abmelden</button></div>');
-        return `<div class="card">${parts.join('')}</div>`;
+        return `<div class="status-card">${parts.join('')}</div>`;
     }
 
     function contactHtml(c) {
@@ -359,28 +382,82 @@
         $('#legal-title').textContent = imprint ? 'Impressum' : 'Datenschutz';
         const text = info ? (imprint ? info.imprint : info.privacy) : '';
         $('#legal-body').textContent = text || 'Dieser Text wird gerade vorbereitet.';
-        $('#legal-overlay').hidden = false;
-    }
-    function closeOverlays() {
-        $('#legal-overlay').hidden = true;
-        $('#lightbox').hidden = true;
-        if (/^#(impressum|datenschutz)$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
+        if (!$('#legal-overlay').open) $('#legal-overlay').showModal();
     }
     function onHash() {
         const h = location.hash.slice(1);
         if (h === 'impressum' || h === 'datenschutz') openLegal(h);
     }
     window.addEventListener('hashchange', onHash);
-    $('#legal-close').addEventListener('click', closeOverlays);
-    $('#lightbox-close').addEventListener('click', closeOverlays);
-    document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeOverlays(); }));
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOverlays(); });
-    $('#gallery').addEventListener('click', e => {
-        const b = e.target.closest('[data-src]');
-        if (!b) return;
-        $('#lightbox-img').src = b.dataset.src;
-        $('#lightbox').hidden = false;
+    $('#legal-overlay').addEventListener('close', () => {
+        if (/^#(impressum|datenschutz)$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
     });
+    $('#legal-close').addEventListener('click', () => $('#legal-overlay').close());
+    document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
+
+    function showPhoto(i) {
+        lbIndex = (i + photos.length) % photos.length;
+        const img = $('#lightbox-img');
+        if (img.getAttribute('src') && !reduceMotion) {
+            img.classList.add('swap');
+            setTimeout(() => { img.src = photos[lbIndex]; }, 180);
+        } else img.src = photos[lbIndex];
+        $('#lightbox-count').textContent = `${lbIndex + 1} / ${photos.length}`;
+        $('#lightbox-prev').hidden = $('#lightbox-next').hidden = photos.length < 2;
+    }
+    function openPhoto(e) {
+        const b = e.target.closest('[data-idx]');
+        if (!b) return;
+        showPhoto(Number(b.dataset.idx));
+        $('#lightbox').showModal();
+    }
+    $('#gallery').addEventListener('click', openPhoto);
+    $('#strip').addEventListener('click', openPhoto);
+    $('#lightbox-close').addEventListener('click', () => $('#lightbox').close());
+    $('#lightbox-prev').addEventListener('click', () => showPhoto(lbIndex - 1));
+    $('#lightbox-next').addEventListener('click', () => showPhoto(lbIndex + 1));
+    $('#lightbox').addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft') showPhoto(lbIndex - 1);
+        if (e.key === 'ArrowRight') showPhoto(lbIndex + 1);
+    });
+
+    $('#lightbox-img').addEventListener('load', e => e.target.classList.remove('swap'));
+
+    // Photos open like a curtain the first time they scroll into view
+    function observeReveals() {
+        if (reduceMotion || !('IntersectionObserver' in window)) return;
+        const io = new IntersectionObserver(entries => entries.forEach(e => {
+            if (!e.isIntersecting) return;
+            e.target.classList.remove('pending');
+            io.unobserve(e.target);
+        }), { rootMargin: '0px 0px -12% 0px' });
+        document.querySelectorAll('#gallery button, #strip button').forEach((el, i) => {
+            const r = el.getBoundingClientRect();
+            if (r.top < innerHeight) return; // already on screen: no wipe
+            el.classList.add('reveal', 'pending');
+            el.style.transitionDelay = `${(i % 3) * 90}ms`;
+            io.observe(el);
+        });
+    }
+
+    // Cover drifts a little slower than the page
+    const coverMedia = $('#hero-media');
+    if (!reduceMotion) {
+        let ticking = false;
+        addEventListener('scroll', () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+                const y = Math.min(scrollY, innerHeight);
+                coverMedia.style.transform = `translate3d(0, ${y * 0.25}px, 0)`;
+                ticking = false;
+            });
+        }, { passive: true });
+    }
+
+    // Masthead turns solid once the cover has scrolled away
+    const mast = $('#masthead');
+    new IntersectionObserver(([e]) => mast.classList.toggle('solid', !e.isIntersecting), { rootMargin: '-72px 0px 0px 0px' }).observe($('#hero'));
 
     // ------------------------------------------------------------------
     (async () => {
