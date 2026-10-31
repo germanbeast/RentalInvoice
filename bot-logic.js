@@ -271,16 +271,19 @@ async function listNukiCodes() {
  * so the current entry is read first and only the given fields are changed.
  * patch: any of { name, allowedFromDate, allowedUntilDate, enabled }
  */
-async function updateNukiAuth(authId, patch) {
+async function updateNukiAuth(authId, patch, known = null) {
     const nuki = db.getAllSettings().nuki;
     if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
     const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
     const headers = { 'Authorization': `Bearer ${nuki.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' };
 
     try {
-        const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, { headers, timeout: 15000 });
-        const auths = Array.isArray(listRes.data) ? listRes.data : [];
-        const cur = auths.find(a => String(a.id) === String(authId));
+        let cur = known && String(known.id) === String(authId) ? known : null;
+        if (!cur) {
+            const listRes = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, { headers, timeout: 15000 });
+            const auths = Array.isArray(listRes.data) ? listRes.data : [];
+            cur = auths.find(a => String(a.id) === String(authId));
+        }
         if (!cur) throw new Error('Code im Nuki-Schloss nicht gefunden (evtl. manuell gelöscht)');
 
         const body = {
@@ -305,6 +308,180 @@ async function updateNukiAuth(authId, patch) {
         }
         throw e;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Door code of a booking: find it, keep it in sync (dates + name) instead of creating new ones
+// ---------------------------------------------------------------------------
+const NUKI_NAME_MAX = 20;
+const DEFAULT_FROM_TIME = 'T15:00:00.000Z';
+const DEFAULT_UNTIL_TIME = 'T11:00:00.000Z';
+
+/** Name of a guest's keypad code as shown in the Nuki app ("Gast: Max Muster", max. 20 characters). */
+function nukiCodeName(guestName) {
+    return `Gast: ${String(guestName || 'Gast').trim() || 'Gast'}`.substring(0, NUKI_NAME_MAX);
+}
+
+/** True for code names created before a real guest name was known ("Gast: Booking 12.03.", "Gast Booking" ...). */
+function isPlaceholderCodeName(codeName) {
+    const rest = String(codeName || '').trim().replace(/^gast\s*:?\s*/i, '').trim();
+    if (!rest) return true;
+    if (isPlaceholderGuestName(rest)) return true;
+    return /^(booking|airbnb|gast)\b[\s\d.:-]*$/i.test(rest);
+}
+
+/** Raw authorization list of the lock from Nuki Web. */
+async function fetchNukiAuths() {
+    const { token, lockId } = nukiCredentials();
+    const res = await axios.get(`https://api.nuki.io/smartlock/${lockId}/auth`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+        timeout: 15000
+    });
+    return Array.isArray(res.data) ? res.data : [];
+}
+
+/**
+ * Finds the live Nuki entry of a booking: by the stored auth id, otherwise by its PIN (the id lookup right
+ * after creating a code sometimes fails because Nuki Web lists new codes with a delay). A found id is stored.
+ */
+function findBookingAuth(booking, auths) {
+    if (!booking) return null;
+    let cur = null;
+    if (booking.nuki_auth_id) cur = auths.find(a => String(a.id) === String(booking.nuki_auth_id));
+    if (!cur && booking.nuki_pin) cur = auths.find(a => a.type === 13 && String(a.code) === String(booking.nuki_pin));
+    if (cur && String(cur.id) !== String(booking.nuki_auth_id || '')) {
+        try { db.updateBookingNukiData(booking.id, booking.nuki_pin || String(cur.code), String(cur.id)); } catch (e) { /* best-effort */ }
+        booking.nuki_auth_id = String(cur.id);
+    }
+    return cur || null;
+}
+
+/** Keeps the time of day of an existing Nuki date (UTC) and only swaps the day. */
+function withDay(iso, ymd, fallbackTime) {
+    const m = /^\d{4}-\d{2}-\d{2}(T.*)$/.exec(String(iso || ''));
+    return `${ymd}${m ? m[1] : fallbackTime}`;
+}
+
+/**
+ * Changes the existing door code of a booking in place.
+ * changes: { from, until } as YYYY-MM-DD (time of day of the code is kept), { name } raw code name,
+ *          or { guestName } -> "Gast: <name>".
+ * Returns { updated: true, pin, authId, name, from, until } or { updated: false, missing: true } when the
+ * booking has no code that still exists in Nuki.
+ */
+async function syncBookingCode(bookingOrId, changes = {}, auths = null) {
+    const booking = typeof bookingOrId === 'object' ? bookingOrId
+        : db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(bookingOrId);
+    if (!booking) throw new Error('Buchung nicht gefunden');
+    if (!booking.nuki_auth_id && !booking.nuki_pin) return { updated: false, missing: true };
+    const list = auths || await fetchNukiAuths();
+    const cur = findBookingAuth(booking, list);
+    if (!cur) return { updated: false, missing: true };
+
+    const patch = {};
+    if (changes.from) patch.allowedFromDate = withDay(cur.allowedFromDate, changes.from, DEFAULT_FROM_TIME);
+    if (changes.until) patch.allowedUntilDate = withDay(cur.allowedUntilDate, changes.until, DEFAULT_UNTIL_TIME);
+    if (changes.name) patch.name = String(changes.name).trim().substring(0, NUKI_NAME_MAX);
+    else if (changes.guestName) patch.name = nukiCodeName(changes.guestName);
+    if (typeof changes.enabled === 'boolean') patch.enabled = changes.enabled;
+
+    const differs = Object.keys(patch).some(k => String(patch[k]) !== String(cur[k]));
+    if (differs) await updateNukiAuth(cur.id, patch, cur);
+    if (!booking.nuki_pin && cur.code) db.updateBookingNukiData(booking.id, String(cur.code), String(cur.id));
+    return {
+        updated: true, changed: differs, pin: String(cur.code || booking.nuki_pin || ''), authId: String(cur.id),
+        name: patch.name || cur.name, from: patch.allowedFromDate || cur.allowedFromDate, until: patch.allowedUntilDate || cur.allowedUntilDate
+    };
+}
+
+/**
+ * A code is requested for a stay (invoice form, Telegram, guest list). If a booking of this stay already
+ * has a code - same dates, or overlapping dates when the check-in/out moved - that code is moved to the
+ * new period and renamed instead of creating a second one. Returns the result of syncBookingCode or null.
+ */
+async function reuseStayCode(guestName, arrival, departure) {
+    const d = db.getDb();
+    const name = String(guestName || '').trim();
+    const withCode = "((b.nuki_auth_id IS NOT NULL AND b.nuki_auth_id != '') OR (b.nuki_pin IS NOT NULL AND b.nuki_pin != ''))";
+    let booking = null;
+    if (name) {
+        booking = d.prepare(`
+            SELECT b.* FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+            WHERE ${withCode} AND b.checkin < ? AND b.checkout > ?
+              AND (g.name = ? COLLATE NOCASE OR b.summary LIKE ?)
+            ORDER BY (b.checkin = ? AND b.checkout = ?) DESC LIMIT 1
+        `).get(departure, arrival, name, `%${name}%`, arrival, departure);
+    }
+    if (!booking) {
+        // Only one overlapping stay with a code -> that is this stay (the apartment has one unit)
+        const rows = d.prepare(`SELECT b.* FROM bookings b WHERE ${withCode} AND b.checkin < ? AND b.checkout > ?`).all(departure, arrival);
+        if (rows.length === 1) booking = rows[0];
+    }
+    if (!booking) return null;
+    const r = await syncBookingCode(booking, {
+        from: arrival, until: departure,
+        guestName: name && !isPlaceholderGuestName(name) ? name : undefined
+    });
+    if (!r.updated) return null;
+    return { ...r, bookingId: booking.id };
+}
+
+/**
+ * Renames the codes of all current and upcoming bookings of a guest (guest renamed in the admin).
+ */
+async function renameGuestCodes(guestId, guestName) {
+    if (!guestId || isPlaceholderGuestName(guestName)) return 0;
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+    const rows = db.getDb().prepare(`
+        SELECT * FROM bookings WHERE guest_id = ? AND checkout >= ?
+          AND ((nuki_auth_id IS NOT NULL AND nuki_auth_id != '') OR (nuki_pin IS NOT NULL AND nuki_pin != ''))
+    `).all(guestId, today);
+    if (!rows.length) return 0;
+    const auths = await fetchNukiAuths();
+    let n = 0;
+    for (const b of rows) {
+        try {
+            const r = await syncBookingCode(b, { guestName }, auths);
+            if (r.changed) n++;
+        } catch (e) {
+            console.warn(`⚠️ Türcode von Buchung ${b.id} konnte nicht umbenannt werden:`, e.message);
+        }
+    }
+    return n;
+}
+
+/**
+ * Hourly repair: links codes whose id was never stored, and renames codes still called
+ * "Gast: Booking 12.03." / "Gast: Airbnb ..." once the booking has a real guest name.
+ * Codes renamed by hand to something else are left alone.
+ */
+async function reconcileBookingCodes() {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+    const rows = db.getDb().prepare(`
+        SELECT b.*, g.name AS guest_name FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE b.checkout >= ?
+          AND ((b.nuki_auth_id IS NOT NULL AND b.nuki_auth_id != '') OR (b.nuki_pin IS NOT NULL AND b.nuki_pin != ''))
+    `).all(today);
+    if (!rows.length) return { renamed: [] };
+    const auths = await fetchNukiAuths();
+    const renamed = [];
+    for (const b of rows) {
+        const cur = findBookingAuth(b, auths);
+        if (!cur || !b.guest_name || isPlaceholderGuestName(b.guest_name)) continue;
+        if (!isPlaceholderCodeName(cur.name)) continue;
+        const want = nukiCodeName(b.guest_name);
+        if (cur.name === want) continue;
+        try {
+            const before = cur.name || 'ohne Namen';
+            await updateNukiAuth(cur.id, { name: want }, cur);
+            cur.name = want;
+            renamed.push(`${before} → ${want}`);
+            await new Promise(r => setTimeout(r, 500));
+        } catch (e) {
+            console.warn(`⚠️ Türcode von Buchung ${b.id} konnte nicht umbenannt werden:`, e.message);
+        }
+    }
+    return { renamed };
 }
 
 // ---------------------------------------------------------------------------
@@ -425,10 +602,11 @@ async function applyGuestName(bookingId, fullName) {
 
     let nukiRenamed = false;
     let nukiError = null;
-    if (booking.nuki_auth_id) {
+    if (booking.nuki_auth_id || booking.nuki_pin) {
         try {
-            await updateNukiAuth(booking.nuki_auth_id, { name: `Gast: ${name}`.substring(0, 20) });
-            nukiRenamed = true;
+            const r = await syncBookingCode(booking, { guestName: name });
+            nukiRenamed = r.updated;
+            if (r.missing) nukiError = 'Türcode im Nuki-Schloss nicht gefunden';
         } catch (e) {
             nukiError = e.message;
             console.warn(`⚠️ Nuki-Code von Buchung ${bookingId} konnte nicht umbenannt werden:`, e.message);
@@ -498,6 +676,10 @@ async function finalizeInvoiceData(data) {
         // Reuse the already-created PIN (e.g. from iCal or Telegram PIN-only flow)
         invoiceData.nukiPin = existingBooking.nuki_pin;
     } else {
+        let reused = null;
+        try { reused = await reuseStayCode(data.gName, data.arrival, data.departure); }
+        catch (e) { console.warn('Bestehender Türcode konnte nicht angepasst werden:', e.message); }
+        if (reused) { invoiceData.nukiPin = reused.pin; return invoiceData; }
         try {
             const nukiResult = await createNukiPinDirect(data.arrival, data.departure, data.gName);
             if (nukiResult.success) {
@@ -589,6 +771,13 @@ module.exports = {
     createNukiPinDirect,
     listNukiCodes,
     updateNukiAuth,
+    fetchNukiAuths,
+    nukiCodeName,
+    isPlaceholderCodeName,
+    syncBookingCode,
+    reuseStayCode,
+    renameGuestCodes,
+    reconcileBookingCodes,
     getNukiLock,
     nukiLockAction,
     applyGuestName,
