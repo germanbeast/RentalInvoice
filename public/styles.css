@@ -3323,3 +3323,69 @@ button.alert:hover { text-decoration: underline; }
     .review-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
     .review-kpis .stat-card { padding: .8rem .9rem; }
 }
+
+/* Auslastung (eigene Seite) & Finanz-Auswertung */
+#view-occupancy .review-section { margin-top: 0; display: flex; flex-direction: column; gap: 1.25rem; }
+#view-occupancy .review-grid, #view-occupancy .review-kpis { margin-bottom: 0; }
+.review-note:empty { display: none; }
+.review-year { border-radius: 999px; padding: .45rem 2rem .45rem .9rem; border-color: #cfd5df; background-color: #fff; }
+.review-table-card .card-title, .fin-export .card-title { margin-bottom: .6rem; }
+.fin-subtitle { margin-top: 1.2rem; }
+.fin-table-wrap { overflow-x: auto; }
+.fin-scroll { max-height: 34rem; overflow-y: auto; }
+.fin-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.fin-table th { text-align: left; font-weight: 500; padding: .55rem .6rem; border-bottom: 1px solid var(--line); white-space: nowrap; background: #fff; position: sticky; top: 0; z-index: 1; }
+.fin-table td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.fin-table tbody tr:hover { background: var(--paper-2); }
+.fin-table tfoot td { font-weight: 600; border-top: 2px solid var(--line); border-bottom: 0; }
+.fin-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fin-table th.num { text-align: right; }
+.fin-table .muted, .fin-table tr.muted td { color: var(--muted); }
+.fin-table .neg { color: var(--bad); }
+.fin-table tr.is-current td { background: var(--accent-soft); }
+.fin-table .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.occ-cell { display: inline-flex; align-items: center; gap: .5rem; justify-content: flex-end; }
+.occ-mini { display: inline-block; width: 3.2rem; height: 6px; background: var(--paper-2); border-radius: 3px; overflow: hidden; }
+.occ-mini.wide { width: 6rem; }
+.occ-mini > span { display: block; height: 100%; background: var(--accent); }
+.daymap { display: flex; flex-direction: column; gap: 3px; }
+.daymap-row { display: grid; grid-template-columns: 2.2rem repeat(31, minmax(0, 1fr)) 3rem; gap: 2px; align-items: center; }
+.daymap-row > span { font-size: .72rem; color: var(--muted); }
+.daymap-row > em { font-style: normal; font-size: .72rem; color: var(--muted); text-align: right; }
+.daymap-row > b { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--paper-2); }
+.daymap-row > b.on { background: var(--accent); }
+.daymap-row > b.future { background: #fff; outline: 1px dashed #cfd5df; outline-offset: -1px; }
+.daymap-head > i { font-style: normal; font-size: .6rem; color: var(--muted); text-align: center; overflow: visible; white-space: nowrap; }
+#review-daymap .review-hint { margin-top: .7rem; }
+.fin-filter { display: flex; flex-direction: column; gap: .75rem; }
+.fin-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.fin-filter select, .fin-filter input[type="date"] { width: auto; border-radius: 999px; padding: .45rem .9rem; border-color: #cfd5df; background-color: #fff; }
+.fin-filter select { padding-right: 2rem; }
+.fin-custom { display: inline-flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .86rem; }
+.fin-custom[hidden], .fin-filter [hidden] { display: none; }
+.fin-check { display: inline-flex; align-items: center; gap: .45rem; font-size: .86rem; color: var(--ink-soft); cursor: pointer; }
+.fin-check input { width: 1rem; height: 1rem; margin: 0; }
+.fin-kpis { margin-bottom: 0; }
+.fin-export { display: flex; flex-direction: column; gap: .8rem; }
+.fin-export-main, .fin-export-csv { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.fin-export .pill { text-decoration: none; }
+.fin-export-csv .pill { font-size: .8rem; padding: .42rem .8rem; }
+#fin-pdf-note:empty { display: none; }
+.fin-grid { margin-bottom: 0; grid-template-columns: 1fr 1fr; }
+.fin-paid { color: var(--ok); font-weight: 600; }
+.fin-open { color: var(--bad); font-weight: 600; }
+a.pill { text-decoration: none; }
+@media (max-width: 992px) {
+    .fin-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    #view-occupancy .review-section { padding: 0; }
+    .fin-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .fin-filter .seg { width: 100%; display: flex; }
+    .fin-filter select, .fin-filter .fin-custom { flex: 1 1 auto; }
+    .daymap-row { grid-template-columns: 1.8rem repeat(31, minmax(0, 1fr)) 2.2rem; gap: 1px; }
+}
+.stat-card-total .review-sub { color: #dbe5ff; }
+.daymap-row > b { aspect-ratio: auto; height: 12px; border-radius: 2px; }
+.daymap-row > em { white-space: nowrap; }
+.review-grid > *, .review-table-card { min-width: 0; }

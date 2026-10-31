@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.27.0",
+    "currentVersion": "1.28.0",
     "releases": [
+        {
+            "version": "1.28.0",
+            "date": "2026-10-31",
+            "title": "Auslastung und Finanz-Auswertung mit Excel-Export",
+            "features": [
+                "Neuer Menüpunkt „Auslastung“: Jahresrückblick mit Umsatz pro Monat, Kanälen, Belegung Tag für Tag, Monatstabelle und Jahresvergleich",
+                "Neuer Menüpunkt „Finanz-Auswertung“: Jahr, Quartal, Monat oder eigener Zeitraum, nach Rechnungsdatum oder Zahlungseingang",
+                "Umsatzsteuer, Kurtaxe, Ausgaben nach Kategorie und offene Rechnungen auf einen Blick",
+                "Massen-Export: alles als Excel-Datei, einzelne Tabellen als CSV und alle Rechnungen als PDF in einer ZIP-Datei"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.27.0",
             "date": "2026-10-31",

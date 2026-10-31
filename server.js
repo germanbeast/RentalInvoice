@@ -2467,7 +2467,7 @@ const reviewYear = q => {
 };
 app.get('/api/review', apiLimiter, (req, res) => {
     try {
-        res.json({ success: true, review: yearReview.build(reviewYear(req.query.year)) });
+        res.json({ success: true, review: { ...yearReview.build(reviewYear(req.query.year)), history: yearReview.history() } });
     } catch (e) {
         console.error('Jahresrückblick Fehler:', e.message);
         res.status(500).json({ success: false, error: 'Jahresrückblick konnte nicht erstellt werden' });
@@ -2482,6 +2482,158 @@ app.post('/api/review/geo', apiLimiter, async (req, res) => {
     } catch (e) {
         console.error('Jahresrückblick Karte Fehler:', e.message);
         res.status(500).json({ success: false, error: 'Orte konnten nicht gesucht werden' });
+    }
+});
+
+// Auslastung as Excel: months of the year, channels, comparison of all years
+app.get('/api/review/export.xlsx', apiLimiter, (req, res) => {
+    try {
+        const year = reviewYear(req.query.year);
+        const r = yearReview.build(year);
+        const hist = yearReview.history();
+        const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+        const months = r.months.map((n, i) => {
+            const days = new Date(Date.UTC(year, i + 1, 0)).getUTCDate();
+            return {
+                month: MONTHS[i], nights: n, days, occ: n / days, arrivals: r.arrivals[i], revenue: r.revenueByMonth[i],
+                perNight: n ? r.revenueByMonth[i] / n : null,
+                prevNights: r.previous ? r.previous.months[i] : null, prevRevenue: r.previous ? r.previous.revenueByMonth[i] : null
+            };
+        });
+        const sum = k => months.reduce((s, m) => s + (m[k] || 0), 0);
+        const buf = xlsxWriter.xlsx([
+            {
+                name: `Monate ${year}`, title: `Auslastung ${year}`, notes: [`Stand ${new Date().toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' })}. Umsatz = Rechnungen nach Rechnungsdatum.`],
+                columns: [
+                    { header: 'Monat', key: 'month', type: 'text' }, { header: 'Belegte Nächte', key: 'nights', type: 'int' },
+                    { header: 'Tage', key: 'days', type: 'int' }, { header: 'Auslastung', key: 'occ', type: 'pct' },
+                    { header: 'Anreisen', key: 'arrivals', type: 'int' }, { header: 'Umsatz', key: 'revenue', type: 'money' },
+                    { header: 'Umsatz pro Nacht', key: 'perNight', type: 'money' },
+                    { header: `Nächte ${year - 1}`, key: 'prevNights', type: 'int' }, { header: `Umsatz ${year - 1}`, key: 'prevRevenue', type: 'money' }
+                ],
+                rows: months,
+                totals: {
+                    month: 'Jahr', nights: r.nights, days: r.days, occ: r.nights / r.days, arrivals: sum('arrivals'), revenue: r.revenue,
+                    perNight: r.perNight || null, prevNights: r.previous ? r.previous.nights : null, prevRevenue: r.previous ? r.previous.revenue : null
+                }
+            },
+            {
+                name: `Kanäle ${year}`,
+                columns: [
+                    { header: 'Kanal', key: 'label', type: 'text' }, { header: 'Aufenthalte', key: 'stays', type: 'int' },
+                    { header: 'Nächte', key: 'nights', type: 'int' }, { header: 'Umsatz (Rechnungen)', key: 'revenue', type: 'money' }
+                ],
+                rows: r.channels
+            },
+            {
+                name: 'Jahresvergleich',
+                columns: [
+                    { header: 'Jahr', key: 'year', type: 'int' }, { header: 'Aufenthalte', key: 'stays', type: 'int' },
+                    { header: 'Belegte Nächte', key: 'nights', type: 'int' }, { header: 'Auslastung', key: 'occ', type: 'pct' },
+                    { header: 'Ø Nächte', key: 'avgStay', type: 'num' }, { header: 'Umsatz', key: 'revenue', type: 'money' },
+                    { header: 'Umsatz pro Nacht', key: 'perNight', type: 'money' }, { header: 'Ausgaben', key: 'expenses', type: 'money' },
+                    { header: 'Ergebnis', key: 'result', type: 'money' }, { header: 'Gäste', key: 'guests', type: 'int' },
+                    { header: 'Stammgäste', key: 'returning', type: 'int' }
+                ],
+                rows: hist.map(h => ({ ...h, occ: h.occupancy / 100 }))
+            }
+        ]);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="Auslastung-${year}.xlsx"`);
+        res.send(buf);
+    } catch (e) {
+        console.error('Auslastung Export Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
+    }
+});
+
+// Finanz-Auswertung: figures of a period and bulk exports (Excel, CSV, invoice PDFs as ZIP)
+const xlsxWriter = require('./xlsx-writer');
+const financeReport = require('./finance-report')({ db });
+app.get('/api/finance', apiLimiter, (req, res) => {
+    try {
+        const r = financeReport.report(req.query);
+        res.json({ success: true, report: r, years: yearReview.years(), tables: financeReport.tables });
+    } catch (e) {
+        console.error('Finanz-Auswertung Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Auswertung konnte nicht erstellt werden' });
+    }
+});
+app.get('/api/finance/export.xlsx', apiLimiter, (req, res) => {
+    try {
+        const r = financeReport.report(req.query);
+        const buf = financeReport.workbook(r);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="Finanzen_${financeReport.fileBase(r)}.xlsx"`);
+        res.send(buf);
+    } catch (e) {
+        console.error('Finanz-Export Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
+    }
+});
+app.get('/api/finance/export.csv', apiLimiter, (req, res) => {
+    try {
+        const r = financeReport.report(req.query);
+        const kind = String(req.query.kind || 'invoices');
+        const text = financeReport.csvOf(r, kind);
+        if (text == null) return res.status(400).json({ success: false, error: 'Unbekannte Tabelle' });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${financeReport.tables[kind]}_${financeReport.fileBase(r)}.csv"`);
+        res.send(text);
+    } catch (e) {
+        console.error('Finanz-CSV Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
+    }
+});
+// All CSV tables in one ZIP
+app.get('/api/finance/export-csv.zip', apiLimiter, (req, res) => {
+    try {
+        const r = financeReport.report(req.query);
+        const files = Object.entries(financeReport.tables).map(([kind, file]) => ({ name: `${file}_${financeReport.fileBase(r)}.csv`, data: financeReport.csvOf(r, kind) }));
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="Finanzen-CSV_${financeReport.fileBase(r)}.zip"`);
+        res.send(xlsxWriter.zip(files));
+    } catch (e) {
+        console.error('Finanz-CSV-ZIP Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
+    }
+});
+// Invoice PDFs of the period as ZIP (made one after another, a few seconds per invoice)
+let financePdfBusy = false;
+app.get('/api/finance/invoices.zip', apiLimiter, async (req, res) => {
+    if (financePdfBusy) return res.status(429).json({ success: false, error: 'Es läuft schon ein PDF-Export. Bitte kurz warten.' });
+    financePdfBusy = true;
+    try {
+        const r = financeReport.report(req.query);
+        const numbers = new Set(r.invoices.map(i => i.number));
+        if (!numbers.size) return res.status(404).json({ success: false, error: 'Keine Rechnungen im Zeitraum' });
+        if (numbers.size > 300) return res.status(400).json({ success: false, error: 'Mehr als 300 Rechnungen. Bitte einen kürzeren Zeitraum wählen.' });
+        const botLogic = require('./bot-logic');
+        const rows = db.getDb().prepare(`SELECT invoice_number, invoice_date, data FROM invoices WHERE invoice_number IN (${[...numbers].map(() => '?').join(',')}) ORDER BY invoice_date, invoice_number`).all(...numbers);
+        const files = [];
+        const failed = [];
+        for (const row of rows) {
+            let filePath = null;
+            try {
+                const data = JSON.parse(row.data || '{}');
+                ({ filePath } = await botLogic.generateInvoicePdf(data));
+                const safe = String(row.invoice_number).replace(/[^a-zA-Z0-9-_]/g, '_');
+                files.push({ name: `${row.invoice_date || 'ohne-Datum'}_Rechnung-${safe}.pdf`, data: fs.readFileSync(filePath) });
+            } catch (e) {
+                failed.push(`${row.invoice_number}: ${e.message}`);
+            } finally {
+                if (filePath) fs.unlink(filePath, () => { });
+            }
+        }
+        if (failed.length) files.push({ name: 'FEHLER.txt', data: 'Diese Rechnungen konnten nicht als PDF erstellt werden:\r\n' + failed.join('\r\n') });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="Rechnungen_${financeReport.fileBase(r)}.zip"`);
+        res.send(xlsxWriter.zip(files));
+    } catch (e) {
+        console.error('Rechnungs-ZIP Fehler:', e.message);
+        if (!res.headersSent) res.status(500).json({ success: false, error: 'PDF-Export fehlgeschlagen' });
+    } finally {
+        financePdfBusy = false;
     }
 });
 

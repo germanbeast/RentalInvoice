@@ -1,8 +1,9 @@
 /**
- * Jahresrückblick (year in review) for the admin dashboard
+ * Jahresrückblick (year in review) for the admin page "Auslastung"
  *
  *  build(year)       - key figures of one year plus the previous year for comparison: stays, nights,
  *                      occupancy, revenue, expenses, channels, months, returning guests, guest origins
+ *  history()         - key figures of every year with data, for the year comparison
  *  geocode(year)     - coordinates for the guest origins of that year (map). Uses OpenStreetMap Nominatim
  *                      with only "postcode city, country" (never names), max. 1 request per second, cached
  *                      forever in table geo_cache. Countries without a known town use a built-in centre point.
@@ -185,12 +186,33 @@ function createYearReview({ db, axios }) {
         const expenses = sql().prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE date >= ? AND date < ?').get(from, to).total;
 
         const channels = {};
+        const channelOf = label => channels[label] || (channels[label] = { label, stays: 0, nights: 0, revenue: 0 });
+        const arrivals = Array.from({ length: 12 }, () => 0);
         for (const s of stays) {
-            const label = s.source === 'invoice' ? 'Nur Rechnung' : (SOURCES[s.source] || s.source);
-            const c = channels[label] || (channels[label] = { label, stays: 0, nights: 0 });
+            const c = channelOf(s.source === 'invoice' ? 'Nur Rechnung' : (SOURCES[s.source] || s.source));
             c.stays++;
             c.nights += nightsBetween(s.checkin, s.checkout);
+            arrivals[parseInt(s.checkin.slice(5, 7), 10) - 1]++;
         }
+        // Revenue per channel: invoice -> booking with the same arrival and departure
+        const bookingAt = sql().prepare('SELECT source, uid FROM bookings WHERE checkin = ? AND checkout = ? LIMIT 1');
+        sql().prepare(`
+            SELECT arrival, departure, total_amount FROM invoices
+            WHERE invoice_date >= ? AND invoice_date < ? AND guest_id IS NOT NULL
+        `).all(from, to).forEach(inv => {
+            const b = inv.arrival && inv.departure ? bookingAt.get(inv.arrival, inv.departure) : null;
+            const src = b ? (b.source || (String(b.uid).startsWith('manual-') ? 'manual' : 'Booking.com')) : null;
+            channelOf(src ? (SOURCES[src] || src) : 'Nur Rechnung').revenue += inv.total_amount || 0;
+        });
+        Object.values(channels).forEach(c => { c.revenue = Math.round(c.revenue * 100) / 100; });
+
+        // Day by day: one string per month, "1" = booked night
+        const dayMap = Array.from({ length: 12 }, (_, m) => {
+            const n = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
+            let str = '';
+            for (let d = 1; d <= n; d++) str += booked.has(`${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`) ? '1' : '0';
+            return str;
+        });
 
         const lengths = stays.map(s => nightsBetween(s.checkin, s.checkout));
         const guestIds = [...new Set(stays.map(s => s.guestId).filter(Boolean))];
@@ -215,9 +237,9 @@ function createYearReview({ db, axios }) {
             perNight: nights ? Math.round(revenue.total / nights * 100) / 100 : 0,
             expenses: Math.round(expenses * 100) / 100,
             result: Math.round((revenue.total - expenses) * 100) / 100,
-            months, revenueByMonth,
+            months, revenueByMonth, arrivals, dayMap,
             busiestMonth: months[busiest] ? busiest + 1 : null,
-            channels: Object.values(channels).sort((a, b) => b.nights - a.nights),
+            channels: Object.values(channels).filter(c => c.stays || c.revenue).sort((a, b) => b.nights - a.nights || b.revenue - a.revenue),
             guests: guestIds.length,
             returning,
             _stays: stays
@@ -281,11 +303,24 @@ function createYearReview({ db, axios }) {
             ...cur,
             previous: hasPrev ? {
                 stays: prev.stays, nights: prev.nights, occupancy: prev.occupancy, revenue: prev.revenue,
-                perNight: prev.perNight, avgStay: prev.avgStay, expenses: prev.expenses, result: prev.result, months: prev.months
+                perNight: prev.perNight, avgStay: prev.avgStay, expenses: prev.expenses, result: prev.result, months: prev.months,
+                revenueByMonth: prev.revenueByMonth
             } : null,
             origins: origins(stays)
         };
     }
+
+    /** Key figures of every year with data (oldest first), for the year comparison. */
+    function history() {
+        return years().filter(y => y <= year0() + 1).sort((a, b) => a - b).map(y => {
+            const s = summary(y);
+            return {
+                year: y, stays: s.stays, nights: s.nights, days: s.days, occupancy: s.occupancy, avgStay: s.avgStay,
+                revenue: s.revenue, perNight: s.perNight, expenses: s.expenses, result: s.result, guests: s.guests, returning: s.returning
+            };
+        }).filter(h => h.stays || h.nights || h.revenue || h.expenses || h.year === year0());
+    }
+    const year0 = () => new Date().getFullYear();
 
     let geocodeBusy = false;
     let lastRequest = 0;
@@ -380,10 +415,10 @@ function createYearReview({ db, axios }) {
             if (r.origins.unknown) t += `\n❔ ohne Adresse: ${r.origins.unknown}`;
             t += '\n';
         }
-        return t + '\nDie Karte mit allen Herkunftsorten steht im Admin unter Dashboard → Jahresrückblick.';
+        return t + '\nDie Karte mit allen Herkunftsorten steht im Admin unter Auslastung.';
     }
 
-    return { build, geocode, text, years };
+    return { build, geocode, text, years, history };
 }
 
 module.exports = createYearReview;

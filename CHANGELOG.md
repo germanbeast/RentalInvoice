@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - 2026-10-31
+
+### Neu
+- Menüpunkt „Auslastung“: der Jahresrückblick ist von der Startseite auf eine eigene Seite umgezogen und erweitert um Umsatz pro Monat (mit Vorjahr), Umsatz je Buchungskanal, Belegung Tag für Tag (12 × 31 Raster), Tabelle „Monate im Überblick“ (Nächte, Auslastung, Anreisen, Umsatz, pro Nacht, Vorjahr) und „Jahresvergleich“ über alle Jahre. Excel-Export der Seite (`GET /api/review/export.xlsx`)
+- Menüpunkt „Finanz-Auswertung“ (unter Finanzen): Zeitraum als Jahr, Quartal, Monat oder frei; nach Rechnungsdatum oder Zahlungseingang (Zuflussprinzip, EÜR); Rechnungen gelöschter Gäste wahlweise mit. Kennzahlen (brutto, netto, USt, Kurtaxe, Ausgaben, Ergebnis, offen), Monatsübersicht, USt nach Steuersatz, Einnahmen nach Art, Ausgaben nach Kategorie, Rechnungsliste
+- Massen-Export: Excel mit allen Tabellen als Blätter (Übersicht, Monate, Umsatzsteuer, Rechnungen, Positionen, Kurtaxe, Ausgaben, Kategorien, Belegung), jede Tabelle einzeln als CSV (Semikolon, Dezimalkomma, UTF-8 mit BOM), alle CSV als ZIP und alle Rechnungs-PDFs des Zeitraums als ZIP
+- `xlsx-writer.js` (ZIP, XLSX, CSV ohne zusätzliche Abhängigkeit) und `finance-report.js`; Endpunkte `GET /api/finance`, `/api/finance/export.xlsx`, `/api/finance/export.csv?kind=…`, `/api/finance/export-csv.zip`, `/api/finance/invoices.zip`
+
+### Geändert
+- Startseite ohne Jahresrückblick (steht jetzt unter „Auslastung“); Telegram `/jahr` verweist dorthin
+
 ## [1.27.0] - 2026-10-31
 
 ### Neu
