@@ -1,6 +1,20 @@
 {
-    "currentVersion": "1.26.1",
+    "currentVersion": "1.27.0",
     "releases": [
+        {
+            "version": "1.27.0",
+            "date": "2026-10-31",
+            "title": "Neuer Admin-Bereich mit Kalender als Startseite",
+            "features": [
+                "Neuer heller Look: Seitenleiste links mit Gruppen (Finanzen, Konfiguration), oben „Buchung eintragen“ und Suche",
+                "Kalender als Startseite: Zeitleiste mit farbigen Balken je Plattform (Booking.com, Airbnb, Direkt) und offenen Anfragen",
+                "Klick auf einen Balken zeigt Zeitraum, Türcode und Gastcode, mit Name ändern, Rechnung erstellen und Gastlink",
+                "Bevorstehende Check-ins und Check-outs mit Uhrzeit und Aktivitätsfeed (neue Buchungen, Anfragen, Rechnungen, Anreisen)",
+                "Buchungen selbst eintragen (Telefon, Stammgäste): wird als Direktbuchung gespeichert, blockiert die Portale und legt auf Wunsch den Türcode an",
+                "Klick auf einen freien Tag im Kalender öffnet direkt „Buchung eintragen“"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.26.1",
             "date": "2026-10-31",

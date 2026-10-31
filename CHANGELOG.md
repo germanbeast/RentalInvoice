@@ -5,6 +5,20 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - 2026-10-31
+
+### Neu
+- Admin-Bereich neu aufgebaut nach dem Vorbild gängiger Ferienwohnungs-Software: helle Oberfläche (weiß, Blau als Akzent, Inter), Seitenleiste mit Gruppen „Finanzen“ und „Konfiguration“, einklappbar auf Symbole; Kopfzeile mit „Buchung eintragen“, Suche (Gast, Datum, Portal) und Benutzer
+- Kalender ist die neue Startseite: Zeitleiste über 8 Wochen mit Balken je Plattform (Booking.com blau, Airbnb rot, Direkt grün, Manuell gelb) und einer Zeile für offene Webseiten-Anfragen; Monatsauswahl, ±2 Wochen blättern, Auslastung des Monats
+- Klick auf einen Balken: Details (Zeitraum, Nächte, Quelle, Türcode, Gastcode) mit Name ändern, Rechnung erstellen, Gastlink kopieren und, bei selbst eingetragenen Buchungen, Löschen
+- „Bevorstehende Buchungen“ (Check-in/Check-out mit Uhrzeit aus den Webseiten-Einstellungen, Nächte, Türcode-Status) und „Aktivitätsfeed“ (neue Buchungen, Anfragen, Rechnungen, Anreisen) unter dem Kalender
+- Buchung eintragen: `POST /api/bookings` speichert als Direktbuchung (blockiert Booking.com/Airbnb über den Kalender-Export, bekommt einen Gastcode), legt auf Wunsch den Nuki-Code an und warnt bei Überschneidungen; `DELETE /api/bookings/:id` nur für selbst eingetragene Buchungen
+- `GET /api/activity` für den Aktivitätsfeed
+
+### Geändert
+- „Dashboard“ heißt jetzt „Start“, „Neue Rechnung“ heißt „Rechnungen“; Ausgaben und Erbverwaltung liegen unter „Finanzen“, Einstellungen und TV Welcome unter „Konfiguration“
+- Buchungsliste hat den Filter „Alle“ (wird von der Suche oben genutzt)
+
 ## [1.26.1] - 2026-10-31
 
 ### Behoben

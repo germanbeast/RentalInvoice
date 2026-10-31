@@ -52,6 +52,8 @@
     const navBookings = $('#nav-bookings');
     const viewWebsite = $('#view-website');
     const navWebsite = $('#nav-website');
+    const viewCalendar = $('#view-calendar');
+    const navCalendar = $('#nav-calendar');
 
     const modalSettings = $('#modal-settings');
     const toastContainer = $('#toast-container');
@@ -124,6 +126,7 @@
         }, 10);
         init(); // Start the app
         refreshSiteBadge();
+        loadTopbarUser();
     }
 
     let loginStep = 'credentials'; // 'credentials', '2fa', 'recovery'
@@ -1363,7 +1366,9 @@
         viewPollInterval = null;
         const POLL_MS = 20000;
         let refresh = null;
-        if (viewId === 'dashboard') {
+        if (viewId === 'calendar') {
+            refresh = () => { if (!document.querySelector('#tl-pop:not([hidden]) input')) loadCalendarHome(); };
+        } else if (viewId === 'dashboard') {
             refresh = loadDashboard;
         } else if (viewId === 'expenses') {
             refresh = loadExpenses;
@@ -1384,8 +1389,8 @@
     });
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1396,7 +1401,11 @@
 
         currentView = viewId;
 
-        if (viewId === 'dashboard') {
+        if (viewId === 'calendar' && viewCalendar) {
+            viewCalendar.style.display = 'flex';
+            navCalendar.classList.add('active');
+            loadCalendarHome();
+        } else if (viewId === 'dashboard') {
             viewDashboard.style.display = 'flex';
             navDashboard.classList.add('active');
             loadDashboard();
@@ -1423,6 +1432,8 @@
         }
 
         startViewPolling(viewId);
+        syncNavGroups();
+        hideTlPop();
 
         // Close mobile sidebar if open
         if (window.innerWidth <= 768) {
@@ -1431,6 +1442,7 @@
     }
 
     navDashboard.addEventListener('click', () => switchView('dashboard'));
+    if (navCalendar) navCalendar.addEventListener('click', () => switchView('calendar'));
     navInvoice.addEventListener('click', () => switchView('invoice'));
     navExpenses.addEventListener('click', () => switchView('expenses'));
     if (navBookings) navBookings.addEventListener('click', () => switchView('bookings'));
@@ -1695,6 +1707,473 @@
         let searchTimer = null;
         const searchEl = $('#bookings-search');
         if (searchEl) searchEl.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { bookingsQuery = searchEl.value.trim(); loadBookings(); }, 250); });
+    }
+
+    // =======================
+    // Kalender-Startseite (Zeitleiste, bevorstehende Buchungen, Aktivitätsfeed)
+    // =======================
+    const TL_DAYS = 56;
+    const berlinYmd = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+    const MONTHS_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    const pfKey = s => /airbnb/i.test(s || '') ? 'airbnb' : s === 'manual' ? 'manual' : s === 'Direkt' ? 'direct' : s === 'request' ? 'request' : 'booking';
+    const pfLetter = { booking: 'B', airbnb: 'A', direct: 'D', manual: 'M', request: '?' };
+    const pfBadge = s => { const k = pfKey(s); return `<i class="pf pf-${k}" title="${escapeHtml(k === 'request' ? 'Anfrage' : srcLabel(s))}">${pfLetter[k]}</i>`; };
+    const dateLong = ymd => `${weekdayDE(ymd)} ${fmtDEfull(ymd)}`;
+    const ICON = {
+        person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>',
+        moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>',
+        clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+        inn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5M3 12h11M10 8l4 4-4 4"/></svg>',
+        out: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M21 12H10M17 8l4 4-4 4"/></svg>',
+        euro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>',
+        home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>'
+    };
+
+    let tlStart = null;
+    let calHome = { bookings: [], requests: [], activity: [], overview: null, site: null, today: berlinYmd() };
+
+    function relTime(iso) {
+        if (!iso) return '';
+        const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+        if (isNaN(mins)) return '';
+        if (mins < 1) return 'gerade eben';
+        if (mins < 60) return `vor ${mins} Min.`;
+        const h = Math.round(mins / 60);
+        if (h < 24) return h === 1 ? 'vor einer Stunde' : `vor ${h} Stunden`;
+        const d = Math.round(h / 24);
+        if (d < 30) return d === 1 ? 'vor einem Tag' : `vor ${d} Tagen`;
+        return new Date(iso).toLocaleDateString('de-DE');
+    }
+
+    async function loadCalendarHome() {
+        if (!viewCalendar) return;
+        calHome.today = berlinYmd();
+        if (!tlStart) tlStart = ymdAdd(calHome.today, -3);
+        const get = url => apiJson(url).catch(() => null);
+        const [b, r, a, o, s] = await Promise.all([
+            get('/api/bookings?filter=all'), get('/api/site/requests'), get('/api/activity'), get('/api/overview'),
+            calHome.site ? Promise.resolve(null) : get('/api/site/settings')
+        ]);
+        if (b && b.success) calHome.bookings = b.bookings;
+        if (r && r.success) calHome.requests = r.requests.filter(x => x.status === 'pending');
+        if (a && a.success) calHome.activity = a.items;
+        if (o && o.success) { calHome.overview = o; calHome.today = o.today || calHome.today; }
+        if (s && s.success) calHome.site = s.site;
+        renderTimeline();
+        renderUpcoming();
+        renderActivity();
+        renderCalAlerts();
+    }
+
+    function renderTimeline() {
+        const today = calHome.today;
+        const days = Array.from({ length: TL_DAYS }, (_, i) => ymdAdd(tlStart, i));
+        const end = ymdAdd(tlStart, TL_DAYS);
+        const idx = ymd => nightsBetweenYmd(tlStart, ymd);
+        const mid = ymdAdd(tlStart, 3);
+        const [my, mm] = mid.split('-').map(Number);
+        $('#tl-label').textContent = `${MONTHS_DE[mm - 1]} ${my}`;
+        $('#tl-month').value = mid.slice(0, 7);
+
+        // Auslastung des angezeigten Monats
+        const mFirst = `${mid.slice(0, 7)}-01`;
+        const mNext = ymdAdd(mFirst, 32).slice(0, 7) + '-01';
+        const mDays = nightsBetweenYmd(mFirst, mNext);
+        const booked = new Set();
+        calHome.bookings.forEach(bk => { for (let d = bk.checkin < mFirst ? mFirst : bk.checkin; d < bk.checkout && d < mNext; d = ymdAdd(d, 1)) booked.add(d); });
+        $('#tl-rate').textContent = `Auslastung ${MONTHS_DE[mm - 1]}: ${Math.round(booked.size / mDays * 100)} % (${booked.size}/${mDays} Nächte)`;
+
+        // Kopf: Monate und Tage
+        const months = [];
+        days.forEach((d, i) => {
+            const key = d.slice(0, 7);
+            if (!months.length || months[months.length - 1].key !== key) months.push({ key, from: i, n: 0 });
+            months[months.length - 1].n++;
+        });
+        const head = `<div class="tl-months">${months.map(m => `<div class="tl-month" style="left:calc(var(--tl-day) * ${m.from});width:calc(var(--tl-day) * ${m.n})"><span>${MONTHS_DE[Number(m.key.slice(5)) - 1]}${m.key.slice(0, 4) !== today.slice(0, 4) ? ' ' + m.key.slice(0, 4) : ''}</span></div>`).join('')}</div>
+            <div class="tl-days">${days.map(d => {
+                const wd = new Date(d + 'T12:00:00').getDay();
+                return `<div class="tl-day${wd === 0 || wd === 6 ? ' we' : ''}${d === today ? ' today' : ''}"><span class="tl-wd">${weekdayDE(d)}</span><span class="tl-dn">${Number(d.slice(8))}</span></div>`;
+            }).join('')}</div>`;
+
+        const cells = days.map(d => {
+            const wd = new Date(d + 'T12:00:00').getDay();
+            return `<div class="tl-cell${wd === 0 || wd === 6 ? ' we' : ''}${d < today ? ' past' : ''}" data-day="${d}"></div>`;
+        }).join('');
+
+        const bar = (item, key, label, attrs) => {
+            const a = Math.max(idx(item.checkin) + 0.5, 0);
+            const z = Math.min(idx(item.checkout) + 0.5, TL_DAYS);
+            if (z <= 0 || a >= TL_DAYS || z - a <= 0) return '';
+            const cls = ['tl-bar', `pf-bg-${key}`];
+            if (idx(item.checkin) + 0.5 < 0) cls.push('cut-l');
+            if (idx(item.checkout) + 0.5 > TL_DAYS) cls.push('cut-r');
+            if (item.checkout <= today) cls.push('done');
+            const tip = `${label} · ${fmtDEfull(item.checkin)} – ${fmtDEfull(item.checkout)} · ${nightsTxt(item.nights)}`;
+            return `<button type="button" class="${cls.join(' ')}" style="left:calc(var(--tl-day) * ${a} + 2px);width:calc(var(--tl-day) * ${z - a} - 4px)" title="${escapeHtml(tip)}" ${attrs}><i class="pf pf-${key}">${pfLetter[key]}</i><span>${escapeHtml(label)}</span></button>`;
+        };
+        const inRange = x => x.checkin < end && x.checkout > tlStart;
+        const bookingBars = calHome.bookings.filter(inRange).map(bk => bar(bk, pfKey(bk.source), bk.name || `${srcLabel(bk.source)}-Gast`, `data-bid="${bk.id}"`)).join('');
+        const requestBars = calHome.requests.filter(inRange).map(rq => bar({ ...rq, nights: rq.nights }, 'request', rq.name, `data-rid="${rq.id}"`)).join('');
+        const todayLine = today >= tlStart && today < end ? `<div class="tl-now" style="left:calc(var(--tl-day) * ${idx(today) + 0.5})"></div>` : '';
+
+        const unit = (calHome.site && calHome.site.title) || 'Ferienwohnung';
+        $('#tl-side').innerHTML = `<div class="tl-side-head"></div>
+            <div class="tl-side-row" title="${escapeHtml(unit)}">${escapeHtml(unit)}</div>
+            <div class="tl-side-row tl-side-sub">Offene Anfragen${calHome.requests.length ? ` <b>${calHome.requests.length}</b>` : ''}</div>`;
+        $('#tl-inner').style.setProperty('--tl-n', TL_DAYS);
+        $('#tl-inner').innerHTML = `<div class="tl-head">${head}</div>
+            <div class="tl-row" data-row="unit">${cells}${bookingBars}${todayLine}</div>
+            <div class="tl-row tl-row-sub" data-row="requests">${cells}${requestBars}${todayLine}</div>`;
+    }
+
+    function nightsBetweenYmd(a, b) {
+        return Math.round((Date.UTC(...b.split('-').map((x, i) => i === 1 ? x - 1 : +x)) - Date.UTC(...a.split('-').map((x, i) => i === 1 ? x - 1 : +x))) / 86400000);
+    }
+
+    function renderUpcoming() {
+        const today = calHome.today;
+        const site = calHome.site || {};
+        const evs = [];
+        calHome.bookings.filter(bk => bk.checkout >= today).forEach(bk => {
+            if (bk.checkin >= today) evs.push({ type: 'in', date: bk.checkin, b: bk });
+            evs.push({ type: 'out', date: bk.checkout, b: bk });
+        });
+        evs.sort((x, y) => x.date.localeCompare(y.date) || (x.type === 'out' ? -1 : 1));
+        const box = $('#cal-upcoming');
+        if (!evs.length) { box.innerHTML = '<div class="panel-empty">Keine bevorstehenden An- oder Abreisen.</div>'; return; }
+        box.innerHTML = evs.slice(0, 10).map(e => {
+            const when = e.date === today ? 'Heute' : e.date === ymdAdd(today, 1) ? 'Morgen' : weekdayDE(e.date);
+            const time = e.type === 'in' ? (site.checkin_time || '') : (site.checkout_time || '');
+            return `<button type="button" class="up-card" data-bid="${e.b.id}">
+                <div class="up-line">
+                    <span class="chip ${e.type === 'in' ? 'chip-in' : 'chip-out'}">${e.type === 'in' ? 'Check-in' : 'Check-out'}</span>
+                    <span class="meta">${e.type === 'in' ? ICON.inn : ICON.out}<b>${when}</b> ${fmtDEfull(e.date)}</span>
+                    ${time ? `<span class="meta">${ICON.clock}${escapeHtml(time)}</span>` : ''}
+                    <span class="meta push">${ICON.moon}${e.b.nights}</span>
+                </div>
+                <div class="up-line">
+                    <span class="meta">${ICON.person}${e.b.name ? escapeHtml(e.b.name) : '<em>Name fehlt</em>'}</span>
+                    <span class="meta">${pfBadge(e.b.source)}${escapeHtml(srcLabel(e.b.source))}</span>
+                    ${e.b.hasCode ? '<span class="meta push ok">Türcode ✓</span>' : (e.type === 'in' ? '<span class="meta push warn">kein Türcode</span>' : '')}
+                </div>
+            </button>`;
+        }).join('');
+    }
+
+    function renderActivity() {
+        const box = $('#cal-activity');
+        const items = calHome.activity;
+        if (!items.length) { box.innerHTML = '<div class="panel-empty">Noch keine Aktivitäten.</div>'; return; }
+        const label = it => {
+            if (it.type === 'booking') return ['chip-new', 'Neue Buchung'];
+            if (it.type === 'manual') return ['chip-new', 'Eingetragen'];
+            if (it.type === 'arrival') return ['chip-gray', 'Angereist'];
+            if (it.type === 'invoice') return ['chip-blue', `Rechnung ${it.number || ''}`.trim()];
+            if (it.status === 'confirmed') return ['chip-new', 'Anfrage bestätigt'];
+            if (it.status === 'declined' || it.status === 'cancelled') return ['chip-gray', 'Anfrage abgelehnt'];
+            return ['chip-warn', 'Neue Anfrage'];
+        };
+        box.innerHTML = items.map(it => {
+            const [cls, txt] = label(it);
+            const src = it.type === 'invoice' ? 'invoice' : it.type === 'request' ? 'request' : it.source;
+            const badge = src === 'invoice' ? '<i class="pf pf-invoice">€</i>' : pfBadge(src);
+            const right1 = [
+                it.amount ? `<span class="meta">${ICON.euro}${formatCurrency(it.amount)}</span>` : '',
+                it.nights ? `<span class="meta">${ICON.moon}${it.nights}</span>` : ''
+            ].join('');
+            const attrs = it.bookingId ? `data-bid="${it.bookingId}"` : it.type === 'request' ? 'data-goto="requests"' : it.type === 'invoice' ? 'data-goto="invoice"' : '';
+            return `<button type="button" class="act-card" ${attrs}>
+                <div class="up-line">${badge}<span class="chip ${cls}">${escapeHtml(txt)}</span>${it.type === 'invoice' && it.paid ? '<span class="chip chip-new">bezahlt</span>' : ''}<span class="push">${right1}</span></div>
+                <div class="up-line"><span class="meta">${ICON.person}${it.name ? escapeHtml(it.name) : '<em>Name fehlt</em>'}</span>${it.checkin ? `<span class="meta push">${ICON.inn}${dateLong(it.checkin)}</span>` : ''}</div>
+                <div class="up-line"><span class="meta muted">${ICON.home}${escapeHtml(it.type === 'invoice' ? 'Rechnung' : it.type === 'request' ? 'Webseite' : srcLabel(it.source || ''))}</span><span class="meta push muted">${relTime(it.at)}</span></div>
+            </button>`;
+        }).join('');
+    }
+
+    function renderCalAlerts() {
+        const o = calHome.overview;
+        const box = $('#cal-alerts');
+        const sync = $('#cal-sync');
+        if (!o) { box.innerHTML = ''; return; }
+        const list = [];
+        if (o.namesMissing > 0) list.push(`<button type="button" class="alert warn" data-goto="noname">${o.namesMissing} Buchung${o.namesMissing === 1 ? '' : 'en'} ohne Namen – jetzt eintragen</button>`);
+        if (calHome.requests.length) list.push(`<button type="button" class="alert info" data-goto="requests">${calHome.requests.length} offene Anfrage${calHome.requests.length === 1 ? '' : 'n'} von der Webseite</button>`);
+        if (o.openInvoices && o.openInvoices.count > 0) list.push(`<span class="alert">${o.openInvoices.count} offene Rechnung${o.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(o.openInvoices.total)})</span>`);
+        (o.warnings || []).forEach(w => list.push(`<span class="alert ${w.type === 'overlap' || w.type === 'sync' ? 'bad' : 'warn'}">${escapeHtml(w.text)}</span>`));
+        box.innerHTML = list.join('');
+        if (o.sync && o.sync.at) {
+            const mins = Math.max(0, Math.round((Date.now() - new Date(o.sync.at).getTime()) / 60000));
+            const failed = (o.sync.feeds || []).filter(f => !f.ok).length;
+            sync.textContent = `Portale abgefragt ${mins < 1 ? 'gerade eben' : mins < 90 ? `vor ${mins} Min.` : new Date(o.sync.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}${failed ? ' · Fehler' : ''}`;
+        } else sync.textContent = 'Portale noch nicht abgefragt';
+    }
+
+    // ---- Details-Fenster zu einem Balken
+    const tlPop = $('#tl-pop');
+    function hideTlPop() { if (tlPop) { tlPop.hidden = true; tlPop.innerHTML = ''; } }
+
+    function placePop(anchor) {
+        tlPop.hidden = false;
+        const r = anchor.getBoundingClientRect();
+        const w = tlPop.offsetWidth, h = tlPop.offsetHeight;
+        let left = Math.min(Math.max(8, r.left + Math.min(r.width, 240) / 2 - w / 2), window.innerWidth - w - 8);
+        let top = r.bottom + 8;
+        if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 8);
+        tlPop.style.left = `${left}px`;
+        tlPop.style.top = `${top}px`;
+    }
+
+    function showBookingPop(bk, anchor) {
+        const today = calHome.today;
+        const state = bk.state === 'inhouse' ? 'Im Haus' : bk.state === 'departing' ? 'Reist heute ab' : bk.state === 'past' ? 'Beendet' : bk.checkin === today ? 'Reist heute an' : 'Bevorstehend';
+        tlPop.innerHTML = `
+            <div class="pop-head">${pfBadge(bk.source)}<strong class="pop-name">${bk.name ? escapeHtml(bk.name) : '<em>Name fehlt</em>'}</strong><button type="button" class="pop-x" data-pop="close" aria-label="Schließen">✕</button></div>
+            <dl class="pop-dl">
+                <dt>Zeitraum</dt><dd>${dateLong(bk.checkin)} – ${dateLong(bk.checkout)}</dd>
+                <dt>Dauer</dt><dd>${nightsTxt(bk.nights)}</dd>
+                <dt>Quelle</dt><dd>${escapeHtml(srcLabel(bk.source))}${bk.manualEntry ? ' · selbst eingetragen' : ''}</dd>
+                <dt>Status</dt><dd>${state}</dd>
+                <dt>Türcode</dt><dd>${bk.hasCode ? (bk.pin ? `<code>${escapeHtml(bk.pin)}</code>` : 'angelegt') + (bk.arrivedAt ? ' · genutzt' : '') : 'kein Code'}</dd>
+                ${bk.guestCode ? `<dt>Gastcode</dt><dd><code>${escapeHtml(bk.guestCode)}</code></dd>` : ''}
+                ${bk.guestEmail ? `<dt>E-Mail</dt><dd>${escapeHtml(bk.guestEmail)}</dd>` : ''}
+            </dl>
+            <div class="pop-actions">
+                <button type="button" class="pill" data-pop="name">${bk.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
+                <button type="button" class="pill" data-pop="invoice">Rechnung erstellen</button>
+                ${bk.state !== 'past' && bk.guestCode ? '<button type="button" class="pill" data-pop="guestlink">Gastlink kopieren</button>' : ''}
+                ${bk.manualEntry ? '<button type="button" class="pill pill-danger" data-pop="delete">Löschen</button>' : ''}
+            </div>`;
+        tlPop.dataset.bid = bk.id;
+        delete tlPop.dataset.rid;
+        placePop(anchor);
+    }
+
+    function showRequestPop(rq, anchor) {
+        tlPop.innerHTML = `
+            <div class="pop-head">${pfBadge('request')}<strong class="pop-name">${escapeHtml(rq.name)}</strong><button type="button" class="pop-x" data-pop="close" aria-label="Schließen">✕</button></div>
+            <dl class="pop-dl">
+                <dt>Zeitraum</dt><dd>${dateLong(rq.checkin)} – ${dateLong(rq.checkout)}</dd>
+                <dt>Dauer</dt><dd>${nightsTxt(rq.nights)}</dd>
+                <dt>Gäste</dt><dd>${rq.adults || 1} Erw.${rq.children ? ` · ${rq.children} Kinder` : ''}</dd>
+                ${rq.price_total ? `<dt>Preis</dt><dd>${formatCurrency(rq.price_total)}</dd>` : ''}
+                ${rq.conflict ? `<dt>Achtung</dt><dd class="bad">überschneidet sich mit ${escapeHtml(rq.conflict.source)}</dd>` : ''}
+            </dl>
+            <div class="pop-actions"><button type="button" class="pill pill-primary" data-pop="request">Anfrage bearbeiten</button></div>`;
+        tlPop.dataset.rid = rq.id;
+        delete tlPop.dataset.bid;
+        placePop(anchor);
+    }
+
+    function openRequests() {
+        switchView('website');
+        setSiteTab('requests');
+    }
+
+    if (viewCalendar) {
+        viewCalendar.addEventListener('click', e => {
+            const goto = e.target.closest('[data-goto]');
+            if (goto) {
+                const g = goto.dataset.goto;
+                if (g === 'requests') return openRequests();
+                if (g === 'invoice') return switchView('invoice');
+                if (g === 'noname') { bookingsFilter = 'noname'; return switchView('bookings'); }
+            }
+            const bEl = e.target.closest('[data-bid]');
+            if (bEl) {
+                const bk = calHome.bookings.find(x => String(x.id) === bEl.dataset.bid);
+                if (bk) { e.stopPropagation(); return showBookingPop(bk, bEl); }
+            }
+            const rEl = e.target.closest('[data-rid]');
+            if (rEl) {
+                const rq = calHome.requests.find(x => String(x.id) === rEl.dataset.rid);
+                if (rq) { e.stopPropagation(); return showRequestPop(rq, rEl); }
+            }
+            const cell = e.target.closest('.tl-row[data-row="unit"] .tl-cell');
+            if (cell && cell.dataset.day >= calHome.today) { e.stopPropagation(); openNewBooking(cell.dataset.day); return; }
+            const tog = e.target.closest('.panel-toggle');
+            if (tog) tog.closest('.panel').classList.toggle('collapsed');
+        });
+
+        tlPop.addEventListener('click', async e => {
+            const btn = e.target.closest('[data-pop]');
+            if (!btn) return;
+            e.stopPropagation();
+            const act = btn.dataset.pop;
+            if (act === 'close') return hideTlPop();
+            if (act === 'request') { hideTlPop(); return openRequests(); }
+            const bk = calHome.bookings.find(x => String(x.id) === tlPop.dataset.bid);
+            if (!bk) return hideTlPop();
+            if (act === 'invoice') { hideTlPop(); return invoiceFromBooking(bk); }
+            if (act === 'guestlink') return copyGuestMessage(bk);
+            if (act === 'delete') {
+                if (!confirm(`Buchung von ${bk.name || 'diesem Gast'} (${fmtDEfull(bk.checkin)} – ${fmtDEfull(bk.checkout)}) löschen?${bk.hasCode ? ' Der Türcode wird ebenfalls gelöscht.' : ''}`)) return;
+                const d = await apiJson(`/api/bookings/${bk.id}`, { method: 'DELETE' }).catch(() => null);
+                if (d && d.success) { showToast('Buchung gelöscht', 'success'); hideTlPop(); loadCalendarHome(); }
+                else showToast((d && d.error) || 'Löschen fehlgeschlagen', 'error');
+                return;
+            }
+            if (act === 'name') {
+                const nameEl = tlPop.querySelector('.pop-name');
+                nameEl.innerHTML = `<input type="text" maxlength="80" placeholder="Vor- und Nachname" value="${escapeHtml(bk.name || '').replace(/"/g, '&quot;')}">`;
+                const input = nameEl.querySelector('input');
+                input.focus();
+                input.addEventListener('keydown', async ev => {
+                    if (ev.key === 'Escape') return showBookingPop(bk, btn);
+                    if (ev.key !== 'Enter') return;
+                    const name = input.value.trim();
+                    if (name.length < 2) return;
+                    const d = await apiJson(`/api/bookings/${bk.id}/guest`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }).catch(() => null);
+                    if (d && d.success) { showToast('Name gespeichert' + (d.nukiRenamed ? ' – Türcode umbenannt' : ''), 'success'); hideTlPop(); loadCalendarHome(); }
+                    else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
+                });
+            }
+        });
+        document.addEventListener('click', e => { if (!tlPop.hidden && !tlPop.contains(e.target)) hideTlPop(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTlPop(); });
+        $('#tl-scroll').addEventListener('scroll', hideTlPop, { passive: true });
+
+        const tlGo = fn => { fn(); hideTlPop(); renderTimeline(); };
+        $('#tl-prev').addEventListener('click', () => tlGo(() => { tlStart = ymdAdd(tlStart, -14); }));
+        $('#tl-next').addEventListener('click', () => tlGo(() => { tlStart = ymdAdd(tlStart, 14); }));
+        $('#tl-today').addEventListener('click', () => tlGo(() => { tlStart = ymdAdd(calHome.today, -3); $('#tl-scroll').scrollLeft = 0; }));
+        $('#tl-month').addEventListener('change', e => { if (e.target.value) tlGo(() => { tlStart = `${e.target.value}-01`; $('#tl-scroll').scrollLeft = 0; }); });
+
+        $('#cal-sync-btn').addEventListener('click', async e => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            const old = btn.textContent;
+            btn.textContent = 'Frage ab …';
+            try {
+                const d = await apiJson('/api/ical/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                if (d.success) showToast('Kalender abgefragt' + (d.newCount ? ` – ${d.newCount} neue Buchung(en)` : ''), 'success');
+                else showToast(d.error || 'Abfrage fehlgeschlagen', 'error');
+            } catch (err) { showToast('Abfrage fehlgeschlagen', 'error'); }
+            btn.disabled = false;
+            btn.textContent = old;
+            loadCalendarHome();
+        });
+    }
+
+    // ---- Buchung eintragen
+    const modalNewBooking = $('#modal-new-booking');
+    let nbForce = false;
+
+    function nbUpdateNights() {
+        const a = $('#nb-checkin').value, b = $('#nb-checkout').value;
+        const n = a && b ? nightsBetweenYmd(a, b) : 0;
+        $('#nb-nights').textContent = n > 0 ? nightsTxt(n) : '';
+    }
+
+    function openNewBooking(day) {
+        if (!modalNewBooking) return;
+        hideTlPop();
+        $('#nb-form').reset();
+        $('#nb-pin').checked = true;
+        const from = day || calHome.today || berlinYmd();
+        $('#nb-checkin').value = from;
+        $('#nb-checkout').value = ymdAdd(from, 1);
+        $('#nb-msg').hidden = true;
+        nbForce = false;
+        $('#btn-save-new-booking').textContent = 'Buchung speichern';
+        nbUpdateNights();
+        modalNewBooking.style.display = 'flex';
+        setTimeout(() => $('#nb-name').focus(), 50);
+    }
+    const closeNewBooking = () => { modalNewBooking.style.display = 'none'; };
+
+    if (modalNewBooking) {
+        $('#btn-new-booking').addEventListener('click', () => openNewBooking());
+        $('#btn-close-new-booking').addEventListener('click', closeNewBooking);
+        $('#btn-cancel-new-booking').addEventListener('click', closeNewBooking);
+        modalNewBooking.addEventListener('click', e => { if (e.target === modalNewBooking) closeNewBooking(); });
+        ['#nb-checkin', '#nb-checkout'].forEach(sel => $(sel).addEventListener('change', () => {
+            if (sel === '#nb-checkin' && $('#nb-checkout').value <= $('#nb-checkin').value) $('#nb-checkout').value = ymdAdd($('#nb-checkin').value, 1);
+            nbForce = false;
+            $('#btn-save-new-booking').textContent = 'Buchung speichern';
+            nbUpdateNights();
+        }));
+        $('#nb-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const msg = $('#nb-msg');
+            const btn = $('#btn-save-new-booking');
+            const body = {
+                name: $('#nb-name').value.trim(), email: $('#nb-email').value.trim(), phone: $('#nb-phone').value.trim(),
+                checkin: $('#nb-checkin').value, checkout: $('#nb-checkout').value, note: $('#nb-note').value.trim(),
+                createPin: $('#nb-pin').checked, force: nbForce
+            };
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                const d = await res.json();
+                if (d.success) {
+                    closeNewBooking();
+                    showToast(`Buchung gespeichert${d.pin ? ` – Türcode ${d.pin}` : ''}`, 'success', 5000);
+                    if (d.pinError) showToast(`Türcode nicht angelegt: ${d.pinError}`, 'error', 6000);
+                    tlStart = ymdAdd(body.checkin, -3);
+                    if (currentView === 'calendar') loadCalendarHome(); else switchView('calendar');
+                } else {
+                    msg.hidden = false;
+                    msg.textContent = d.error || 'Speichern fehlgeschlagen';
+                    if (d.conflict) { nbForce = true; btn.textContent = 'Trotzdem speichern'; }
+                }
+            } catch (err) {
+                msg.hidden = false;
+                msg.textContent = 'Keine Verbindung zum Server.';
+            }
+            btn.disabled = false;
+        });
+    }
+
+    // ---- Suche in der Kopfzeile
+    const topSearch = $('#topbar-search');
+    if (topSearch) {
+        let tsTimer = null;
+        const runSearch = () => {
+            const q = topSearch.value.trim();
+            if (!q && currentView !== 'bookings') return;
+            bookingsQuery = q;
+            bookingsFilter = q ? 'all' : 'upcoming';
+            const inner = $('#bookings-search');
+            if (inner) inner.value = q;
+            if (bookingsMode === 'calendar') setBookingsMode('list');
+            if (currentView !== 'bookings') switchView('bookings'); else loadBookings();
+        };
+        topSearch.addEventListener('input', () => { clearTimeout(tsTimer); tsTimer = setTimeout(runSearch, 300); });
+        topSearch.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(tsTimer); runSearch(); } });
+    }
+
+    // ---- Seitenleiste: Gruppen und Einklappen
+    function syncNavGroups() {
+        $$('.nav-group').forEach(g => {
+            const hasActive = !!g.querySelector('.sidebar-item.active');
+            if (hasActive) g.classList.add('open');
+            g.classList.toggle('has-active', hasActive);
+            g.querySelector('.nav-group-toggle').setAttribute('aria-expanded', g.classList.contains('open'));
+        });
+    }
+    $$('.nav-group-toggle').forEach(t => t.addEventListener('click', () => {
+        const g = t.closest('.nav-group');
+        if (appWrapper.classList.contains('nav-collapsed')) appWrapper.classList.remove('nav-collapsed');
+        g.classList.toggle('open');
+        t.setAttribute('aria-expanded', g.classList.contains('open'));
+    }));
+    const navCollapseBtn = $('#btn-nav-collapse');
+    try { if (localStorage.getItem('navCollapsed') === '1' && window.innerWidth > 768) appWrapper.classList.add('nav-collapsed'); } catch (e) { /* ignore */ }
+    if (navCollapseBtn) navCollapseBtn.addEventListener('click', () => {
+        const on = appWrapper.classList.toggle('nav-collapsed');
+        try { localStorage.setItem('navCollapsed', on ? '1' : '0'); } catch (e) { /* ignore */ }
+    });
+
+    // ---- Benutzername oben rechts
+    async function loadTopbarUser() {
+        try {
+            const d = await apiJson('/api/me');
+            const u = d && d.user;
+            const name = typeof u === 'string' ? u : (u && (u.username || u.name)) || '';
+            const el = $('#topbar-user');
+            if (el) el.textContent = name;
+        } catch (e) { /* ignore */ }
     }
 
     // =======================
@@ -2153,7 +2632,7 @@
                     {
                         label: 'Umsatz',
                         data: revValues,
-                        backgroundColor: '#8a4b2a',
+                        backgroundColor: '#2b62e3',
                         borderRadius: 1
                     },
                     {
@@ -2252,7 +2731,7 @@
         const canvas = $('#reviewMonthsChart');
         if (!canvas || typeof Chart === 'undefined') return;
         if (window.myReviewChart) window.myReviewChart.destroy();
-        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: '#8a4b2a', borderRadius: 1 }];
+        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: '#2b62e3', borderRadius: 1 }];
         if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: '#c4b8a5', borderRadius: 1 });
         window.myReviewChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
@@ -2325,7 +2804,7 @@
             const label = p.city ? `${p.zip ? p.zip + ' ' : ''}${p.city}${p.country && p.cc !== 'DE' ? ', ' + p.country : ''}` : `${p.country} (Ort unbekannt)`;
             L.circleMarker([p.lat, p.lon], {
                 radius: 6 + Math.round(10 * Math.sqrt(p.stays / max)),
-                color: '#fbf8f3', weight: 2, fillColor: p.city ? '#8a4b2a' : '#675e52', fillOpacity: .85
+                color: '#ffffff', weight: 2, fillColor: p.city ? '#2b62e3' : '#6b7385', fillOpacity: .85
             }).bindTooltip(`${escapeHtml(label)}: ${p.stays} Aufenthalt${p.stays === 1 ? '' : 'e'}`).addTo(reviewMarkers);
         });
         const bounds = L.latLngBounds(points.map(p => [p.lat, p.lon]));
@@ -3695,9 +4174,9 @@
         // Pre-fetch archive
         fetchArchive();
 
-        // Default to Dashboard view; a tapped push notification opens /?view=bookings
+        // Default to the calendar (Smoobu-style home); a tapped push notification opens /?view=bookings
         const startView = new URLSearchParams(location.search).get('view');
-        switchView(['bookings', 'expenses', 'invoice'].includes(startView) ? startView : 'dashboard');
+        switchView(['bookings', 'expenses', 'invoice', 'dashboard'].includes(startView) ? startView : 'calendar');
         if (startView) history.replaceState(null, '', '/');
 
         registerServiceWorker();
