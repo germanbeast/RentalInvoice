@@ -160,20 +160,10 @@ body.signed-in { background: var(--paper); }
 .ms-hint { font-size: .86rem; color: var(--muted); margin: -.4rem 0 1rem; }
 .ms-companion { position: relative; border: 1px solid var(--line); border-radius: 4px; padding: 1rem 1rem .1rem; margin-bottom: .8rem; background: var(--paper); }
 .ms-companion-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; font-weight: 600; font-size: .9rem; }
-.ms-remove { background: none; border: 0; color: var(--bad); font: 500 .85rem var(--sans); cursor: pointer; padding: .2rem; }
-.ms-add { display: inline-flex; align-items: center; gap: .4rem; }
-.ms-add svg { width: 16px; height: 16px; }
-.sigpad { position: relative; height: 190px; border: 1px dashed var(--muted); border-radius: 4px; background: #fff; touch-action: none; margin-top: .4rem; }
-.sigpad canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
-.sigpad::after { content: ''; position: absolute; left: 18px; right: 18px; bottom: 44px; height: 1px; background: var(--line); pointer-events: none; }
-.sigpad-ph { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; color: var(--muted); font-size: .85rem; pointer-events: none; }
-.sigpad.inked .sigpad-ph { display: none; }
-.sig-tools { display: flex; justify-content: space-between; align-items: center; margin: .4rem 0 1.2rem; font-size: .88rem; color: var(--ink-soft); }
 .ms-summary dl { margin: 0; display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); border-top: 1px solid var(--line); }
 .ms-summary dt, .ms-summary dd { margin: 0; padding: .55rem 0; border-bottom: 1px solid var(--line); }
 .ms-summary dt { font-size: .76rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: .75rem; }
 .ms-summary dd { overflow-wrap: anywhere; }
-.ms-summary img { display: block; max-width: 260px; height: 80px; object-fit: contain; object-position: left; }
 @media (max-width: 480px) { .ms-summary dl { grid-template-columns: 1fr; } .ms-summary dt { border-bottom: 0; padding-bottom: 0; } }
 .ms-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; }
 

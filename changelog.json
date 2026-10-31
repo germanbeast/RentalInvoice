@@ -8,7 +8,7 @@
             "features": [
                 "„Meine Buchung“ im App-Stil: großes Titelbild, Karten für Buchungscode und Gast, Abschnitt „Gebucht“ mit Foto-Karussell",
                 "Tab-Leiste mit Gäste, Aufenthalt, Gästemappe A – Z und Umgebung (auf dem Handy unten, am Computer oben)",
-                "Online-Meldeschein: Gäste tragen vor der Anreise Name, Geburtsdatum, Staatsangehörigkeit, Anschrift, Ausweis (bei ausländischen Gästen) und Mitreisende ein und unterschreiben auf dem Handy",
+                "Online-Meldeschein: Gäste tragen vor der Anreise Name, Geburtsdatum, Staatsangehörigkeit, Anschrift, Ausweis (bei ausländischen Gästen) ein, dazu für jede weitere Person Vorname, Familienname und Geburtsdatum",
                 "Admin: neuer Reiter „Meldescheine“ unter Anfragen mit Drucken (einzeln oder alle eines Monats/Jahres), CSV-Export und Liste der noch offenen Meldescheine",
                 "Telegram-Nachricht bei jedem neuen Meldeschein, automatische Löschung 13 Monate nach Abreise"
             ],

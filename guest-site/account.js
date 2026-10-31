@@ -226,7 +226,7 @@
             right.push(ms.form
                 ? `<div class="gcard gdone"><span class="tick">${ICON.tick}</span><p><strong>Meldeschein ausgefüllt.</strong> Danke! <button type="button" class="link-btn" style="margin:0" data-goto="guests">Ansehen</button></p></div>`
                 : `<div class="gcard gcallout"><h3>Meldeschein ausfüllen</h3>
-                    <p>Bitte füllen Sie vor der Anreise kurz den Meldeschein aus. Das dauert zwei Minuten und erspart Papierkram bei der Ankunft.</p>
+                    <p>Bitte füllen Sie vor der Anreise kurz den Meldeschein aus, für sich und alle Personen, die mit Ihnen übernachten. Das dauert zwei Minuten.</p>
                     <button type="button" class="btn btn-dark btn-small" data-goto="guests">Jetzt ausfüllen</button></div>`);
         }
         if (s.status === 'pending') {
@@ -257,15 +257,12 @@
     function companionHtml(c, i) {
         c = c || {};
         return `<div class="ms-companion" data-companion>
-            <div class="ms-companion-head"><span>Person ${i + 2}</span><button type="button" class="ms-remove" data-remove>Entfernen</button></div>
+            <div class="ms-companion-head"><span>Person ${i + 2}</span></div>
             <div class="row">
                 <label>Vorname(n)<input type="text" name="c_firstName" maxlength="80" value="${esc(c.firstName)}" required></label>
                 <label>Familienname<input type="text" name="c_lastName" maxlength="80" value="${esc(c.lastName)}" required></label>
             </div>
-            <div class="row">
-                <label>Geburtsdatum <small>optional</small><input type="date" name="c_birthDate" value="${esc(c.birthDate)}"></label>
-                <label>Staatsangehörigkeit<input type="text" name="c_nationality" maxlength="60" list="ms-countries" value="${esc(c.nationality || 'Deutschland')}" required></label>
-            </div>
+            <label>Geburtsdatum<input type="date" name="c_birthDate" value="${esc(c.birthDate)}" required></label>
         </div>`;
     }
 
@@ -274,6 +271,7 @@
         const p = m.prefill || {};
         const nat = f.nationality || 'Deutschland';
         const foreign = isForeign(nat);
+        const persons = m.form ? (f.companions || []).length + 1 : (m.booked || 0);
         return `<form class="ms-form" id="ms-form" novalidate>
             <datalist id="ms-countries">${COUNTRIES.map(c => `<option value="${c}">`).join('')}</datalist>
             <div class="ms-dates"><div><span>Tag der Ankunft</span><strong>${fmt(m.checkin)}</strong></div><div><span>Voraussichtliche Abreise</span><strong>${fmt(m.checkout)}</strong></div></div>
@@ -305,14 +303,16 @@
                 </div>
                 <label>E-Mail <small>optional</small><input type="email" name="email" maxlength="120" autocomplete="email" value="${esc(f.email || (me.details && me.details.email) || '')}"></label>
             </fieldset>
-            <fieldset><legend>Mitreisende</legend>
-                <p class="ms-hint" style="margin-top:-.4rem">Alle weiteren Personen, die mit Ihnen übernachten, auch Kinder.</p>
+            <fieldset><legend>Weitere Personen</legend>
+                <label>Wie viele Personen übernachten insgesamt, Sie eingeschlossen?
+                    <select name="persons" required>
+                        ${persons ? '' : '<option value="">Bitte wählen</option>'}
+                        ${Array.from({ length: m.maxPersons || 8 }, (_, k) => k + 1).map(n => `<option value="${n}"${n === persons ? ' selected' : ''}>${n} ${n === 1 ? 'Person (nur ich)' : 'Personen'}</option>`).join('')}
+                    </select></label>
+                <p class="ms-hint">Jede weitere Person, auch Kinder, braucht einen eigenen Eintrag mit Vorname, Familienname und Geburtsdatum.</p>
                 <div id="ms-companions">${(f.companions || []).map(companionHtml).join('')}</div>
-                <button type="button" class="btn btn-ghost btn-small ms-add" id="ms-add">${ICON.plus}<span>Person hinzufügen</span></button>
             </fieldset>
-            <fieldset><legend>Unterschrift</legend>
-                <div class="sigpad" id="ms-sig"><canvas aria-label="Unterschriftsfeld: mit dem Finger oder der Maus unterschreiben"></canvas><span class="sigpad-ph">Hier mit dem Finger unterschreiben</span></div>
-                <div class="sig-tools"><span>${m.form ? 'Bitte zur Bestätigung erneut unterschreiben.' : 'Mit Finger oder Maus.'}</span><button type="button" class="link-btn" style="margin:0" id="ms-sig-clear">Löschen</button></div>
+            <fieldset><legend>Bestätigung</legend>
                 <label class="check"><input type="checkbox" name="confirm" required> Ich bestätige, dass meine Angaben richtig und vollständig sind.</label>
                 <p class="ms-hint" style="margin-top:0">Wir nutzen die Angaben nur für die gesetzliche Meldepflicht (§§ 29, 30 Bundesmeldegesetz) und löschen sie nach Ablauf der Aufbewahrungsfrist von einem Jahr nach Abreise.</p>
             </fieldset>
@@ -337,8 +337,7 @@
                 <dt>Staatsangehörigkeit</dt><dd>${esc(f.nationality)}</dd>
                 <dt>Anschrift</dt><dd>${esc(f.street)}, ${esc(f.zip)} ${esc(f.city)}${f.country && !GERMAN.test(f.country) ? `, ${esc(f.country)}` : ''}</dd>
                 ${idTxt ? `<dt>Ausweis</dt><dd>${idTxt}</dd>` : ''}
-                <dt>Mitreisende</dt><dd>${comp.length ? comp.map(c => `${esc(c.firstName)} ${esc(c.lastName)}${c.birthDate ? ` (${fmtDate(c.birthDate)})` : ''}`).join('<br>') : 'keine'}</dd>
-                ${f.signature ? `<dt>Unterschrift</dt><dd><img src="${esc(f.signature)}" alt="Ihre Unterschrift"></dd>` : ''}
+                <dt>Weitere Personen</dt><dd>${comp.length ? comp.map(c => `${esc(c.firstName)} ${esc(c.lastName)}${c.birthDate ? `, geb. ${fmtDate(c.birthDate)}` : ''}`).join('<br>') : 'keine'}</dd>
             </dl>
             <div class="ms-actions">${m.editable ? '<button type="button" class="btn btn-ghost btn-small" id="ms-edit">Angaben ändern</button>' : '<p class="ms-hint" style="margin:0">Änderungen ab dem Anreisetag bitte direkt bei uns.</p>'}</div>
         </div>`;
@@ -367,7 +366,7 @@
                 <div class="form-error" id="details-error" hidden></div>
                 <button type="submit" class="btn btn-dark btn-small">Speichern</button><span class="saved" id="details-saved" hidden>Gespeichert, danke!</span>
             </form></div>`;
-        return `<div class="gapp-pane-head"><h2>Gäste</h2><p>Meldeschein, Mitreisende und wie wir Sie erreichen.</p></div>
+        return `<div class="gapp-pane-head"><h2>Gäste</h2><p>Meldeschein für alle Personen und wie wir Sie erreichen.</p></div>
             <div class="gapp-cols"><div class="gapp-col">${parts.join('') || details}</div><div class="gapp-col">${parts.length ? details : ''}</div></div>`;
     }
     const fmtDate = ymd => ymd ? new Date(ymd + 'T12:00:00').toLocaleDateString('de-DE') : '–';
@@ -545,56 +544,6 @@
     }
 
 
-    // ---- Signature pad ----------------------------------------------------
-    function signaturePad(wrap) {
-        const c = wrap.querySelector('canvas');
-        const ctx = c.getContext('2d');
-        let inked = false, drawing = false, last = null, width = 0;
-        function size() {
-            const r = wrap.getBoundingClientRect();
-            if (!r.width || r.width === width) return;
-            width = r.width;
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            c.width = Math.round(r.width * dpr);
-            c.height = Math.round(r.height * dpr);
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            ctx.strokeStyle = ctx.fillStyle = '#1f1c18';
-            inked = false;
-            wrap.classList.remove('inked');
-        }
-        const pt = e => { const r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-        c.addEventListener('pointerdown', e => {
-            e.preventDefault();
-            drawing = true;
-            c.setPointerCapture(e.pointerId);
-            last = pt(e);
-            ctx.beginPath(); ctx.arc(last.x, last.y, 1.1, 0, Math.PI * 2); ctx.fill();
-        });
-        c.addEventListener('pointermove', e => {
-            if (!drawing) return;
-            const p = pt(e);
-            ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-            if (Math.abs(p.x - last.x) + Math.abs(p.y - last.y) > 0) { inked = true; wrap.classList.add('inked'); }
-            last = p;
-        });
-        ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => c.addEventListener(t, () => { drawing = false; }));
-        size();
-        const ro = new ResizeObserver(size);
-        ro.observe(wrap);
-        return {
-            clear() { width = 0; size(); },
-            isEmpty: () => !inked,
-            toDataURL() {
-                const w = Math.min(600, c.width);
-                const out = document.createElement('canvas');
-                out.width = w; out.height = Math.round(c.height * w / c.width);
-                out.getContext('2d').drawImage(c, 0, 0, out.width, out.height);
-                return out.toDataURL('image/png');
-            }
-        };
-    }
-
     // ---- Bindings ---------------------------------------------------------
     function bindApp() {
         const root = $('#app');
@@ -645,20 +594,14 @@
         if (edit) edit.addEventListener('click', () => { msEditing = true; renderApp(); });
         const form = root.querySelector('#ms-form');
         if (!form) return;
-        const pad = signaturePad(form.querySelector('#ms-sig'));
-        form.querySelector('#ms-sig-clear').addEventListener('click', () => pad.clear());
         const cancel = form.querySelector('#ms-cancel');
         if (cancel) cancel.addEventListener('click', () => { msEditing = false; renderApp(); });
         const list = form.querySelector('#ms-companions');
-        const renumber = () => list.querySelectorAll('[data-companion]').forEach((el, i) => { el.querySelector('.ms-companion-head span').textContent = `Person ${i + 2}`; });
-        form.querySelector('#ms-add').addEventListener('click', () => {
-            list.insertAdjacentHTML('beforeend', companionHtml({ lastName: form.elements.lastName.value }, list.children.length));
-            renumber();
-            list.lastElementChild.querySelector('input').focus();
-        });
-        list.addEventListener('click', e => {
-            const rm = e.target.closest('[data-remove]');
-            if (rm) { rm.closest('[data-companion]').remove(); renumber(); }
+        // One row per further person, values are kept when the number changes
+        form.elements.persons.addEventListener('change', () => {
+            const want = Math.max(0, (parseInt(form.elements.persons.value, 10) || 1) - 1);
+            while (list.children.length > want) list.lastElementChild.remove();
+            while (list.children.length < want) list.insertAdjacentHTML('beforeend', companionHtml({ lastName: form.elements.lastName.value }, list.children.length));
         });
         form.elements.nationality.addEventListener('input', () => {
             const foreign = isForeign(form.elements.nationality.value);
@@ -670,16 +613,18 @@
             const el = form.elements;
             const companions = [...list.querySelectorAll('[data-companion]')].map(c => ({
                 firstName: c.querySelector('[name=c_firstName]').value, lastName: c.querySelector('[name=c_lastName]').value,
-                birthDate: c.querySelector('[name=c_birthDate]').value, nationality: c.querySelector('[name=c_nationality]').value
+                birthDate: c.querySelector('[name=c_birthDate]').value
             }));
-            if (pad.isEmpty()) return showError(err, 'Bitte unterschreiben Sie im Feld oben.');
+            if (!el.persons.value) return showError(err, 'Bitte angeben, wie viele Personen übernachten.');
+            const missing = companions.findIndex(c => !c.firstName.trim() || !c.lastName.trim() || !c.birthDate);
+            if (missing >= 0) return showError(err, `Bitte bei Person ${missing + 2} Vorname, Familienname und Geburtsdatum eintragen.`);
             if (!el.confirm.checked) return showError(err, 'Bitte bestätigen Sie, dass Ihre Angaben stimmen.');
             const foreign = isForeign(el.nationality.value);
             const body = {
                 firstName: el.firstName.value, lastName: el.lastName.value, birthDate: el.birthDate.value, nationality: el.nationality.value,
                 idType: foreign ? el.idType.value : '', idNumber: foreign ? el.idNumber.value : '',
                 street: el.street.value, zip: el.zip.value, city: el.city.value, country: el.country.value,
-                phone: el.phone.value, email: el.email.value, companions, signature: pad.toDataURL(), confirm: true
+                phone: el.phone.value, email: el.email.value, persons: parseInt(el.persons.value, 10), companions, confirm: true
             };
             const btn = form.querySelector('[type=submit]');
             btn.disabled = true;

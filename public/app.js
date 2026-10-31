@@ -2578,7 +2578,7 @@
                 </div>
                 <div>
                     <div>${fmtDEfull(f.checkin)} – ${fmtDEfull(f.checkout)}</div>
-                    <div class="booking-sub">${f.companions ? `+ ${f.companions} Mitreisende${f.companions === 1 ? 'r' : ''}` : 'allein'}</div>
+                    <div class="booking-sub">${f.companions + 1} ${f.companions ? 'Personen, alle erfasst' : 'Person'}</div>
                 </div>
                 <div class="booking-actions"><button class="btn-mini" data-ms="print">Drucken</button><button class="btn-mini" data-ms="delete">Löschen</button></div>
             </div>`).join('') : '<div class="bookings-empty">Für diesen Zeitraum gibt es noch keine Meldescheine.</div>';

@@ -2,7 +2,8 @@
  * Online-Meldeschein (guest registration, §§ 29–30 Bundesmeldegesetz)
  *
  * Guests fill in the registration form on "Meine Buchung" before arrival: name, birth date, nationality,
- * address, ID document number (foreign guests), co-travellers, signature drawn on the screen.
+ * address, ID document number (foreign guests) and every further person staying (first name, last name, birth date).
+ * No signature (host decision 2026-10-31): the guest confirms with a checkbox.
  *  - one form per booking (table guest_registrations), the guest can change it until the arrival day
  *  - the host gets a Telegram message, sees all forms in the admin (Anfragen → Meldescheine),
  *    prints them (single or a whole month/year) and exports them as CSV
@@ -13,7 +14,6 @@
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_COMPANIONS = 12;
-const MAX_SIGNATURE = 200 * 1024; // data URL length
 const GERMAN = /^(deutsch(land)?|germany|german|de|d|brd)$/i;
 
 function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, guestBooking, berlinToday, nightsBetween, formatDateDE }) {
@@ -83,8 +83,10 @@ function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, 
                 prefill = { lastName: parts.length > 1 ? parts.pop() : '', firstName: parts.join(' ') };
             }
         }
+        const req2 = sql().prepare('SELECT adults, children FROM booking_requests WHERE booking_id = ?').get(b.id);
         res.json({
-            success: true, enabled: true, checkin: b.checkin, checkout: b.checkout, nights: nightsBetween(b.checkin, b.checkout),
+            success: true, enabled: true, booked: req2 ? (req2.adults || 1) + (req2.children || 0) : null,
+            maxPersons: Math.min(13, Number(getSite().max_guests) || 13), checkin: b.checkin, checkout: b.checkout, nights: nightsBetween(b.checkin, b.checkout),
             form: r ? rowToForm(r) : null, prefill, editable: editable(b), past: b.checkout < berlinToday()
         });
     });
@@ -126,20 +128,18 @@ function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, 
             }
             if (f.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return fail('Bitte eine gültige E-Mail-Adresse angeben.');
 
+            // Every person staying is registered: the main guest in full, everyone else with name and birth date
+            const persons = parseInt(body.persons, 10);
+            if (!Number.isInteger(persons) || persons < 1 || persons > MAX_COMPANIONS + 1) return fail('Bitte angeben, wie viele Personen übernachten.');
             const companions = (Array.isArray(body.companions) ? body.companions : []).slice(0, MAX_COMPANIONS).map(c => ({
-                lastName: str(c && c.lastName, 80), firstName: str(c && c.firstName, 80),
-                birthDate: str(c && c.birthDate, 10), nationality: str(c && c.nationality, 60)
-            })).filter(c => c.lastName || c.firstName);
-            for (const c of companions) {
-                if (!c.lastName || !c.firstName) return fail('Bitte bei allen Mitreisenden Vor- und Familiennamen angeben.');
-                if (c.birthDate && !validBirth(c.birthDate)) return fail(`Das Geburtsdatum von ${c.firstName} stimmt nicht.`);
-                if (c.nationality.length < 2) return fail(`Bitte die Staatsangehörigkeit von ${c.firstName} angeben.`);
+                lastName: str(c && c.lastName, 80), firstName: str(c && c.firstName, 80), birthDate: str(c && c.birthDate, 10)
+            }));
+            if (companions.length !== persons - 1) return fail('Bitte für jede weitere Person Vorname, Familienname und Geburtsdatum angeben.');
+            for (const [i, c] of companions.entries()) {
+                if (!c.firstName || c.lastName.length < 2) return fail(`Bitte Vor- und Familiennamen von Person ${i + 2} angeben.`);
+                if (!validBirth(c.birthDate)) return fail(`Bitte das Geburtsdatum von ${c.firstName || `Person ${i + 2}`} angeben.`);
             }
-
-            const signature = String(body.signature || '');
-            if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature) || signature.length > MAX_SIGNATURE || signature.length < 400) {
-                return fail('Bitte unterschreiben Sie im Feld unten.');
-            }
+            const signature = null;
             if (body.confirm !== true) return fail('Bitte bestätigen Sie, dass Ihre Angaben stimmen.');
 
             const data = { ...f, companions, confirmedAt: new Date().toISOString() };
@@ -213,12 +213,12 @@ function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, 
     ${row('Anschrift', [f.street, `${f.zip} ${f.city}`, f.country].filter(Boolean).join(', '))}
     ${f.idNumber ? row(`Ausweisdokument`, `${f.idType ? f.idType + ' · ' : ''}${f.idNumber}`) : ''}
     ${f.email || f.phone ? row('Kontakt', [f.email, f.phone].filter(Boolean).join(' · ')) : ''}
-    ${row('Zahl der Mitreisenden', String(comp.length))}
+    ${row('Personen insgesamt', String(comp.length + 1))}
   </table>
-  ${comp.length ? `<h2>Mitreisende</h2><table class="list"><thead><tr><th>Familienname</th><th>Vorname</th><th>Geburtsdatum</th><th>Staatsangehörigkeit</th></tr></thead><tbody>
-    ${comp.map(c => `<tr><td>${esc(c.lastName)}</td><td>${esc(c.firstName)}</td><td>${de(c.birthDate)}</td><td>${esc(c.nationality)}</td></tr>`).join('')}</tbody></table>` : ''}
-  <div class="sig"><div>${f.signature ? `<img src="${f.signature}" alt="Unterschrift">` : '<div class="blank"></div>'}<p class="line">Unterschrift des Gastes</p></div>
-  <p class="meta">Online ausgefüllt und bestätigt am ${esc(stamp(f.submittedAt))}${f.updatedAt && f.updatedAt !== f.submittedAt ? `, zuletzt geändert am ${esc(stamp(f.updatedAt))}` : ''}.<br>
+  ${comp.length ? `<h2>Weitere Personen</h2><table class="list"><thead><tr><th>Familienname</th><th>Vorname</th><th>Geburtsdatum</th></tr></thead><tbody>
+    ${comp.map(c => `<tr><td>${esc(c.lastName)}</td><td>${esc(c.firstName)}</td><td>${de(c.birthDate)}</td></tr>`).join('')}</tbody></table>` : ''}
+  <div class="sig">
+  <p class="meta">Vom Gast online ausgefüllt und als richtig bestätigt am ${esc(stamp(f.submittedAt))}${f.updatedAt && f.updatedAt !== f.submittedAt ? `, zuletzt geändert am ${esc(stamp(f.updatedAt))}` : ''}.<br>
   Aufbewahrung ein Jahr ab Abreise (§ 30 Abs. 4 BMG), danach Vernichtung.</p></div>
 </section>`;
     }
@@ -246,12 +246,7 @@ function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, 
   .list th { text-align: left; font-size: 8.5pt; font-weight: 500; color: #675e52; border-bottom: 1px solid #1f1c18; padding: 1.5mm 2mm 1.5mm 0; }
   .list td { padding: 1.8mm 2mm 1.8mm 0; border-bottom: 1px solid #e6ddcf; }
   .sig { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; margin-top: 8mm; }
-  .sig img { display: block; height: 22mm; max-width: 80mm; object-fit: contain; }
   .sig p { margin: 0; font-size: 8.5pt; color: #675e52; }
-  .sig > div { min-width: 70mm; }
-  .sig .blank { height: 22mm; }
-  .sig .line { border-top: 1px solid #1f1c18; padding-top: 1mm; }
-  .sig .meta { text-align: right; max-width: 90mm; }
   .tools { text-align: center; margin: 1rem; font-size: 14px; }
   .tools button { font: inherit; padding: .5rem 1.2rem; border: 1px solid #1f1c18; background: #1f1c18; color: #f5f0e8; border-radius: 2px; cursor: pointer; }
   .empty { text-align: center; padding: 3rem 1rem; color: #675e52; }
@@ -304,11 +299,11 @@ ${forms.length ? forms.map(f => formHtml(f, h)).join('\n') : '<p class="empty">F
         app.get('/api/meldescheine/export.csv', apiLimiter, (req, res) => {
             const rows = rowsFor(req.query).reverse().map(r => rowToForm(r, false));
             const head = ['Nr', 'Buchungscode', 'Anreise', 'Abreise', 'Familienname', 'Vorname', 'Geburtsdatum', 'Geburtsort', 'Staatsangehörigkeit',
-                'Straße', 'PLZ', 'Ort', 'Land', 'Ausweisart', 'Ausweisnummer', 'E-Mail', 'Telefon', 'Mitreisende (Anzahl)', 'Mitreisende', 'Erfasst am'];
+                'Straße', 'PLZ', 'Ort', 'Land', 'Ausweisart', 'Ausweisnummer', 'E-Mail', 'Telefon', 'Personen gesamt', 'Weitere Personen', 'Erfasst am'];
             const lines = rows.map(f => [
                 f.id, f.code, de(f.checkin), de(f.checkout), f.lastName, f.firstName, de(f.birthDate), f.birthPlace, f.nationality,
-                f.street, f.zip, f.city, f.country, f.idType, f.idNumber, f.email, f.phone, (f.companions || []).length,
-                (f.companions || []).map(c => `${c.firstName} ${c.lastName}${c.birthDate ? ` (${de(c.birthDate)})` : ''}, ${c.nationality}`).join(' | '),
+                f.street, f.zip, f.city, f.country, f.idType, f.idNumber, f.email, f.phone, (f.companions || []).length + 1,
+                (f.companions || []).map(c => `${c.firstName} ${c.lastName}${c.birthDate ? ` (${de(c.birthDate)})` : ''}`).join(' | '),
                 stamp(f.submittedAt)
             ].map(csvCell).join(';'));
             const name = `Meldescheine${req.query.year ? '-' + String(req.query.year).replace(/\D/g, '') : ''}${req.query.month ? '-' + String(req.query.month).replace(/\D/g, '') : ''}.csv`;
