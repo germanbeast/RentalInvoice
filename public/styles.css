@@ -3202,6 +3202,12 @@ button.alert:hover { text-decoration: underline; }
 .meta.warn { color: var(--warn); font-size: .78rem; }
 .meta em, .up-card em, .act-card em { color: var(--warn); font-style: normal; }
 .act-card .up-line { gap: .4rem .8rem; }
+.up-name { font-weight: 600; }
+.up-stops { gap: .5rem .75rem; }
+.up-stop { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.up-stop.done { opacity: .5; }
+.up-stop.today .meta b { color: var(--accent); }
+.up-arrow { color: var(--muted); }
 .chip { display: inline-flex; align-items: center; padding: .22rem .5rem; border-radius: 6px; font: 600 .74rem/1 var(--sans); background: var(--paper-2); color: var(--ink-soft); }
 .chip-in { background: #e2ecfd; color: #1f4fc4; }
 .chip-out { background: #eceef2; color: #4a5263; }

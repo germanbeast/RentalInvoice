@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.31.0",
+    "currentVersion": "1.31.1",
     "releases": [
+        {
+            "version": "1.31.1",
+            "date": "2026-10-31",
+            "title": "Bevorstehende Buchungen übersichtlicher",
+            "features": [
+                "Unter dem Kalender steht jetzt eine Karte pro Buchung mit Check-in und Check-out in einer Zeile statt zwei getrennter Karten"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.31.0",
             "date": "2026-10-31",
