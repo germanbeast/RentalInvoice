@@ -1,8 +1,8 @@
 {
-    "currentVersion": "1.29.0",
+    "currentVersion": "1.31.0",
     "releases": [
         {
-            "version": "1.29.0",
+            "version": "1.31.0",
             "date": "2026-10-31",
             "title": "Gästebereich als App mit Online-Meldeschein",
             "features": [
@@ -13,6 +13,19 @@
                 "Telegram-Nachricht bei jedem neuen Meldeschein, automatische Löschung 13 Monate nach Abreise"
             ],
             "fixes": []
+        },
+        {
+            "version": "1.30.0",
+            "date": "2026-10-31",
+            "title": "Türcode wird angepasst statt neu angelegt",
+            "features": [
+                "Türcode jederzeit bearbeiten: im Kalender auf die Buchung tippen → „Türcode bearbeiten“ (Name im Schloss, gültig ab/bis)",
+                "Neuer Gastname im Webinterface benennt den Türcode im Nuki-Schloss automatisch um"
+            ],
+            "fixes": [
+                "Ändert sich An- oder Abreise, wird der vorhandene Türcode verschoben statt ein zweiter angelegt (Kalender-Abgleich, Rechnung, Telegram, Gästeliste)",
+                "Alte Codes wie „Gast: Booking 12.03.“ werden stündlich auf den eingetragenen Gastnamen umbenannt"
+            ]
         },
         {
             "version": "1.28.0",

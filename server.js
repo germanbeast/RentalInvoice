@@ -381,14 +381,6 @@ function icalDateToYmd(d) {
     return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt);
 }
 
-// Adjust the validity period of an existing Nuki keypad code
-async function updateNukiPinDates(authId, arrival, departure) {
-    await require('./bot-logic').updateNukiAuth(authId, {
-        allowedFromDate: `${arrival}T15:00:00.000Z`,
-        allowedUntilDate: `${departure}T11:00:00.000Z`
-    });
-}
-
 function formatDateDE(dateStr) {
     if (!dateStr) return '\u2014';
     const d = new Date(dateStr);
@@ -468,11 +460,12 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
 
         // Existing booking whose dates changed (booking modified, or corrected date parsing):
         // keep the already created door code in sync with the new period.
-        if (existing && existing.nuki_auth_id && checkout >= todayYmd &&
+        if (existing && (existing.nuki_auth_id || existing.nuki_pin) && checkout >= todayYmd &&
             (existing.checkin !== checkin || existing.checkout !== checkout)) {
             try {
-                await updateNukiPinDates(existing.nuki_auth_id, checkin, checkout);
-                adjusted.push(`${summary.split('(')[0].trim()}: ${formatDateDE(checkin)} – ${formatDateDE(checkout)}`);
+                const r = await require('./bot-logic').syncBookingCode(existing, { from: checkin, until: checkout });
+                if (r.updated) adjusted.push(`${summary.split('(')[0].trim()}: ${formatDateDE(checkin)} – ${formatDateDE(checkout)}`);
+                else console.warn(`⚠️ Türcode von Buchung ${existing.id} nicht mehr im Nuki-Schloss – Zeitraum nicht angepasst.`);
             } catch (ue) {
                 console.warn(`⚠️ Nuki-Zeitraum für Buchung ${existing.id} konnte nicht angepasst werden:`, ue.message);
             }
@@ -646,13 +639,15 @@ async function cleanupExpiredNukiCodes() {
     for (const a of auths) {
         // Only keypad codes created by this system ("Gast: ...") whose validity has ended.
         // Codes without an end date or with other names (e.g. cleaning staff) are never touched.
-        if (a.type !== 13 || !a.allowedUntilDate || !/^gast|^airbnb/i.test(String(a.name || ''))) continue;
+        // Codes of a booking count too, even when renamed by hand in the admin.
+        if (a.type !== 13 || !a.allowedUntilDate) continue;
         if (new Date(a.allowedUntilDate).getTime() >= now) continue;
 
         // Cross-check with the synced iCal booking: never delete while the booking still runs or lies ahead
         const booking = db.getDb().prepare(
             "SELECT id, checkout FROM bookings WHERE nuki_auth_id = ? OR (? != '' AND nuki_pin = ?) LIMIT 1"
         ).get(String(a.id), String(a.code || ''), String(a.code || ''));
+        if (!booking && !/^gast|^airbnb/i.test(String(a.name || ''))) continue;
         if (booking && booking.checkout && booking.checkout > todayYmd) continue;
 
         const key = String(a.id);
@@ -729,6 +724,13 @@ async function runNukiCleanup() {
             db.logNotification('nuki_cleanup_stuck', msg, sent ? 'sent' : 'failed');
         }
         if (failed > 0) console.warn(`⚠️ ${failed} Nuki-Code(s) konnten nicht gelöscht werden (nächster Versuch in 1 Stunde).`);
+        // Codes still called "Gast: Booking 12.03." although the guest has a real name -> rename them
+        try {
+            const { renamed } = await require('./bot-logic').reconcileBookingCodes();
+            if (renamed.length) console.log(`✏️ ${renamed.length} Türcode(s) umbenannt: ${renamed.join(', ')}`);
+        } catch (re) {
+            console.warn('⚠️ Türcode-Namen konnten nicht abgeglichen werden:', re.message);
+        }
     } catch (e) {
         console.error('❌ Nuki-Cleanup Fehler:', e.message);
     }
@@ -1567,6 +1569,76 @@ app.put('/api/bookings/:id/guest', apiLimiter, async (req, res) => {
     }
 });
 
+// Door code of a booking: show the live entry from Nuki and change it by hand (name, valid from/until)
+app.get('/api/bookings/:id/nuki', apiLimiter, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const b = db.getDb().prepare('SELECT b.*, g.name AS guest_name FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id WHERE b.id = ?').get(id);
+        if (!b) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+        const guestName = b.guest_name && !botLogicShared.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
+        const base = {
+            success: true, bookingId: id, checkin: b.checkin, checkout: b.checkout,
+            editableBooking: /^(direct-manual-|manual-)/.test(String(b.uid)) || b.source === 'Direkt',
+            suggestedName: botLogicShared.nukiCodeName(guestName || 'Gast')
+        };
+        if (!b.nuki_auth_id && !b.nuki_pin) return res.json({ ...base, hasCode: false });
+        const auths = await botLogicShared.fetchNukiAuths();
+        let cur = null;
+        if (b.nuki_auth_id) cur = auths.find(a => String(a.id) === String(b.nuki_auth_id));
+        if (!cur && b.nuki_pin) cur = auths.find(a => a.type === 13 && String(a.code) === String(b.nuki_pin));
+        if (!cur) return res.json({ ...base, hasCode: false, lost: true, pin: b.nuki_pin || null });
+        if (String(cur.id) !== String(b.nuki_auth_id || '')) db.updateBookingNukiData(id, b.nuki_pin || String(cur.code), String(cur.id));
+        res.json({
+            ...base, hasCode: true, pin: String(cur.code || b.nuki_pin || ''), name: cur.name || '',
+            from: cur.allowedFromDate ? String(cur.allowedFromDate).slice(0, 10) : null,
+            until: cur.allowedUntilDate ? String(cur.allowedUntilDate).slice(0, 10) : null,
+            enabled: cur.enabled !== false
+        });
+    } catch (e) {
+        console.error('Booking Nuki GET Error:', e.message);
+        res.status(500).json({ success: false, error: 'Türcode konnte nicht geladen werden: ' + e.message });
+    }
+});
+
+app.put('/api/bookings/:id/nuki', apiLimiter, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const b = db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+        if (!b) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+        const body = req.body || {};
+        const from = String(body.from || '');
+        const until = String(body.until || '');
+        const name = String(body.name || '').trim();
+        const ymd = /^\d{4}-\d{2}-\d{2}$/;
+        if (!ymd.test(from) || !ymd.test(until) || until <= from) return res.status(400).json({ success: false, error: 'Bitte gültige Daten angeben (Ende nach Beginn).' });
+        if (name.length < 2 || name.length > 20) return res.status(400).json({ success: false, error: 'Der Name im Schloss muss 2–20 Zeichen lang sein.' });
+
+        let result = await botLogicShared.syncBookingCode(b, { from, until, name });
+        let created = false;
+        if (!result.updated) {
+            if (!body.createIfMissing) return res.status(409).json({ success: false, missing: true, error: 'Für diese Buchung gibt es keinen Türcode mehr im Schloss.' });
+            const plain = name.replace(/^gast\s*:\s*/i, '');
+            const n = await createNukiPin(from, until, plain);
+            db.updateBookingNukiData(id, n.pin, n.authId);
+            if (botLogicShared.nukiCodeName(plain) !== name) {
+                // Custom name without the "Gast: " prefix; may fail while Nuki Web still lists the new code
+                const fresh = db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+                try { await botLogicShared.syncBookingCode(fresh, { name }); } catch (e) { console.warn('Türcode-Name nicht gesetzt:', e.message); }
+            }
+            result = { updated: true, pin: n.pin };
+            created = true;
+        }
+        // Bookings entered by hand: their period follows the code. Portal bookings keep the calendar dates.
+        if (body.alsoBooking && /^(direct-manual-|manual-)/.test(String(b.uid))) {
+            db.getDb().prepare('UPDATE bookings SET checkin = ?, checkout = ? WHERE id = ?').run(from, until, id);
+        }
+        res.json({ success: true, pin: result.pin, created });
+    } catch (e) {
+        console.error('Booking Nuki PUT Error:', e.message);
+        res.status(500).json({ success: false, error: 'Türcode konnte nicht geändert werden: ' + e.message });
+    }
+});
+
 app.get('/api/overview', apiLimiter, (req, res) => {
     try {
         const today = berlinToday();
@@ -2044,7 +2116,7 @@ app.get('/api/guests/:id', apiLimiter, (req, res) => {
     }
 });
 
-app.post('/api/guests', apiLimiter, (req, res) => {
+app.post('/api/guests', apiLimiter, async (req, res) => {
     try {
         const { id, name, email, address, phone, notes } = req.body;
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -2054,8 +2126,14 @@ app.post('/api/guests', apiLimiter, (req, res) => {
         const data = { name: name.trim(), email, address, phone, notes };
 
         if (id) {
+            const before = db.getGuestById(parseInt(id));
             db.updateGuest(parseInt(id), data);
-            res.json({ success: true, message: 'Gast aktualisiert', guest: { id: parseInt(id), ...data } });
+            let codesRenamed = 0;
+            if (before && before.name !== data.name) {
+                try { codesRenamed = await botLogicShared.renameGuestCodes(parseInt(id), data.name); }
+                catch (e) { console.warn('Türcodes konnten nicht umbenannt werden:', e.message); }
+            }
+            res.json({ success: true, message: 'Gast aktualisiert', guest: { id: parseInt(id), ...data }, codesRenamed });
         } else {
             const guest = db.createGuest(data);
             res.json({ success: true, message: 'Gast erstellt', guest });
@@ -2142,6 +2220,13 @@ app.post('/api/nuki/pin/create-for-guest', apiLimiter, async (req, res) => {
         const guest = db.getGuestById(parseInt(guestId));
         if (!guest) return res.status(404).json({ error: 'Gast nicht gefunden' });
 
+        // A code for this stay already exists (maybe with old dates) -> move it instead of adding a second one
+        const reused = await botLogicShared.reuseStayCode(guest.name, arrival, departure);
+        if (reused) {
+            const rb = db.getDb().prepare('SELECT guest_id FROM bookings WHERE id = ?').get(reused.bookingId);
+            if (rb && !rb.guest_id) db.getDb().prepare('UPDATE bookings SET guest_id = ? WHERE id = ?').run(guest.id, reused.bookingId);
+            return res.json({ success: true, pin: reused.pin, authId: reused.authId, updated: true });
+        }
         const nukiResult = await createNukiPin(arrival, departure, guest.name);
         // Check if a booking for this stay already exists
         const existingBooking = db.findBookingForStay(guest.name, arrival, departure);
@@ -2174,15 +2259,16 @@ app.put('/api/nuki/pin/:bookingId/extend', apiLimiter, async (req, res) => {
         const nuki = allSettings.nuki;
         if (!nuki || !nuki.token || !nuki.lockId) throw new Error('Nuki-Zugangsdaten fehlen');
 
-        // If there is an existing auth entry, update it; otherwise create a new PIN
-        if (booking.nuki_auth_id) {
-            await updateNukiPinDates(booking.nuki_auth_id, arrival, departure);
+        // Existing code (found by id or by its PIN) -> change it in place; only without any code create one
+        const synced = await botLogicShared.syncBookingCode(booking, { from: arrival, until: departure });
+        if (synced.updated) {
             // Update local dates
             db.getDb().prepare('UPDATE bookings SET checkin = ?, checkout = ? WHERE id = ?').run(arrival, departure, bookingId);
-            res.json({ success: true, pin: booking.nuki_pin });
+            res.json({ success: true, pin: synced.pin });
         } else {
-            // No auth_id stored — create a new PIN
-            const guestName = booking.summary ? booking.summary.replace('Gast: ', '') : 'Gast';
+            // No code left in Nuki — create a new PIN
+            const g = booking.guest_id ? db.getGuestById(booking.guest_id) : null;
+            const guestName = (g && g.name) || (booking.summary ? booking.summary.replace(/^(Gast|Direkt|Buchung):\s*/, '') : 'Gast');
             const nukiResult = await createNukiPin(arrival, departure, guestName);
             db.updateBookingNukiData(bookingId, nukiResult.pin, nukiResult.authId);
             db.getDb().prepare('UPDATE bookings SET checkin = ?, checkout = ? WHERE id = ?').run(arrival, departure, bookingId);
@@ -3040,6 +3126,12 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
 app.post('/api/nuki/create-pin', apiLimiter, async (req, res) => {
     try {
         const { arrival, departure, guestName } = req.body;
+        const ymd = /^\d{4}-\d{2}-\d{2}$/;
+        if (!ymd.test(String(arrival || '')) || !ymd.test(String(departure || '')) || departure <= arrival) {
+            return res.status(400).json({ error: 'Bitte gültige An- und Abreise angeben' });
+        }
+        const reused = await botLogicShared.reuseStayCode(guestName, arrival, departure);
+        if (reused) return res.json({ success: true, pin: reused.pin, authId: reused.authId, updated: true });
         const result = await createNukiPin(arrival, departure, guestName);
         res.json(result);
     } catch (error) {

@@ -3223,6 +3223,8 @@ button.alert:hover { text-decoration: underline; }
 .nb-msg { padding: .6rem .8rem; border-radius: 8px; background: var(--bad-soft); color: var(--bad); font-size: .85rem; margin-bottom: .6rem; }
 .nb-actions { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; margin-top: .4rem; }
 .nb-nights { margin-right: auto; font-size: .84rem; color: var(--muted); }
+.dc-pin { font-size: .9rem; margin: 0 0 .8rem; }
+.dc-pin code { font-size: 1.15rem; letter-spacing: .12em; font-weight: 600; }
 
 @media (max-width: 1100px) {
     .cal-panels { grid-template-columns: 1fr; }

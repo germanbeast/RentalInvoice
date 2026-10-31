@@ -907,6 +907,12 @@ async function executeSession(bot, chatId, session, q) {
 async function createOrReusePin(data) {
     const existing = existingPinFor(data);
     if (existing) return existing;
+    // A code of this stay with other dates (check-in moved): move it instead of creating a second one
+    const reused = await botLogic.reuseStayCode(data.gName, data.arrival, data.departure).catch(e => {
+        console.warn('[TG] Bestehender Türcode konnte nicht angepasst werden:', e.message);
+        return null;
+    });
+    if (reused) return reused.pin;
 
     const nukiResult = await botLogic.createNukiPinDirect(data.arrival, data.departure, data.gName);
     const pin = nukiResult.pin;
