@@ -54,6 +54,10 @@
     const navWebsite = $('#nav-website');
     const viewCalendar = $('#view-calendar');
     const navCalendar = $('#nav-calendar');
+    const viewOccupancy = $('#view-occupancy');
+    const navOccupancy = $('#nav-occupancy');
+    const viewFinance = $('#view-finance');
+    const navFinance = $('#nav-finance');
 
     const modalSettings = $('#modal-settings');
     const toastContainer = $('#toast-container');
@@ -1389,8 +1393,8 @@
     });
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar, viewOccupancy, viewFinance];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar, navOccupancy, navFinance];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1429,6 +1433,14 @@
             viewWebsite.style.display = 'flex';
             navWebsite.classList.add('active');
             loadWebsite();
+        } else if (viewId === 'occupancy' && viewOccupancy) {
+            viewOccupancy.style.display = 'flex';
+            navOccupancy.classList.add('active');
+            loadReview(reviewYear);
+        } else if (viewId === 'finance' && viewFinance) {
+            viewFinance.style.display = 'flex';
+            navFinance.classList.add('active');
+            loadFinance();
         }
 
         startViewPolling(viewId);
@@ -1448,6 +1460,8 @@
     if (navBookings) navBookings.addEventListener('click', () => switchView('bookings'));
     if (navEstate) navEstate.addEventListener('click', () => switchView('estate'));
     if (navWebsite) navWebsite.addEventListener('click', () => switchView('website'));
+    if (navOccupancy) navOccupancy.addEventListener('click', () => switchView('occupancy'));
+    if (navFinance) navFinance.addEventListener('click', () => switchView('finance'));
 
     if (navWelcome) {
         navWelcome.addEventListener('click', () => {
@@ -2557,7 +2571,6 @@
 
     async function loadDashboard() {
         loadOverview();
-        loadReview(reviewYear);
         try {
             const res = await fetch('/api/stats');
             const data = await res.json();
@@ -2692,7 +2705,9 @@
         const sel = $('#review-year');
         sel.innerHTML = r.years.map(y => `<option value="${y}"${y === r.year ? ' selected' : ''}>${y}</option>`).join('');
         const running = r.today.slice(0, 4) === String(r.year);
-        $('#review-note').textContent = running ? `Stand heute – bereits gebuchte Nächte bis Jahresende zählen mit` : '';
+        $('#review-note').textContent = running ? `Stand heute – bereits gebuchte Nächte bis Jahresende zählen mit.` : '';
+        const exp = $('#review-export');
+        if (exp) exp.href = `/api/review/export.xlsx?year=${r.year}`;
 
         const p = r.previous;
         const delta = (cur, prev, pts) => {
@@ -2718,14 +2733,94 @@
         const maxN = Math.max(1, ...r.channels.map(c => c.nights));
         $('#review-channels').innerHTML = r.channels.length ? r.channels.map(c => `
             <div class="review-bar">
-                <div class="review-bar-head"><span>${escapeHtml(c.label)}</span><small>${c.stays}× · ${c.nights} Nächte</small></div>
+                <div class="review-bar-head"><span>${escapeHtml(c.label)}</span><small>${c.stays}× · ${c.nights} Nächte${c.revenue ? ' · ' + formatCurrency(c.revenue) : ''}</small></div>
                 <div class="review-bar-track"><div class="review-bar-fill" style="width:${Math.round(c.nights / maxN * 100)}%"></div></div>
             </div>`).join('') + (r.busiestMonth ? `<p class="review-hint">Stärkster Monat: ${MONTHS_LONG[r.busiestMonth - 1]} (${r.months[r.busiestMonth - 1]} Nächte)</p>` : '')
             : '<div class="today-empty">Keine Aufenthalte in diesem Jahr.</div>';
 
+        renderReviewRevenue(r);
+        renderReviewDayMap(r);
+        renderReviewTables(r);
         renderReviewOrigins(r.origins);
         if (r.origins.pending) geocodeReview(r.year);
     }
+
+    function renderReviewRevenue(r) {
+        const canvas = $('#reviewRevenueChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+        if (window.myReviewRevenueChart) window.myReviewRevenueChart.destroy();
+        const datasets = [{ label: String(r.year), data: r.revenueByMonth, backgroundColor: '#2b62e3', borderRadius: 1 }];
+        if (r.previous && r.previous.revenueByMonth) datasets.push({ label: String(r.year - 1), data: r.previous.revenueByMonth, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        window.myReviewRevenueChart = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: { labels: MONTHS_SHORT, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, ticks: { callback: v => numDE(v) + ' €' } } },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6 } },
+                    tooltip: { callbacks: { label: c => `${c.dataset.label}: ${formatCurrency(c.parsed.y || 0)}` } }
+                }
+            }
+        });
+    }
+
+    // 12 rows (months) x up to 31 days, filled = booked night
+    function renderReviewDayMap(r) {
+        const el = $('#review-daymap');
+        if (!el) return;
+        const today = r.today;
+        const head = '<div class="daymap-row daymap-head"><span></span>' + Array.from({ length: 31 }, (_, i) => `<i>${(i + 1) % 5 === 0 || i === 0 ? i + 1 : ''}</i>`).join('') + '</div>';
+        el.innerHTML = '<div class="daymap">' + head + (r.dayMap || []).map((str, m) => {
+            const cells = [...str].map((c, d) => {
+                const ymd = `${r.year}-${String(m + 1).padStart(2, '0')}-${String(d + 1).padStart(2, '0')}`;
+                const cls = c === '1' ? 'on' : (ymd > today ? 'future' : '');
+                return `<b class="${cls}" title="${fmtDEfull(ymd)}${c === '1' ? ' · belegt' : ' · frei'}"></b>`;
+            }).join('');
+            const n = (str.match(/1/g) || []).length;
+            return `<div class="daymap-row"><span>${MONTHS_SHORT[m]}</span>${cells}<em>${Math.round(n / str.length * 100)} %</em></div>`;
+        }).join('') + '</div><p class="review-hint">Blau = belegte Nacht. Hell = noch frei, gestrichelt = Zukunft.</p>';
+    }
+
+    function renderReviewTables(r) {
+        const t = $('#review-months-table');
+        if (t) {
+            const prev = r.previous;
+            const rows = r.months.map((n, i) => {
+                const days = new Date(r.year, i + 1, 0).getDate();
+                const occ = n / days * 100;
+                const rev = r.revenueByMonth[i] || 0;
+                return `<tr><td>${MONTHS_LONG[i]}</td><td class="num">${n}</td>
+                    <td class="num"><span class="occ-cell"><span class="occ-mini"><span style="width:${Math.min(100, occ).toFixed(0)}%"></span></span>${numDE(occ, 0)} %</span></td>
+                    <td class="num">${r.arrivals ? r.arrivals[i] : ''}</td><td class="num">${rev ? formatCurrency(rev) : '–'}</td>
+                    <td class="num">${n && rev ? formatCurrency(rev / n) : '–'}</td>
+                    ${prev ? `<td class="num muted">${prev.months[i]}</td><td class="num muted">${prev.revenueByMonth && prev.revenueByMonth[i] ? formatCurrency(prev.revenueByMonth[i]) : '–'}</td>` : ''}</tr>`;
+            }).join('');
+            const arr = (r.arrivals || []).reduce((a, b) => a + b, 0);
+            t.innerHTML = `<thead><tr><th>Monat</th><th class="num">Nächte</th><th class="num">Auslastung</th><th class="num">Anreisen</th><th class="num">Umsatz</th><th class="num">pro Nacht</th>
+                ${prev ? `<th class="num">Nächte ${r.year - 1}</th><th class="num">Umsatz ${r.year - 1}</th>` : ''}</tr></thead><tbody>${rows}</tbody>
+                <tfoot><tr><td>Jahr</td><td class="num">${r.nights}</td><td class="num">${numDE(r.occupancy, 1)} %</td><td class="num">${arr}</td><td class="num">${formatCurrency(r.revenue)}</td>
+                <td class="num">${r.perNight ? formatCurrency(r.perNight) : '–'}</td>${prev ? `<td class="num">${prev.nights}</td><td class="num">${formatCurrency(prev.revenue)}</td>` : ''}</tr></tfoot>`;
+        }
+        const h = $('#review-history-table');
+        if (h) {
+            const hist = (r.history || []).slice().reverse();
+            const maxRev = Math.max(1, ...hist.map(x => x.revenue));
+            h.innerHTML = hist.length ? `<thead><tr><th>Jahr</th><th class="num">Aufenthalte</th><th class="num">Nächte</th><th class="num">Auslastung</th><th class="num">Ø Nächte</th>
+                <th>Umsatz</th><th class="num">pro Nacht</th><th class="num">Ausgaben</th><th class="num">Ergebnis</th><th class="num">Gäste</th></tr></thead><tbody>` +
+                hist.map(x => `<tr class="${x.year === r.year ? 'is-current' : ''}" data-year="${x.year}"><td><button type="button" class="link-btn" data-year="${x.year}">${x.year}</button></td>
+                    <td class="num">${x.stays}</td><td class="num">${x.nights}</td><td class="num">${numDE(x.occupancy, 1)} %</td><td class="num">${numDE(x.avgStay, 1)}</td>
+                    <td><span class="occ-cell"><span class="occ-mini wide"><span style="width:${(x.revenue / maxRev * 100).toFixed(0)}%"></span></span>${formatCurrency(x.revenue)}</span></td>
+                    <td class="num">${x.perNight ? formatCurrency(x.perNight) : '–'}</td><td class="num">${formatCurrency(x.expenses)}</td>
+                    <td class="num ${x.result < 0 ? 'neg' : ''}">${formatCurrency(x.result)}</td><td class="num">${x.guests}${x.returning ? ` <small class="muted">(${x.returning} Stamm)</small>` : ''}</td></tr>`).join('') + '</tbody>'
+                : '<tbody><tr><td class="muted">Noch keine Daten.</td></tr></tbody>';
+        }
+    }
+    const histTable = $('#review-history-table');
+    if (histTable) histTable.addEventListener('click', e => {
+        const b = e.target.closest('[data-year]');
+        if (b && b.tagName === 'BUTTON') loadReview(parseInt(b.dataset.year, 10));
+    });
 
     function renderReviewMonths(r) {
         const canvas = $('#reviewMonthsChart');
@@ -2829,6 +2924,155 @@
 
     const reviewYearSel = $('#review-year');
     if (reviewYearSel) reviewYearSel.addEventListener('change', () => loadReview(parseInt(reviewYearSel.value, 10)));
+
+    // =======================
+    // Finanz-Auswertung
+    // =======================
+    const fin = { mode: 'year', year: new Date().getFullYear(), quarter: Math.floor(new Date().getMonth() / 3) + 1, month: new Date().getMonth() + 1, from: '', to: '', basis: 'invoice', orphans: true, loaded: false };
+    const pad2 = n => String(n).padStart(2, '0');
+    const lastDay = (y, m) => new Date(y, m, 0).getDate();
+
+    function finPeriod() {
+        const y = fin.year;
+        if (fin.mode === 'quarter') { const m0 = (fin.quarter - 1) * 3 + 1; return { from: `${y}-${pad2(m0)}-01`, to: `${y}-${pad2(m0 + 2)}-${lastDay(y, m0 + 2)}` }; }
+        if (fin.mode === 'month') return { from: `${y}-${pad2(fin.month)}-01`, to: `${y}-${pad2(fin.month)}-${lastDay(y, fin.month)}` };
+        if (fin.mode === 'custom' && fin.from && fin.to) return { from: fin.from, to: fin.to };
+        return { from: `${y}-01-01`, to: `${y}-12-31` };
+    }
+    function finQuery() {
+        const p = finPeriod();
+        return new URLSearchParams({ from: p.from, to: p.to, basis: fin.basis, orphans: fin.orphans ? '1' : '0' }).toString();
+    }
+
+    function syncFinControls() {
+        $$('#fin-mode button').forEach(b => b.classList.toggle('active', b.dataset.mode === fin.mode));
+        $('#fin-year').hidden = fin.mode === 'custom';
+        $('#fin-quarter').hidden = fin.mode !== 'quarter';
+        $('#fin-month').hidden = fin.mode !== 'month';
+        $('#fin-custom').hidden = fin.mode !== 'custom';
+        const q = finQuery();
+        $$('#view-finance .fin-dl').forEach(a => {
+            const base = a.dataset.href;
+            a.href = base + (base.includes('?') ? '&' : '?') + q;
+            a.setAttribute('download', '');
+        });
+    }
+
+    async function loadFinance() {
+        if (!viewFinance) return;
+        if (!fin.loaded) {
+            $('#fin-month').innerHTML = MONTHS_LONG.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+            fin.loaded = true;
+        }
+        $('#fin-quarter').value = fin.quarter;
+        $('#fin-month').value = fin.month;
+        if (fin.mode === 'custom' && !fin.from) { const p = { from: `${fin.year}-01-01`, to: `${fin.year}-12-31` }; fin.from = p.from; fin.to = p.to; }
+        $('#fin-from').value = fin.from;
+        $('#fin-to').value = fin.to;
+        syncFinControls();
+        try {
+            const d = await apiJson('/api/finance?' + finQuery());
+            if (!d.success) { showToast(d.error || 'Auswertung fehlgeschlagen', 'error'); return; }
+            const ys = d.years.includes(fin.year) ? d.years : [...d.years, fin.year].sort((a, b) => b - a);
+            $('#fin-year').innerHTML = ys.map(y => `<option value="${y}"${y === fin.year ? ' selected' : ''}>${y}</option>`).join('');
+            renderFinance(d.report);
+        } catch (e) {
+            showToast('Keine Verbindung zum Server', 'error');
+        }
+    }
+
+    function renderFinance(r) {
+        const t = r.totals;
+        const money = v => formatCurrency(v || 0);
+        $('#fin-label').textContent = `${r.label} · ${r.basis === 'payment' ? 'bezahlte Rechnungen nach Zahlungsdatum' : 'Rechnungen nach Rechnungsdatum'}`;
+        $('#fin-orphans-label').textContent = `Rechnungen gelöschter Gäste einbeziehen${r.orphanCount ? ` (${r.orphanCount})` : ''}`;
+        const tile = (label, value, sub, cls = '') => `<div class="card stat-card ${cls}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${sub ? `<div class="review-sub">${sub}</div>` : ''}</div>`;
+        $('#fin-kpis').innerHTML = [
+            tile('Einnahmen brutto', money(t.brutto), `${t.invoices} Rechnung${t.invoices === 1 ? '' : 'en'}`, 'stat-card-total'),
+            tile('Einnahmen netto', money(t.netto), `Umsatzsteuer ${money(t.ust)}`),
+            tile('Kurtaxe', money(t.kurtaxe), 'aus den Rechnungspositionen'),
+            tile('Ausgaben', money(t.expenses), `${t.expenseCount} Beleg${t.expenseCount === 1 ? '' : 'e'}`),
+            tile('Ergebnis', money(t.result), `netto ${money(t.resultNet)}`),
+            tile('Offen', money(t.open), t.open ? 'noch nicht bezahlt' : 'alles bezahlt')
+        ].join('');
+
+        const num = v => `<td class="num">${v}</td>`;
+        $('#fin-months').innerHTML = `<thead><tr><th>Monat</th><th class="num">Rechn.</th><th class="num">Netto</th><th class="num">USt</th><th class="num">Brutto</th><th class="num">Kurtaxe</th><th class="num">Offen</th><th class="num">Ausgaben</th><th class="num">Ergebnis</th></tr></thead><tbody>` +
+            r.months.map(m => `<tr class="${!m.count && !m.expenses ? 'muted' : ''}"><td>${m.label}</td>${num(m.count)}${num(money(m.netto))}${num(money(m.ust))}${num(money(m.brutto))}${num(m.kurtaxe ? money(m.kurtaxe) : '–')}${num(m.open ? money(m.open) : '–')}${num(money(m.expenses))}<td class="num ${m.result < 0 ? 'neg' : ''}">${money(m.result)}</td></tr>`).join('') +
+            `</tbody><tfoot><tr><td>Summe</td>${num(t.invoices)}${num(money(t.netto))}${num(money(t.ust))}${num(money(t.brutto))}${num(money(t.kurtaxe))}${num(money(t.open))}${num(money(t.expenses))}<td class="num ${t.result < 0 ? 'neg' : ''}">${money(t.result)}</td></tr></tfoot>`;
+
+        $('#fin-vat').innerHTML = r.vat.length ? `<thead><tr><th>Steuersatz</th><th class="num">Rechn.</th><th class="num">Netto</th><th class="num">USt</th><th class="num">Brutto</th></tr></thead><tbody>` +
+            r.vat.map(v => `<tr><td>${escapeHtml(v.label)}</td>${num(v.count)}${num(money(v.netto))}${num(money(v.ust))}${num(money(v.brutto))}</tr>`).join('') +
+            `</tbody><tfoot><tr><td>Summe</td>${num(t.invoices)}${num(money(t.netto))}${num(money(t.ust))}${num(money(t.brutto))}</tr></tfoot>`
+            : '<tbody><tr><td class="muted">Keine Rechnungen im Zeitraum.</td></tr></tbody>';
+        const kinds = [['Übernachtung', t.stay], ['Reinigung', t.cleaning], ['Kurtaxe', t.kurtaxe], ['Sonstiges', t.other]].filter(k => k[1]);
+        $('#fin-kinds').innerHTML = kinds.length ? '<tbody>' + kinds.map(([k, v]) => `<tr><td>${k}</td>${num(money(v))}</tr>`).join('') + '</tbody>' : '<tbody><tr><td class="muted">–</td></tr></tbody>';
+
+        $('#fin-categories').innerHTML = r.expenseCategories.length ? `<thead><tr><th>Kategorie</th><th class="num">Belege</th><th class="num">Betrag</th></tr></thead><tbody>` +
+            r.expenseCategories.map(c => `<tr><td>${escapeHtml(c.category)}</td>${num(c.count)}${num(money(c.amount))}</tr>`).join('') +
+            `</tbody><tfoot><tr><td>Summe</td>${num(t.expenseCount)}${num(money(t.expenses))}</tr></tfoot>`
+            : '<tbody><tr><td class="muted">Keine Ausgaben im Zeitraum.</td></tr></tbody>';
+
+        $('#fin-invoices').innerHTML = r.invoices.length ? `<thead><tr><th>Nr.</th><th>Datum</th><th>Gast</th><th>Aufenthalt</th><th>Kanal</th><th class="num">Netto</th><th class="num">USt</th><th class="num">Brutto</th><th>Bezahlt</th></tr></thead><tbody>` +
+            r.invoices.map(i => `<tr><td>${escapeHtml(i.number)}</td><td>${fmtDEfull(i.date)}</td><td>${escapeHtml(i.guest)}${i.note ? `<br><small class="muted">${escapeHtml(i.note)}</small>` : ''}</td>
+                <td>${i.arrival ? `${fmtDE(i.arrival)}–${fmtDEfull(i.departure)}` : '–'}${i.nights ? ` <small class="muted">(${i.nights} N.)</small>` : ''}</td><td>${escapeHtml(i.channel)}</td>
+                ${num(money(i.netto))}${num(money(i.ust))}${num(money(i.brutto))}<td>${i.paid === 'ja' ? `<span class="fin-paid">bezahlt</span>${i.paymentDate ? ` <small class="muted">${fmtDEfull(i.paymentDate)}</small>` : ''}` : '<span class="fin-open">offen</span>'}</td></tr>`).join('') + '</tbody>'
+            : '<tbody><tr><td class="muted">Keine Rechnungen im Zeitraum.</td></tr></tbody>';
+        $('#fin-stays-note').textContent = t.staysWithoutInvoice
+            ? `${t.staysWithoutInvoice} von ${t.stays} Aufenthalten im Zeitraum haben keine Rechnung hier (z. B. Booking.com/Airbnb, die über das Portal abrechnen). Sie stehen im Export im Blatt „Belegung“.`
+            : (t.stays ? `Alle ${t.stays} Aufenthalte im Zeitraum haben eine Rechnung.` : '');
+        $('#fin-pdfs').disabled = !t.invoices;
+    }
+
+    if (viewFinance) {
+        $('#fin-mode').addEventListener('click', e => {
+            const b = e.target.closest('button[data-mode]');
+            if (!b) return;
+            if (b.dataset.mode === 'custom' && !fin.from) { const p = finPeriod(); fin.from = p.from; fin.to = p.to; }
+            fin.mode = b.dataset.mode;
+            loadFinance();
+        });
+        $('#fin-year').addEventListener('change', e => { fin.year = parseInt(e.target.value, 10); loadFinance(); });
+        $('#fin-quarter').addEventListener('change', e => { fin.quarter = parseInt(e.target.value, 10); loadFinance(); });
+        $('#fin-month').addEventListener('change', e => { fin.month = parseInt(e.target.value, 10); loadFinance(); });
+        ['#fin-from', '#fin-to'].forEach(sel => $(sel).addEventListener('change', () => {
+            if ($('#fin-from').value && $('#fin-to').value) { fin.from = $('#fin-from').value; fin.to = $('#fin-to').value; loadFinance(); }
+        }));
+        $('#fin-basis').addEventListener('change', e => { fin.basis = e.target.value; loadFinance(); });
+        $('#fin-orphans').addEventListener('change', e => { fin.orphans = e.target.checked; loadFinance(); });
+
+        // Invoice PDFs: made on the server one by one, so show progress and errors instead of a blank download
+        $('#fin-pdfs').addEventListener('click', async () => {
+            const btn = $('#fin-pdfs');
+            const note = $('#fin-pdf-note');
+            btn.disabled = true;
+            const old = btn.textContent;
+            btn.textContent = 'PDFs werden erstellt …';
+            note.textContent = 'Das dauert ein paar Sekunden pro Rechnung. Bitte die Seite offen lassen.';
+            try {
+                const res = await fetch('/api/finance/invoices.zip?' + finQuery());
+                if (!res.ok) {
+                    let msg = 'PDF-Export fehlgeschlagen';
+                    try { msg = (await res.json()).error || msg; } catch (e) { /* not JSON */ }
+                    throw new Error(msg);
+                }
+                const blob = await res.blob();
+                const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || 'Rechnungen.zip';
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = name;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+                note.textContent = `Fertig: ${name}`;
+            } catch (e) {
+                note.textContent = '';
+                showToast(e.message, 'error');
+            } finally {
+                btn.textContent = old;
+                btn.disabled = false;
+            }
+        });
+    }
 
     // =======================
     // Expenses Module
@@ -4176,7 +4420,7 @@
 
         // Default to the calendar (Smoobu-style home); a tapped push notification opens /?view=bookings
         const startView = new URLSearchParams(location.search).get('view');
-        switchView(['bookings', 'expenses', 'invoice', 'dashboard'].includes(startView) ? startView : 'calendar');
+        switchView(['bookings', 'expenses', 'invoice', 'dashboard', 'occupancy', 'finance'].includes(startView) ? startView : 'calendar');
         if (startView) history.replaceState(null, '', '/');
 
         registerServiceWorker();
