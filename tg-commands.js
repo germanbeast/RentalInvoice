@@ -967,6 +967,9 @@ async function processMessage(bot, msg) {
         return send(bot, chatId, '⛔ <b>Zugriff verweigert</b>\n\nBitte sende <code>/register</code>, um eine Zugangsanfrage zu stellen.');
     }
 
+    // Reply to a guest-chat notice: goes to the guest by WhatsApp/SMS (see guest-chat.js)
+    if (msg.reply_to_message && hooks && hooks.guestChatReply && await hooks.guestChatReply(bot, msg)) return;
+
     const lower = body.toLowerCase();
     const session = getActiveSession(chatId);
 

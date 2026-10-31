@@ -5,6 +5,21 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.0] - 2026-10-31
+
+### Neu
+- Gäste-Chat „Nachrichten“ im Admin (`guest-chat.js`, Tabellen `guest_chat_contacts`, `guest_chat_messages`, `guest_chat_tg`): Gäste schreiben per WhatsApp an die gekoppelte Nummer, bisher wurden Nachrichten von Nicht-Admins ignoriert. Unterhaltungen links, Verlauf rechts, Antworten per WhatsApp oder SMS, Bilder, Sprachnachrichten und Standorte, Suche, „Ungelesen“, Löschen, Zähler in der Seitenleiste. Auf dem Handy eine Spalte mit Zurück-Knopf
+- Automatische Zuordnung zur Buchung: Buchungscode im Text (BH-XXXXXX, der Knopf auf „Meine Buchung“ schreibt ihn vor), sonst die Telefonnummer beim Gast, in der Anfrage oder im Meldeschein. Von Hand änderbar („Buchung zuordnen“). Eine über den Code erkannte Nummer wird beim Gast gespeichert
+- Vor der ersten WhatsApp an eine Nummer wird geprüft, ob es sie bei WhatsApp gibt (`getNumberId`). Ohne WhatsApp schaltet das Postfach auf SMS um, es wird nichts blind verschickt. Hinweis mit „Erneut prüfen“
+- „Nachricht“ im Kalender-Popup und in der Buchungsliste öffnet den Chat mit dem Gast; „Gästenachricht einfügen“ (Deutsch/Englisch) setzt den fertigen Text mit Link und Türcode ein
+- Neue Gastnachricht per Telegram (auf die Nachricht antworten schickt die Antwort an den Gast) und als Web-Push (`guest_chat`, öffnet `/?view=chat`). Nachrichten, die direkt auf dem WhatsApp-Handy geschrieben werden, erscheinen auch im Verlauf
+- SMS über ein Android-Handy mit der App „SMS Gateway for Android“ (sms-gate.app): Cloud- oder Local-Server, SIM-Wahl, Test-SMS, Einrichtung eingehender SMS per Webhook (`POST /gast/sms-hook/<geheim>`)
+- Webseite: schwebender WhatsApp-Knopf und WhatsApp-Link im Fußbereich; „Meine Buchung“: „Per WhatsApp schreiben“ im Kontakt, in der Gästemappe und im Menü
+- Einstellungen → „Gäste-Chat & SMS“ (Server-only-Einstellung `guest_chat`, Passwort maskiert). Verläufe und Bilder werden 13 Monate nach der letzten Nachricht gelöscht
+
+### Behoben
+- Zähler in der Seitenleiste zeigten „0“ statt zu verschwinden
+
 ## [1.31.1] - 2026-10-31
 
 ### Geändert
