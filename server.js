@@ -620,7 +620,11 @@ async function cleanupExpiredNukiCodes() {
     const now = Date.now();
     const todayYmd = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
     const rawState = settings.nuki_delete_requests;
-    const state = rawState && typeof rawState === 'object' ? { ...rawState } : {};
+    // Deep copy: the entries are changed in place (warned, lastTry, gone). With a shallow copy those changes
+    // also landed in rawState, the comparison below saw no difference and nothing was saved - so the
+    // "stuck" warning was sent again every hour.
+    const savedJson = JSON.stringify(rawState && typeof rawState === 'object' ? rawState : {});
+    const state = JSON.parse(savedJson);
     const deleted = [];
     const stuck = [];
     let failed = 0;
@@ -705,7 +709,7 @@ async function cleanupExpiredNukiCodes() {
         }
     }
 
-    if (JSON.stringify(state) !== JSON.stringify(rawState || {})) db.setSetting('nuki_delete_requests', state);
+    if (JSON.stringify(state) !== savedJson) db.setSetting('nuki_delete_requests', state);
     return { deleted, stuck, failed, confirmed };
 }
 

@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.26.0",
+    "currentVersion": "1.26.1",
     "releases": [
+        {
+            "version": "1.26.1",
+            "date": "2026-10-31",
+            "title": "Keine stündliche Türcode-Warnung mehr",
+            "features": [],
+            "fixes": [
+                "„Türcode nach 24 Stunden noch im Schloss“ kam jede Stunde erneut, weil sich das System nicht merken konnte, dass schon gewarnt wurde. Jetzt kommt die Warnung pro Code nur einmal; das Löschen wird still alle 6 Stunden wiederholt"
+            ]
+        },
         {
             "version": "1.26.0",
             "date": "2026-10-30",
