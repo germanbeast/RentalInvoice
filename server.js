@@ -1378,7 +1378,8 @@ function loadBookingRows() {
             checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout),
             hasCode: !!(r.nuki_auth_id || r.nuki_pin), pin: r.nuki_pin || null,
             arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state,
-            guestCode: r.guest_code || null
+            guestCode: r.guest_code || null,
+            manualEntry: String(r.uid).startsWith('direct-manual-')
         };
     });
 }
@@ -1443,6 +1444,96 @@ app.get('/api/calendar', apiLimiter, (req, res) => {
     } catch (e) {
         console.error('Calendar API Error:', e.message);
         res.status(500).json({ success: false, error: 'Kalender konnte nicht geladen werden' });
+    }
+});
+
+// Manually entered booking ("Buchung eintragen" in the admin top bar): stored as a direct booking,
+// so it blocks the portals via the exported calendar and the guest gets a booking code
+app.post('/api/bookings', apiLimiter, async (req, res) => {
+    try {
+        const b = req.body || {};
+        const name = String(b.name || '').trim();
+        const email = String(b.email || '').trim().toLowerCase();
+        const phone = String(b.phone || '').trim().substring(0, 40);
+        const checkin = String(b.checkin || '');
+        const checkout = String(b.checkout || '');
+        const ymd = /^\d{4}-\d{2}-\d{2}$/;
+        if (name.length < 2 || name.length > 80) return res.status(400).json({ success: false, error: 'Bitte einen Namen angeben (2–80 Zeichen).' });
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ success: false, error: 'Die E-Mail-Adresse sieht nicht gültig aus.' });
+        if (!ymd.test(checkin) || !ymd.test(checkout) || checkout <= checkin) return res.status(400).json({ success: false, error: 'Bitte gültige An- und Abreise angeben.' });
+        const clash = db.getDb().prepare('SELECT checkin, checkout, source FROM bookings WHERE checkin IS NOT NULL AND checkout IS NOT NULL AND checkin < ? AND checkout > ? LIMIT 1').get(checkout, checkin);
+        if (clash && !b.force) {
+            return res.status(409).json({ success: false, conflict: true, error: `Zeitraum überschneidet sich mit ${clash.source || 'einer Buchung'} ${formatDateDE(clash.checkin)} – ${formatDateDE(clash.checkout)}.` });
+        }
+
+        const guest = db.findOrCreateGuest(name, email || null, null);
+        if (phone && !guest.phone) db.updateGuest(guest.id, { ...guest, phone });
+        const note = String(b.note || '').trim().substring(0, 1000);
+        const ins = db.getDb().prepare(`
+            INSERT INTO bookings (uid, summary, checkin, checkout, description, source, guest_id)
+            VALUES (?, ?, ?, ?, ?, 'Direkt', ?)
+        `).run(`direct-manual-${Date.now()}`, `Direkt: ${name}`, checkin, checkout, note || 'Im Admin eingetragen', guest.id);
+        const bookingId = Number(ins.lastInsertRowid);
+
+        let pin = null, pinError = null;
+        if (b.createPin) {
+            try {
+                const n = await createNukiPin(checkin, checkout, name);
+                if (n && n.success) { db.updateBookingNukiData(bookingId, n.pin, n.authId); pin = n.pin; }
+            } catch (e) { pinError = e.message; }
+        }
+        res.json({ success: true, bookingId, pin, pinError });
+    } catch (e) {
+        console.error('Manual booking Error:', e.message);
+        res.status(500).json({ success: false, error: 'Buchung konnte nicht gespeichert werden' });
+    }
+});
+
+// Only bookings entered by hand in the admin can be removed here; portal bookings come from the iCal feeds
+app.delete('/api/bookings/:id', apiLimiter, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const row = db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+        if (!row) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+        if (!String(row.uid).startsWith('direct-manual-')) return res.status(400).json({ success: false, error: 'Nur selbst eingetragene Buchungen können hier gelöscht werden.' });
+        if (row.nuki_auth_id) {
+            try { await deleteNukiPin(row.nuki_auth_id); } catch (e) { console.warn('Nuki PIN Löschen fehlgeschlagen:', e.message); }
+        }
+        db.getDb().prepare('DELETE FROM bookings WHERE id = ?').run(id);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Booking delete Error:', e.message);
+        res.status(500).json({ success: false, error: 'Buchung konnte nicht gelöscht werden' });
+    }
+});
+
+// Activity feed for the calendar home: new bookings, website requests, invoices, arrivals
+app.get('/api/activity', apiLimiter, (req, res) => {
+    try {
+        const sqlTs = s => s ? (String(s).includes('T') ? String(s) : String(s).replace(' ', 'T') + 'Z') : null;
+        const byId = new Map(loadBookingRows().map(r => [r.id, r]));
+        const items = [];
+        db.getDb().prepare('SELECT id, uid, created_at, arrived_at FROM bookings WHERE checkin IS NOT NULL ORDER BY created_at DESC LIMIT 40').all().forEach(r => {
+            const b = byId.get(r.id);
+            if (!b) return;
+            const base = { bookingId: b.id, name: b.name, source: b.source, checkin: b.checkin, checkout: b.checkout, nights: b.nights };
+            items.push({ type: String(r.uid).startsWith('direct-manual-') ? 'manual' : 'booking', at: sqlTs(r.created_at), ...base });
+        });
+        db.getDb().prepare('SELECT id, arrived_at FROM bookings WHERE arrived_at IS NOT NULL ORDER BY arrived_at DESC LIMIT 15').all().forEach(r => {
+            const b = byId.get(r.id);
+            if (b) items.push({ type: 'arrival', at: sqlTs(r.arrived_at), bookingId: b.id, name: b.name, source: b.source, checkin: b.checkin, checkout: b.checkout, nights: b.nights });
+        });
+        db.getDb().prepare('SELECT id, name, checkin, checkout, price_total, status, created_at FROM booking_requests ORDER BY created_at DESC LIMIT 15').all().forEach(r => {
+            items.push({ type: 'request', at: sqlTs(r.created_at), name: r.name, source: 'Direkt', checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout), amount: r.price_total || 0, status: r.status });
+        });
+        db.getDb().prepare('SELECT invoice_number, guest_name, arrival, departure, total_amount, is_paid, created_at FROM invoices ORDER BY created_at DESC LIMIT 15').all().forEach(r => {
+            items.push({ type: 'invoice', at: sqlTs(r.created_at), name: r.guest_name || '', number: r.invoice_number, checkin: r.arrival, checkout: r.departure, amount: r.total_amount || 0, paid: !!r.is_paid });
+        });
+        items.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+        res.json({ success: true, items: items.slice(0, 25) });
+    } catch (e) {
+        console.error('Activity API Error:', e.message);
+        res.status(500).json({ success: false, error: 'Aktivitäten konnten nicht geladen werden' });
     }
 });
 

@@ -8,7 +8,7 @@
         content="Rechnungsgenerator für Ferienwohnungen – Rechnungen erstellen, drucken und an Paperless NGX exportieren.">
     <title>Invoice Beckhome</title>
     <link rel="manifest" href="/manifest.webmanifest">
-    <meta name="theme-color" content="#f5f0e8">
+    <meta name="theme-color" content="#ffffff">
     <meta name="color-scheme" content="light">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=4.1">
+    <link rel="stylesheet" href="styles.css?v=5.0">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 </head>
 
@@ -80,129 +80,152 @@
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo">
-                    <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-                        <rect x="2" y="4" width="28" height="24" rx="3" stroke="currentColor" stroke-width="2" />
-                        <path d="M8 12h16M8 17h12M8 22h8" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" />
-                        <circle cx="24" cy="22" r="1.5" fill="currentColor" />
-                    </svg>
-                    <span>Beckhome<small>Invoice</small></span>
+                    <span class="brand-mark" aria-hidden="true">B</span>
+                    <span class="brand-name">Beckhome</span>
                 </div>
             </div>
             <div class="sidebar-nav">
-                <button class="sidebar-item" id="nav-dashboard" title="Dashboard">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <line x1="3" y1="9" x2="21" y2="9" />
-                        <line x1="9" y1="21" x2="9" y2="9" />
-                    </svg>
-                    <span>Dashboard</span>
+                <button class="sidebar-item" id="nav-dashboard" title="Start">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+                    <span>Start</span>
+                </button>
+                <button class="sidebar-item" id="nav-calendar" title="Kalender">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/></svg>
+                    <span>Kalender</span>
                 </button>
                 <button class="sidebar-item" id="nav-bookings" title="Buchungen">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                        <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" />
-                        <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
                     <span>Buchungen</span>
                 </button>
-                <button class="sidebar-item" id="nav-website" title="Gäste-Webseite">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="2" y1="12" x2="22" y2="12" />
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                    </svg>
-                    <span>Webseite <i class="nav-badge" id="website-badge" hidden></i></span>
+                <button class="sidebar-item" id="nav-invoice" title="Rechnungen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h9l4 4V21l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21V3.5a1 1 0 0 1 1-1z"/><path d="M9 9h6M9 13h6"/></svg>
+                    <span>Rechnungen</span>
                 </button>
-                <button class="sidebar-item active" id="nav-invoice" title="Neue Rechnung">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <path d="M4 3h8l4 4v10a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor"
-                            stroke-width="1.5" />
-                        <path d="M12 3v4h4M7 10h6M7 13h4" stroke="currentColor" stroke-width="1.5"
-                            stroke-linecap="round" />
-                    </svg>
-                    <span>Neue Rechnung</span>
-                </button>
-                <button class="sidebar-item" id="nav-guests" title="Gäste-Verwaltung">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <circle cx="7" cy="7" r="3" stroke="currentColor" stroke-width="1.5" />
-                        <path d="M1 17c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.5"
-                            stroke-linecap="round" />
-                        <circle cx="14" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5" />
-                        <path d="M15 11c2.2 0 4 1.8 4 4" stroke="currentColor" stroke-width="1.5"
-                            stroke-linecap="round" />
-                    </svg>
+                <button class="sidebar-item" id="nav-guests" title="Gäste">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.2 3.2 0 0 1 0 6.4M18 13.8c2.1.7 3.5 2.9 3.5 5.2"/></svg>
                     <span>Gäste</span>
                 </button>
-                <button class="sidebar-item" id="nav-expenses" title="Ausgaben">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="1" x2="12" y2="23" />
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                    </svg>
-                    <span>Ausgaben</span>
+                <button class="sidebar-item" id="nav-website" title="Webseite &amp; Anfragen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.6L3 21l1.4-5.6A8.5 8.5 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 14h4.5"/></svg>
+                    <span>Anfragen</span><i class="nav-badge" id="website-badge" hidden></i>
                 </button>
-                <button class="sidebar-item" id="nav-estate" title="Erbverwaltung">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                    <span>Erbverwaltung</span>
-                </button>
-                <button class="sidebar-item" id="nav-welcome" title="TV Welcome Screen">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/>
-                        <polyline points="17 2 12 7 7 2"/>
-                    </svg>
-                    <span>TV Welcome</span>
-                </button>
-                <button class="sidebar-item" id="btn-settings" title="Einstellungen">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.5" />
-                        <path
-                            d="M17.73 12.02l-1.09-.63a6.07 6.07 0 000-2.78l1.09-.63a.5.5 0 00.18-.68l-1-1.73a.5.5 0 00-.68-.18l-1.09.63a6.07 6.07 0 00-2.4-1.39V3.5a.5.5 0 00-.5-.5h-2a.5.5 0 00-.5.5v1.26a6.07 6.07 0 00-2.4 1.39l-1.09-.63a.5.5 0 00-.68.18l-1 1.73a.5.5 0 00.18.68l1.09.63a6.07 6.07 0 000 2.78l-1.09.63a.5.5 0 00-.18.68l1 1.73a.5.5 0 00.68.18l1.09-.63c.71.6 1.52 1.05 2.4 1.39v1.26a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-1.26a6.07 6.07 0 002.4-1.39l1.09.63a.5.5 0 00.68-.18l1-1.73a.5.5 0 00-.18-.68z"
-                            stroke="currentColor" stroke-width="1.5" />
-                    </svg>
-                    <span>Einstellungen</span>
-                </button>
+
+                <div class="nav-sep"></div>
+
+                <div class="nav-group" data-group="finance">
+                    <button type="button" class="nav-group-toggle" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 16V10M10 16V6M15 16v-4M20 16V8"/></svg>
+                        <span>Finanzen</span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <div class="nav-group-items">
+                        <button class="sidebar-item" id="nav-expenses" title="Ausgaben"><span>Ausgaben</span></button>
+                        <button class="sidebar-item" id="nav-estate" title="Erbverwaltung"><span>Erbverwaltung</span></button>
+                    </div>
+                </div>
+                <div class="nav-group" data-group="config">
+                    <button type="button" class="nav-group-toggle" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+                        <span>Konfiguration</span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <div class="nav-group-items">
+                        <button class="sidebar-item" id="btn-settings" title="Einstellungen"><span>Einstellungen</span></button>
+                        <button class="sidebar-item" id="nav-welcome" title="TV Welcome Screen"><span>TV Welcome</span></button>
+                    </div>
+                </div>
             </div>
             <div class="sidebar-footer">
                 <button class="sidebar-item" id="btn-logout" title="Abmelden">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                        <polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                        <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
                     <span>Abmelden</span>
+                </button>
+                <button type="button" class="nav-collapse" id="btn-nav-collapse" title="Seitenleiste ein-/ausklappen" aria-label="Seitenleiste ein-/ausklappen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
                 </button>
             </div>
         </nav>
 
-        <!-- MOBILE HEADER -->
-        <header class="mobile-header" id="mobile-header">
-            <button class="hamburger" id="btn-hamburger" title="Menü">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                </svg>
-            </button>
-            <span class="mobile-title">Beckhome</span>
-        </header>
-
         <!-- MAIN CONTENT -->
         <main class="content-area">
+            <!-- TOP BAR -->
+            <header class="topbar" id="topbar">
+                <button class="hamburger" id="btn-hamburger" title="Menü" aria-label="Menü">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                </button>
+                <button type="button" class="topbar-cta" id="btn-new-booking">Buchung eintragen</button>
+                <label class="topbar-search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <input type="search" id="topbar-search" placeholder="Gast oder Zeitraum suchen" autocomplete="off">
+                </label>
+                <div class="topbar-right">
+                    <span class="topbar-lang">DE</span>
+                    <span class="topbar-sep"></span>
+                    <svg class="topbar-user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+                    <span class="topbar-user" id="topbar-user"></span>
+                </div>
+            </header>
+
+            <!-- VIEW: KALENDER (Startseite) -->
+            <div id="view-calendar" class="content-view" style="display:none;">
+                <div class="content-header">
+                    <div class="content-breadcrumb"><h2>Kalender</h2></div>
+                    <div class="content-actions">
+                        <span class="cal-sync" id="cal-sync"></span>
+                        <button type="button" class="pill" id="cal-sync-btn">Kalender abfragen</button>
+                    </div>
+                </div>
+                <div class="cal-toolbar">
+                    <div class="cal-month">
+                        <button type="button" class="pill pill-icon" id="tl-prev" aria-label="Zurück">‹</button>
+                        <label class="pill cal-month-pick">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
+                            <span id="tl-label"></span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+                            <input type="month" id="tl-month" aria-label="Monat wählen">
+                        </label>
+                        <button type="button" class="pill pill-icon" id="tl-next" aria-label="Weiter">›</button>
+                    </div>
+                    <button type="button" class="pill" id="tl-today">Heute</button>
+                    <div class="tl-legend">
+                        <span><i class="pf pf-booking">B</i>Booking.com</span>
+                        <span><i class="pf pf-airbnb">A</i>Airbnb</span>
+                        <span><i class="pf pf-direct">D</i>Direkt</span>
+                        <span><i class="pf pf-manual">M</i>Manuell</span>
+                        <span><i class="pf pf-request">?</i>Anfrage</span>
+                    </div>
+                    <span class="tl-rate" id="tl-rate"></span>
+                </div>
+                <div class="cal-alerts" id="cal-alerts"></div>
+                <div class="tl" id="tl">
+                    <div class="tl-side" id="tl-side"></div>
+                    <div class="tl-scroll" id="tl-scroll"><div class="tl-inner" id="tl-inner"></div></div>
+                </div>
+                <div class="cal-panels">
+                    <section class="panel" data-panel="upcoming">
+                        <header class="panel-head">
+                            <h3>Bevorstehende Buchungen</h3>
+                            <button type="button" class="panel-toggle" aria-label="Ein-/ausklappen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg></button>
+                        </header>
+                        <div class="panel-body" id="cal-upcoming"></div>
+                    </section>
+                    <section class="panel" data-panel="activity">
+                        <header class="panel-head">
+                            <h3>Aktivitätsfeed</h3>
+                            <button type="button" class="panel-toggle" aria-label="Ein-/ausklappen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg></button>
+                        </header>
+                        <div class="panel-body" id="cal-activity"></div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Buchungs-Details (Klick auf einen Balken) -->
+            <div class="tl-pop" id="tl-pop" hidden></div>
             <!-- VIEW: DASHBOARD -->
             <div id="view-dashboard" class="content-view" style="display:none;">
                 <div class="content-header">
                     <div class="content-breadcrumb">
-                        <h2>Dashboard & Statistiken</h2>
+                        <h2>Start</h2>
                     </div>
                 </div>
                 <section class="today-section" id="today-section">
@@ -356,6 +379,7 @@
                         <button type="button" data-filter="upcoming" class="active">Aktuell &amp; kommend</button>
                         <button type="button" data-filter="noname">Ohne Namen</button>
                         <button type="button" data-filter="past">Vergangene</button>
+                        <button type="button" data-filter="all">Alle</button>
                     </div>
                     <input type="search" id="bookings-search" placeholder="Suchen (Name, Datum, Portal)">
                 </div>
@@ -2095,6 +2119,43 @@
 
 
         <!-- GÄSTE MODAL -->
+        <div class="modal-overlay" id="modal-new-booking" style="display:none;">
+            <div class="modal nb-modal" role="dialog" aria-labelledby="nb-title">
+                <div class="modal-header">
+                    <h3 id="nb-title">Buchung eintragen</h3>
+                    <button type="button" id="btn-close-new-booking" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                    </button>
+                </div>
+                <form class="modal-body nb-form" id="nb-form" novalidate>
+                    <p class="nb-hint">Für Buchungen per Telefon, E-Mail oder Stammgäste. Der Zeitraum wird als Direktbuchung gespeichert und über den Kalender-Export bei Booking.com und Airbnb blockiert.</p>
+                    <div class="form-group">
+                        <label for="nb-name">Gast</label>
+                        <input type="text" id="nb-name" maxlength="80" placeholder="Vor- und Nachname" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="nb-checkin">Anreise</label><input type="date" id="nb-checkin" required></div>
+                        <div class="form-group"><label for="nb-checkout">Abreise</label><input type="date" id="nb-checkout" required></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="nb-email">E-Mail <small>(optional)</small></label><input type="email" id="nb-email" placeholder="gast@beispiel.de"></div>
+                        <div class="form-group"><label for="nb-phone">Telefon <small>(optional)</small></label><input type="tel" id="nb-phone"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="nb-note">Notiz <small>(optional)</small></label>
+                        <input type="text" id="nb-note" maxlength="300" placeholder="z. B. Preis, Absprachen">
+                    </div>
+                    <label class="nb-check"><input type="checkbox" id="nb-pin" checked> Türcode (Nuki) für den Zeitraum anlegen</label>
+                    <div class="nb-msg" id="nb-msg" hidden></div>
+                    <div class="nb-actions">
+                        <span class="nb-nights" id="nb-nights"></span>
+                        <button type="button" class="btn btn-outline" id="btn-cancel-new-booking">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-new-booking">Buchung speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div class="modal-overlay" id="modal-guests" style="display:none;">
             <div class="modal modal-wide">
                 <div class="modal-header">
@@ -2219,7 +2280,7 @@
     <!-- TOAST -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script defer src="app.js?v=3.6"></script>
+    <script defer src="app.js?v=3.7"></script>
 </body>
 
 </html>
