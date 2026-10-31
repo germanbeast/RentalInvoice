@@ -16,8 +16,6 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Einstellung „Online-Meldeschein“ (Webseite → Einrichtung), Telegram-Nachricht bei neuem oder geändertem Meldeschein, Hinweis in der Gästenachricht
 - Automatische Löschung 13 Monate nach Abreise (Aufbewahrung 1 Jahr nach § 30 Abs. 4 BMG)
 
-## [1.30.0] - 2026-10-31
-
 ## [1.30.1] - 2026-10-31
 
 ### Behoben
