@@ -5,6 +5,18 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] - 2026-10-31
+
+### Neu
+- „Türcode bearbeiten“ im Buchungsfenster des Kalenders: Name im Schloss sowie gültig ab/bis direkt im Nuki-Schloss ändern, die Ziffern bleiben gleich. Ist kein Code (mehr) da, wird einer angelegt. Bei selbst eingetragenen Buchungen wahlweise auch den Buchungszeitraum ändern. Endpunkte `GET/PUT /api/bookings/:id/nuki`
+- Gast in der Gästeliste umbenannt → Türcodes seiner laufenden und kommenden Buchungen werden umbenannt
+
+### Behoben
+- Bei geänderter An-/Abreise wurde ein neuer Türcode angelegt und der alte blieb im Schloss. Jetzt wird der vorhandene Code der Buchung (per gespeicherter ID oder per PIN gefunden) auf den neuen Zeitraum verschoben: beim Kalender-Abgleich, bei „Keypad-PIN generieren“ in der Rechnung, im Telegram/WhatsApp-Ablauf, bei „Verlängern“ und „PIN erstellen“ in der Gästeliste
+- Name des Türcodes änderte sich nicht, wenn beim Anlegen die Nuki-ID nicht gespeichert werden konnte. Der Code wird jetzt über die PIN gefunden und die ID nachgetragen
+- Stündlicher Abgleich benennt Codes wie „Gast: Booking 12.03.“ / „Gast: Airbnb …“ nach dem eingetragenen Gastnamen um. Von Hand vergebene Namen bleiben unverändert
+- Abgelaufene Codes einer Buchung werden auch dann gelöscht, wenn sie von Hand umbenannt wurden
+
 ## [1.28.0] - 2026-10-31
 
 ### Neu

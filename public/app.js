@@ -1955,6 +1955,7 @@
             <div class="pop-actions">
                 <button type="button" class="pill" data-pop="name">${bk.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
                 <button type="button" class="pill" data-pop="invoice">Rechnung erstellen</button>
+                ${bk.state !== 'past' ? `<button type="button" class="pill" data-pop="doorcode">${bk.hasCode ? 'Türcode bearbeiten' : 'Türcode anlegen'}</button>` : ''}
                 ${bk.state !== 'past' && bk.guestCode ? '<button type="button" class="pill" data-pop="guestlink">Gastlink kopieren</button>' : ''}
                 ${bk.manualEntry ? '<button type="button" class="pill pill-danger" data-pop="delete">Löschen</button>' : ''}
             </div>`;
@@ -2020,6 +2021,7 @@
             if (!bk) return hideTlPop();
             if (act === 'invoice') { hideTlPop(); return invoiceFromBooking(bk); }
             if (act === 'guestlink') return copyGuestMessage(bk);
+            if (act === 'doorcode') { hideTlPop(); return openDoorCode(bk); }
             if (act === 'delete') {
                 if (!confirm(`Buchung von ${bk.name || 'diesem Gast'} (${fmtDEfull(bk.checkin)} – ${fmtDEfull(bk.checkout)}) löschen?${bk.hasCode ? ' Der Türcode wird ebenfalls gelöscht.' : ''}`)) return;
                 const d = await apiJson(`/api/bookings/${bk.id}`, { method: 'DELETE' }).catch(() => null);
@@ -2130,6 +2132,81 @@
                     msg.hidden = false;
                     msg.textContent = d.error || 'Speichern fehlgeschlagen';
                     if (d.conflict) { nbForce = true; btn.textContent = 'Trotzdem speichern'; }
+                }
+            } catch (err) {
+                msg.hidden = false;
+                msg.textContent = 'Keine Verbindung zum Server.';
+            }
+            btn.disabled = false;
+        });
+    }
+
+    // ---- Türcode einer Buchung bearbeiten (Name + Gültigkeit direkt im Nuki-Schloss)
+    const modalDoorCode = $('#modal-door-code');
+    let dcBooking = null, dcCreate = false;
+    const closeDoorCode = () => { if (modalDoorCode) modalDoorCode.style.display = 'none'; };
+    async function openDoorCode(bk) {
+        if (!modalDoorCode) return;
+        dcBooking = bk;
+        const msg = $('#dc-msg');
+        msg.hidden = true;
+        $('#dc-pin').textContent = 'Lade Türcode aus dem Nuki-Schloss …';
+        $('#dc-name').value = '';
+        $('#dc-from').value = bk.checkin;
+        $('#dc-until').value = bk.checkout;
+        $('#btn-save-door-code').disabled = true;
+        $('#btn-save-door-code').textContent = 'Speichern';
+        modalDoorCode.style.display = 'flex';
+        const d = await apiJson(`/api/bookings/${bk.id}/nuki`).catch(e => ({ success: false, error: e.message }));
+        if (!d || !d.success) {
+            $('#dc-pin').textContent = '';
+            msg.hidden = false;
+            msg.textContent = (d && d.error) || 'Türcode konnte nicht geladen werden.';
+            return;
+        }
+        dcCreate = !d.hasCode;
+        $('#dc-title').textContent = dcCreate ? 'Türcode anlegen' : 'Türcode bearbeiten';
+        $('#dc-hint').textContent = dcCreate
+            ? (d.lost ? `Der bisherige Code ${d.pin || ''} ist nicht mehr im Schloss. Es wird ein neuer Code angelegt.` : 'Für diese Buchung gibt es noch keinen Türcode. Es wird ein neuer Code angelegt.')
+            : 'Der vorhandene Code wird direkt im Nuki-Schloss geändert. Die Ziffern bleiben gleich, es entsteht kein zweiter Code.';
+        $('#dc-pin').innerHTML = d.hasCode ? `Code: <code>${escapeHtml(d.pin)}</code>${d.enabled === false ? ' · <span class="bad">deaktiviert</span>' : ''}` : '';
+        $('#dc-name').value = d.hasCode ? (d.name || d.suggestedName) : d.suggestedName;
+        $('#dc-from').value = (d.hasCode && d.from) || d.checkin;
+        $('#dc-until').value = (d.hasCode && d.until) || d.checkout;
+        $('#dc-also-wrap').hidden = !d.editableBooking;
+        $('#dc-also').checked = true;
+        $('#btn-save-door-code').disabled = false;
+        setTimeout(() => $('#dc-name').focus(), 50);
+    }
+    if (modalDoorCode) {
+        $('#btn-close-door-code').addEventListener('click', closeDoorCode);
+        $('#btn-cancel-door-code').addEventListener('click', closeDoorCode);
+        modalDoorCode.addEventListener('click', e => { if (e.target === modalDoorCode) closeDoorCode(); });
+        $('#dc-from').addEventListener('change', () => {
+            if ($('#dc-until').value <= $('#dc-from').value) $('#dc-until').value = ymdAdd($('#dc-from').value, 1);
+        });
+        $('#dc-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            if (!dcBooking) return;
+            const msg = $('#dc-msg');
+            const btn = $('#btn-save-door-code');
+            const body = {
+                name: $('#dc-name').value.trim(), from: $('#dc-from').value, until: $('#dc-until').value,
+                alsoBooking: !$('#dc-also-wrap').hidden && $('#dc-also').checked, createIfMissing: dcCreate
+            };
+            btn.disabled = true;
+            msg.hidden = true;
+            try {
+                const res = await fetch(`/api/bookings/${dcBooking.id}/nuki`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                const d = await res.json();
+                if (d.success) {
+                    closeDoorCode();
+                    showToast(d.created ? `Türcode ${d.pin} angelegt` : `Türcode ${d.pin} geändert`, 'success', 5000);
+                    if (currentView === 'calendar') loadCalendarHome();
+                } else {
+                    msg.hidden = false;
+                    msg.textContent = d.error || 'Speichern fehlgeschlagen';
+                    if (d.missing) { dcCreate = true; btn.textContent = 'Neuen Code anlegen'; }
                 }
             } catch (err) {
                 msg.hidden = false;
@@ -3427,7 +3504,7 @@
             if (data.success) {
                 $('#nuki-pin-result').style.display = 'block';
                 $('#nuki-pin-code').textContent = data.pin;
-                showToast('Keypad-PIN erfolgreich generiert! 🔑', 'success');
+                showToast(data.updated ? 'Vorhandenen Türcode auf den Zeitraum angepasst 🔑' : 'Keypad-PIN erfolgreich generiert! 🔑', 'success');
                 updatePreview();
                 scheduleDraftSave();
             } else {
