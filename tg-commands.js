@@ -158,6 +158,7 @@ async function showHelp(bot, chatId) {
         '• <code>/nachricht</code> – fertige Nachricht für den Gast (zum Kopieren)\n' +
         '• <code>/schloss</code> – Schloss-Status und Batterie\n' +
         '• <code>/zu</code> – Tür abschließen\n' +
+        '• <code>/jahr</code> – Jahresrückblick (z. B. <code>/jahr 2025</code>)\n' +
         '• <code>/auf</code> – Tür aufschließen/öffnen (mit Rückfrage)\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
@@ -384,6 +385,7 @@ async function showLockStatus(bot, chatId, intro) {
     if (lock.batteryCritical) battery = `🪫 ${battery} – bitte tauschen`;
     if (lock.batteryCharging) battery += ' (lädt)';
     let text = (intro ? `${intro}\n\n` : '') +
+        (lock.offline ? '📡 <b>Schloss ist offline</b> – angezeigt wird der letzte bekannte Stand\n' : '') +
         `<b>${icon} Schloss: ${esc(lock.lockText)}</b>\n` +
         (lock.doorText ? `🚪 ${esc(lock.doorText)}\n` : '') +
         `Batterie: ${esc(battery)}\n`;
@@ -391,6 +393,17 @@ async function showLockStatus(bot, chatId, intro) {
     if (lock.doorsensorBatteryCritical) text += '🪫 Türsensor-Batterie fast leer\n';
     text += `Gast im Haus: ${hooks.isOccupied && hooks.isOccupied() ? 'ja' : 'nein'}`;
     return send(bot, chatId, text, lockKeyboard());
+}
+
+async function showYearReview(bot, chatId, year) {
+    if (!hooks.yearText) return send(bot, chatId, 'Jahresrückblick ist gerade nicht verfügbar.', menuOnlyKeyboard());
+    const now = new Date();
+    const y = year || (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+    try {
+        return send(bot, chatId, hooks.yearText(y), menuOnlyKeyboard());
+    } catch (e) {
+        return send(bot, chatId, `❌ Jahresrückblick nicht möglich: ${esc(e.message)}`, menuOnlyKeyboard());
+    }
 }
 
 async function confirmUnlock(bot, chatId) {
@@ -981,6 +994,13 @@ async function processMessage(bot, msg) {
         return showLockStatus(bot, chatId);
     }
 
+    // Jahresrückblick: /jahr oder /jahr 2025 (ohne Jahr: laufendes Jahr, im Januar das Vorjahr)
+    const yearCmd = body.match(/^\/(jahr|rueckblick|rückblick)(?:@\w+)?(?:\s+(\d{4}))?$/i);
+    if (yearCmd) {
+        if (active) await cancelSession(bot, chatId, active, true);
+        return showYearReview(bot, chatId, yearCmd[2] ? parseInt(yearCmd[2], 10) : null);
+    }
+
     let cmd = detectCommand(body);
     // Im laufenden Dialog gelten nur echte Slash-Befehle als Befehle - sonst könnte eine Antwort
     // wie "Status Quo" als Name versehentlich einen Befehl auslösen.
@@ -1169,6 +1189,11 @@ async function processCallback(bot, q) {
                 return blockGuestLink(bot, chatId, parseInt(data.slice(7), 10));
             case data.startsWith('nm:'):
                 return startNameFlow(bot, chatId, parseInt(data.slice(3), 10));
+            case data.startsWith('ovl:'): {
+                const n = hooks.ackOverlap ? hooks.ackOverlap(data.slice(4)) : 0;
+                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+                return send(bot, chatId, n ? '✅ Erledigt. Zu dieser Überschneidung kommt keine Erinnerung mehr.' : 'Diese Überschneidung besteht nicht mehr.');
+            }
             case data.startsWith('inv:'):
                 return startInvoiceFromBooking(bot, chatId, parseInt(data.slice(4), 10));
             case data === 'new:invoice':
@@ -1244,6 +1269,7 @@ async function setup(bot, options = {}) {
             { command: 'nachricht', description: 'Fertige Nachricht für den Gast' },
             { command: 'schloss', description: 'Schloss-Status und Batterie' },
             { command: 'zu', description: 'Tür abschließen' },
+            { command: 'jahr', description: 'Jahresrückblick mit Statistik' },
             { command: 'auf', description: 'Tür aufschließen (mit Rückfrage)' },
             { command: 'abbrechen', description: 'Aktuellen Vorgang abbrechen' },
             { command: 'hilfe', description: 'Hilfe anzeigen' }

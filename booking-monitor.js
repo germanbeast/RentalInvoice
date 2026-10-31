@@ -1,12 +1,15 @@
 /**
  * Booking monitor
  *
- *  1. checkOverlaps()      - warns when a Booking.com and an Airbnb stay overlap (possible double booking)
+ *  1. checkOverlaps()      - warns when stays from different channels (Booking.com, Airbnb, direct) overlap
+ *                            (possible double booking) or a new stay blocks an open website request;
+ *                            remindOverlaps() repeats it daily until resolved or marked "in order"
  *  2. processMissing()     - detects cancellations: a future booking that disappeared from its calendar feed
  *                            for several consecutive successful polls -> delete the door code, remove the
  *                            booking, notify. Guarded against empty/broken feeds.
  *  3. checkArrivals()      - reports the first use of a guest's keypad code (Nuki activity log)
- *  4. checkLock()          - battery warnings (lock, keypad, door sensor) and "flat empty but not locked"
+ *  4. checkLock()          - battery warnings (lock, keypad, door sensor), lock offline, problems shortly
+ *                            before an arrival and "flat empty but not locked"
  */
 
 const MISSING_THRESHOLD = 3;          // consecutive successful polls a booking must be absent (3 x 15 min)
@@ -16,6 +19,9 @@ const STALE_ARRIVAL_MS = 36 * 60 * 60 * 1000; // first use older than this is ma
 const BATTERY_LOW = 25;               // % -> "battery low" warning
 const BATTERY_OK = 40;                // % -> warning re-armed (batteries replaced / charged)
 const UNLOCKED_ALERT_MS = 30 * 60 * 1000; // flat empty and unlocked at least this long -> warning
+const OFFLINE_ALERT_MS = 30 * 60 * 1000;  // lock offline at least this long -> warning (short Wi-Fi hiccups stay silent)
+const API_ERROR_ALERT_MS = 2 * 60 * 60 * 1000; // Nuki Web unreachable at least this long -> warning
+const CRITICAL_REPEAT_MS = 24 * 60 * 60 * 1000; // "battery almost empty" is repeated daily until replaced
 const CHECKIN_HOUR = 15;              // stays count as occupied from 15:00 on arrival day ...
 const CHECKOUT_HOUR = 11;             // ... until 11:00 on departure day (same as the door code validity)
 
@@ -64,6 +70,33 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
         return found;
     }
 
+    const overlapKey = (a, b) => `${[a.id, b.id].sort((x, y) => x - y).join('-')}:${a.checkin}/${a.checkout}:${b.checkin}/${b.checkout}`;
+    const pairOf = key => String(key).split(':')[0];
+    // Older versions stored only the timestamp of the first warning
+    const overlapEntry = v => (v && typeof v === 'object' ? { ...v } : { ts: Number(v) || Date.now() });
+
+    /** Overlaps that still need attention (not marked as "in order") - for the dashboard. */
+    function openOverlaps() {
+        const state = getState('overlap_warnings');
+        return findOverlaps().map(([a, b]) => ({ a, b, key: overlapKey(a, b), identical: a.checkin === b.checkin && a.checkout === b.checkout }))
+            .filter(o => !(state[o.key] && overlapEntry(state[o.key]).ack));
+    }
+
+    function overlapMessage(a, b, reminder) {
+        const identical = a.checkin === b.checkin && a.checkout === b.checkout;
+        const lines = `• ${sourceOf(a)}: ${nameOf(a)} (${period(a)})\n• ${sourceOf(b)}: ${nameOf(b)} (${period(b)})\n`;
+        if (reminder) {
+            return `⏰ *Erinnerung: Überschneidung noch offen*\n${lines}` +
+                `Ist alles geklärt (z. B. eine Buchung storniert oder die Kalender sind verknüpft), tippe auf „Ist in Ordnung“. Dann kommt keine Erinnerung mehr.`;
+        }
+        return identical
+            ? `⚠️ *Gleicher Zeitraum in ${sourceOf(a)} und ${sourceOf(b)}*\n${lines}` +
+              `Vermutlich ist ein Kalender mit dem anderen verknüpft (gespiegelte Sperre) – dann ist es *eine* Buchung und es gibt evtl. zwei Türcodes. Bitte prüfen.`
+            : `🚨 *Mögliche Doppelbuchung!*\n${lines}` +
+              `Die Zeiträume überschneiden sich. Bitte in beiden Portalen prüfen und eine Buchung stornieren.`;
+    }
+    const overlapKeyboard = (a, b) => ({ inline_keyboard: [[{ text: '✅ Ist in Ordnung', callback_data: `ovl:${pairOf(overlapKey(a, b))}` }]] });
+
     async function checkOverlaps() {
         const found = findOverlaps();
 
@@ -71,24 +104,76 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
         const state = {};
         const fresh = [];
         for (const [a, b] of found) {
-            const key = `${[a.id, b.id].sort((x, y) => x - y).join('-')}:${a.checkin}/${a.checkout}:${b.checkin}/${b.checkout}`;
-            state[key] = before[key] || Date.now();
+            const key = overlapKey(a, b);
+            state[key] = before[key] ? overlapEntry(before[key]) : { ts: Date.now() };
             if (!before[key]) fresh.push([a, b]);
         }
         saveState('overlap_warnings', state, before); // pairs that no longer overlap drop out -> can warn again later
 
         for (const [a, b] of fresh) {
-            const identical = a.checkin === b.checkin && a.checkout === b.checkout;
-            const msg = identical
-                ? `⚠️ *Gleicher Zeitraum in ${sourceOf(a)} und ${sourceOf(b)}*\n` +
-                  `• ${sourceOf(a)}: ${nameOf(a)} (${period(a)})\n• ${sourceOf(b)}: ${nameOf(b)} (${period(b)})\n` +
-                  `Vermutlich ist ein Kalender mit dem anderen verknüpft (gespiegelte Sperre) – dann ist es *eine* Buchung und es gibt evtl. zwei Türcodes. Bitte prüfen.`
-                : `🚨 *Mögliche Doppelbuchung!*\n` +
-                  `• ${sourceOf(a)}: ${nameOf(a)} (${period(a)})\n• ${sourceOf(b)}: ${nameOf(b)} (${period(b)})\n` +
-                  `Die Zeiträume überschneiden sich. Bitte in beiden Portalen prüfen.`;
-            await notify(msg, 'overlap_warning');
+            await notify(overlapMessage(a, b, false), 'overlap_warning', { tgKeyboard: overlapKeyboard(a, b) });
         }
+        await checkRequestClashes();
         return fresh.length;
+    }
+
+    /** Daily: remind once a day of overlaps that are neither resolved nor marked as "in order". */
+    async function remindOverlaps() {
+        const today = berlinYmd();
+        const before = getState('overlap_warnings');
+        const state = { ...before };
+        let sent = 0;
+        for (const [a, b] of findOverlaps()) {
+            const key = overlapKey(a, b);
+            if (!state[key]) continue; // not warned yet -> the next calendar check does that
+            const e = overlapEntry(state[key]);
+            if (e.ack || e.remindedOn === today || berlinYmd(new Date(e.ts)) === today) continue;
+            e.remindedOn = today;
+            state[key] = e;
+            await notify(overlapMessage(a, b, true), 'overlap_warning', { tgKeyboard: overlapKeyboard(a, b) });
+            sent++;
+        }
+        saveState('overlap_warnings', state, before);
+        return sent;
+    }
+
+    /** Marks an overlap as "in order" (pair "12-34" or a full key): no more reminders, hidden on the dashboard. */
+    function ackOverlap(keyOrPair) {
+        const pair = pairOf(keyOrPair);
+        const before = getState('overlap_warnings');
+        const state = { ...before };
+        let n = 0;
+        for (const k of Object.keys(state)) {
+            if (k === keyOrPair || pairOf(k) === pair) { state[k] = { ...overlapEntry(state[k]), ack: Date.now() }; n++; }
+        }
+        saveState('overlap_warnings', state, before);
+        return n;
+    }
+
+    /** A new portal booking that overlaps an open booking request from the guest website. */
+    async function checkRequestClashes() {
+        const today = berlinYmd();
+        const requests = db.getDb().prepare(
+            "SELECT * FROM booking_requests WHERE status = 'pending' AND checkout > ?"
+        ).all(today);
+        const before = getState('request_clash_warnings');
+        const state = {};
+        for (const r of requests) {
+            const clash = db.getDb().prepare(`
+                SELECT b.*, g.name AS guest_name FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+                WHERE b.checkin < ? AND b.checkout > ? AND b.uid NOT LIKE 'manual-%' ORDER BY b.checkin LIMIT 1
+            `).get(r.checkout, r.checkin);
+            if (!clash) continue;
+            const key = `${r.id}:${clash.id}`;
+            state[key] = before[key] || Date.now();
+            if (before[key]) continue;
+            await notify(
+                `⚠️ *Offene Anfrage ist jetzt belegt*\n` +
+                `Webseiten-Anfrage von ${r.name} (${period(r)}) überschneidet sich mit\n• ${sourceOf(clash)}: ${nameOf(clash)} (${period(clash)})\n` +
+                `Bitte die Anfrage im Admin unter Webseite → Anfragen absagen.`,
+                'overlap_warning');
+        }
+        saveState('request_clash_warnings', state, before);
     }
 
     // -----------------------------------------------------------------------
@@ -235,10 +320,29 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
         });
     }
 
+    /** Arrivals today, tomorrow and the day after (for "fix it before the guest comes" warnings). */
+    function arrivalsSoon(now) {
+        const today = berlinYmd(now);
+        const until = berlinYmd(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000));
+        return db.getDb().prepare(`
+            SELECT b.*, g.name AS guest_name FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+            WHERE b.checkin >= ? AND b.checkin <= ? ORDER BY b.checkin
+        `).all(today, until);
+    }
+    const dayWord = (ymd, now) => {
+        const today = berlinYmd(now);
+        const tomorrow = berlinYmd(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+        return ymd === today ? 'heute' : ymd === tomorrow ? 'morgen' : `am ${formatDateDE(ymd)}`;
+    };
+
     async function checkLock(now = new Date()) {
         if (lockStateUnavailable) return { checked: false };
         const nuki = db.getAllSettings().nuki;
         if (!nuki || !nuki.token || !nuki.lockId) return { checked: false };
+
+        const before = getState('nuki_lock_watch');
+        const state = { ...before };
+        const sent = [];
 
         let lock;
         try {
@@ -247,40 +351,107 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
             if (e.permission) {
                 lockStateUnavailable = true;
                 console.warn('⚠️ Nuki-Schlossstatus nicht verfügbar:', e.message);
-                await notify('ℹ️ *Schloss-Überwachung nicht möglich*\n' + e.message + '\n(Batterie- und „nicht abgeschlossen“-Warnungen sind aus. Die Meldung kommt nur einmal.)', 'lock_unavailable');
-            } else {
-                console.warn('⚠️ Nuki-Schlossstatus:', e.message);
+                await notify('ℹ️ *Schloss-Überwachung nicht möglich*\n' + e.message + '\n(Batterie-, Offline- und „nicht abgeschlossen“-Warnungen sind aus. Die Meldung kommt nur einmal.)', 'lock_unavailable');
+                return { checked: false };
             }
-            return { checked: false };
+            console.warn('⚠️ Nuki-Schlossstatus:', e.message);
+            // Nuki Web not reachable for a longer time -> say so once (status unknown, no other warnings possible)
+            if (!state.apiErrorSince) state.apiErrorSince = now.getTime();
+            if (!state.apiErrorWarned && now.getTime() - state.apiErrorSince >= API_ERROR_ALERT_MS) {
+                state.apiErrorWarned = true;
+                await notify(`📡 *Nuki nicht erreichbar*\nSeit über ${Math.round((now.getTime() - state.apiErrorSince) / 3600000)} Stunden bekommt der Server keinen Schloss-Status von Nuki Web (${e.message}). ` +
+                    'Batterie- und Offline-Warnungen sind so lange aus. Bitte Internet des Servers und den Nuki-Token prüfen.', 'nuki_offline');
+                sent.push('api');
+            }
+            saveState('nuki_lock_watch', state, before);
+            return { checked: false, sent };
+        }
+        if (state.apiErrorWarned) {
+            await notify('✅ *Nuki wieder erreichbar*\nDer Schloss-Status kommt wieder an.', 'nuki_offline');
+            sent.push('api_back');
+        }
+        delete state.apiErrorSince;
+        delete state.apiErrorWarned;
+
+        // Offline (bridge / Wi-Fi gone): codes and remote opening cannot reach the lock any more
+        if (lock.offline) {
+            if (!state.offlineSince) state.offlineSince = now.getTime();
+            if (!state.offlineWarned && now.getTime() - state.offlineSince >= OFFLINE_ALERT_MS) {
+                state.offlineWarned = true;
+                const mins = Math.round((now.getTime() - state.offlineSince) / 60000);
+                await notify(
+                    `📡 *Nuki-Schloss ist offline*\nSeit mindestens ${mins} Minuten hat Nuki keine Verbindung zum Schloss.\n` +
+                    'Bereits gespeicherte Türcodes funktionieren am Keypad weiter. Neue oder geänderte Codes, Fernöffnen und Notfall-Öffnen gehen aber nicht. ' +
+                    'Bitte Bridge (Stecker, WLAN) bzw. Internet in der Wohnung prüfen.', 'nuki_offline');
+                sent.push('offline');
+            }
+        } else {
+            if (state.offlineWarned) {
+                const mins = Math.round((now.getTime() - state.offlineSince) / 60000);
+                await notify(`✅ *Nuki-Schloss wieder online*\nNach etwa ${mins >= 120 ? Math.round(mins / 60) + ' Stunden' : mins + ' Minuten'} ist das Schloss wieder verbunden.`, 'nuki_offline');
+                sent.push('online');
+            }
+            delete state.offlineSince;
+            delete state.offlineWarned;
         }
 
-        const before = getState('nuki_lock_watch');
-        const state = { ...before };
-        const sent = [];
-
-        // Battery of the lock: warn when it gets low and again when it becomes critical; re-arm after replacing
+        // Battery of the lock: warn when it gets low and again when it becomes critical; re-arm after replacing.
+        // An offline lock reports its last known values -> only the offline warning counts then.
         const rank = { ok: 0, low: 1, critical: 2 };
         const level = lock.batteryCritical ? 'critical' : (lock.battery !== null && lock.battery <= BATTERY_LOW ? 'low' : 'ok');
-        if (rank[level] > rank[state.battery || 'ok']) {
-            state.battery = level;
-            const pct = lock.battery !== null ? ` (${lock.battery} %)` : '';
-            await notify(level === 'critical'
-                ? `🪫 *Nuki-Batterie fast leer*${pct}\nBitte die Batterien des Schlosses bald tauschen – sonst lässt sich die Tür nicht mehr per Code öffnen.`
-                : `🔋 *Nuki-Batterie wird schwach*${pct}\nBitte Ersatzbatterien bereitlegen.`, 'nuki_battery');
-            sent.push('battery');
-        } else if (level === 'ok' && (lock.battery === null || lock.battery >= BATTERY_OK)) {
-            state.battery = 'ok';
-        }
-        for (const [key, label] of [['keypadBatteryCritical', 'Keypad'], ['doorsensorBatteryCritical', 'Türsensor']]) {
-            if (lock[key] && !state[key]) {
-                await notify(`🪫 *Batterie ${label} fast leer*\nBitte die Batterie ${label === 'Keypad' ? 'des Keypads' : 'des Türsensors'} tauschen.`, 'nuki_battery');
-                sent.push(key);
+        const pct = lock.battery !== null ? ` (${lock.battery} %)` : '';
+        if (!lock.offline) {
+            if (rank[level] > rank[state.battery || 'ok']) {
+                state.battery = level;
+                state.batteryWarnedAt = now.getTime();
+                await notify(level === 'critical'
+                    ? `🪫 *Nuki-Batterie fast leer*${pct}\nBitte die Batterien des Schlosses bald tauschen – sonst lässt sich die Tür nicht mehr per Code öffnen.`
+                    : `🔋 *Nuki-Batterie wird schwach*${pct}\nBitte Ersatzbatterien bereitlegen.`, 'nuki_battery');
+                sent.push('battery');
+            } else if (level === 'critical' && now.getTime() - (state.batteryWarnedAt || 0) >= CRITICAL_REPEAT_MS) {
+                // Still almost empty a day later -> remind once a day until the batteries are replaced
+                state.batteryWarnedAt = now.getTime();
+                await notify(`🪫 *Erinnerung: Nuki-Batterie fast leer*${pct}\nDie Batterien des Schlosses sind noch nicht getauscht.`, 'nuki_battery');
+                sent.push('battery_repeat');
+            } else if (level === 'ok' && (lock.battery === null || lock.battery >= BATTERY_OK)) {
+                state.battery = 'ok';
+                delete state.batteryWarnedAt;
             }
-            state[key] = lock[key];
+            for (const [key, label] of [['keypadBatteryCritical', 'Keypad'], ['doorsensorBatteryCritical', 'Türsensor']]) {
+                if (lock[key] && !state[key]) {
+                    await notify(`🪫 *Batterie ${label} fast leer*\nBitte die Batterie ${label === 'Keypad' ? 'des Keypads' : 'des Türsensors'} tauschen.`, 'nuki_battery');
+                    sent.push(key);
+                }
+                state[key] = lock[key];
+            }
         }
 
+        // A guest arrives within two days while the lock has a serious problem -> one extra warning per arrival
+        // ("battery low" alone is not one: that lasts weeks and would come before every arrival)
+        const problems = [];
+        if (lock.offline) problems.push('das Schloss ist offline');
+        else {
+            if (level === 'critical') problems.push(`die Schloss-Batterie ist fast leer${pct}`);
+            if (lock.keypadBatteryCritical) problems.push('die Keypad-Batterie ist fast leer');
+        }
+        const warnedFor = { ...(state.arrivalWarned || {}) };
+        const soon = arrivalsSoon(now);
+        if (problems.length && (!lock.offline || state.offlineWarned)) {
+            for (const b of soon) {
+                if (warnedFor[b.id]) continue;
+                warnedFor[b.id] = b.checkin;
+                await notify(
+                    `🔑 *Vor der Anreise prüfen*\n${nameOf(b)} reist ${dayWord(b.checkin, now)} an (${period(b)}), aber ${problems.join(' und ')}. ` +
+                    'Bitte vorher erledigen, damit der Türcode sicher funktioniert.', lock.offline ? 'nuki_offline' : 'nuki_battery');
+                sent.push('arrival');
+            }
+        }
+        const today = berlinYmd(now);
+        for (const id of Object.keys(warnedFor)) if (warnedFor[id] < today) delete warnedFor[id];
+        if (Object.keys(warnedFor).length) state.arrivalWarned = warnedFor; else delete state.arrivalWarned;
+
         // Unlocked while nobody should be in the flat -> one warning per unlocked phase
-        if (lock.unlocked) {
+        if (lock.unlocked && !lock.offline) {
             if (!state.unlockedSince) state.unlockedSince = now.getTime();
             if (!state.unlockedWarned && now.getTime() - state.unlockedSince >= UNLOCKED_ALERT_MS && !isOccupied(now)) {
                 state.unlockedWarned = true;
@@ -297,13 +468,42 @@ function createMonitor({ db, axios, notify, deleteNukiPin, botLogic, formatDateD
             delete state.unlockedWarned;
         }
 
+        // Last known status for the dashboard (only saved when something relevant changes)
+        state.last = {
+            battery: lock.battery, level, offline: !!lock.offline,
+            keypad: !!lock.keypadBatteryCritical, doorsensor: !!lock.doorsensorBatteryCritical
+        };
+
         saveState('nuki_lock_watch', state, before);
         return { checked: true, lock, sent };
     }
 
+    /** Lock problems for the dashboard, from the last check (no API call). */
+    function lockWarnings() {
+        const nuki = db.getAllSettings().nuki;
+        if (!nuki || !nuki.token || !nuki.lockId) return [];
+        const st = getState('nuki_lock_watch');
+        const out = [];
+        if (st.apiErrorWarned) out.push({ type: 'lock', bad: true, text: 'Nuki Web nicht erreichbar – Schloss-Status unbekannt' });
+        const last = st.last;
+        if (!last) return out;
+        if (last.offline) out.push({ type: 'lock', bad: true, text: 'Nuki-Schloss ist offline (Bridge/WLAN prüfen)' });
+        else {
+            const pct = last.battery !== null && last.battery !== undefined ? ` (${last.battery} %)` : '';
+            if (last.level === 'critical') out.push({ type: 'lock', bad: true, text: `Nuki-Batterie fast leer${pct} – bitte tauschen` });
+            else if (last.level === 'low') out.push({ type: 'lock', bad: false, text: `Nuki-Batterie wird schwach${pct}` });
+            if (last.keypad) out.push({ type: 'lock', bad: true, text: 'Keypad-Batterie fast leer' });
+            if (last.doorsensor) out.push({ type: 'lock', bad: false, text: 'Türsensor-Batterie fast leer' });
+        }
+        return out;
+    }
+
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-    return { checkOverlaps, findOverlaps, processMissing, checkArrivals, checkLock, isOccupied, _internal: { cancelBooking } };
+    return {
+        checkOverlaps, findOverlaps, openOverlaps, remindOverlaps, ackOverlap, processMissing, checkArrivals, checkLock, lockWarnings, isOccupied,
+        _internal: { cancelBooking }
+    };
 }
 
 module.exports = createMonitor;

@@ -2967,3 +2967,39 @@ button, input, select, textarea { font-family: inherit; }
         box-shadow: none !important;
     }
 }
+
+/* Jahresrückblick (Dashboard) */
+.review-section { margin-top: 2.5rem; }
+.review-year { width: auto; padding: .35rem .6rem; font-size: .9rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 2px; }
+.review-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.review-kpis .stat-card { padding: 1.1rem 1.2rem; gap: .2rem; }
+.review-kpis .stat-value { font-size: clamp(1.6rem, 2.2vw, 2.3rem); }
+.review-sub { font-size: .8rem; color: var(--muted); }
+.review-delta { font-size: .78rem; font-weight: 600; }
+.review-delta.up { color: var(--ok); }
+.review-delta.down { color: var(--bad); }
+.review-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; align-items: start; }
+.review-chart { position: relative; height: 260px; }
+.review-bar { margin-bottom: .8rem; }
+.review-bar-head { display: flex; justify-content: space-between; gap: 8px; font-size: .88rem; margin-bottom: 4px; }
+.review-bar-head small { color: var(--muted); white-space: nowrap; }
+.review-bar-track { height: 8px; background: var(--paper-2); border-radius: 2px; overflow: hidden; }
+.review-bar-fill { height: 100%; background: var(--accent); }
+.review-origin-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.25rem; }
+.review-map { height: 420px; border: 1px solid var(--line); background: var(--paper-2); z-index: 0; }
+.review-map-empty { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 1rem; color: var(--muted); font-size: .9rem; }
+.review-origin-list h4 { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 .5rem; font-weight: 500; }
+.review-origin-list ul { list-style: none; margin: 0 0 1.2rem; padding: 0; }
+.review-origin-list li { display: flex; justify-content: space-between; gap: 8px; padding: .4rem 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.review-origin-list li:last-child { border-bottom: 0; }
+.review-origin-list li span:last-child { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.review-hint { font-size: .8rem; color: var(--muted); margin: 0; }
+@media (max-width: 992px) {
+    .review-grid, .review-origin-body { grid-template-columns: 1fr; }
+    .review-map { height: 320px; }
+}
+@media (max-width: 768px) {
+    .review-section { padding-left: 12px; padding-right: 12px; }
+    .review-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+    .review-kpis .stat-card { padding: .8rem .9rem; }
+}

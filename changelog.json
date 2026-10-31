@@ -1,6 +1,22 @@
 {
-    "currentVersion": "1.25.0",
+    "currentVersion": "1.26.0",
     "releases": [
+        {
+            "version": "1.26.0",
+            "date": "2026-10-30",
+            "title": "Warnungen und Jahresrückblick",
+            "features": [
+                "Jahresrückblick im Dashboard: Auslastung, Aufenthalte, Umsatz, Umsatz pro Nacht, Ergebnis und Stammgäste, jeweils mit Vergleich zum Vorjahr",
+                "Belegte Nächte pro Monat, Buchungskanäle und eine Landkarte, woher deine Gäste kommen (aus den Adressen von Gästen und Rechnungen)",
+                "Telegram: /jahr zeigt den Rückblick als Nachricht, z. B. /jahr 2025",
+                "Doppelbuchung: tägliche Erinnerung, bis sie gelöst ist, und Knopf „Ist in Ordnung“ in Telegram und im Dashboard",
+                "Warnung, wenn eine neue Buchung eine offene Anfrage von der Webseite blockiert",
+                "Nuki: Warnung, wenn das Schloss länger als 30 Minuten offline ist, und Entwarnung, wenn es wieder da ist",
+                "Nuki: extra Hinweis, wenn kurz vor einer Anreise das Schloss offline oder die Batterie fast leer ist; „fast leer“ wird täglich wiederholt",
+                "Batterie- und Offline-Probleme stehen im Dashboard unter „To-do & Warnungen“"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.25.0",
             "date": "2026-10-30",

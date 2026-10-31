@@ -365,7 +365,9 @@ async function getNukiLock() {
         batteryCritical: !!st.batteryCritical,
         batteryCharging: !!st.batteryCharging,
         keypadBatteryCritical: !!st.keypadBatteryCritical,
-        doorsensorBatteryCritical: !!st.doorsensorBatteryCritical
+        doorsensorBatteryCritical: !!st.doorsensorBatteryCritical,
+        // Nuki Web serverState: 0 ok, 4 offline (no connection via bridge / Wi-Fi)
+        offline: !!(res.data && res.data.serverState === 4)
     };
 }
 

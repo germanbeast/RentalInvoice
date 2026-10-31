@@ -5,6 +5,26 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2026-10-30
+
+### Neu
+- Jahresrückblick im Dashboard (unter den Diagrammen) mit Jahresauswahl: Auslastung, Aufenthalte (Ø und längster), Umsatz (davon offen), Umsatz pro belegter Nacht, Ergebnis nach Ausgaben, Gäste und Stammgäste. Jeweils mit Vergleich zum Vorjahr
+- Belegte Nächte pro Monat (mit Vorjahr), Buchungskanäle (Booking.com, Airbnb, Direkt, Manuell, nur Rechnung) und stärkster Monat
+- Landkarte „Woher die Gäste kommen“ mit Länder- und Ortsliste. Die Herkunft kommt aus der Adresse des Gastes oder der Rechnung zum Aufenthalt (PLZ, Ort, Land; auch „A-1010 Wien“, „1012 AB Amsterdam“). Orte werden über OpenStreetMap (Nominatim) gesucht, dabei gehen nur PLZ, Ort und Land raus, nie Namen. Ergebnisse werden in der Tabelle `geo_cache` gespeichert. Karte mit Leaflet und OpenStreetMap-Kacheln, lädt erst im Dashboard
+- Aufenthalte zählen nach Anreisejahr. Belegte Nächte kommen aus Buchungen und Rechnungen, doppelte Einträge für denselben Aufenthalt zählen einmal. Umsatz wie im Dashboard nach Rechnungsdatum
+- Telegram `/jahr` (oder `/jahr 2025`): Rückblick als Nachricht. Im Januar zeigt `/jahr` das Vorjahr
+- Doppelbuchungs-Alarm: tägliche Erinnerung um 8 Uhr, solange die Überschneidung besteht. Knopf „✅ Ist in Ordnung“ in der Telegram-Meldung und „ist in Ordnung“ im Dashboard beendet die Erinnerungen (z. B. bei verknüpften Kalendern)
+- Warnung, wenn eine neue Buchung aus Booking.com oder Airbnb eine offene Webseiten-Anfrage überschneidet
+- Nuki-Offline-Warnung: Ist das Schloss länger als 30 Minuten offline (Bridge/WLAN), kommt eine Meldung per Telegram und Push, später die Entwarnung. Ist Nuki Web länger als 2 Stunden nicht erreichbar, ebenfalls einmal eine Meldung
+- Nuki vor der Anreise: Reist innerhalb von zwei Tagen ein Gast an, während das Schloss offline oder die Schloss- oder Keypad-Batterie fast leer ist, kommt einmal pro Buchung ein Hinweis
+- „Nuki-Batterie fast leer“ wird täglich wiederholt, bis die Batterien getauscht sind
+- Dashboard „To-do & Warnungen“ zeigt Batterie- und Offline-Probleme aus der letzten Schloss-Prüfung
+- `/schloss` zeigt an, wenn das Schloss offline ist
+
+### Geändert
+- Push-Typ `nuki_offline` gilt als wichtige Meldung
+- Content-Security-Policy erlaubt Leaflet-CSS von cdnjs und Kartenkacheln von tile.openstreetmap.org
+
 ## [1.25.0] - 2026-10-30
 
 ### Neu
