@@ -18,6 +18,18 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [1.30.0] - 2026-10-31
 
+## [1.30.1] - 2026-10-31
+
+### Behoben
+- Bei Booking.com geschlossene Zeiträume (z. B. 02.–08.11.) wurden nur teilweise als belegt angezeigt. Liefert ein Kalender mehrere Einträge mit derselben UID, hat der iCal-Parser sie zu einem zusammengefasst und die übrigen Tage galten als frei. Jeder VEVENT wird jetzt einzeln gelesen (`ical-events.js`); weitere Blöcke derselben UID werden als eigene Einträge `UID#Anreise` gespeichert, ohne zweiten Türcode und ohne „Neue Buchung“-Nachricht. Eine schon gespeicherte Buchung behält ihre UID und ihren Türcode
+- Einträge ohne DTEND (oder mit Ende am selben Tag) zählen als ein Tag statt übersprungen zu werden
+- Auch die Kalender-Vorschau (`POST /api/calendar/fetch`) zeigt alle Einträge
+
+### Neu
+- Bei Airbnb gesperrte Tage („Airbnb (Not available)“) werden in der neuen Tabelle `calendar_blocks` gespeichert und blockieren auf der Webseite Kalender und Anfragen. Sie werden keine Buchungen, bekommen keinen Türcode und stehen nicht in Auswertungen
+
+ - 2026-10-31
+
 ### Neu
 - „Türcode bearbeiten“ im Buchungsfenster des Kalenders: Name im Schloss sowie gültig ab/bis direkt im Nuki-Schloss ändern, die Ziffern bleiben gleich. Ist kein Code (mehr) da, wird einer angelegt. Bei selbst eingetragenen Buchungen wahlweise auch den Buchungszeitraum ändern. Endpunkte `GET/PUT /api/bookings/:id/nuki`
 - Gast in der Gästeliste umbenannt → Türcodes seiner laufenden und kommenden Buchungen werden umbenannt

@@ -15,7 +15,6 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const axios = require('axios');
-const ical = require('node-ical');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
@@ -366,20 +365,7 @@ const pending2FA = new Map(); // sessionId -> { code, username, expiresAt }
 // =======================
 // 1c. SCHEDULED JOBS (Cron)
 // =======================
-// iCal all-day events (VALUE=DATE) are parsed by node-ical as local midnight. Calling
-// toISOString() on them shifts the date one day back on servers west of UTC+0 (e.g. Europe/Berlin).
-function icalDateToYmd(d) {
-    if (!d) return null;
-    const dt = new Date(d);
-    if (isNaN(dt.getTime())) return null;
-    if (d.dateOnly) {
-        const y = dt.getFullYear();
-        const m = String(dt.getMonth() + 1).padStart(2, '0');
-        const day = String(dt.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-    }
-    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt);
-}
+const { parseEvents: parseIcalEvents } = require('./ical-events');
 
 function formatDateDE(dateStr) {
     if (!dateStr) return '\u2014';
@@ -424,25 +410,30 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
     if (typeof response.data !== 'string' || !response.data.includes('BEGIN:VCALENDAR')) {
         throw new Error('Antwort ist kein iCal-Kalender (Link prüfen)');
     }
-    const data = ical.parseICS(response.data);
+    // Every VEVENT counts on its own, even when the portal repeats a UID for several blocks
+    const keepPlainUid = (uid, checkin, checkout) => {
+        const b = db.getBookingByUid(uid);
+        return !!b && b.checkin === checkin && b.checkout === checkout;
+    };
+    const list = parseIcalEvents(response.data, { keepPlainUid });
     let newCount = 0;
     let events = 0;
     const seen = new Set();
+    const blocks = [];
 
-    for (const k in data) {
-        if (!data.hasOwnProperty(k)) continue;
-        const ev = data[k];
-        if (ev.type !== 'VEVENT' || !ev.uid) continue;
+    for (const ev of list) {
         events++;
         seen.add(ev.uid);
 
         const rawSummary = String(ev.summary || 'Buchung').substring(0, 500);
-        // Airbnb exports blocked dates as "Airbnb (Not available)" - only "Reserved" are real stays
-        if (feed.source === 'Airbnb' && /not available/i.test(rawSummary)) continue;
+        // Airbnb exports blocked dates as "Airbnb (Not available)" - only "Reserved" are real stays.
+        // The closed days still block the guest website's availability calendar.
+        if (feed.source === 'Airbnb' && /not available/i.test(rawSummary)) {
+            blocks.push({ checkin: ev.checkin, checkout: ev.checkout });
+            continue;
+        }
 
-        const checkin = icalDateToYmd(ev.start);
-        const checkout = icalDateToYmd(ev.end);
-        if (!checkin || !checkout) continue;
+        const { checkin, checkout } = ev;
         const summary = feed.source === 'Airbnb' ? `Airbnb: ${rawSummary}` : rawSummary;
 
         const existing = db.getBookingByUid(ev.uid);
@@ -474,6 +465,9 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
         if (result.inserted && !existing) {
             // Stays that are already over (old entries in a freshly connected feed) get no code and no message
             if (checkout < todayYmd) continue;
+            // Further block of an entry the feed already listed under the same UID (e.g. a closed period
+            // split into parts): it blocks the dates, but gets no second door code and no "new booking" message
+            if (ev.uid !== ev.rawUid) continue;
             newCount++;
 
             // --- Brand New: Auto-Nuki PIN for iCal ---
@@ -517,6 +511,7 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
             await sendGuestMessageToTelegram(result.id);
         }
     }
+    db.replaceCalendarBlocks(feed.source, blocks);
     return { newCount, events, seen };
 }
 
@@ -3283,23 +3278,13 @@ app.post('/api/calendar/fetch', apiLimiter, async (req, res) => {
             maxContentLength: 5 * 1024 * 1024,
             headers: { 'User-Agent': 'RentalInvoice/1.0' }
         });
-        const data = ical.parseICS(response.data);
-
-        const events = [];
-        for (let k in data) {
-            if (data.hasOwnProperty(k)) {
-                const ev = data[k];
-                if (ev.type === 'VEVENT') {
-                    events.push({
-                        summary: String(ev.summary || '').substring(0, 500),
-                        start: ev.start,
-                        end: ev.end,
-                        description: String(ev.description || '').substring(0, 2000),
-                        uid: String(ev.uid || '').substring(0, 200)
-                    });
-                }
-            }
-        }
+        const events = parseIcalEvents(response.data).map(ev => ({
+            summary: String(ev.summary || '').substring(0, 500),
+            start: ev.start,
+            end: ev.end,
+            description: String(ev.description || '').substring(0, 2000),
+            uid: ev.uid.substring(0, 200)
+        }));
 
         events.sort((a, b) => new Date(b.start) - new Date(a.start));
         res.json({ success: true, events });
