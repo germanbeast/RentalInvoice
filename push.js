@@ -124,6 +124,8 @@ function createPush({ db }) {
         let rows = sql().prepare('SELECT * FROM push_subscriptions').all();
         if (opts.only) rows = rows.filter(r => r.id === opts.only);
         else rows = rows.filter(r => r.mode === 'all' || IMPORTANT_TYPES.has(type));
+        // Devices of users whose rights do not cover this kind of message are skipped (see permissions.js)
+        if (opts.canReceive && !opts.only) rows = rows.filter(r => opts.canReceive(r.username, type));
         if (rows.length === 0) return false;
 
         const payload = { ...toPayload(message), url: opts.url || (BOOKING_TYPES.has(type) ? '/?view=bookings' : '/'), tag: opts.tag };

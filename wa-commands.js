@@ -1,5 +1,6 @@
 const db = require('./db');
 const botLogic = require('./bot-logic');
+const permissions = require('./permissions');
 
 // Simple in-memory state for follow-up questions
 const sessions = new Map();
@@ -27,12 +28,20 @@ async function processMessage(msg, waClient, MessageMedia) {
     }
     console.log(`[WA] Authentifizierter User: ${user.username} (ID: ${from})`);
 
+    const perms = permissions.forUser(user);
+    const denied = () => msg.reply('⛔ Dafür hat dein Benutzer keine Berechtigung.');
+
     // Check if we are in a follow-up session
     if (sessions.has(from)) {
         return handleFollowUp(msg, waClient, MessageMedia, sessions.get(from));
     }
 
     const command = body.split('\n')[0].toLowerCase();
+    const isInvoice = command.includes('rechnung') || (!command.includes('status') && !command.includes('pin')
+        && !command.includes('hilfe') && command !== '?' && (body.split('\n').length >= 2 || body.match(/\d{2}\.\d{2}\./)));
+    if (isInvoice && !permissions.canBot(perms, 'rechnung')) return denied();
+    if (command.includes('status') && !permissions.canBot(perms, 'status')) return denied();
+    if (command.includes('pin') && !permissions.canBot(perms, 'pin')) return denied();
 
     if (command.includes('rechnung')) {
         return handleInvoiceCommand(msg, waClient, MessageMedia);

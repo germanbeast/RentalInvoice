@@ -1,5 +1,30 @@
 const db = require('./db');
 const botLogic = require('./bot-logic');
+const permissions = require('./permissions');
+
+/** Rights of a Telegram chat: a linked user account gets its own rights; an ID that was only approved
+ *  under Einstellungen → Telegram (no user linked) keeps full access as before. */
+function botPerms(chatId) {
+    const user = db.getUserByTelegramId(chatId);
+    return user ? permissions.forUser(user) : permissions.ROLES.admin.permissions;
+}
+const DENIED = '⛔ <b>Keine Berechtigung</b>\nDein Benutzer darf das nicht. Rechte vergibt der Inhaber in der Benutzerverwaltung.';
+const CMD_RIGHT = { status: 'offen', offen: 'offen', sync: 'sync', namen: 'namen', codes: 'codes', 'türcodes': 'codes', tuercodes: 'codes',
+    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin' };
+function callbackRight(data) {
+    if (data === 'open') return 'offen';
+    if (data === 'arrivals') return 'anreisen';
+    if (data === 'codes') return 'codes';
+    if (data === 'sync' || data.startsWith('ovl:')) return 'sync';
+    if (data === 'names' || data.startsWith('nm:')) return 'namen';
+    if (data === 'lock:status') return 'lockstatus';
+    if (data.startsWith('lock:')) return 'lock';
+    if (data === 'gm' || data.startsWith('gm:')) return 'nachricht';
+    if (data.startsWith('gl:')) return 'guestlink';
+    if (data.startsWith('inv:') || data === 'new:invoice') return 'rechnung';
+    if (data === 'new:pin') return 'pin';
+    return null;
+}
 const fs = require('fs');
 
 /**
@@ -980,6 +1005,8 @@ async function processMessage(bot, msg) {
     }
 
     const active = session && session !== 'expired' ? session : null;
+    const perms = botPerms(chatId);
+    const allowed = (right) => permissions.canBot(perms, right);
 
     // --- Globale Navigation (in jedem Schritt) ---
     if (active) {
@@ -995,6 +1022,7 @@ async function processMessage(bot, msg) {
     if (lockCmd) {
         if (active) await cancelSession(bot, chatId, active, true);
         const c = lockCmd[1].toLowerCase();
+        if (!allowed(c === 'zu' || c === 'auf' ? 'lock' : 'lockstatus')) return send(bot, chatId, DENIED);
         if (c === 'zu') return runLockAction(bot, chatId, 'lock', msg.from && (msg.from.username || msg.from.first_name));
         if (c === 'auf') return confirmUnlock(bot, chatId);
         return showLockStatus(bot, chatId);
@@ -1003,6 +1031,7 @@ async function processMessage(bot, msg) {
     // Jahresrückblick: /jahr oder /jahr 2025 (ohne Jahr: laufendes Jahr, im Januar das Vorjahr)
     const yearCmd = body.match(/^\/(jahr|rueckblick|rückblick)(?:@\w+)?(?:\s+(\d{4}))?$/i);
     if (yearCmd) {
+        if (!allowed('review')) return send(bot, chatId, DENIED);
         if (active) await cancelSession(bot, chatId, active, true);
         return showYearReview(bot, chatId, yearCmd[2] ? parseInt(yearCmd[2], 10) : null);
     }
@@ -1013,6 +1042,7 @@ async function processMessage(bot, msg) {
     if (cmd && active && !body.startsWith('/')) cmd = null;
 
     // --- Befehle ---
+    if (cmd && CMD_RIGHT[cmd.cmd.toLowerCase()] && !allowed(CMD_RIGHT[cmd.cmd.toLowerCase()])) return send(bot, chatId, DENIED);
     if (cmd) {
         switch (cmd.cmd) {
             case 'abbrechen':
@@ -1064,6 +1094,7 @@ async function processMessage(bot, msg) {
 
     // --- Freitext ohne Befehl: Buchungstext erkennen (mehrzeilig oder mit Datum) ---
     if (body.split('\n').length >= 2 || /\d{1,2}\.\d{1,2}\./.test(body)) {
+        if (!allowed('rechnung')) return send(bot, chatId, DENIED);
         return startFlow(bot, chatId, 'invoice', body);
     }
 
@@ -1141,6 +1172,12 @@ async function processCallback(bot, q) {
     if (active && needsSession && q.message && active.lastMsgId && q.message.message_id !== active.lastMsgId) {
         await answer('Diese Auswahl ist veraltet.');
         bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+        return;
+    }
+
+    const right = callbackRight(data);
+    if (right && !permissions.canBot(botPerms(chatId), right)) {
+        await answer('⛔ Keine Berechtigung');
         return;
     }
 

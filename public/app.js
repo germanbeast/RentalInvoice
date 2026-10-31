@@ -87,6 +87,81 @@
         // Now loaded as part of loadAllSettings()
     }
 
+    // =======================
+    // Rechte des angemeldeten Benutzers (der Server prüft jeden Zugriff, hier wird nur die Oberfläche angepasst)
+    // =======================
+    let ME = { role: null, permissions: {} };
+    const LEVELS_UI = { none: 0, view: 1, edit: 2 };
+    function canDo(area, level = 'view') {
+        return (LEVELS_UI[(ME.permissions || {})[area]] || 0) >= LEVELS_UI[level];
+    }
+
+    // A refused change (403) shows the server's reason instead of failing silently
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+        const res = await nativeFetch(input, init);
+        const method = String((init && init.method) || 'GET').toUpperCase();
+        if (res.status === 403 && method !== 'GET') {
+            res.clone().json().then(d => { if (d && d.permission) showToast(d.error || 'Keine Berechtigung', 'error'); }).catch(() => { });
+        }
+        return res;
+    };
+
+    async function refreshMe(known) {
+        try {
+            const d = known || await (await nativeFetch('/api/me')).json();
+            if (d && d.authenticated && d.user) ME = { id: d.user.id, username: d.user.username, role: d.user.role, permissions: d.user.permissions || {} };
+        } catch (e) { /* keep last */ }
+        applyPermissions();
+        return ME;
+    }
+
+    // Which navigation entry needs which right
+    const NAV_RIGHTS = {
+        'nav-dashboard': ['calendar'], 'nav-calendar': ['calendar'], 'nav-bookings': ['bookings'],
+        'nav-invoice': ['invoices'], 'nav-guests': ['bookings'], 'nav-website': ['bookings', 'website'],
+        'nav-occupancy': ['finance'], 'nav-finance': ['finance'], 'nav-expenses': ['finance'], 'nav-estate': ['finance'],
+        'nav-chat': ['messages'], 'nav-welcome': ['settings'], 'btn-settings': ['settings'], 'nav-users': ['users'],
+        'btn-new-booking': [['bookings', 'edit']], 'cal-sync-btn': [['calendar', 'edit']]
+    };
+    const SETTINGS_PAGE_RIGHTS = { 'settings-users': 'users', 'settings-push': null };
+    const START_VIEWS = [['calendar', 'calendar'], ['bookings', 'bookings'], ['invoice', 'invoices'], ['occupancy', 'finance'], ['finance', 'finance'], ['website', 'website']];
+
+    function applyPermissions() {
+        const ok = need => need.some(n => Array.isArray(n) ? canDo(n[0], n[1]) : canDo(n));
+        Object.entries(NAV_RIGHTS).forEach(([id, need]) => {
+            const el = document.getElementById(id);
+            if (el) el.hidden = !ok(need);
+        });
+        // A group (Finanzen, Konfiguration) without a visible entry disappears
+        document.querySelectorAll('.nav-group').forEach(g => {
+            g.hidden = !Array.from(g.querySelectorAll('.nav-group-items .sidebar-item')).some(b => !b.hidden);
+        });
+        // Settings pages: everything needs the settings right, except the user page and the own push device
+        document.querySelectorAll('#modal-settings .nav-item[data-target]').forEach(item => {
+            const t = item.dataset.target;
+            const right = t in SETTINGS_PAGE_RIGHTS ? SETTINGS_PAGE_RIGHTS[t] : 'settings';
+            item.hidden = right ? !canDo(right) : false;
+        });
+        // Section headings of the settings menu: hidden when no entry below them is left
+        document.querySelectorAll('#modal-settings .nav-section').forEach(sec => {
+            let el = sec.nextElementSibling, any = false;
+            while (el && !el.classList.contains('nav-section')) { if (el.matches('.nav-item') && !el.hidden) any = true; el = el.nextElementSibling; }
+            sec.hidden = !any;
+        });
+        const saveBtn = document.getElementById('btn-save-settings');
+        if (saveBtn) saveBtn.hidden = !canDo('settings', 'edit');
+        document.body.dataset.role = ME.role || '';
+    }
+
+    /** First view the user may open (calendar for most, otherwise the first allowed one). */
+    function allowedStartView(wanted) {
+        const area = { bookings: 'bookings', expenses: 'finance', invoice: 'invoices', dashboard: 'calendar', occupancy: 'finance', finance: 'finance', calendar: 'calendar' }[wanted];
+        if (wanted && area && canDo(area)) return wanted;
+        const first = START_VIEWS.find(([, a]) => canDo(a));
+        return first ? first[0] : null;
+    }
+
     async function checkAuth() {
         // Check if this is a TV welcome screen request (bypass auth)
         const urlParams = new URLSearchParams(window.location.search);
@@ -101,7 +176,7 @@
             const response = await fetch('/api/me');
             const data = await response.json();
             if (data.authenticated) {
-                showApp();
+                showApp(data);
             } else {
                 showLogin();
             }
@@ -120,7 +195,8 @@
         appWrapper.classList.remove('authenticated');
     }
 
-    function showApp() {
+    async function showApp(me) {
+        await refreshMe(me && me.user && me.user.permissions ? me : null);
         loginScreen.style.display = 'none';
         appWrapper.style.display = 'flex';
         setTimeout(() => {
@@ -623,6 +699,7 @@
     // Server-side Settings (API)
     // =======================
     async function saveAllSettings() {
+        if (!canDo('settings', 'edit')) return; // the server would refuse it anyway
         try {
             // First, load existing settings from server to preserve values not shown in UI
             const existing = await fetch('/api/settings');
@@ -1001,53 +1078,76 @@
     if (btnAddWaPhone) btnAddWaPhone.addEventListener('click', () => addWaPhoneRow(''));
     if (btnAddTgId) btnAddTgId.addEventListener('click', () => addTgIdRow(''));
 
-    // --- NEW: User Management Support ---
+    // =======================
+    // Benutzer & Rechte
+    // =======================
+    const modalUser = $('#modal-user');
+    let usersCache = { users: [], areas: [], roles: {}, me: null };
+    let usEditing = null;
+    const LEVEL_LABEL = { none: 'Kein Zugriff', view: 'Ansehen', edit: 'Bearbeiten' };
+    const LEVEL_RANK = { none: 0, view: 1, edit: 2 };
+
+    function rightsSummary(perms) {
+        const areas = usersCache.areas || [];
+        const edit = areas.filter(a => perms[a.key] === 'edit').map(a => a.label);
+        const view = areas.filter(a => perms[a.key] === 'view').map(a => a.label);
+        if (edit.length === areas.length) return 'Alle Bereiche: Bearbeiten';
+        const parts = [];
+        if (edit.length) parts.push(`Bearbeiten: ${edit.join(', ')}`);
+        if (view.length) parts.push(`Ansehen: ${view.join(', ')}`);
+        return parts.join(' · ') || 'Kein Zugriff';
+    }
+
     async function loadUsers() {
         const container = $('#users-list-container');
         if (!container) return;
-
+        const addBtn = $('#btn-add-user-modal');
+        if (addBtn) addBtn.hidden = !canDo('users', 'edit');
         try {
-            const res = await fetch('/api/users');
-            const data = await res.json();
+            const data = await apiJson('/api/users');
             if (!data.success) {
-                container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;">Nur Admins können Benutzer verwalten.</p>';
+                container.innerHTML = `<p class="nb-hint">${escapeHtml(data.error || 'Keine Berechtigung für die Benutzerverwaltung.')}</p>`;
                 return;
             }
-
-            container.innerHTML = '';
-            data.users.forEach(user => {
-                const div = document.createElement('div');
-                div.className = 'card';
-                div.style.marginBottom = '0.5rem';
-                div.style.padding = '0.75rem';
-                div.style.display = 'flex';
-                div.style.justifyContent = 'space-between';
-                div.style.alignItems = 'center';
-
-                div.innerHTML = `
-                    <div style="flex:1">
-                        <strong>${user.username}</strong> (${user.role})<br>
-                        <small>📱 2FA: ${user.phone || 'Nicht gesetzt'}</small><br>
-                        <small style="color:var(--primary-color);">🔑 Recovery: ${user.has_recovery_key ? 'eingerichtet' : 'keiner'}</small>
+            usersCache = data;
+            const mayEdit = canDo('users', 'edit');
+            container.innerHTML = data.users.map(u => {
+                const role = data.roles[u.role] ? data.roles[u.role].label : u.role;
+                const isMe = u.id === data.me;
+                const higher = Object.keys(u.permissions).some(k => LEVEL_RANK[u.permissions[k]] > LEVEL_RANK[(ME.permissions || {})[k] || 'none']);
+                const locked = !mayEdit || higher || (u.role === 'owner' && ME.role !== 'owner');
+                const contacts = [u.phone ? `📱 ${escapeHtml(u.phone)}` : '📱 keine Handynummer', u.telegramId ? `✈️ Telegram ${escapeHtml(u.telegramId)}` : null,
+                    `🔑 Recovery-Key ${u.hasRecoveryKey ? 'eingerichtet' : 'fehlt'}`].filter(Boolean).join(' · ');
+                return `<div class="user-card" data-id="${u.id}">
+                    <div class="user-avatar">${escapeHtml(u.username.slice(0, 1))}</div>
+                    <div class="user-main">
+                        <div class="user-name">${escapeHtml(u.username)} <span class="chip ${u.role === 'owner' ? 'chip-blue' : ''}">${escapeHtml(role)}</span>${isMe ? '<span class="chip chip-gray">Du</span>' : ''}</div>
+                        <div class="user-meta">${contacts}</div>
+                        <div class="user-rights">${escapeHtml(rightsSummary(u.permissions))}</div>
                     </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-outline btn-sm recovery-user-btn" data-id="${user.id}">Neuer Recovery-Key</button>
-                        <button class="btn btn-outline btn-sm edit-user-btn" data-id="${user.id}">Edit</button>
-                        <button class="btn btn-outline btn-sm delete-user-btn" data-id="${user.id}" style="color:red;">Del</button>
-                    </div>
-                `;
-
-                div.querySelector('.recovery-user-btn').onclick = () => newRecoveryKey(user);
-                div.querySelector('.edit-user-btn').onclick = () => editUser(user);
-                div.querySelector('.delete-user-btn').onclick = () => deleteUser(user.id, user.username);
-
-                container.appendChild(div);
-            });
+                    ${locked ? '' : `<div class="user-actions">
+                        <button type="button" class="btn btn-outline btn-sm" data-us="edit">Bearbeiten</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-us="key">Neuer Recovery-Key</button>
+                        ${u.role === 'owner' || isMe ? '' : '<button type="button" class="btn btn-ghost btn-sm btn-danger" data-us="delete">Löschen</button>'}
+                    </div>`}
+                </div>`;
+            }).join('');
         } catch (e) {
             console.error('User list error:', e);
-            container.innerHTML = '<p>Fehler beim Laden der Benutzer.</p>';
+            container.innerHTML = '<p class="nb-hint">Fehler beim Laden der Benutzer.</p>';
         }
     }
+
+    const usersList = $('#users-list-container');
+    if (usersList) usersList.addEventListener('click', e => {
+        const btn = e.target.closest('[data-us]');
+        if (!btn) return;
+        const user = usersCache.users.find(u => String(u.id) === btn.closest('.user-card').dataset.id);
+        if (!user) return;
+        if (btn.dataset.us === 'edit') openUserModal(user);
+        else if (btn.dataset.us === 'key') newRecoveryKey(user);
+        else if (btn.dataset.us === 'delete') deleteUser(user);
+    });
 
     // The server keeps only a hash: the key is visible this one time
     function showRecoveryKey(username, key) {
@@ -1057,69 +1157,140 @@
     async function newRecoveryKey(user) {
         if (!confirm(`Neuen Recovery-Key für ${user.username} erzeugen? Der alte Schlüssel gilt dann nicht mehr.`)) return;
         try {
-            const res = await fetch(`/api/users/${user.id}/recovery-key`, { method: 'POST' });
-            const data = await res.json();
+            const data = await apiJson(`/api/users/${user.id}/recovery-key`, { method: 'POST' });
             if (!data.success) return showToast(data.error || 'Fehler', 'error');
             showRecoveryKey(user.username, data.recoveryKey);
             loadUsers();
         } catch (e) { showToast('Fehler', 'error'); }
     }
 
-    async function editUser(user) {
-        const phone = prompt(`Handy-Nummer für 2FA ändern (Username: ${user.username}):`, user.phone || '');
-        if (phone === null) return;
-        const pass = prompt(`Neues Passwort (leer lassen um nicht zu ändern):`);
-        if (pass === null) return;
-
+    async function deleteUser(user) {
+        if (!confirm(`Benutzer "${user.username}" wirklich löschen? Er wird sofort abgemeldet.`)) return;
         try {
-            const res = await fetch(`/api/users/${user.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: user.username, role: user.role, phone, password: pass || undefined })
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast('Benutzer aktualisiert!', 'success');
-                loadUsers();
-            }
+            const data = await apiJson(`/api/users/${user.id}`, { method: 'DELETE' });
+            if (!data.success) return showToast(data.error || 'Fehler', 'error');
+            showToast('Benutzer gelöscht', 'success');
+            loadUsers();
         } catch (e) { showToast('Fehler', 'error'); }
     }
 
-    async function deleteUser(id, username) {
-        if (username === 'admin') return showToast('Admin kann nicht gelöscht werden', 'error');
-        if (!confirm(`Benutzer "${username}" wirklich löschen?`)) return;
-        try {
-            const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-            if ((await res.json()).success) {
-                showToast('Benutzer gelöscht', 'success');
-                loadUsers();
+    function renderPermTable(perms, editable) {
+        const table = $('#us-perms');
+        const mine = ME.permissions || {};
+        table.classList.toggle('locked', !editable);
+        table.innerHTML = usersCache.areas.map(a => `<div class="perm-row">
+            <div class="perm-label">${escapeHtml(a.label)}<small>${escapeHtml(a.hint || '')}</small></div>
+            <div class="perm-seg">${['none', 'view', 'edit'].map(l => {
+                const over = LEVEL_RANK[l] > LEVEL_RANK[mine[a.key] || 'none'];
+                return `<label title="${over ? 'Dieses Recht hast du selbst nicht' : ''}"><input type="radio" name="perm-${a.key}" value="${l}" ${perms[a.key] === l ? 'checked' : ''} ${!editable || over ? 'disabled' : ''}><span>${LEVEL_LABEL[l]}</span></label>`;
+            }).join('')}</div>
+        </div>`).join('');
+    }
+
+    function readPermTable() {
+        const out = {};
+        usersCache.areas.forEach(a => {
+            const c = $(`#us-perms input[name="perm-${a.key}"]:checked`);
+            out[a.key] = c ? c.value : 'none';
+        });
+        return out;
+    }
+
+    function syncRoleUi() {
+        const role = $('#us-role').value;
+        const isOwner = usEditing && usEditing.role === 'owner';
+        const preset = usersCache.roles[role] && usersCache.roles[role].permissions;
+        if (isOwner) renderPermTable(usEditing.permissions, false);
+        else if (role === 'custom') renderPermTable(usEditing && usEditing.role === 'custom' ? usEditing.permissions : readPermTableOr(preset), true);
+        else renderPermTable(preset, false);
+        $('#us-perm-hint').textContent = isOwner ? 'Der Inhaber hat immer alle Rechte und kann nicht gelöscht werden.'
+            : role === 'custom' ? 'Rechte pro Bereich frei wählen. „Ansehen“ erlaubt nur Lesen, „Bearbeiten“ auch Ändern.'
+            : 'Feste Rolle. Für abweichende Rechte „Eigene Rechte“ wählen.';
+    }
+    // Switching to "custom" starts from what was shown before (preset), so ticking starts from a sensible base
+    function readPermTableOr(fallback) {
+        return $('#us-perms').children.length ? readPermTable() : (fallback || {});
+    }
+
+    function openUserModal(user) {
+        if (!modalUser) return;
+        usEditing = user || null;
+        $('#us-title').textContent = user ? `Benutzer „${user.username}“ bearbeiten` : 'Benutzer anlegen';
+        $('#us-name').value = user ? user.username : '';
+        $('#us-pass').value = '';
+        $('#us-pass').placeholder = user ? 'leer lassen = unverändert' : '';
+        $('#us-pass-hint').textContent = user ? '(optional)' : '(mind. 8 Zeichen)';
+        $('#us-phone').value = user ? user.phone : '';
+        $('#us-tg').value = user ? user.telegramId : '';
+        $('#us-msg').hidden = true;
+        const isOwner = user && user.role === 'owner';
+        const isMe = user && user.id === usersCache.me;
+        const mine = ME.permissions || {};
+        const select = $('#us-role');
+        select.innerHTML = Object.entries(usersCache.roles)
+            .filter(([k]) => k !== 'owner' || isOwner)
+            .map(([k, r]) => {
+                const over = r.permissions && Object.keys(r.permissions).some(a => LEVEL_RANK[r.permissions[a]] > LEVEL_RANK[mine[a] || 'none']);
+                return `<option value="${k}" ${over && k !== (user && user.role) ? 'disabled' : ''}>${escapeHtml(r.label)}${over ? ' (mehr Rechte als du)' : ''}</option>`;
+            }).join('');
+        select.value = user ? user.role : 'manager';
+        if (select.selectedOptions[0] && select.selectedOptions[0].disabled) select.value = 'custom';
+        select.disabled = !!(isOwner || isMe);
+        $('#us-perms').innerHTML = '';
+        syncRoleUi();
+        if (isMe && !isOwner) $('#us-perm-hint').textContent = 'Die eigene Rolle kann nur ein anderer Benutzer mit Benutzerverwaltungs-Recht ändern.';
+        modalUser.style.display = 'flex';
+        setTimeout(() => $('#us-name').focus(), 50);
+    }
+    const closeUserModal = () => { if (modalUser) modalUser.style.display = 'none'; };
+
+    if (modalUser) {
+        $('#btn-close-user').addEventListener('click', closeUserModal);
+        $('#btn-cancel-user').addEventListener('click', closeUserModal);
+        modalUser.addEventListener('click', e => { if (e.target === modalUser) closeUserModal(); });
+        $('#us-role').addEventListener('change', syncRoleUi);
+        $('#us-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const msg = $('#us-msg');
+            msg.hidden = true;
+            const body = {
+                username: $('#us-name').value.trim(),
+                phone: $('#us-phone').value.trim(),
+                telegramId: $('#us-tg').value.trim()
+            };
+            const pass = $('#us-pass').value;
+            if (pass) body.password = pass;
+            if (!$('#us-role').disabled) {
+                body.role = $('#us-role').value;
+                if (body.role === 'custom') body.permissions = readPermTable();
             }
-        } catch (e) { showToast('Fehler', 'error'); }
+            if (!usEditing && !pass) { msg.hidden = false; msg.textContent = 'Bitte ein Passwort vergeben.'; return; }
+            const btn = $('#btn-save-user');
+            btn.disabled = true;
+            try {
+                const data = await apiJson(usEditing ? `/api/users/${usEditing.id}` : '/api/users', {
+                    method: usEditing ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!data.success) { msg.hidden = false; msg.textContent = data.error || 'Speichern fehlgeschlagen.'; return; }
+                closeUserModal();
+                showToast(usEditing ? 'Benutzer gespeichert' : 'Benutzer angelegt', 'success');
+                if (data.recoveryKey) showRecoveryKey(body.username, data.recoveryKey);
+                if (usEditing && usEditing.id === usersCache.me) refreshMe();
+                loadUsers();
+            } catch (err) {
+                msg.hidden = false; msg.textContent = 'Speichern fehlgeschlagen.';
+            } finally {
+                btn.disabled = false;
+            }
+        });
     }
 
     if ($('#btn-add-user-modal')) {
         $('#btn-add-user-modal').addEventListener('click', async () => {
-            const username = prompt('Neuer Benutzername:');
-            if (!username) return;
-            const password = prompt('Passwort:');
-            if (!password) return;
-            const phone = prompt('Handy-Nummer für 2FA (+49...):', '');
-
-            try {
-                const res = await fetch('/api/users', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password, role: 'admin', phone })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    showToast('Benutzer erstellt!', 'success');
-                    if (data.recoveryKey) showRecoveryKey(username, data.recoveryKey);
-                    loadUsers();
-                } else {
-                    showToast(data.error || 'Fehler', 'error');
-                }
-            } catch (e) { showToast('Fehler', 'error'); }
+            if (!usersCache.areas.length) await loadUsers();
+            openUserModal(null);
         });
     }
 
@@ -1509,7 +1680,7 @@
 
             const todo = [];
             if (d.namesMissing > 0) todo.push(`<div class="today-warn">❓ ${d.namesMissing} Buchung${d.namesMissing === 1 ? '' : 'en'} ohne Namen – <button class="today-link" data-goto="noname">jetzt eintragen</button></div>`);
-            if (d.openInvoices.count > 0) todo.push(`<div>🧾 ${d.openInvoices.count} offene Rechnung${d.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(d.openInvoices.total)})</div>`);
+            if (d.openInvoices && d.openInvoices.count > 0) todo.push(`<div>🧾 ${d.openInvoices.count} offene Rechnung${d.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(d.openInvoices.total)})</div>`);
             d.warnings.forEach(w => {
                 const bad = w.type === 'overlap' || w.type === 'sync' || w.bad;
                 const icon = w.type === 'lock' ? '🔋' : '⚠️';
@@ -3406,8 +3577,19 @@
     // =======================
     btnSettings.addEventListener('click', () => {
         modalSettings.style.display = 'flex';
-        loadChangelog();
-        loadTelegramRequests();
+        if (canDo('settings')) {
+            loadChangelog();
+            loadTelegramRequests();
+        } else {
+            // Without the settings right only "Benutzer & Rechte" and the own push device are offered
+            openSettingsPage(canDo('users') ? 'users' : 'push');
+        }
+    });
+    const navUsers = $('#nav-users');
+    if (navUsers) navUsers.addEventListener('click', () => {
+        modalSettings.style.display = 'flex';
+        openSettingsPage('users');
+        if (window.innerWidth <= 768) appWrapper.classList.remove('sidebar-open');
     });
 
     const settingsModal = $('.settings-modal');
@@ -3453,6 +3635,7 @@
                 if (bcPage) bcPage.textContent = pageTitle;
 
                 if (targetId === 'settings-push') loadPushSettings();
+                if (targetId === 'settings-users') loadUsers();
 
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {
@@ -4556,7 +4739,9 @@
 
         // Default to the calendar (Smoobu-style home); a tapped push notification opens /?view=bookings
         const startView = new URLSearchParams(location.search).get('view');
-        switchView(['bookings', 'expenses', 'invoice', 'dashboard', 'occupancy', 'finance'].includes(startView) ? startView : 'calendar');
+        const firstView = allowedStartView(['bookings', 'expenses', 'invoice', 'dashboard', 'occupancy', 'finance'].includes(startView) ? startView : 'calendar');
+        if (firstView) switchView(firstView);
+        else if (canDo('users')) { $('#btn-settings').click(); openSettingsPage('users'); }
         if (startView) history.replaceState(null, '', '/');
 
         registerServiceWorker();

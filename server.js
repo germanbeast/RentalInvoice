@@ -2,6 +2,7 @@
    Ferienwohnung Rechnung – Server (Hardened + SQLite)
    =========================== */
 
+const permissions = require('./permissions');
 const { exec } = require('child_process');
 const express = require('express');
 const puppeteer = require('puppeteer');
@@ -324,6 +325,20 @@ async function sendGuestMessageToTelegram(bookingId) {
 }
 
 // Send to all configured notification recipients
+/** Push device of `username` may get a message of `type`: door messages need the door right, chat messages
+ *  the messages right, everything else the calendar right. Devices without a user (older versions) get all. */
+function pushAllowed(username, type) {
+    if (!username) return true;
+    const user = db.getUser(username);
+    if (!user) return false;
+    const perms = permissions.forUser(user);
+    const t = String(type || '');
+    if (t.startsWith('nuki')) return permissions.can(perms, 'door');
+    if (t.startsWith('guest_chat')) return permissions.can(perms, 'messages');
+    if (t === 'invoice' || t.startsWith('invoice_')) return permissions.can(perms, 'invoices');
+    return permissions.can(perms, 'calendar');
+}
+
 async function sendToAllRecipients(message, opts = {}) {
     const allSettings = db.getAllSettings();
     let anySent = false;
@@ -351,7 +366,7 @@ async function sendToAllRecipients(message, opts = {}) {
 
     // Web Push (installed web app on phones)
     try {
-        if (await push.send(message, opts.type)) anySent = true;
+        if (await push.send(message, opts.type, { canReceive: pushAllowed })) anySent = true;
     } catch (e) {
         console.error('❌ Push Fehler:', e.message);
     }
@@ -1095,6 +1110,8 @@ app.use('/gast', emergencyDoor.router);
 app.use('/gast', guestPortal.router);
 
 app.use(ensureAuthenticated);
+// Roles & rights: every /api route (and /uploads) is checked here, see permissions.js
+app.use(permissions.createGuard(db));
 
 // =======================
 // 7. PROTECTED STATIC FILE SERVING
@@ -1169,7 +1186,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             // Fallback: skip 2FA if WhatsApp send fails
             return req.session.regenerate((err) => {
                 if (err) return res.status(500).json({ success: false, message: 'Server-Fehler' });
-                startUserSession(req, { username: user.username, role: user.role }, remember);
+                startUserSession(req, { id: user.id, username: user.username, role: user.role }, remember);
                 res.json({ success: true, user: req.session.user });
             });
         }
@@ -1188,7 +1205,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             console.error('Session regeneration error:', err);
             return res.status(500).json({ success: false, message: 'Server-Fehler' });
         }
-        startUserSession(req, { username: user.username, role: user.role }, remember);
+        startUserSession(req, { id: user.id, username: user.username, role: user.role }, remember);
         res.json({ success: true, user: req.session.user });
     });
 });
@@ -1265,8 +1282,11 @@ app.get('/api/logout', (req, res) => {
 });
 
 app.get('/api/me', (req, res) => {
-    if (req.session && req.session.user) {
-        res.json({ authenticated: true, user: req.session.user });
+    if (req.session && req.session.user && req.user) {
+        res.json({
+            authenticated: true,
+            user: { id: req.user.id, username: req.user.username, role: req.user.role, permissions: req.user.permissions }
+        });
     } else {
         res.json({ authenticated: false });
     }
@@ -1284,24 +1304,78 @@ app.get('/api/version', (req, res) => {
 // =======================
 // 7b. USER MANAGEMENT API
 // =======================
+// Who may do what is checked by the guard (area "users"); the rules here protect the owner and stop
+// anyone from handing out more rights than they hold themselves.
+function userView(u) {
+    return {
+        id: u.id, username: u.username, role: u.role, phone: u.phone || '', telegramId: u.telegram_id || '',
+        permissions: permissions.forUser(u), hasRecoveryKey: !!u.has_recovery_key, createdAt: u.created_at
+    };
+}
+
+/** Validates role + permissions from a form; returns { role, perms } or { error }. */
+function readRoleInput(body, actor) {
+    const role = String(body.role || '');
+    if (!permissions.ROLES[role] || role === 'owner') return { error: 'Ungültige Rolle' };
+    const perms = role === 'custom' ? permissions.normalize(body.permissions) : { ...permissions.ROLES[role].permissions };
+    if (!permissions.within(perms, actor.permissions)) {
+        return { error: 'Du kannst keine Rechte vergeben, die du selbst nicht hast' };
+    }
+    return { role, perms };
+}
+
+function readUserFields(body) {
+    const out = {};
+    if (body.username !== undefined) {
+        const name = String(body.username || '').trim();
+        if (!/^[a-zA-Z0-9_-]{2,50}$/.test(name)) return { error: 'Benutzername: 2–50 Zeichen, nur Buchstaben, Ziffern, - und _' };
+        out.username = name;
+    }
+    if (body.phone !== undefined) out.phone = String(body.phone || '').trim().slice(0, 30);
+    if (body.telegramId !== undefined) {
+        const tg = String(body.telegramId || '').trim();
+        if (tg && !/^-?\d{3,20}$/.test(tg)) return { error: 'Telegram-ID besteht nur aus Ziffern' };
+        out.telegram_id = tg;
+    }
+    if (body.password) {
+        if (String(body.password).length < 8) return { error: 'Passwort: mindestens 8 Zeichen' };
+        out.password = bcrypt.hashSync(String(body.password), 12);
+    }
+    return out;
+}
+
+function usernameTaken(name, exceptId) {
+    const u = db.getUser(name);
+    return !!u && String(u.id) !== String(exceptId);
+}
+
 app.get('/api/users', (req, res) => {
-    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
     try {
-        const users = db.getAllUsers();
-        res.json({ success: true, users });
+        res.json({
+            success: true,
+            users: db.getAllUsers().map(userView),
+            areas: permissions.AREAS,
+            roles: Object.fromEntries(Object.entries(permissions.ROLES).map(([k, r]) => [k, { label: r.label, permissions: r.permissions }])),
+            me: req.user.id
+        });
     } catch (e) {
         res.status(500).json({ error: 'Fehler beim Laden der Benutzer' });
     }
 });
 
-app.post('/api/users', loginLimiter, (req, res) => {
-    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
-    const { username, password, role, phone } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+app.post('/api/users', apiLimiter, (req, res) => {
+    const body = req.body || {};
+    if (!body.username || !body.password) return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+    const fields = readUserFields(body);
+    if (fields.error) return res.status(400).json({ error: fields.error });
+    const r = readRoleInput(body, req.user);
+    if (r.error) return res.status(400).json({ error: r.error });
+    if (usernameTaken(fields.username)) return res.status(400).json({ error: 'Benutzername ist schon vergeben' });
 
     try {
-        const hashed = bcrypt.hashSync(password, 12);
-        const recoveryKey = db.createUser(username, hashed, role || 'admin', phone || '');
+        const recoveryKey = db.createUser(fields.username, fields.password, r.role, fields.phone || '', fields.telegram_id || '',
+            r.role === 'custom' ? r.perms : null);
+        console.log(`👤 Benutzer "${fields.username}" (${r.role}) angelegt von ${req.user.username}`);
         res.json({ success: true, message: 'Benutzer erstellt', recoveryKey });
     } catch (e) {
         res.status(500).json({ error: 'Benutzer konnte nicht erstellt werden' });
@@ -1309,16 +1383,35 @@ app.post('/api/users', loginLimiter, (req, res) => {
 });
 
 app.put('/api/users/:id', (req, res) => {
-    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
-    const { username, password, role, phone } = req.body;
-    const { id } = req.params;
+    const target = db.getUserById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+    const body = req.body || {};
+    const actorIsOwner = req.user.role === 'owner';
+    if (target.role === 'owner' && !actorIsOwner) return res.status(403).json({ error: 'Nur der Inhaber kann sein Konto ändern' });
+    // A user with full rights can only be changed by the owner or by someone with full rights
+    if (!permissions.within(permissions.forUser(target), req.user.permissions)) {
+        return res.status(403).json({ error: 'Dieser Benutzer hat mehr Rechte als du' });
+    }
+
+    const fields = readUserFields(body);
+    if (fields.error) return res.status(400).json({ error: fields.error });
+    if (fields.username && usernameTaken(fields.username, target.id)) return res.status(400).json({ error: 'Benutzername ist schon vergeben' });
+
+    const data = { ...fields };
+    if (body.role !== undefined && target.role !== 'owner') {
+        if (String(target.id) === String(req.user.id)) return res.status(400).json({ error: 'Die eigene Rolle kann man nicht ändern' });
+        const r = readRoleInput(body, req.user);
+        if (r.error) return res.status(400).json({ error: r.error });
+        data.role = r.role;
+        data.permissions = r.role === 'custom' ? r.perms : null;
+    }
 
     try {
-        const data = { username, role, phone };
-        if (password) {
-            data.password = bcrypt.hashSync(password, 12);
+        db.updateUser(target.id, data);
+        if (data.username && data.username !== target.username) {
+            try { db.getDb().prepare('UPDATE push_subscriptions SET username = ? WHERE username = ?').run(data.username, target.username); } catch (e) { /* no push table */ }
         }
-        db.updateUser(id, data);
+        console.log(`👤 Benutzer "${target.username}" geändert von ${req.user.username}`);
         res.json({ success: true, message: 'Benutzer aktualisiert' });
     } catch (e) {
         res.status(500).json({ error: 'Benutzer konnte nicht aktualisiert werden' });
@@ -1327,10 +1420,12 @@ app.put('/api/users/:id', (req, res) => {
 
 // New recovery key; the plain key is returned only in this response
 app.post('/api/users/:id/recovery-key', loginLimiter, (req, res) => {
-    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
+    const target = db.getUserById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+    if (target.role === 'owner' && req.user.role !== 'owner') return res.status(403).json({ error: 'Nur der Inhaber kann sein Konto ändern' });
+    if (!permissions.within(permissions.forUser(target), req.user.permissions)) return res.status(403).json({ error: 'Dieser Benutzer hat mehr Rechte als du' });
     try {
-        const recoveryKey = db.resetRecoveryKey(req.params.id);
-        if (!recoveryKey) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+        const recoveryKey = db.resetRecoveryKey(target.id);
         res.json({ success: true, recoveryKey });
     } catch (e) {
         res.status(500).json({ error: 'Schlüssel konnte nicht erzeugt werden' });
@@ -1338,10 +1433,16 @@ app.post('/api/users/:id/recovery-key', loginLimiter, (req, res) => {
 });
 
 app.delete('/api/users/:id', (req, res) => {
-    if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Nur Admins erlaubt' });
-    const { id } = req.params;
+    const target = db.getUserById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+    if (target.role === 'owner') return res.status(400).json({ error: 'Der Inhaber kann nicht gelöscht werden' });
+    if (String(target.id) === String(req.user.id)) return res.status(400).json({ error: 'Das eigene Konto kann man nicht löschen' });
+    if (!permissions.within(permissions.forUser(target), req.user.permissions)) return res.status(403).json({ error: 'Dieser Benutzer hat mehr Rechte als du' });
     try {
-        db.deleteUser(id);
+        db.deleteUser(target.id);
+        // Push devices of the removed user stop getting notifications
+        try { db.getDb().prepare('DELETE FROM push_subscriptions WHERE username = ?').run(target.username); } catch (e) { /* no push table */ }
+        console.log(`👤 Benutzer "${target.username}" gelöscht von ${req.user.username}`);
         res.json({ success: true, message: 'Benutzer gelöscht' });
     } catch (e) {
         res.status(500).json({ error: 'Benutzer konnte nicht gelöscht werden' });
@@ -1411,7 +1512,7 @@ app.get('/api/bookings', apiLimiter, (req, res) => {
         else if (filter === 'noname') rows = rows.filter(r => r.needsName && r.state !== 'past').sort((a, b) => a.checkin.localeCompare(b.checkin));
         const q = String(req.query.q || '').trim().toLowerCase();
         if (q) rows = rows.filter(r => `${r.name} ${r.source} ${r.checkin} ${r.checkout}`.toLowerCase().includes(q));
-        res.json({ success: true, bookings: rows.slice(0, 300) });
+        res.json({ success: true, bookings: rows.slice(0, 300).map(r => permissions.redactBooking(r, req.user.permissions)) });
     } catch (e) {
         console.error('Bookings API Error:', e.message);
         res.status(500).json({ success: false, error: 'Buchungen konnten nicht geladen werden' });
@@ -1451,7 +1552,7 @@ app.get('/api/calendar', apiLimiter, (req, res) => {
 
         res.json({
             success: true, today, month, first, daysInMonth,
-            bookings,
+            bookings: bookings.map(r => permissions.redactBooking(r, req.user.permissions)),
             occupancy: { nights: booked.size, days: daysInMonth, rate: Math.round(booked.size / daysInMonth * 100) },
             gaps
         });
@@ -1544,7 +1645,10 @@ app.get('/api/activity', apiLimiter, (req, res) => {
             items.push({ type: 'invoice', at: sqlTs(r.created_at), name: r.guest_name || '', number: r.invoice_number, checkin: r.arrival, checkout: r.departure, amount: r.total_amount || 0, paid: !!r.is_paid });
         });
         items.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
-        res.json({ success: true, items: items.slice(0, 25) });
+        const perms = req.user.permissions;
+        const visible = items.filter(i => (i.type !== 'invoice' || permissions.can(perms, 'invoices'))
+            && (i.type !== 'request' || permissions.can(perms, 'bookings')));
+        res.json({ success: true, items: visible.slice(0, 25) });
     } catch (e) {
         console.error('Activity API Error:', e.message);
         res.status(500).json({ success: false, error: 'Aktivitäten konnten nicht geladen werden' });
@@ -1672,11 +1776,13 @@ app.get('/api/overview', apiLimiter, (req, res) => {
             sync.feeds.filter(f => !f.ok).forEach(f => warnings.push({ type: 'sync', text: `${f.source}: Kalenderabfrage fehlgeschlagen (${f.error})` }));
         }
 
+        const perms = req.user.permissions;
+        const redact = r => permissions.redactBooking(r, perms);
         res.json({
             success: true, today,
-            inHouse, events: events.slice(0, 12),
+            inHouse: inHouse.map(redact), events: events.slice(0, 12).map(e => ({ ...e, booking: redact(e.booking) })),
             namesMissing: active.filter(r => r.needsName && r.source !== 'manual').length,
-            openInvoices: { count: open.length, total: openTotal },
+            openInvoices: permissions.can(perms, 'invoices') ? { count: open.length, total: openTotal } : null,
             warnings, sync
         });
     } catch (e) {
@@ -1775,6 +1881,14 @@ function formSecret(value, ...p) {
 app.get('/api/settings', apiLimiter, (req, res) => {
     try {
         const settings = maskSettings(db.getAllSettings());
+        if (!permissions.can(req.user.permissions, 'settings')) {
+            // Without the settings right only what the invoice form needs (landlord, bank, prices)
+            const reduced = {};
+            if (permissions.can(req.user.permissions, 'invoices')) {
+                for (const key of ['vermieter', 'bank', 'pricing']) if (settings[key] !== undefined) reduced[key] = settings[key];
+            }
+            return res.json({ success: true, settings: reduced, reduced: true });
+        }
         res.json({ success: true, settings });
     } catch (e) {
         console.error('Settings GET Error:', e.message);

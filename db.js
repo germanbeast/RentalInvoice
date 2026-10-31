@@ -34,6 +34,7 @@ function initSchema() {
             phone TEXT DEFAULT '',
             telegram_id TEXT DEFAULT '',
             recovery_key TEXT,
+            permissions TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     `);
@@ -134,6 +135,16 @@ function initSchema() {
     if (!hasTgId) {
         db.exec("ALTER TABLE users ADD COLUMN telegram_id TEXT DEFAULT ''");
         console.log('✅ Migration: telegram_id Spalte zu users Tabelle hinzugefügt.');
+    }
+    if (!tableInfo.some(col => col.name === 'permissions')) {
+        db.exec("ALTER TABLE users ADD COLUMN permissions TEXT");
+        console.log('✅ Migration: permissions Spalte zu users Tabelle hinzugefügt.');
+    }
+    if (!tableInfo.some(col => col.name === 'recovery_key')) {
+        db.exec("ALTER TABLE users ADD COLUMN recovery_key TEXT");
+    }
+    if (!tableInfo.some(col => col.name === 'phone')) {
+        db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''");
     }
 
     // Migration: add status + updated_at to telegram_requests
@@ -264,8 +275,13 @@ function getUser(username) {
     return getDb().prepare('SELECT * FROM users WHERE username = ?').get(username);
 }
 
+function getUserById(id) {
+    return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id);
+}
+
 function getAllUsers() {
-    return getDb().prepare('SELECT id, username, role, phone, recovery_key IS NOT NULL AS has_recovery_key, created_at FROM users ORDER BY created_at').all();
+    return getDb().prepare(`SELECT id, username, role, phone, telegram_id, permissions, recovery_key IS NOT NULL AS has_recovery_key, created_at
+        FROM users ORDER BY role = 'owner' DESC, created_at, id`).all();
 }
 
 function getUserByPhone(phone) {
@@ -337,11 +353,11 @@ function hashRecoveryKey(key) {
 }
 
 /** Creates the user and returns the plain recovery key. */
-function createUser(username, hashedPassword, role = 'admin', phone = '', telegramId = '') {
+function createUser(username, hashedPassword, role = 'admin', phone = '', telegramId = '', permissions = null) {
     const recoveryKey = newRecoveryKey();
     getDb().prepare(
-        'INSERT OR REPLACE INTO users (username, password, role, phone, telegram_id, recovery_key) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(username, hashedPassword, role, phone, telegramId, hashRecoveryKey(recoveryKey));
+        'INSERT INTO users (username, password, role, phone, telegram_id, recovery_key, permissions) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(username, hashedPassword, role, phone || '', telegramId || '', hashRecoveryKey(recoveryKey), permissions ? JSON.stringify(permissions) : null);
     return recoveryKey;
 }
 
@@ -366,15 +382,17 @@ function updateUserPassword(username, hashedPassword) {
     ).run(hashedPassword, username);
 }
 
+/** Updates only the given fields: username, password (hash), role, phone, telegram_id, permissions (object). */
 function updateUser(id, data) {
-    const db = getDb();
-    if (data.password) {
-        db.prepare('UPDATE users SET username = ?, password = ?, role = ?, phone = ? WHERE id = ?')
-            .run(data.username, data.password, data.role || 'admin', data.phone || '', id);
-    } else {
-        db.prepare('UPDATE users SET username = ?, role = ?, phone = ? WHERE id = ?')
-            .run(data.username, data.role || 'admin', data.phone || '', id);
+    const cols = [];
+    const vals = [];
+    for (const key of ['username', 'password', 'role', 'phone', 'telegram_id', 'permissions']) {
+        if (data[key] === undefined) continue;
+        cols.push(`${key} = ?`);
+        vals.push(key === 'permissions' ? (data[key] ? JSON.stringify(data[key]) : null) : data[key]);
     }
+    if (!cols.length) return { changes: 0 };
+    return getDb().prepare(`UPDATE users SET ${cols.join(', ')} WHERE id = ?`).run(...vals, id);
 }
 
 function deleteUser(id) {
@@ -384,12 +402,15 @@ function deleteUser(id) {
 function initDefaultUser() {
     const defaultPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const existing = getUser('admin');
+    const userCount = getDb().prepare('SELECT COUNT(*) AS n FROM users').get().n;
 
-    if (!existing) {
+    // Only a fresh installation gets the default user. Once other users exist, a deleted or renamed
+    // "admin" must not come back with the default password.
+    if (!existing && userCount === 0) {
         const hashed = bcrypt.hashSync(defaultPassword, 12);
-        const recoveryKey = createUser('admin', hashed, 'admin');
+        const recoveryKey = createUser('admin', hashed, 'owner');
         console.log(`✅ Standard-Benutzer "admin" erstellt. Wiederherstellungs-Schlüssel (nur jetzt sichtbar): ${recoveryKey}`);
-    } else {
+    } else if (existing) {
         // Sync password if ADMIN_PASSWORD env var changed
         if (!bcrypt.compareSync(defaultPassword, existing.password)) {
             console.log('🔄 ADMIN_PASSWORD hat sich geändert. Aktualisiere...');
@@ -417,6 +438,17 @@ function initDefaultUser() {
         getDb().prepare('UPDATE users SET recovery_key = ? WHERE id = ?').run(hashRecoveryKey(u.recovery_key), u.id);
     }
     if (plain.length) console.log(`🔐 ${plain.length} Wiederherstellungs-Schlüssel verschlüsselt gespeichert.`);
+
+    // Roles & permissions (v1.32): one owner who always keeps every right. Existing users keep the role
+    // "admin" (full rights), so nothing changes for them; the "admin" user (or the oldest one) becomes owner.
+    const hasOwner = getDb().prepare("SELECT 1 FROM users WHERE role = 'owner' LIMIT 1").get();
+    if (!hasOwner) {
+        const first = getUser('admin') || getDb().prepare('SELECT * FROM users ORDER BY created_at, id LIMIT 1').get();
+        if (first) {
+            getDb().prepare("UPDATE users SET role = 'owner' WHERE id = ?").run(first.id);
+            console.log(`👑 Benutzer "${first.username}" ist jetzt Inhaber (alle Rechte).`);
+        }
+    }
 }
 
 // Migrate from users.json if it exists
@@ -1140,6 +1172,7 @@ module.exports = {
     getDb,
     // Users
     getUser,
+    getUserById,
     getAllUsers,
     getUserByPhone,
     getUserByTelegramId,
