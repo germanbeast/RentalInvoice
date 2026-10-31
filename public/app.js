@@ -1848,28 +1848,35 @@
     function renderUpcoming() {
         const today = calHome.today;
         const site = calHome.site || {};
-        const evs = [];
-        calHome.bookings.filter(bk => bk.checkout >= today).forEach(bk => {
-            if (bk.checkin >= today) evs.push({ type: 'in', date: bk.checkin, b: bk });
-            evs.push({ type: 'out', date: bk.checkout, b: bk });
-        });
-        evs.sort((x, y) => x.date.localeCompare(y.date) || (x.type === 'out' ? -1 : 1));
+        // Eine Karte pro Buchung: Check-in und Check-out nebeneinander, sortiert nach dem nächsten Termin
+        const list = calHome.bookings.filter(bk => bk.checkout >= today)
+            .map(bk => ({ b: bk, next: bk.checkin >= today ? bk.checkin : bk.checkout }))
+            .sort((x, y) => x.next.localeCompare(y.next) || x.b.checkin.localeCompare(y.b.checkin));
         const box = $('#cal-upcoming');
-        if (!evs.length) { box.innerHTML = '<div class="panel-empty">Keine bevorstehenden An- oder Abreisen.</div>'; return; }
-        box.innerHTML = evs.slice(0, 10).map(e => {
-            const when = e.date === today ? 'Heute' : e.date === ymdAdd(today, 1) ? 'Morgen' : weekdayDE(e.date);
-            const time = e.type === 'in' ? (site.checkin_time || '') : (site.checkout_time || '');
-            return `<button type="button" class="up-card" data-bid="${e.b.id}">
+        if (!list.length) { box.innerHTML = '<div class="panel-empty">Keine bevorstehenden An- oder Abreisen.</div>'; return; }
+        const when = d => d === today ? 'Heute' : d === ymdAdd(today, 1) ? 'Morgen' : weekdayDE(d);
+        const stop = (type, d, time, done) => `<span class="up-stop${done ? ' done' : ''}${d === today ? ' today' : ''}">
+                <span class="chip ${type === 'in' ? 'chip-in' : 'chip-out'}">${type === 'in' ? 'Check-in' : 'Check-out'}</span>
+                <span class="meta"><b>${when(d)}</b> ${fmtDEfull(d)}</span>
+                ${time ? `<span class="meta">${ICON.clock}${escapeHtml(time)}</span>` : ''}
+            </span>`;
+        box.innerHTML = list.slice(0, 10).map(({ b }) => {
+            const inHouse = b.checkin < today;
+            const state = b.checkin === today ? '<span class="chip chip-new">reist heute an</span>'
+                : b.checkout === today ? '<span class="chip chip-warn">reist heute ab</span>'
+                : inHouse ? '<span class="chip chip-gray">im Haus</span>' : '';
+            const code = b.hasCode ? '<span class="meta ok">Türcode ✓</span>' : (!inHouse ? '<span class="meta warn">kein Türcode</span>' : '');
+            return `<button type="button" class="up-card" data-bid="${b.id}">
                 <div class="up-line">
-                    <span class="chip ${e.type === 'in' ? 'chip-in' : 'chip-out'}">${e.type === 'in' ? 'Check-in' : 'Check-out'}</span>
-                    <span class="meta">${e.type === 'in' ? ICON.inn : ICON.out}<b>${when}</b> ${fmtDEfull(e.date)}</span>
-                    ${time ? `<span class="meta">${ICON.clock}${escapeHtml(time)}</span>` : ''}
-                    <span class="meta push">${ICON.moon}${e.b.nights}</span>
+                    <span class="meta up-name">${ICON.person}${b.name ? escapeHtml(b.name) : '<em>Name fehlt</em>'}</span>
+                    <span class="meta">${pfBadge(b.source)}${escapeHtml(srcLabel(b.source))}</span>
+                    ${state}
+                    <span class="push">${code}<span class="meta">${ICON.moon}${b.nights}</span></span>
                 </div>
-                <div class="up-line">
-                    <span class="meta">${ICON.person}${e.b.name ? escapeHtml(e.b.name) : '<em>Name fehlt</em>'}</span>
-                    <span class="meta">${pfBadge(e.b.source)}${escapeHtml(srcLabel(e.b.source))}</span>
-                    ${e.b.hasCode ? '<span class="meta push ok">Türcode ✓</span>' : (e.type === 'in' ? '<span class="meta push warn">kein Türcode</span>' : '')}
+                <div class="up-line up-stops">
+                    ${stop('in', b.checkin, site.checkin_time || '', inHouse)}
+                    <span class="up-arrow" aria-hidden="true">→</span>
+                    ${stop('out', b.checkout, site.checkout_time || '', false)}
                 </div>
             </button>`;
         }).join('');

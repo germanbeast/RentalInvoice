@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.1] - 2026-10-31
+
+### Geändert
+- Kalender-Startseite, „Bevorstehende Buchungen“: eine Karte pro Buchung statt je einer für Check-in und Check-out. Oben Gast, Plattform, Status (reist heute an/ab, im Haus), Türcode und Nächte, darunter Check-in → Check-out mit Datum und Uhrzeit. Sortiert nach dem nächsten Termin; ein bereits erfolgter Check-in wird blass angezeigt
+
 ## [1.31.0] - 2026-10-31
 
 ### Neu
