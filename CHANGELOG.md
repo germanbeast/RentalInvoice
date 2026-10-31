@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0] - 2026-10-31
+
+### Neu
+- „Meine Buchung“ als App: Titelbild mit schwebender Kopfzeile und Menü, Karten „Buchungscode“ und „Gebucht von“, Abschnitt „Gebucht“ mit Foto-Karussell und Aufenthaltsdaten, Tab-Leiste Gäste / Aufenthalt / A – Z / Umgebung (Handy: unten fixiert, ab 900 px oben unter dem Titelbild). Gleiche Boutique-Tokens wie die Webseite (`guest-site/app.css`)
+- Gästemappe A – Z: WLAN, Türcode, An- & Abreise, Adresse, Parken, Hausregeln, Kontakt und alle „Gut zu wissen“-Abschnitte alphabetisch zum Aufklappen
+- Umgebung: Anfahrt mit Routen-Link und die Ausflugstipps aus „Inhalte“
+- Online-Meldeschein (`meldeschein.js`, Tabelle `guest_registrations`): Familienname, Vornamen, Geburtsdatum, Staatsangehörigkeit, Anschrift, Ausweisart und -nummer (Pflicht bei ausländischer Staatsangehörigkeit), Mitreisende, Unterschrift auf dem Bildschirm, Bestätigung. Änderbar bis zum Anreisetag. Füllt fehlende Gastnamen, Adresse und Kontakt beim Gast auf
+- Admin „Anfragen“ → „Meldescheine“: Liste nach Jahr/Monat, Drucken einzeln (`GET /api/meldescheine/:id/druck`) oder gesammelt (`/api/meldescheine/druck`), CSV-Export (`/api/meldescheine/export.csv`), Löschen, offene Meldescheine der nächsten 30 Tage. Im Kalender-Popup: Status „Meldeschein“ und Knopf zum Drucken
+- Einstellung „Online-Meldeschein“ (Webseite → Einrichtung), Telegram-Nachricht bei neuem oder geändertem Meldeschein, Hinweis in der Gästenachricht
+- Automatische Löschung 13 Monate nach Abreise (Aufbewahrung 1 Jahr nach § 30 Abs. 4 BMG)
+
 ## [1.28.0] - 2026-10-31
 
 ### Neu

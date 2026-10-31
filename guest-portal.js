@@ -38,6 +38,7 @@ const SITE_DEFAULTS = {
     show_bank: true,
     show_contact: true,
     pin_days: 2,          // show the door code this many days before arrival (0 = never)
+    meldeschein: 'all',   // online registration form on "Meine Buchung": 'all' | 'off' (see meldeschein.js)
     guest_invoice: 'all', // guests create their own invoice on "Meine Buchung": 'all' | 'direct' | 'off'
     wifi_name: '',
     wifi_password: '',
@@ -774,6 +775,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 checkin_time: time(inp.checkin_time, cur.checkin_time), checkout_time: time(inp.checkout_time, cur.checkout_time),
                 show_bank: !!inp.show_bank, show_contact: !!inp.show_contact,
                 guest_invoice: ['all', 'direct', 'off'].includes(inp.guest_invoice) ? inp.guest_invoice : cur.guest_invoice,
+                meldeschein: ['all', 'off'].includes(inp.meldeschein) ? inp.meldeschein : cur.meldeschein,
                 public_url: /^https?:\/\/[^\s]+$/i.test(url) ? url.replace(/\/+$/, '') : ''
             };
             Object.assign(site, cleanExtras(inp));

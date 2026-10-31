@@ -510,6 +510,7 @@
                     </div>
                     <div class="seg" id="website-tabs">
                         <button type="button" data-tab="requests" class="active">Anfragen</button>
+                        <button type="button" data-tab="meldescheine">Meldescheine</button>
                         <button type="button" data-tab="content">Inhalte</button>
                         <button type="button" data-tab="setup">Einrichtung</button>
                     </div>
@@ -517,6 +518,29 @@
 
                 <div class="site-pane" data-pane="requests">
                     <div id="site-requests" class="bookings-list"></div>
+                </div>
+
+                <div class="site-pane" data-pane="meldescheine" style="display:none;">
+                    <div class="card ms-toolbar">
+                        <div>
+                            <div class="today-title">Meldescheine</div>
+                            <p class="text-muted" style="font-size:.85rem;margin:0">Gäste füllen den Meldeschein vor der Anreise auf „Meine Buchung“ aus und unterschreiben auf dem Handy. Gelöscht wird automatisch 13 Monate nach Abreise (Aufbewahrung 1 Jahr, § 30 BMG).</p>
+                        </div>
+                        <div class="ms-filter">
+                            <select id="ms-year" aria-label="Jahr"></select>
+                            <select id="ms-month" aria-label="Monat">
+                                <option value="">Ganzes Jahr</option>
+                                <option value="01">Januar</option><option value="02">Februar</option><option value="03">März</option>
+                                <option value="04">April</option><option value="05">Mai</option><option value="06">Juni</option>
+                                <option value="07">Juli</option><option value="08">August</option><option value="09">September</option>
+                                <option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option>
+                            </select>
+                            <button type="button" class="btn-mini" id="ms-print-all">Alle drucken</button>
+                            <button type="button" class="btn-mini" id="ms-csv">CSV exportieren</button>
+                        </div>
+                    </div>
+                    <div id="ms-missing"></div>
+                    <div id="ms-list" class="bookings-list"></div>
                 </div>
 
                 <div class="site-pane" data-pane="content" style="display:none;">
@@ -622,6 +646,11 @@
                                 <option value="all">Bei allen Buchungen</option>
                                 <option value="direct">Nur bei Direktbuchungen</option>
                                 <option value="off">Aus – ich erstelle Rechnungen selbst</option>
+                            </select></div>
+                        <div class="form-group" style="margin-top:1rem"><label for="site-meldeschein">Online-Meldeschein auf „Meine Buchung“</label>
+                            <select id="site-meldeschein">
+                                <option value="all">An – alle Gäste füllen ihn vor der Anreise aus</option>
+                                <option value="off">Aus</option>
                             </select></div>
                         <p class="text-muted" style="font-size:.85rem">Auf „Meine Buchung“ ergänzt der Gast Adresse, Firma und ggf. USt-IdNr. und lädt die Rechnung sofort herunter. Beträge wie im Telegram-Bot aus Preise &amp; Gebühren (Direktbuchungen: vereinbarter Preis). Du bekommst eine Nachricht. Danach kann der Gast nichts mehr ändern, nur eine Korrektur anfragen.</p>
                     </div>

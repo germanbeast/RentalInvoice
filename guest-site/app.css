@@ -1,0 +1,188 @@
+/* Ferienwohnung – Gäste-Webseite · Meine Buchung als App (nach dem Login)
+   Gleiche Tokens wie site.css (Papier, Tinte, Rost, Instrument Serif + Hanken Grotesk). */
+
+body.signed-in .login-only { display: none !important; }
+body.signed-in { background: var(--paper); }
+
+.gapp { --bar-h: 76px; min-height: 100svh; padding-bottom: calc(var(--bar-h) + 28px + env(safe-area-inset-bottom)); }
+
+/* ---------- Hero ---------- */
+.gapp-hero { position: relative; height: clamp(300px, 46vh, 560px); color: var(--paper); overflow: hidden; background: radial-gradient(120% 90% at 20% 10%, #8a6e52, #3a3027 70%); }
+.gapp-hero-media, .gapp-hero-media img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gapp-hero-media img { object-fit: cover; animation: settle 2.2s var(--ease) both; }
+.gapp-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(31, 28, 24, .25) 0%, rgba(31, 28, 24, 0) 30%, rgba(31, 28, 24, .72) 100%); pointer-events: none; }
+.gapp-bar {
+    position: absolute; z-index: 2; top: max(12px, env(safe-area-inset-top)); left: 50%; translate: -50% 0;
+    width: min(1180px, 100% - 24px);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: .55rem .6rem .55rem 1.1rem; background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 4px;
+}
+.gapp-brand { font: 400 1.35rem/1.1 var(--serif); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gapp-menu-btn { display: grid; place-items: center; width: 42px; height: 42px; border: 0; border-radius: 50%; background: var(--paper-2); color: var(--ink); cursor: pointer; flex: none; transition: background .2s var(--ease); }
+.gapp-menu-btn:hover { background: var(--accent-soft); }
+.gapp-hero-text { position: absolute; z-index: 1; left: 50%; translate: -50% 0; bottom: clamp(20px, 4vw, 44px); width: min(1180px, 100% - 2 * var(--gutter)); }
+.gapp-kicker { margin: 0 0 .4rem; font-size: .76rem; letter-spacing: .16em; text-transform: uppercase; opacity: .9; }
+.gapp-hero-text h1 { font-size: clamp(2.4rem, 7vw, 4.6rem); color: var(--paper); text-shadow: 0 1px 18px rgba(0, 0, 0, .25); }
+.gapp-hero-text p:last-child { margin: .5rem 0 0; font-size: 1.02rem; opacity: .95; max-width: 56ch; }
+.gapp-hero-text p:empty { display: none; }
+
+/* ---------- Tab bar: unten auf dem Handy, oben auf großen Bildschirmen ---------- */
+.gapp-tabs {
+    position: fixed; z-index: 40; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px;
+    padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+    box-shadow: 0 10px 30px rgba(31, 28, 24, .14);
+}
+.gapp-tabs button {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem;
+    min-height: 58px; padding: .4rem .2rem; border: 0; border-radius: 3px; background: none; color: var(--ink);
+    font: 500 .82rem/1.1 var(--sans); cursor: pointer; transition: background .2s var(--ease), color .2s var(--ease);
+}
+.gapp-tabs button svg { width: 24px; height: 24px; stroke-width: 1.5; }
+.gapp-tabs button:hover { background: var(--paper-2); }
+.gapp-tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+.gapp-tabs button span { white-space: nowrap; }
+.gapp-dot { position: absolute; top: 8px; left: calc(50% + 8px); width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--card); }
+@media (min-width: 900px) {
+    .gapp { padding-bottom: clamp(48px, 8vw, 96px); }
+    .gapp-tabs {
+        position: sticky; top: 0; left: auto; right: auto; bottom: auto;
+        display: flex; justify-content: center; gap: .4rem;
+        border-width: 0 0 1px; border-radius: 0; box-shadow: none; padding: .55rem var(--gutter);
+        background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(8px);
+    }
+    .gapp-tabs button { flex-direction: row; gap: .55rem; min-height: 0; padding: .7rem 1.3rem; font-size: .95rem; }
+    .gapp-tabs button svg { width: 20px; height: 20px; }
+    .gapp-dot { top: 6px; left: 30px; }
+}
+
+/* ---------- Content ---------- */
+.gapp-main { width: min(1180px, 100% - 2 * var(--gutter)); margin: 0 auto; padding-top: clamp(16px, 3vw, 36px); }
+.gapp-pane { animation: soft-in .4s var(--ease); }
+.gapp-cols { display: grid; gap: 14px; align-items: start; }
+.gapp-col { display: grid; gap: 14px; min-width: 0; }
+@media (min-width: 900px) { .gapp-cols { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; } .gapp-col { gap: 20px; } }
+.gapp-pane-head { margin: .4rem 0 1.2rem; }
+.gapp-pane-head h2 { font-size: clamp(2rem, 4.5vw, 2.8rem); }
+.gapp-pane-head p { margin: .4rem 0 0; color: var(--ink-soft); max-width: 60ch; }
+
+.gcard { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: clamp(16px, 2.6vw, 26px); min-width: 0; }
+.gcard h3 { font-size: 1.7rem; margin-bottom: .6rem; }
+.gcard > p:last-child { margin-bottom: 0; }
+.gcard-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 560px) { .gcard-pair { grid-template-columns: 1fr; } }
+@media (min-width: 900px) { .gcard-pair { gap: 20px; } }
+.gid { text-align: center; padding-block: clamp(18px, 3vw, 28px); }
+.gid span { display: block; font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; }
+.gid strong { display: block; font: 400 clamp(1.8rem, 5vw, 2.3rem)/1.1 var(--serif); letter-spacing: .03em; overflow-wrap: anywhere; }
+.gid strong.muted { color: var(--muted); font-size: 1.4rem; }
+.gid .badge { margin-top: .6rem; }
+
+/* Abschnitt mit Kopfband ("Gebucht") */
+.gsection { background: var(--card); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; min-width: 0; }
+.gsection-head { display: grid; grid-template-columns: 58px 1fr 58px; align-items: stretch; background: var(--ink); color: var(--paper); }
+.gsection-head .ic { display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 10%, transparent); }
+.gsection-head .ic svg { width: 24px; height: 24px; }
+.gsection-head h3 { margin: 0; padding: .95rem .5rem; text-align: center; font: 400 1.55rem/1.1 var(--serif); }
+.gsection-body { padding: clamp(14px, 2.4vw, 22px); }
+.gsection-body > :last-child { margin-bottom: 0; }
+
+/* Foto-Karussell */
+.gcarousel { position: relative; border-radius: 2px; overflow: hidden; background: var(--paper-2); }
+.gcarousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
+.gcarousel-track::-webkit-scrollbar { display: none; }
+.gcarousel-track img { flex: 0 0 100%; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; scroll-snap-align: start; display: block; }
+.gcarousel-btn {
+    position: absolute; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 40px; height: 40px;
+    border: 1px solid rgba(255, 255, 255, .6); border-radius: 50%; background: rgba(251, 248, 243, .82); color: var(--ink); cursor: pointer;
+    backdrop-filter: blur(4px); transition: background .2s var(--ease), opacity .2s var(--ease);
+}
+.gcarousel-btn:hover { background: var(--card); }
+.gcarousel-btn:disabled { opacity: 0; pointer-events: none; }
+.gcarousel-btn.prev { left: 10px; }
+.gcarousel-btn.next { right: 10px; }
+.gcarousel-count { position: absolute; right: 10px; bottom: 10px; padding: .2rem .55rem; border-radius: 2px; background: rgba(31, 28, 24, .7); color: var(--paper); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.gstay-title { margin: 1rem 0 .2rem; font: 400 1.5rem/1.2 var(--serif); }
+.gsection .stay-grid { margin: .6rem 0 0; }
+
+/* Türcode, Hinweise */
+.gpin { text-align: center; }
+.gpin .pin { font-size: clamp(2.6rem, 9vw, 3.4rem); margin: .2rem 0 .6rem; }
+.gpin p { color: var(--ink-soft); font-size: .92rem; margin: 0 auto; max-width: 40ch; }
+.gcallout { background: var(--accent-soft); border-color: var(--accent-soft); }
+.gcallout h3 { font-size: 1.55rem; }
+.gcallout p { color: var(--ink-soft); }
+.gdone { display: flex; align-items: center; gap: .8rem; }
+.gdone .tick { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--ok-soft); color: var(--ok); }
+.gdone .tick svg { width: 20px; height: 20px; stroke-width: 2; }
+.gdone p { margin: 0; color: var(--ink-soft); }
+.gdone strong { color: var(--ink); }
+.gcard .info-block:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.gcard .guest-actions { margin-top: 0; }
+
+/* ---------- A – Z ---------- */
+.az-letter { display: flex; align-items: baseline; gap: .8rem; margin: 1.4rem 0 .5rem; }
+.az-letter b { font: 400 2rem/1 var(--serif); color: var(--accent); }
+.az-letter::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.az-letter:first-child { margin-top: 0; }
+.az-item { background: var(--card); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 8px; }
+.az-item summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; cursor: pointer; list-style: none; font: 400 1.3rem/1.2 var(--serif); }
+.az-item summary::-webkit-details-marker { display: none; }
+.az-item summary svg { flex: none; width: 18px; height: 18px; transition: rotate .25s var(--ease); }
+.az-item[open] summary svg { rotate: 180deg; }
+.az-item summary:hover { color: var(--accent); }
+.az-body { padding: 0 1.15rem 1.1rem; }
+.az-body .prose { overflow-wrap: anywhere; }
+.az-body .text-link { display: inline-block; margin-top: .6rem; font-size: .92rem; }
+.az-cols { columns: 2 380px; column-gap: 20px; }
+.az-group { break-inside: avoid; }
+
+/* ---------- Umgebung ---------- */
+.area-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+@media (min-width: 900px) { .area-grid { gap: 20px; } }
+.tip h3 { font-size: 1.5rem; margin-bottom: .2rem; }
+.tip .dist { display: inline-block; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .6rem; }
+.tip p { color: var(--ink-soft); }
+.tip .text-link { font-size: .92rem; }
+.area-empty { color: var(--muted); }
+
+/* ---------- Meldeschein ---------- */
+.ms-form fieldset { border: 0; padding: 0; margin: 0 0 1.4rem; min-width: 0; }
+.ms-form legend { padding: 0; margin-bottom: .9rem; font: 400 1.45rem/1.2 var(--serif); }
+.ms-form .row3 { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; }
+@media (max-width: 480px) { .ms-form .row3 { grid-template-columns: 1fr; } }
+.ms-dates { display: grid; grid-template-columns: 1fr 1fr; border-block: 1px solid var(--line); margin-bottom: 1.4rem; }
+.ms-dates div { padding: .7rem 0; }
+.ms-dates div + div { padding-left: 1rem; border-left: 1px solid var(--line); }
+.ms-dates span { display: block; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ms-dates strong { font: 400 1.25rem/1.25 var(--serif); }
+.ms-hint { font-size: .86rem; color: var(--muted); margin: -.4rem 0 1rem; }
+.ms-companion { position: relative; border: 1px solid var(--line); border-radius: 4px; padding: 1rem 1rem .1rem; margin-bottom: .8rem; background: var(--paper); }
+.ms-companion-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; font-weight: 600; font-size: .9rem; }
+.ms-remove { background: none; border: 0; color: var(--bad); font: 500 .85rem var(--sans); cursor: pointer; padding: .2rem; }
+.ms-add { display: inline-flex; align-items: center; gap: .4rem; }
+.ms-add svg { width: 16px; height: 16px; }
+.sigpad { position: relative; height: 190px; border: 1px dashed var(--muted); border-radius: 4px; background: #fff; touch-action: none; margin-top: .4rem; }
+.sigpad canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+.sigpad::after { content: ''; position: absolute; left: 18px; right: 18px; bottom: 44px; height: 1px; background: var(--line); pointer-events: none; }
+.sigpad-ph { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; color: var(--muted); font-size: .85rem; pointer-events: none; }
+.sigpad.inked .sigpad-ph { display: none; }
+.sig-tools { display: flex; justify-content: space-between; align-items: center; margin: .4rem 0 1.2rem; font-size: .88rem; color: var(--ink-soft); }
+.ms-summary dl { margin: 0; display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); border-top: 1px solid var(--line); }
+.ms-summary dt, .ms-summary dd { margin: 0; padding: .55rem 0; border-bottom: 1px solid var(--line); }
+.ms-summary dt { font-size: .76rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: .75rem; }
+.ms-summary dd { overflow-wrap: anywhere; }
+.ms-summary img { display: block; max-width: 260px; height: 80px; object-fit: contain; object-position: left; }
+@media (max-width: 480px) { .ms-summary dl { grid-template-columns: 1fr; } .ms-summary dt { border-bottom: 0; padding-bottom: 0; } }
+.ms-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; }
+
+/* Menü */
+.gapp-sheet { max-width: 420px; }
+.gapp-menu { display: grid; margin-top: 1rem; }
+.gapp-menu a, .gapp-menu button, .gapp-menu span a { display: block; padding: .9rem 0; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; font: 400 1.05rem var(--sans); color: var(--ink); text-decoration: none; cursor: pointer; }
+.gapp-menu span:empty { display: none; }
+.gapp-menu button { color: var(--bad); }
+.gapp-menu a:hover, .gapp-menu button:hover { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) { .gapp-hero-media img, .gapp-pane { animation: none; } .gcarousel-track { scroll-behavior: auto; } }
