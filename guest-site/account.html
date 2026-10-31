@@ -10,9 +10,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="site.css">
+    <link rel="stylesheet" href="app.css">
+    <meta name="theme-color" content="#1f1c18">
 </head>
 <body class="account-page">
-    <header class="masthead solid">
+    <header class="masthead solid login-only">
         <a href="./" class="brand" id="brand">Ferienwohnung Beckhome</a>
         <nav class="mast-nav" aria-label="Hauptnavigation">
             <a href="./#wohnung">Die Wohnung</a>
@@ -22,7 +24,7 @@
         </nav>
     </header>
 
-    <main class="account">
+    <main class="account login-only">
         <div class="account-media" id="account-media" aria-hidden="true"></div>
 
         <div class="account-panel">
@@ -42,11 +44,10 @@
                 <p class="account-help">Noch nicht gebucht? <a href="./#buchen">Verfügbarkeit ansehen</a></p>
             </div>
 
-            <div id="guest-box" hidden></div>
         </div>
     </main>
 
-    <footer class="colophon">
+    <footer class="colophon login-only">
         <div class="colophon-inner">
             <div>
                 <p class="colophon-title" id="footer-title">Ferienwohnung Beckhome</p>
@@ -59,6 +60,63 @@
             </nav>
         </div>
     </footer>
+
+    <!-- Gästebereich als App (nach dem Login) -->
+    <div class="gapp" id="app" hidden>
+        <header class="gapp-hero" id="app-hero">
+            <div class="gapp-hero-media" id="app-hero-media" aria-hidden="true"></div>
+            <div class="gapp-bar">
+                <a href="./" class="gapp-brand" id="app-brand">Ferienwohnung Beckhome</a>
+                <button type="button" class="gapp-menu-btn" id="app-menu-btn" aria-label="Menü" aria-haspopup="dialog">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+            </div>
+            <div class="gapp-hero-text">
+                <p class="gapp-kicker">Meine Buchung</p>
+                <h1 id="app-hello">Willkommen</h1>
+                <p id="app-state"></p>
+            </div>
+        </header>
+
+        <nav class="gapp-tabs" id="app-tabs" role="tablist" aria-label="Bereiche">
+            <button type="button" role="tab" data-tab="guests" id="tab-guests">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.2 3.2 0 0 1 0 6.4M18 13.8c2.1.7 3.5 2.9 3.5 5.2"/></svg>
+                <span>Gäste</span><i class="gapp-dot" id="tab-guests-dot" hidden></i>
+            </button>
+            <button type="button" role="tab" data-tab="stay" id="tab-stay">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="m9 14 2 2 4-4"/></svg>
+                <span>Aufenthalt</span>
+            </button>
+            <button type="button" role="tab" data-tab="az" id="tab-az">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3.5 5v13.5c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5z"/><path d="M12 6.5V20"/></svg>
+                <span>A – Z</span>
+            </button>
+            <button type="button" role="tab" data-tab="area" id="tab-area">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>
+                <span>Umgebung</span>
+            </button>
+        </nav>
+
+        <main class="gapp-main">
+            <section class="gapp-pane" data-pane="stay" role="tabpanel" aria-labelledby="tab-stay"></section>
+            <section class="gapp-pane" data-pane="guests" role="tabpanel" aria-labelledby="tab-guests" hidden></section>
+            <section class="gapp-pane" data-pane="az" role="tabpanel" aria-labelledby="tab-az" hidden></section>
+            <section class="gapp-pane" data-pane="area" role="tabpanel" aria-labelledby="tab-area" hidden></section>
+        </main>
+    </div>
+
+    <dialog class="sheet gapp-sheet" id="app-menu" aria-label="Menü">
+        <button type="button" class="icon-btn sheet-close" data-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <h2 id="app-menu-title">Menü</h2>
+        <nav class="gapp-menu" id="app-menu-links">
+            <a href="./">Zur Startseite</a>
+            <a href="./#wohnung">Die Wohnung</a>
+            <span id="app-menu-contact"></span>
+            <a href="#impressum">Impressum</a>
+            <a href="#datenschutz">Datenschutz</a>
+            <button type="button" id="app-logout">Abmelden</button>
+        </nav>
+    </dialog>
 
     <dialog class="sheet" id="legal-overlay" aria-labelledby="legal-title">
         <button type="button" class="icon-btn sheet-close" id="legal-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>

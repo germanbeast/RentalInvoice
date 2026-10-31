@@ -1075,7 +1075,22 @@ const guestMessage = require('./guest-message')({
     berlinToday: () => berlinToday(),
     addDays: (ymd, n) => addDays(ymd, n)
 });
+// Online-Meldeschein on "Meine Buchung" (see meldeschein.js)
+const meldeschein = require('./meldeschein')({
+    express, rateLimit, db,
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortal.getSite(),
+    guestBooking: (sess) => guestPortal.guestBooking(sess),
+    berlinToday: () => berlinToday(),
+    nightsBetween: (a, b) => nightsBetween(a, b),
+    formatDateDE: (d) => formatDateDE(d),
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg, { type });
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    }
+});
 app.use('/gast', guestMessage.router);
+app.use('/gast', meldeschein.router);
 app.use('/gast', emergencyDoor.router);
 app.use('/gast', guestPortal.router);
 
@@ -1355,7 +1370,8 @@ function loadBookingRows() {
     guestPortal.ensureGuestCodes();
     const rows = db.getDb().prepare(`
         SELECT b.id, b.uid, b.summary, b.checkin, b.checkout, b.source, b.nuki_pin, b.nuki_auth_id, b.guest_code,
-               b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email
+               b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email,
+               (SELECT id FROM guest_registrations r WHERE r.booking_id = b.id) AS meldeschein_id
         FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
         WHERE b.checkin IS NOT NULL AND b.checkout IS NOT NULL
         ORDER BY b.checkin DESC
@@ -1375,7 +1391,7 @@ function loadBookingRows() {
             checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout),
             hasCode: !!(r.nuki_auth_id || r.nuki_pin), pin: r.nuki_pin || null,
             arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state,
-            guestCode: r.guest_code || null,
+            guestCode: r.guest_code || null, meldescheinId: r.meldeschein_id || null,
             manualEntry: String(r.uid).startsWith('direct-manual-')
         };
     });
@@ -1384,6 +1400,7 @@ function loadBookingRows() {
 // Guest website admin: settings, photos, booking requests
 guestPortal.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
+meldeschein.registerAdminRoutes(app, apiLimiter);
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {

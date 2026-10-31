@@ -71,6 +71,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
             departure: (d, t) => `📅 Abreise: ${d}${t ? ` bis ${t} Uhr` : ''}`,
             pin: p => `🔑 Dein Türcode: ${p}\n(gilt ab der Anreise am Tastenfeld an der Tür)`,
             portal: 'Alle Infos zu deinem Aufenthalt (Anreise, WLAN, Hausregeln) findest du in deinem persönlichen Gästeportal, ganz ohne Anmeldung:',
+            meldeschein: '📝 Bitte fülle dort vor der Anreise kurz den Meldeschein für dich und alle Mitreisenden aus (Reiter „Gäste“), das dauert zwei Minuten.',
             emergency: 'Falls das Tastenfeld einmal nicht funktioniert, kannst du die Tür während deines Aufenthalts auch hier öffnen:',
             private: 'Bitte gib die Links nicht weiter, sie gehören nur zu deiner Buchung.',
             code: c => `Dein Buchungscode (falls du doch einmal danach gefragt wirst): ${c}`,
@@ -85,6 +86,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
             departure: (d, t) => `📅 Departure: ${d}${t ? ` by ${t}` : ''}`,
             pin: p => `🔑 Your door code: ${p}\n(works from your arrival at the keypad by the door)`,
             portal: 'All details for your stay (arrival, Wi-Fi, house rules) are in your personal guest portal, no login needed:',
+            meldeschein: '📝 Please fill in the short registration form for yourself and everyone travelling with you before you arrive (tab “Gäste”), it takes two minutes.',
             emergency: 'If the keypad ever fails, you can also open the door here during your stay:',
             private: 'Please do not share these links, they belong to your booking only.',
             code: c => `Your booking code (in case you are asked for it): ${c}`,
@@ -149,6 +151,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
         lines.push(L.departure(fmtDay(b.checkout, L.locale), site.checkout_time));
         if (b.nuki_pin) lines.push(L.pin(b.nuki_pin));
         if (link) lines.push('', L.portal, `👉 ${link}`);
+        if (link && site.meldeschein !== 'off' && b.checkin >= berlinToday()) lines.push(L.meldeschein);
         if (emergencyLink) lines.push('', L.emergency, `🚪 ${emergencyLink}`);
         if (link) lines.push('', L.private);
         if (b.guest_code) lines.push('', L.code(b.guest_code));

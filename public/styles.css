@@ -3391,3 +3391,11 @@ a.pill { text-decoration: none; }
 .daymap-row > b { aspect-ratio: auto; height: 12px; border-radius: 2px; }
 .daymap-row > em { white-space: nowrap; }
 .review-grid > *, .review-table-card { min-width: 0; }
+
+/* Meldescheine */
+.ms-toolbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.ms-toolbar > div:first-child { flex: 1 1 320px; }
+.ms-filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ms-filter select { width: auto; }
+.ms-note { font-size: .85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ms-chip { display: inline-block; padding: 2px 8px; border: 1px solid var(--line, var(--border)); border-radius: 2px; font-size: .8rem; }

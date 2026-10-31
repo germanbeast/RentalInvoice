@@ -1951,10 +1951,12 @@
                 <dt>Türcode</dt><dd>${bk.hasCode ? (bk.pin ? `<code>${escapeHtml(bk.pin)}</code>` : 'angelegt') + (bk.arrivedAt ? ' · genutzt' : '') : 'kein Code'}</dd>
                 ${bk.guestCode ? `<dt>Gastcode</dt><dd><code>${escapeHtml(bk.guestCode)}</code></dd>` : ''}
                 ${bk.guestEmail ? `<dt>E-Mail</dt><dd>${escapeHtml(bk.guestEmail)}</dd>` : ''}
+                <dt>Meldeschein</dt><dd>${bk.meldescheinId ? 'ausgefüllt ✓' : bk.state === 'past' ? '–' : 'fehlt noch'}</dd>
             </dl>
             <div class="pop-actions">
                 <button type="button" class="pill" data-pop="name">${bk.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
                 <button type="button" class="pill" data-pop="invoice">Rechnung erstellen</button>
+                ${bk.meldescheinId ? '<button type="button" class="pill" data-pop="meldeschein">Meldeschein</button>' : ''}
                 ${bk.state !== 'past' ? `<button type="button" class="pill" data-pop="doorcode">${bk.hasCode ? 'Türcode bearbeiten' : 'Türcode anlegen'}</button>` : ''}
                 ${bk.state !== 'past' && bk.guestCode ? '<button type="button" class="pill" data-pop="guestlink">Gastlink kopieren</button>' : ''}
                 ${bk.manualEntry ? '<button type="button" class="pill pill-danger" data-pop="delete">Löschen</button>' : ''}
@@ -2021,6 +2023,7 @@
             if (!bk) return hideTlPop();
             if (act === 'invoice') { hideTlPop(); return invoiceFromBooking(bk); }
             if (act === 'guestlink') return copyGuestMessage(bk);
+            if (act === 'meldeschein') { hideTlPop(); return window.open(`/api/meldescheine/${bk.meldescheinId}/druck`, '_blank', 'noopener'); }
             if (act === 'doorcode') { hideTlPop(); return openDoorCode(bk); }
             if (act === 'delete') {
                 if (!confirm(`Buchung von ${bk.name || 'diesem Gast'} (${fmtDEfull(bk.checkin)} – ${fmtDEfull(bk.checkout)}) löschen?${bk.hasCode ? ' Der Türcode wird ebenfalls gelöscht.' : ''}`)) return;
@@ -2307,6 +2310,7 @@
         siteTab = tab;
         $$('#website-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         $$('#view-website .site-pane').forEach(p => { p.style.display = p.dataset.pane === tab ? 'flex' : 'none'; });
+        if (tab === 'meldescheine') loadMeldescheine();
     }
     $$('#website-tabs button').forEach(b => b.addEventListener('click', () => setSiteTab(b.dataset.tab)));
 
@@ -2330,7 +2334,7 @@
         checkin_time: '#site-checkin', checkout_time: '#site-checkout', pin_days: '#site-pin-days', payment_info: '#site-payment-info',
         testimonials: '#site-testimonials', bedrooms: '#site-bedrooms', size_sqm: '#site-size',
         wifi_name: '#site-wifi-name', wifi_password: '#site-wifi-password', parking: '#site-parking', guide: '#site-guide',
-        guest_invoice: '#site-guest-invoice'
+        guest_invoice: '#site-guest-invoice', meldeschein: '#site-meldeschein'
     };
     const SITE_CHECKS = { enabled: '#site-enabled', show_bank: '#site-show-bank', show_contact: '#site-show-contact' };
 
@@ -2621,6 +2625,54 @@
             } else showToast(d.error || 'Aktion fehlgeschlagen', 'error', 6000);
         } catch (x) { showToast('Aktion fehlgeschlagen', 'error'); }
         loadSiteRequests();
+    });
+
+    // ---- Meldescheine (online ausgefüllt auf „Meine Buchung“)
+    let msLoaded = false;
+    function msQuery() {
+        const y = $('#ms-year').value, m = $('#ms-month').value;
+        return new URLSearchParams({ ...(y ? { year: y } : {}), ...(y && m ? { month: m } : {}) }).toString();
+    }
+    async function loadMeldescheine() {
+        const list = $('#ms-list');
+        if (!msLoaded) {
+            const now = new Date().getFullYear();
+            $('#ms-year').innerHTML = `<option value="">Alle Jahre</option>` + [now + 1, now, now - 1].map(y => `<option value="${y}"${y === now ? ' selected' : ''}>${y}</option>`).join('');
+            msLoaded = true;
+        }
+        try {
+            const d = await apiJson(`/api/meldescheine?${msQuery()}`);
+            if (!d.success) throw new Error();
+            const miss = $('#ms-missing');
+            miss.innerHTML = !d.enabled ? '<div class="card ms-note">Der Online-Meldeschein ist ausgeschaltet (Einrichtung → Online-Meldeschein).</div>'
+                : d.missing.length ? `<div class="card ms-note"><strong>Noch offen (nächste 30 Tage):</strong> ${d.missing.map(b =>
+                    `<span class="ms-chip">${escapeHtml(b.name || srcLabel(b.source) || 'Gast')} · ${fmtDEfull(b.checkin)}</span>`).join('')}</div>` : '';
+            list.innerHTML = d.forms.length ? d.forms.map(f => `<div class="card req-card ms-card" data-id="${f.id}">
+                <div>
+                    <div class="booking-name">${escapeHtml(f.name)}</div>
+                    <div class="booking-sub">${escapeHtml(f.nationality)} · geb. ${fmtDEfull(f.birthDate)} · ${escapeHtml(f.city)}${f.country && !/^deutschland$/i.test(f.country) ? ', ' + escapeHtml(f.country) : ''}</div>
+                    <div class="booking-sub">Code ${escapeHtml(f.code || '–')} · erfasst ${new Date(f.submittedAt.replace(' ', 'T') + 'Z').toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                </div>
+                <div>
+                    <div>${fmtDEfull(f.checkin)} – ${fmtDEfull(f.checkout)}</div>
+                    <div class="booking-sub">${f.companions + 1} ${f.companions ? 'Personen, alle erfasst' : 'Person'}</div>
+                </div>
+                <div class="booking-actions"><button class="btn-mini" data-ms="print">Drucken</button><button class="btn-mini" data-ms="delete">Löschen</button></div>
+            </div>`).join('') : '<div class="bookings-empty">Für diesen Zeitraum gibt es noch keine Meldescheine.</div>';
+        } catch (e) { list.innerHTML = '<div class="bookings-empty">Meldescheine konnten nicht geladen werden.</div>'; }
+    }
+    ['#ms-year', '#ms-month'].forEach(sel => $(sel).addEventListener('change', loadMeldescheine));
+    $('#ms-print-all').addEventListener('click', () => window.open(`/api/meldescheine/druck?${msQuery()}`, '_blank', 'noopener'));
+    $('#ms-csv').addEventListener('click', () => { location.href = `/api/meldescheine/export.csv?${msQuery()}`; });
+    $('#ms-list').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-ms]');
+        if (!btn) return;
+        const id = btn.closest('.ms-card').dataset.id;
+        if (btn.dataset.ms === 'print') return window.open(`/api/meldescheine/${id}/druck`, '_blank', 'noopener');
+        if (!confirm('Diesen Meldeschein endgültig löschen?')) return;
+        const d = await apiJson(`/api/meldescheine/${id}`, { method: 'DELETE' }).catch(() => null);
+        showToast(d && d.success ? 'Meldeschein gelöscht' : 'Löschen fehlgeschlagen', d && d.success ? 'success' : 'error');
+        loadMeldescheine();
     });
 
     // ---- Verbindungsstatus (Punkte in den Einstellungen)
