@@ -423,8 +423,13 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             WHERE checkin IS NOT NULL AND checkout IS NOT NULL AND checkout > ? AND checkin < ?
             ORDER BY checkin
         `).all(today, addDays(today, HORIZON_DAYS));
+        // Days closed in a portal without a stay (e.g. Airbnb "Not available") are taken as well
+        const closed = sql().prepare(`
+            SELECT checkin, checkout FROM calendar_blocks WHERE checkout > ? AND checkin < ? ORDER BY checkin
+        `).all(today, addDays(today, HORIZON_DAYS));
+        const booked = [...rows, ...closed].map(r => ({ from: r.checkin, to: r.checkout })).sort((a, b) => a.from.localeCompare(b.from));
         res.set('Cache-Control', 'no-store');
-        res.json({ success: true, today, horizon: addDays(today, HORIZON_DAYS), booked: rows.map(r => ({ from: r.checkin, to: r.checkout })) });
+        res.json({ success: true, today, horizon: addDays(today, HORIZON_DAYS), booked });
     });
 
     function validateStay(checkin, checkout, adults, children) {
@@ -443,6 +448,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             if (adults + children > (Number(s.max_guests) || 1)) return `Die Wohnung ist für höchstens ${s.max_guests} Personen.`;
         }
         if (overlappingBooking(checkin, checkout)) return 'Der Zeitraum ist leider schon belegt.';
+        if (sql().prepare('SELECT 1 FROM calendar_blocks WHERE checkin < ? AND checkout > ? LIMIT 1').get(checkout, checkin)) return 'Der Zeitraum ist leider schon belegt.';
         return null;
     }
 

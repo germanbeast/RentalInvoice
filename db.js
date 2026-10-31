@@ -105,6 +105,13 @@ function initSchema() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
+        -- Days a portal marks as closed without a stay (e.g. Airbnb "Not available"): they only block availability
+        CREATE TABLE IF NOT EXISTS calendar_blocks (
+            source TEXT NOT NULL,
+            checkin DATE NOT NULL,
+            checkout DATE NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS notification_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             type TEXT NOT NULL,
@@ -884,6 +891,16 @@ function getBookingByUid(uid) {
     return db.prepare('SELECT * FROM bookings WHERE uid = ?').get(uid);
 }
 
+// Replaces all closed periods of one feed (called after each successful sync of that feed)
+function replaceCalendarBlocks(source, blocks) {
+    const db = getDb();
+    const ins = db.prepare('INSERT INTO calendar_blocks (source, checkin, checkout) VALUES (?, ?, ?)');
+    db.transaction(() => {
+        db.prepare('DELETE FROM calendar_blocks WHERE source = ?').run(source);
+        for (const b of blocks) ins.run(source, b.checkin, b.checkout);
+    })();
+}
+
 function upsertBooking(data) {
     const db = getDb();
     const existing = db.prepare('SELECT id FROM bookings WHERE uid = ?').get(data.uid);
@@ -1164,6 +1181,7 @@ module.exports = {
     // Bookings & Notifications
     getBookingByUid,
     upsertBooking,
+    replaceCalendarBlocks,
     getUpcomingBookings,
     markReminderSent,
     logNotification,
