@@ -1,6 +1,23 @@
 {
-    "currentVersion": "1.31.1",
+    "currentVersion": "1.33.0",
     "releases": [
+        {
+            "version": "1.33.0",
+            "date": "2026-10-31",
+            "title": "Benutzerverwaltung mit Rechten",
+            "features": [
+                "Mehrere Benutzer mit eigenem Login, z. B. ein zweiter Manager oder die Reinigung",
+                "Rollen Admin, Manager, Reinigung (nur Kalender ansehen) oder eigene Rechte pro Bereich: Kein Zugriff, Ansehen oder Bearbeiten",
+                "Bereiche: Kalender, Buchungen & Gäste, Rechnungen, Finanzen, Türcodes & Notfall-Öffnen, Gast-Nachrichten, Meldescheine, Webseite, Einstellungen, Benutzerverwaltung",
+                "Der Server prüft die Rechte bei jedem Zugriff, auch beim Telegram- und WhatsApp-Bot und bei Handy-Benachrichtigungen",
+                "Menü zeigt nur, was der Benutzer darf; neuer Menüpunkt „Benutzer & Rechte“ unter Konfiguration",
+                "Der bisherige Admin wird automatisch Inhaber mit allen Rechten und kann nicht gelöscht werden"
+            ],
+            "fixes": [
+                "Ein gelöschter Benutzer „admin“ wird nicht mehr mit dem Standard-Passwort neu angelegt",
+                "Hochgeladene Zertifikate unter /uploads sind nur noch mit vollen Rechten abrufbar"
+            ]
+        },
         {
             "version": "1.31.1",
             "date": "2026-10-31",

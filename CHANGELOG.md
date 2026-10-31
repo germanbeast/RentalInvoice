@@ -5,6 +5,23 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.0] - 2026-10-31
+
+### Neu
+- Benutzerverwaltung mit Rechten (`permissions.js`): Rollen Inhaber, Admin, Manager, Reinigung und „Eigene Rechte“. Pro Bereich Kein Zugriff / Ansehen / Bearbeiten für Kalender & Startseite, Buchungen/Gäste/Anfragen, Rechnungen, Finanzen & Exporte, Türcodes & Notfall-Öffnen, Gast-Nachrichten & Chat, Meldescheine, Gäste-Webseite, Einstellungen & Integrationen, Benutzerverwaltung
+- Serverseitige Prüfung per Middleware vor allen `/api`-Routen und `/uploads`: GET braucht „Ansehen“, alles andere „Bearbeiten“. Routen ohne Regel sind nur mit vollen Rechten erreichbar. Rechte werden bei jedem Zugriff frisch aus der Datenbank gelesen, gelöschte Benutzer sind sofort abgemeldet
+- Niemand kann Rechte vergeben, die er selbst nicht hat; der Inhaber kann nicht gelöscht oder herabgestuft werden; die eigene Rolle kann man nicht ändern
+- Kalender/Buchungen liefern Türcode, E-Mail, Gästecode und Meldeschein nur mit dem passenden Recht; `GET /api/settings` liefert ohne Einstellungs-Recht nur Vermieter-, Bank- und Preisdaten (für Rechnungen)
+- Telegram-Bot: ist die Chat-ID bei einem Benutzer eingetragen, gelten dessen Rechte; nur unter Einstellungen freigegebene IDs behalten vollen Zugriff. WhatsApp-Bot: Rechte des Benutzers mit der Handynummer
+- Push-Benachrichtigungen nur an Geräte von Benutzern mit passendem Recht (Kalender, Türcodes, Nachrichten)
+- Admin: Seite „Benutzer & Rechte“ mit Rollen-Auswahl und Rechte-Tabelle, Menü blendet Bereiche ohne Recht aus
+
+### Geändert
+- Migration: der Benutzer „admin“ (sonst der älteste) wird Inhaber, alle anderen bisherigen Benutzer behalten volle Rechte (Rolle Admin)
+
+### Behoben
+- Ein gelöschter Benutzer „admin“ wurde beim Neustart mit dem Standard-Passwort neu angelegt; jetzt nur noch bei leerer Datenbank
+
 ## [1.31.1] - 2026-10-31
 
 ### Geändert

@@ -136,6 +136,7 @@
                     </button>
                     <div class="nav-group-items">
                         <button class="sidebar-item" id="btn-settings" title="Einstellungen"><span>Einstellungen</span></button>
+                        <button class="sidebar-item" id="nav-users" title="Benutzer &amp; Rechte"><span>Benutzer &amp; Rechte</span></button>
                         <button class="sidebar-item" id="nav-welcome" title="TV Welcome Screen"><span>TV Welcome</span></button>
                     </div>
                 </div>
@@ -1600,7 +1601,7 @@
                             <a href="#" class="nav-item" data-target="settings-whatsapp">WhatsApp Web</a>
                             <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot <i class="status-dot" data-status="telegram"></i></a>
                             <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
-                            <a href="#" class="nav-item" data-target="settings-users">Benutzer (2FA)</a>
+                            <a href="#" class="nav-item" data-target="settings-users">Benutzer &amp; Rechte</a>
                             <a href="#" class="nav-item" data-target="settings-system">System & Update</a>
                         </nav>
                     </aside>
@@ -2199,10 +2200,11 @@
 
                             <!-- USERS -->
                             <section id="settings-users" class="settings-page">
-                                <h2>Benutzerverwaltung</h2>
-                                <div id="users-list-container" style="margin-top: 1.5rem;"></div>
+                                <h2>Benutzer &amp; Rechte</h2>
+                                <p class="nb-hint" style="margin-top:.6rem;">Jeder Benutzer meldet sich mit eigenem Namen und Passwort an. Über die Rolle oder eigene Rechte legst du fest, was er sehen und ändern darf. Der Server prüft die Rechte bei jedem Zugriff, auch beim Telegram- und WhatsApp-Bot.</p>
+                                <div id="users-list-container" class="users-list"></div>
                                 <button type="button" id="btn-add-user-modal" class="btn btn-primary"
-                                    style="width:100%; margin-top:1rem;">Neuen Benutzer hinzufügen</button>
+                                    style="width:100%; margin-top:1rem;">Neuen Benutzer anlegen</button>
                             </section>
 
                             <!-- SYSTEM -->
@@ -2293,6 +2295,38 @@
                         <span class="nb-nights" id="nb-nights"></span>
                         <button type="button" class="btn btn-outline" id="btn-cancel-new-booking">Abbrechen</button>
                         <button type="submit" class="btn btn-primary" id="btn-save-new-booking">Buchung speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="modal-user" style="display:none;">
+            <div class="modal nb-modal user-modal" role="dialog" aria-labelledby="us-title">
+                <div class="modal-header">
+                    <h3 id="us-title">Benutzer anlegen</h3>
+                    <button type="button" id="btn-close-user" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                    </button>
+                </div>
+                <form class="modal-body nb-form" id="us-form" novalidate autocomplete="off">
+                    <div class="form-row">
+                        <div class="form-group"><label for="us-name">Benutzername</label><input type="text" id="us-name" maxlength="50" autocomplete="off" required></div>
+                        <div class="form-group"><label for="us-pass">Passwort <small id="us-pass-hint">(mind. 8 Zeichen)</small></label><input type="password" id="us-pass" autocomplete="new-password"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="us-phone">Handy <small>(WhatsApp: 2FA + Bot)</small></label><input type="tel" id="us-phone" placeholder="+49 …"></div>
+                        <div class="form-group"><label for="us-tg">Telegram-ID <small>(optional)</small></label><input type="text" id="us-tg" inputmode="numeric" placeholder="z. B. 123456789"></div>
+                    </div>
+                    <div class="form-group" id="us-role-wrap">
+                        <label for="us-role">Rolle</label>
+                        <select id="us-role"></select>
+                    </div>
+                    <div class="perm-table" id="us-perms" role="group" aria-label="Rechte"></div>
+                    <p class="nb-hint" id="us-perm-hint"></p>
+                    <div class="nb-msg" id="us-msg" hidden></div>
+                    <div class="nb-actions">
+                        <button type="button" class="btn btn-outline" id="btn-cancel-user">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-user">Speichern</button>
                     </div>
                 </form>
             </div>
