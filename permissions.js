@@ -195,7 +195,8 @@ const BOT_COMMANDS = {
     offen: ['invoices', 'view'], rechnung: ['invoices', 'edit'],
     codes: ['door', 'view'], pin: ['door', 'edit'], lock: ['door', 'edit'], lockstatus: ['door', 'view'],
     nachricht: ['messages', 'view'], guestlink: ['messages', 'edit'],
-    review: ['finance', 'view']
+    review: ['finance', 'view'],
+    server: ['settings', 'view']
 };
 
 function canBot(perms, command) {

@@ -112,6 +112,7 @@ fi
 # 9. Start mit PM2
 echo "▶️ Starte Server mit PM2..."
 pm2 start server.js --name "invoice-app" || pm2 restart "invoice-app"
+pm2 start watchdog.js --name "beckhome-watchdog" || pm2 restart "beckhome-watchdog"
 pm2 save
 
 # 10. Autostart bei Reboot

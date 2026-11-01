@@ -16,6 +16,8 @@ users.json.bak
 rental.db
 rental.db-wal
 rental.db-shm
+watchdog-state.json
+watchdog-state.json.tmp
 .wwebjs_auth/
 
 # Android build output (TV-Kiosk-App)

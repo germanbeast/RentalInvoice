@@ -2695,6 +2695,7 @@ input[type="checkbox"]:focus-visible {
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); margin-left: 8px; vertical-align: middle; }
 .status-dot.ok { background: var(--accent-green); }
 .status-dot.warn { background: var(--warn); }
+.watchdog-status { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; font-size: 0.9rem; }
 .status-dot.bad { background: var(--bad); }
 
 @media (max-width: 900px) {

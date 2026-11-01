@@ -184,6 +184,7 @@ async function showHelp(bot, chatId) {
         '• <code>/schloss</code> – Schloss-Status und Batterie\n' +
         '• <code>/zu</code> – Tür abschließen\n' +
         '• <code>/jahr</code> – Jahresrückblick (z. B. <code>/jahr 2025</code>)\n' +
+        '• <code>/server</code> – Server-Status (App, Tunnel, Speicher)\n' +
         '• <code>/auf</code> – Tür aufschließen/öffnen (mit Rückfrage)\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
@@ -1032,6 +1033,13 @@ async function processMessage(bot, msg) {
         return showLockStatus(bot, chatId);
     }
 
+    // Server-Status (Server-Wächter): /server
+    if (/^\/(server|serverstatus)(?:@\w+)?$/i.test(body)) {
+        if (!allowed('server')) return send(bot, chatId, DENIED);
+        if (active) await cancelSession(bot, chatId, active, true);
+        return send(bot, chatId, hooks.serverText ? hooks.serverText() : 'Server-Status ist gerade nicht verfügbar.', menuOnlyKeyboard());
+    }
+
     // Jahresrückblick: /jahr oder /jahr 2025 (ohne Jahr: laufendes Jahr, im Januar das Vorjahr)
     const yearCmd = body.match(/^\/(jahr|rueckblick|rückblick)(?:@\w+)?(?:\s+(\d{4}))?$/i);
     if (yearCmd) {
@@ -1317,6 +1325,7 @@ async function setup(bot, options = {}) {
             { command: 'schloss', description: 'Schloss-Status und Batterie' },
             { command: 'zu', description: 'Tür abschließen' },
             { command: 'jahr', description: 'Jahresrückblick mit Statistik' },
+            { command: 'server', description: 'Server-Status (App, Tunnel, Speicher)' },
             { command: 'auf', description: 'Tür aufschließen (mit Rückfrage)' },
             { command: 'abbrechen', description: 'Aktuellen Vorgang abbrechen' },
             { command: 'hilfe', description: 'Hilfe anzeigen' }

@@ -5,6 +5,23 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.0] - 2026-11-01
+
+### Neu
+- Server-Wächter `watchdog.js` als eigener PM2-Prozess `beckhome-watchdog` (unabhängig von der App). Prüft jede Minute und meldet direkt über die Telegram-Bot-API an die Benachrichtigungs-IDs:
+  - App antwortet nicht auf `http://127.0.0.1:<PORT>/api/health` (3 Fehlversuche in Folge)
+  - Domain aus der „Öffentlichen Adresse“ über Cloudflare/Tunnel nicht erreichbar (5 Fehlversuche, mit Zustand des `cloudflared`-Dienstes)
+  - Festplatte unter 10 % oder 2 GB frei
+  - Server neu gestartet (mit letztem Lebenszeichen davor)
+  - Wiederherstellung wird gemeldet, Erinnerung alle 6 Stunden, nicht zugestellte Meldungen werden nachgeschickt
+- Optional `WATCHDOG_HEARTBEAT_URL` in der `.env` (z. B. healthchecks.io): Dead-Man-Switch für einen Totalausfall des Servers
+- App-seitig (`server-watch.js`): Warnung, wenn der Wächter länger als 10 Minuten nicht geprüft hat; Telegram-Befehl `/server` (Recht „Einstellungen ansehen“); Übersicht unter Einstellungen → Telegram Bot; `watchdog` in `/api/status`
+- `update.sh`, `setup.sh` und das Update im Admin starten bzw. aktualisieren den Wächter; läuft die App unter PM2 ohne Wächter, startet sie ihn einmal selbst (`WATCHDOG_AUTOSTART=0` schaltet das ab)
+- `node watchdog.js --test` zeigt das Prüfergebnis und schickt eine Testnachricht
+
+### Geändert
+- `/api/health` prüft die Datenbank mit, wird nicht mehr auf die Gäste-Webseite umgeleitet (auch auf der Domain erreichbar) und ist nicht cachebar
+
 ## [1.36.1] - 2026-11-01
 
 ### Sicherheit
