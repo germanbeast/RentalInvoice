@@ -7,7 +7,8 @@
             "title": "Eigene Domain (beckhome.cloud)",
             "features": [
                 "Ist unter Webseite → Einrichtung eine eigene Adresse wie https://beckhome.cloud/gast eingetragen, öffnet die Domain selbst direkt die Gäste-Webseite",
-                "Der Admin bleibt unter einer anderen Adresse (z. B. admin.beckhome.cloud oder der Heimnetz-IP) und unter /admin erreichbar"
+                "Der Admin bleibt unter einer anderen Adresse (z. B. admin.beckhome.cloud oder der Heimnetz-IP) und unter /admin erreichbar",
+                "Mit LISTEN_HOST=127.0.0.1 in der .env ist die App nur noch über den Tunnel erreichbar, Port 3000 ist von außen zu"
             ],
             "fixes": [
                 "Login-Cookie ist über https automatisch „Secure“ und funktioniert im Heimnetz weiter über http",

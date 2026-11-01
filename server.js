@@ -3693,8 +3693,10 @@ app.use((err, req, res, next) => {
 // =======================
 // 15. START SERVER
 // =======================
-app.listen(PORT, () => {
-    console.log(`🔒 Server (Hardened + SQLite) running on http://localhost:${PORT}`);
+// LISTEN_HOST=127.0.0.1 in .env: reachable only through the tunnel/proxy on this machine, port 3000 closed to the outside
+const LISTEN_HOST = process.env.LISTEN_HOST || undefined;
+app.listen(PORT, LISTEN_HOST, () => {
+    console.log(`🔒 Server (Hardened + SQLite) running on http://${LISTEN_HOST || 'localhost'}:${PORT}`);
     console.log(`   Static files: ${PUBLIC_DIR}`);
 
     // Initialize bots
