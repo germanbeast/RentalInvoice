@@ -1,6 +1,25 @@
 {
-    "currentVersion": "1.33.1",
+    "currentVersion": "1.33.2",
     "releases": [
+        {
+            "version": "1.33.2",
+            "date": "2026-11-01",
+            "title": "WhatsApp-Verbindung repariert",
+            "features": [
+                "Neuer Knopf „Neu verbinden“ unter WhatsApp: startet die Verbindung neu, ohne neuen QR-Code",
+                "Bei „Offline“ wird der Grund angezeigt"
+            ],
+            "fixes": [
+                "Befehle vom Admin-Handy (Rechnung, Pin, Status, Hilfe) funktionieren wieder bei WhatsApp-Konten, die mit einer internen ID (@lid) statt der Nummer schreiben",
+                "Immer die aktuelle WhatsApp-Web-Version laden statt einer alten zwischengespeicherten",
+                "Nach einer Trennung startet eine frische Verbindung, auch mit Wartezeiten bei wiederholten Fehlern; ein fehlgeschlagener Start wird automatisch wiederholt",
+                "Verbindungsprüfung alle 2 Minuten: hängt WhatsApp, obwohl „Online“ angezeigt wird, wird neu verbunden",
+                "Hängengebliebener Chromium nach Neustart oder Update blockiert WhatsApp nicht mehr",
+                "„Trennen“ funktioniert auch, wenn WhatsApp nicht mehr antwortet, und startet keine zwei Verbindungen gleichzeitig",
+                "Benachrichtigungen per WhatsApp fragen die richtige Chat-ID ab, Nummern mit 0049 werden erkannt",
+                "Admin-Nummern mit Bindestrich, Schrägstrich oder Klammern werden erkannt"
+            ]
+        },
         {
             "version": "1.33.1",
             "date": "2026-11-01",

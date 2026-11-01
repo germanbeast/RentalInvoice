@@ -134,30 +134,123 @@ let waClient = null;
 let waQrCode = null;
 let waReady = false;
 let waStatus = 'disconnected'; // disconnected, qr_pending, connecting, ready
+let waLastError = '';
+let waStatusSince = Date.now();
+let waGeneration = 0;      // every new client gets a number; events of an old client are ignored
+let waRestartTimer = null;
+let waFailures = 0;        // failed starts in a row, for the waiting time before the next try
+let waHealthMisses = 0;
+let waStopping = false;
+const WA_AUTH_DIR = path.join(__dirname, '.wwebjs_auth');
+
+function setWaStatus(status, error) {
+    if (status !== waStatus) waStatusSince = Date.now();
+    waStatus = status;
+    waReady = status === 'ready';
+    if (status !== 'qr_pending') waQrCode = null;
+    if (error !== undefined) waLastError = error;
+}
+
+/**
+ * A Chromium that was not shut down cleanly (crash, hard kill on restart/update) keeps its profile locked:
+ * the next start then fails with "The browser is already running". Ends leftover Chromiums of our
+ * WhatsApp profile and removes the lock files.
+ */
+function cleanupWaBrowser() {
+    try {
+        require('child_process').execSync(`pkill -9 -f -- ${JSON.stringify('--user-data-dir=' + WA_AUTH_DIR)}`, { stdio: 'ignore', timeout: 5000 });
+    } catch (e) { /* no leftover Chromium (or no pkill) */ }
+    try {
+        for (const dir of fs.readdirSync(WA_AUTH_DIR)) {
+            if (!dir.startsWith('session')) continue;
+            for (const f of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+                try { fs.rmSync(path.join(WA_AUTH_DIR, dir, f), { force: true }); } catch (e) { }
+            }
+        }
+    } catch (e) { /* no session yet */ }
+}
+
+/** Closes the current client completely, so a new one can start on the same profile. */
+async function stopWhatsApp() {
+    const client = waClient;
+    waClient = null;
+    waGeneration++;
+    if (waRestartTimer) { clearTimeout(waRestartTimer); waRestartTimer = null; }
+    setWaStatus('disconnected');
+    if (!client) return;
+    try { client.removeAllListeners(); } catch (e) { }
+    try {
+        await Promise.race([client.destroy(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000))]);
+    } catch (e) { /* browser already gone */ }
+    try {
+        const proc = client.pupBrowser && client.pupBrowser.process && client.pupBrowser.process();
+        if (proc && proc.exitCode === null) proc.kill('SIGKILL');
+    } catch (e) { }
+}
+
+/** Starts a fresh client after a pause; repeated failures wait longer (30 s up to 10 min). */
+function scheduleWaRestart(reason, delayMs) {
+    if (waStopping || waRestartTimer) return;
+    const wait = delayMs !== undefined ? delayMs : Math.min(30000 * Math.pow(2, Math.min(waFailures, 5)), 600000);
+    console.log(`🔄 WhatsApp startet in ${Math.round(wait / 1000)} s neu (${reason}).`);
+    waRestartTimer = setTimeout(() => {
+        waRestartTimer = null;
+        restartWhatsApp(reason).catch(e => console.error('WA Neustart fehlgeschlagen:', e.message));
+    }, wait);
+}
+
+async function restartWhatsApp(reason) {
+    console.log(`🔄 WhatsApp Neustart: ${reason}`);
+    await stopWhatsApp();
+    initWhatsApp();
+}
 
 function initWhatsApp() {
-    waClient = new Client({
-        authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
+    if (waStopping) return;
+    if (waClient) { restartWhatsApp('erneuter Start'); return; }
+    cleanupWaBrowser();
+    const gen = ++waGeneration;
+    const current = () => gen === waGeneration;
+    setWaStatus('connecting', '');
+    waHealthMisses = 0;
+
+    const client = new Client({
+        authStrategy: new LocalAuth({ dataPath: WA_AUTH_DIR }),
+        // Always load the current WhatsApp Web. The default cache can pin an old version that WhatsApp
+        // no longer supports: messages then stop arriving or sending fails, although it looks connected.
+        webVersionCache: { type: 'none' },
+        // The bot number opened in another browser would otherwise end this session ("CONFLICT")
+        takeoverOnConflict: true,
+        takeoverTimeoutMs: 10000,
+        authTimeoutMs: 120000,
         puppeteer: {
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote']
         }
     });
+    waClient = client;
 
-    waClient.on('qr', async (qr) => {
-        waStatus = 'qr_pending';
-        waQrCode = await qrcode.toDataURL(qr);
-        console.log('\ud83d\udcf1 WhatsApp QR-Code bereit. Bitte in der App scannen.');
+    client.on('qr', async (qr) => {
+        if (!current()) return;
+        try {
+            const img = await qrcode.toDataURL(qr);
+            if (!current()) return;
+            setWaStatus('qr_pending');
+            waQrCode = img;
+        } catch (e) { /* next QR comes soon */ }
+        console.log('📱 WhatsApp QR-Code bereit. Bitte in der App scannen.');
     });
 
-    waClient.on('ready', () => {
-        waReady = true;
-        waStatus = 'ready';
-        waQrCode = null;
-        console.log('\u2705 WhatsApp Web verbunden!');
+    client.on('ready', () => {
+        if (!current()) return;
+        setWaStatus('ready', '');
+        waFailures = 0;
+        waHealthMisses = 0;
+        console.log('✅ WhatsApp Web verbunden!');
     });
 
-    waClient.on('message', async (msg) => {
+    client.on('message', async (msg) => {
+        if (!current()) return;
         // Log incoming message
         if (msg.body) {
             console.log(`📩 [WA] Nachricht von ${msg.from}: "${msg.body.substring(0, 50)}..."`);
@@ -169,22 +262,26 @@ function initWhatsApp() {
             if (msg.fromMe) {
                 return;
             }
-            if (msg.from === 'status@broadcast' || msg.from.includes('@g.us') || msg.from.includes('@newsletter') || msg.isStatus) return;
+            if (!msg.from || msg.from === 'status@broadcast' || msg.from.includes('@g.us') || msg.from.includes('@newsletter') || msg.from.includes('@broadcast') || msg.isStatus) return;
 
-            // Admin users get the commands, everybody else is a guest: the message goes to "Nachrichten"
+            // Admin users get the commands, everybody else is a guest: the message goes to "Nachrichten".
+            // Newer WhatsApp accounts write from an id ending in @lid instead of the phone number:
+            // the admin is found by the phone number behind it.
             const phone = await waPhoneOf(msg.from, msg);
-            if (db.getUserByPhone(msg.from) || (phone && db.getUserByPhone(phone))) {
-                await waCommands.processMessage(msg, waClient, MessageMedia);
+            const admin = db.getUserByPhone(msg.from) || (phone && db.getUserByPhone(phone)) || null;
+            if (admin) {
+                await waCommands.processMessage(msg, client, MessageMedia, admin);
             } else if (guestChat) {
                 await guestChat.receiveWhatsApp(msg, phone);
             }
         } catch (e) {
-            console.error('❌ Fehler in waCommands.processMessage:', e);
+            console.error('❌ Fehler bei eingehender WhatsApp:', e);
         }
     });
 
     // Messages the host types directly on the WhatsApp phone appear in the guest conversation too
-    waClient.on('message_create', async (msg) => {
+    client.on('message_create', async (msg) => {
+        if (!current()) return;
         try {
             if (!msg.fromMe || !guestChat || !msg.to || !/@(c\.us|lid)$/.test(msg.to)) return;
             const phone = await waPhoneOf(msg.to);
@@ -192,34 +289,66 @@ function initWhatsApp() {
         } catch (e) { /* only a mirror */ }
     });
 
-    waClient.on('authenticated', () => {
-        waStatus = 'connecting';
-        console.log('\ud83d\udd10 WhatsApp authentifiziert, lade Session...');
+    client.on('authenticated', () => {
+        if (!current()) return;
+        setWaStatus('connecting');
+        console.log('🔐 WhatsApp authentifiziert, lade Session...');
     });
 
-    waClient.on('auth_failure', (msg) => {
-        waReady = false;
-        waStatus = 'disconnected';
-        console.error('\u274c WhatsApp Auth-Fehler:', msg);
+    client.on('auth_failure', (msg) => {
+        if (!current()) return;
+        setWaStatus('disconnected', 'Anmeldung fehlgeschlagen: ' + msg);
+        console.error('❌ WhatsApp Auth-Fehler:', msg);
+        waFailures++;
+        scheduleWaRestart('Anmeldung fehlgeschlagen');
     });
 
-    waClient.on('disconnected', (reason) => {
-        waReady = false;
-        waStatus = 'disconnected';
-        waQrCode = null;
-        console.warn('\u26a0\ufe0f  WhatsApp getrennt:', reason);
-        // Auto-reconnect after 30s
-        setTimeout(() => {
-            console.log('\ud83d\udd04 WhatsApp Reconnect...');
-            waClient.initialize().catch(e => console.error('WA Reconnect Error:', e.message));
-        }, 30000);
+    client.on('change_state', (state) => {
+        if (current()) console.log('WhatsApp Zustand:', state);
     });
 
-    waClient.initialize().catch(e => {
-        console.error('\u274c WhatsApp init fehlgeschlagen:', e.message);
-        waStatus = 'disconnected';
+    client.on('disconnected', (reason) => {
+        if (!current()) return;
+        setWaStatus('disconnected', 'Getrennt: ' + reason);
+        console.warn('⚠️  WhatsApp getrennt:', reason);
+        // The library closes this client itself; a new client is started (re-using the old one fails)
+        scheduleWaRestart('getrennt: ' + reason, 15000);
+    });
+
+    client.initialize().catch(e => {
+        if (!current()) return;
+        console.error('❌ WhatsApp init fehlgeschlagen:', e.message);
+        setWaStatus('disconnected', 'Start fehlgeschlagen: ' + e.message);
+        waFailures++;
+        scheduleWaRestart('Start fehlgeschlagen');
     });
 }
+
+/**
+ * Watchdog: WhatsApp Web can hang while it still looks connected (browser crashed, page stuck,
+ * phone session gone). Checks the connection every 2 minutes and starts a fresh client when needed.
+ */
+setInterval(async () => {
+    if (waStopping || waRestartTimer || !waClient) return;
+    if (waStatus === 'connecting' && Date.now() - waStatusSince > 5 * 60000) {
+        waFailures++;
+        return scheduleWaRestart('hängt beim Verbinden', 0);
+    }
+    if (waStatus !== 'ready') return;
+    const gen = waGeneration;
+    let state = null;
+    try {
+        state = await Promise.race([waClient.getState(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000))]);
+    } catch (e) { state = null; }
+    if (gen !== waGeneration) return;
+    if (state === 'CONNECTED') { waHealthMisses = 0; return; }
+    waHealthMisses++;
+    console.warn(`⚠️ WhatsApp antwortet nicht richtig (Zustand: ${state || 'keine Antwort'}, ${waHealthMisses}. Mal)`);
+    if (state === 'UNPAIRED' || state === 'UNPAIRED_IDLE' || waHealthMisses >= 2) {
+        setWaStatus('disconnected', 'Verbindung hing (' + (state || 'keine Antwort') + ')');
+        scheduleWaRestart('Verbindungsprüfung fehlgeschlagen', 0);
+    }
+}, 120000).unref();
 
 /** Phone number (digits with country code) behind a WhatsApp id; newer accounts send ids ending in @lid. */
 async function waPhoneOf(id, msg) {
@@ -238,23 +367,33 @@ async function waPhoneOf(id, msg) {
     return '';
 }
 
+/** WhatsApp chat id for a phone number: asks WhatsApp for the right id (phone or @lid). null = no WhatsApp. */
+async function waChatIdFor(phone) {
+    let cleaned = String(phone || '').replace(/[^\d]/g, '');
+    // Automatische Konvertierung von dt. Nummern (z.B. 0176 -> 49176, 0049 -> 49)
+    if (cleaned.startsWith('00')) cleaned = cleaned.substring(2);
+    else if (cleaned.startsWith('0')) cleaned = '49' + cleaned.substring(1);
+    if (cleaned.length < 8) return null;
+    const id = await waClient.getNumberId(cleaned);
+    return id ? id._serialized : null;
+}
+
 async function sendWhatsApp(phone, message) {
     if (!waReady || !waClient) {
-        console.warn('\u26a0\ufe0f  WhatsApp nicht verbunden');
+        console.warn('⚠️  WhatsApp nicht verbunden');
         return false;
     }
     try {
-        let cleaned = phone.replace(/[^\d]/g, '');
-        // Automatische Konvertierung von dt. Nummern (z.B. 0176 -> 49176)
-        if (cleaned.startsWith('0') && !cleaned.startsWith('00')) {
-            cleaned = '49' + cleaned.substring(1);
+        const chatId = await waChatIdFor(phone);
+        if (!chatId) {
+            console.warn(`⚠️  WhatsApp: ${phone} hat kein WhatsApp, nicht gesendet.`);
+            return false;
         }
-        const chatId = cleaned + '@c.us';
         await waClient.sendMessage(chatId, message);
-        console.log(`\u2709\ufe0f  WhatsApp gesendet an ${phone}: ${message.substring(0, 50)}...`);
+        console.log(`✉️  WhatsApp gesendet an ${phone}: ${message.substring(0, 50)}...`);
         return true;
     } catch (e) {
-        console.error('\u274c WhatsApp-Fehler:', e.message);
+        console.error('❌ WhatsApp-Fehler:', e.message);
         return false;
     }
 }
@@ -1151,10 +1290,11 @@ guestChat = require('./guest-chat')({
     wa: {
         status: () => ({ ready: waReady, number: (waReady && waClient && waClient.info && waClient.info.wid && waClient.info.wid.user) || '' }),
         chatIdFor: async (phone) => {
-            const id = await waClient.getNumberId(phone);
-            return id ? id._serialized : null;
+            if (!waReady || !waClient) throw new Error('WhatsApp ist nicht verbunden');
+            return waChatIdFor(phone);
         },
         send: async (chatId, text) => {
+            if (!waReady || !waClient) throw new Error('WhatsApp ist nicht verbunden');
             const m = await waClient.sendMessage(chatId, text);
             return m && m.id ? m.id._serialized : null;
         }
@@ -3552,8 +3692,7 @@ app.post('/api/update', apiLimiter, (req, res) => {
         res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
         setTimeout(() => {
             console.log('🔄 Starte Server neu...');
-            db.close();
-            process.exit(0);
+            shutdown();
         }, 3000);
     })().catch(e => {
         console.error('Update Error:', e.detail || e.message);
@@ -3568,13 +3707,14 @@ app.post('/api/update', apiLimiter, (req, res) => {
 
 // Get WhatsApp QR Code for scanning
 app.get('/api/whatsapp/qr', apiLimiter, (req, res) => {
+    const extra = { lastError: waLastError || '', restarting: !!waRestartTimer };
     if (waReady) {
-        return res.json({ success: true, status: 'ready', message: 'WhatsApp ist bereits verbunden.' });
+        return res.json({ success: true, status: 'ready', message: 'WhatsApp ist bereits verbunden.', ...extra });
     }
     if (waQrCode) {
-        return res.json({ success: true, status: 'qr_pending', qr: waQrCode });
+        return res.json({ success: true, status: 'qr_pending', qr: waQrCode, ...extra });
     }
-    res.json({ success: true, status: waStatus, message: 'Kein QR-Code verf\u00fcgbar. Bitte warten...' });
+    res.json({ success: true, status: waStatus, message: 'Kein QR-Code verf\u00fcgbar. Bitte warten...', ...extra });
 });
 
 // Get WhatsApp connection status
@@ -3586,6 +3726,7 @@ app.get('/api/whatsapp/status', apiLimiter, (req, res) => {
             success: true,
             waStatus,
             waReady,
+            lastError: waLastError || '',
             enabled: allSettings.notifications_enabled !== 'false',
             configured: !!allSettings.wa_phone,
             logs
@@ -3596,22 +3737,36 @@ app.get('/api/whatsapp/status', apiLimiter, (req, res) => {
     }
 });
 
+// Restart WhatsApp without logging out (the pairing stays, no new QR code needed)
+app.post('/api/whatsapp/restart', apiLimiter, async (req, res) => {
+    waFailures = 0;
+    restartWhatsApp('Neustart im Admin').catch(e => console.error('WA Neustart fehlgeschlagen:', e.message));
+    res.json({ success: true, message: 'WhatsApp wird neu verbunden...' });
+});
+
 // Logout WhatsApp (to re-scan QR)
 app.post('/api/whatsapp/logout', apiLimiter, async (req, res) => {
+    const client = waClient;
+    // Stop listening first: the logout itself fires "disconnected" and must not start a second client
+    waGeneration++;
     try {
-        if (waClient) {
-            await waClient.logout();
-            waReady = false;
-            waStatus = 'disconnected';
-            waQrCode = null;
-            // Re-initialize for new QR
-            setTimeout(() => initWhatsApp(), 2000);
+        if (client && waReady) {
+            try { client.removeAllListeners(); } catch (e) { }
+            await Promise.race([client.logout(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000))]);
         }
-        res.json({ success: true, message: 'WhatsApp abgemeldet. Neuer QR-Code wird generiert...' });
     } catch (e) {
         console.error('WA Logout Error:', e.message);
-        res.status(500).json({ error: 'Abmeldung fehlgeschlagen' });
     }
+    try {
+        // Even when WhatsApp did not answer: close everything and remove the pairing, then show a new QR code
+        await stopWhatsApp();
+        fs.rmSync(WA_AUTH_DIR, { recursive: true, force: true });
+    } catch (e) {
+        console.error('WA Logout Cleanup Error:', e.message);
+    }
+    waFailures = 0;
+    setTimeout(() => initWhatsApp(), 2000);
+    res.json({ success: true, message: 'WhatsApp abgemeldet. Neuer QR-Code wird generiert...' });
 });
 
 // Test WhatsApp message
@@ -3686,5 +3841,12 @@ app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => { db.close(); process.exit(0); });
-process.on('SIGINT', () => { db.close(); process.exit(0); });
+// WhatsApp's Chromium is closed too, otherwise it keeps the profile locked for the next start
+function shutdown() {
+    waStopping = true;
+    const done = () => { try { db.close(); } catch (e) { } process.exit(0); };
+    setTimeout(done, 5000).unref();
+    stopWhatsApp().catch(() => { }).then(done);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
