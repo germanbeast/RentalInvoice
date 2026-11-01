@@ -28,12 +28,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Gradle direkt (das gradlew-Skript im Ordner ist ein defektes Altstück)
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
 
       - name: APK bauen
         run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          gradle --no-daemon assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk beckhome-tv.apk
 
       - uses: actions/upload-artifact@v4
