@@ -1,6 +1,21 @@
 {
-    "currentVersion": "1.33.1",
+    "currentVersion": "1.34.0",
     "releases": [
+        {
+            "version": "1.34.0",
+            "date": "2026-11-01",
+            "title": "Gäste-Chat per E-Mail (Booking.com)",
+            "features": [
+                "Unter „Nachrichten“ kannst du Gästen jetzt auch per E-Mail schreiben, z. B. an die Booking.com-Adresse (name.123456@guest.booking.com)",
+                "Die Booking.com-Adresse trägst du einmal pro Gast bei „E-Mail eintragen“ oder beim Öffnen der Unterhaltung ein; sie wird beim Gast gespeichert",
+                "Booking.com-Buchungen ohne Telefonnummer öffnen direkt eine E-Mail-Unterhaltung, sobald die Adresse bekannt ist",
+                "Antworten der Gäste werden auf Wunsch alle 2 Minuten aus dem E-Mail-Postfach (IMAP) geholt und erscheinen im Chat, mit Telegram- und Push-Hinweis; das Postfach wird nur gelesen",
+                "Antwort per Telegram auf den Hinweis geht ebenfalls per E-Mail an den Gast"
+            ],
+            "fixes": [
+                "Das Fenster „Neue Nachricht“ erscheint wieder mittig statt oben links"
+            ]
+        },
         {
             "version": "1.33.1",
             "date": "2026-11-01",
