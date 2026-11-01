@@ -147,7 +147,10 @@ const PUBLIC_API = new Set(['/api/login', '/api/login/verify', '/api/login/recov
 function createGuard(db) {
     return function guard(req, res, next) {
         const p = req.path;
-        if (!(p.startsWith('/api/') || p.startsWith('/uploads'))) return next();
+        // Lower-cased for the "is this an API path" test: /API/users must never skip the check
+        // (routes match case-sensitively, see server.js; an unknown spelling falls to "full rights only")
+        const lp = p.toLowerCase();
+        if (!(lp.startsWith('/api/') || lp.startsWith('/uploads'))) return next();
         if (PUBLIC_API.has(p)) return next();
         const su = req.session && req.session.user;
         if (!su) return next(); // ensureAuthenticated answers 401

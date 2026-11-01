@@ -22,6 +22,17 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Geändert
 - `/api/health` prüft die Datenbank mit, wird nicht mehr auf die Gäste-Webseite umgeleitet (auch auf der Domain erreichbar) und ist nicht cachebar
 
+## [1.36.1] - 2026-11-01
+
+### Sicherheit
+- Gast-Domain wird nur noch am `Host`-Header erkannt, nicht mehr über `req.hostname` (das bevorzugt `X-Forwarded-Host`). Vorher erreichte `beckhome.cloud` + `X-Forwarded-Host: admin.beckhome.cloud` die Admin-API an Cloudflare Access vorbei
+- `case sensitive routing` an, und die Rechte-Prüfung erkennt API-Pfade unabhängig von Groß-/Kleinschreibung. Vorher übersprang `/API/…` die Prüfung, Express lieferte aber trotzdem die Route aus
+- `escapeHtml` im Admin maskiert auch `"` und `'` (Werte stehen oft in `title="…"`/`href="…"`); Link-Erkennung in Chat-Nachrichten damit sicher; iCal-Vorschau maskiert den Titel
+- 2FA: kein Login mehr ohne zweiten Faktor, wenn WhatsApp nicht sendet; Fallback auf Telegram (verknüpfte Chat-ID des Benutzers), sonst Fehler mit Hinweis auf den Recovery-Key. Code per `crypto.randomInt`, Vergleich zeitkonstant, max. 5 Versuche pro Code
+- `/api/generate-pdf`: Puppeteer lässt nur noch die eigene Seite und `data:` zu (vorher auch iframes auf `http://localhost/…` und das lokale Netz)
+- Erbverwaltung-Upload: Endung und MIME-Typ exakt geprüft, Dateiname mit `crypto.randomBytes`
+- `npm audit fix` (qs 6.14.3)
+
 ## [1.36.0] - 2026-11-01
 
 ### Neu

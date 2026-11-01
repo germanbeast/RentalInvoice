@@ -413,10 +413,10 @@
         });
     }
 
+    // Also escapes quotes: many values end up in attributes (title="…", href="…"), and a guest name or chat message
+    // with a " would otherwise break out of the attribute and run its own code (onmouseover=…).
     function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
     // Position input handlers
@@ -4332,7 +4332,7 @@
                         div.className = 'calendar-event';
                         div.style = 'padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;';
                         div.innerHTML = `
-                            <strong>${ev.summary}</strong><br>
+                            <strong>${escapeHtml(ev.summary)}</strong><br>
                             <small>${dateRange}</small>
                         `;
                         div.addEventListener('mouseover', () => div.style.background = 'var(--bg-secondary)');

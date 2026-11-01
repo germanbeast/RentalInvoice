@@ -14,6 +14,21 @@
                 "Startet automatisch mit ./update.sh oder nach dem Update über den Knopf im Admin"
             ],
             "fixes": []
+
+        },
+        {
+            "version": "1.36.1",
+            "date": "2026-11-01",
+            "title": "Sicherheits-Update",
+            "features": [],
+            "fixes": [
+                "Admin-Zugang über beckhome.cloud mit gefälschtem X-Forwarded-Host gesperrt: Cloudflare Access lässt sich nicht mehr umgehen",
+                "Rechte-Prüfung ließ sich mit Großbuchstaben im Pfad (/API/…) umgehen: eingeschränkte Benutzer (z. B. Reinigung) kommen nur noch an ihre Bereiche",
+                "Gästenamen und Chat-Nachrichten mit Anführungszeichen konnten im Admin Code ausführen (XSS): wird jetzt sauber maskiert",
+                "Login-Code: fällt WhatsApp aus, kommt er per Telegram; ohne Kanal kein Login ohne zweiten Faktor mehr (Recovery-Key geht weiter). Höchstens 5 Versuche pro Code",
+                "PDF-Erzeugung lädt keine Seiten aus dem Netz oder vom Server mehr nach",
+                "Uploads unter Erbverwaltung prüfen Dateiendung und Typ genauer"
+            ]
         },
         {
             "version": "1.36.0",
