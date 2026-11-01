@@ -1625,7 +1625,7 @@
                             <a href="#" class="nav-item" data-target="settings-paperless">Paperless NGX</a>
                             <a href="#" class="nav-item" data-target="settings-booking">Booking.com &amp; Airbnb <i class="status-dot" data-status="calendars"></i></a>
                             <a href="#" class="nav-item" data-target="settings-whatsapp">WhatsApp Web</a>
-                            <a href="#" class="nav-item" data-target="settings-chat">Gäste-Chat &amp; SMS</a>
+                            <a href="#" class="nav-item" data-target="settings-chat">Gäste-Chat, SMS &amp; E-Mail</a>
                             <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot <i class="status-dot" data-status="telegram"></i></a>
                             <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
                             <a href="#" class="nav-item" data-target="settings-users">Benutzer &amp; Rechte</a>
@@ -2159,8 +2159,8 @@
 
                             <!-- GÄSTE-CHAT & SMS -->
                             <section id="settings-chat" class="settings-page">
-                                <h2>Gäste-Chat &amp; SMS</h2>
-                                <p class="text-muted">Gäste schreiben dir per WhatsApp an die gekoppelte Nummer oder per SMS. Du liest und antwortest im Admin unter „Nachrichten“ oder direkt in Telegram, indem du auf die Hinweis-Nachricht antwortest.</p>
+                                <h2>Gäste-Chat, SMS &amp; E-Mail</h2>
+                                <p class="text-muted">Gäste schreiben dir per WhatsApp an die gekoppelte Nummer, per SMS oder per E-Mail (z. B. über die Booking.com-Adresse). Du liest und antwortest im Admin unter „Nachrichten“ oder direkt in Telegram, indem du auf die Hinweis-Nachricht antwortest.</p>
                                 <div class="card" style="margin-top: 1rem;">
                                     <h3 class="chat-set-h">WhatsApp</h3>
                                     <label class="chat-check"><input type="checkbox" id="chat-enabled"> Nachrichten von Gästen annehmen</label>
@@ -2217,6 +2217,34 @@
                                     <div class="btn-group" style="margin-top: .5rem;">
                                         <button type="button" class="btn btn-outline btn-sm" id="chat-sms-test">Test-SMS senden</button>
                                         <button type="button" class="btn btn-outline btn-sm" id="chat-sms-hook-btn">Eingehende SMS einrichten</button>
+                                    </div>
+                                </div>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 class="chat-set-h">E-Mail (Booking.com-Adresse)</h3>
+                                    <p class="text-muted" style="margin-top:0">Booking.com gibt jedem Gast eine eigene Adresse (z. B. <code>name.123456@guest.booking.com</code>) und leitet E-Mails daran an den Gast weiter. Die Adresse kommt nicht über den Kalender, du trägst sie im Chat bei „E-Mail eintragen“ ein. Danach schreibst du dem Gast wie gewohnt unter „Nachrichten“.</p>
+                                    <ol class="chat-steps">
+                                        <li>Versendet wird über <b>Einstellungen → E-Mail (SMTP)</b>. <b>Wichtig:</b> Booking.com leitet nur E-Mails weiter, die von der Adresse kommen, die im Extranet für die Unterkunft hinterlegt ist.</li>
+                                        <li>Damit Antworten der Gäste hier erscheinen, „Antworten aus dem Postfach abrufen“ einschalten und den IMAP-Zugang des Postfachs eintragen, an das Booking.com die Gastnachrichten schickt.</li>
+                                        <li>Das Postfach wird alle 2 Minuten nur gelesen: nichts wird verschoben, gelöscht oder als gelesen markiert. Übernommen werden E-Mails von Booking.com-Gastadressen und von Adressen, die schon zu einer Unterhaltung oder einer aktuellen Buchung gehören.</li>
+                                    </ol>
+                                    <label class="chat-check"><input type="checkbox" id="chat-mail-enabled"> E-Mail im Gäste-Chat anbieten</label>
+                                    <p class="text-muted" id="chat-mail-smtp-hint" style="font-size:.85rem"></p>
+                                    <label class="chat-check"><input type="checkbox" id="chat-mail-imap"> Antworten aus dem Postfach abrufen (IMAP)</label>
+                                    <div class="form-row">
+                                        <div class="form-group"><label for="chat-mail-host">IMAP-Server</label><input type="text" id="chat-mail-host" placeholder="z. B. imap.gmail.com" autocomplete="off"></div>
+                                        <div class="form-group"><label for="chat-mail-port">Port</label><input type="number" id="chat-mail-port" placeholder="993"></div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group"><label for="chat-mail-user">Benutzer <small>leer = wie SMTP</small></label><input type="text" id="chat-mail-user" autocomplete="off"></div>
+                                        <div class="form-group"><label for="chat-mail-pass">Passwort <small>leer = wie SMTP</small></label><input type="password" id="chat-mail-pass" autocomplete="new-password"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="chat-mail-folder">Ordner</label>
+                                        <input type="text" id="chat-mail-folder" placeholder="INBOX">
+                                        <small class="text-muted" id="chat-mail-status"></small>
+                                    </div>
+                                    <div class="btn-group" style="margin-top: .5rem;">
+                                        <button type="button" class="btn btn-outline btn-sm" id="chat-mail-check">Postfach jetzt prüfen</button>
                                     </div>
                                 </div>
                             </section>
@@ -2586,6 +2614,11 @@
             <div class="form-group">
                 <label for="chat-new-phone">Telefonnummer</label>
                 <input type="tel" id="chat-new-phone" placeholder="leer = Nummer aus der Buchung">
+            </div>
+            <div class="form-group">
+                <label for="chat-new-email">E-Mail <small>z. B. Booking.com-Adresse des Gastes</small></label>
+                <input type="email" id="chat-new-email" placeholder="name.123456@guest.booking.com" autocomplete="off">
+                <small class="text-muted">Steht im Booking.com-Extranet in der Reservierung. Leer lassen, wenn du per WhatsApp oder SMS schreibst.</small>
             </div>
             <p class="chat-new-error" id="chat-new-error" hidden></p>
             <div class="btn-group">

@@ -1140,8 +1140,11 @@ const meldeschein = require('./meldeschein')({
     }
 });
 // Guest chat: WhatsApp + SMS with guests in the admin (see guest-chat.js)
+// Optional packages for reading guest e-mails (IMAP); without them the chat still sends e-mails
+let imapPkg = null, mailParserPkg = null;
+try { imapPkg = require('imapflow'); mailParserPkg = require('mailparser'); } catch (e) { console.warn('⚠️ imapflow/mailparser fehlen (npm install): Gast-E-Mails werden nicht abgerufen'); }
 guestChat = require('./guest-chat')({
-    express, rateLimit, db, push, guestMessage,
+    express, rateLimit, db, push, guestMessage, imap: imapPkg, mailParser: mailParserPkg,
     botLogic: require('./bot-logic'),
     getSite: () => guestPortal.getSite(),
     berlinToday: () => berlinToday(),
@@ -1898,7 +1901,7 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 // the mask back unchanged when it was not edited. Server-only settings are neither sent nor accepted.
 const SECRET_MASK = '••••••••';
 const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
-const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat'];
+const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state'];
 
 function secretPath(settings, [key, field]) {
     const holder = field ? settings[key] : settings;
