@@ -8,7 +8,7 @@ const sessions = new Map();
 /**
  * Main entry point for processing incoming WhatsApp messages.
  */
-async function processMessage(msg, waClient, MessageMedia) {
+async function processMessage(msg, waClient, MessageMedia, knownUser) {
     const from = msg.from;
     const body = msg.body.trim();
 
@@ -18,7 +18,8 @@ async function processMessage(msg, waClient, MessageMedia) {
         return;
     }
 
-    const user = db.getUserByPhone(from);
+    // server.js passes the admin it found; with @lid sender ids the number is not in msg.from
+    const user = knownUser || db.getUserByPhone(from);
 
     console.log(`[WA] Nachricht von [${from}]: "${body}"`);
     if (!user) {

@@ -952,9 +952,13 @@
                 if (text) text.textContent = 'QR-Code scannen';
                 if (qrGroup) qrGroup.style.display = 'block';
                 if (qrImage) qrImage.src = data.qr;
+            } else if (data.status === 'connecting') {
+                if (dot) { dot.className = 'badge'; dot.textContent = 'Verbinde...'; }
+                if (text) text.textContent = 'Verbindung wird aufgebaut...';
+                if (qrGroup) qrGroup.style.display = 'none';
             } else {
                 if (dot) { dot.className = 'badge'; dot.textContent = 'Offline'; }
-                if (text) text.textContent = 'Offline';
+                if (text) text.textContent = 'Offline' + (data.lastError ? ` (${data.lastError})` : '') + (data.restarting ? ', neuer Versuch läuft gleich' : '');
                 if (qrGroup) qrGroup.style.display = 'none';
             }
         } catch (e) {
@@ -1314,6 +1318,24 @@
             } finally {
                 btnTestWhatsApp.disabled = false;
                 btnTestWhatsApp.textContent = 'WhatsApp testen';
+            }
+        });
+    }
+
+    // WhatsApp restart button (keeps the pairing)
+    const btnWaRestart = $('#btn-wa-restart');
+    if (btnWaRestart) {
+        btnWaRestart.addEventListener('click', async () => {
+            btnWaRestart.disabled = true;
+            try {
+                const res = await fetch('/api/whatsapp/restart', { method: 'POST' });
+                const data = await res.json();
+                showToast(data.message || data.error || 'WhatsApp wird neu verbunden', res.ok ? 'success' : 'error');
+                setTimeout(pollWhatsAppStatus, 1500);
+            } catch (e) {
+                showToast('Neustart fehlgeschlagen', 'error');
+            } finally {
+                setTimeout(() => { btnWaRestart.disabled = false; }, 5000);
             }
         });
     }

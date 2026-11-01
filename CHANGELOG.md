@@ -5,6 +5,22 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.34.1] - 2026-11-01
+
+### Behoben
+- WhatsApp-Bot: Admin-Befehle kamen bei Absendern mit `@lid`-ID nicht an, weil `wa-commands.js` den Benutzer erneut über `msg.from` suchte. Der in `server.js` über die Telefonnummer gefundene Benutzer wird jetzt durchgereicht
+- WhatsApp Web wird immer live geladen (`webVersionCache: none`), statt eine alte, im lokalen Cache festgehaltene Version zu nutzen
+- Nach `disconnected` wird ein neuer Client gebaut statt `initialize()` auf dem geschlossenen alten aufzurufen; fehlgeschlagene Starts werden mit wachsender Wartezeit (30 s bis 10 min) wiederholt; Ereignisse alter Clients werden ignoriert
+- Watchdog prüft alle 2 Minuten `getState()` und startet neu, wenn WhatsApp nicht antwortet oder über 5 Minuten beim Verbinden hängt
+- Vor dem Start werden verwaiste Chromium-Prozesse des WhatsApp-Profils beendet und `SingletonLock` entfernt; beim Beenden (auch beim Update aus der App) wird der Browser geschlossen
+- `takeoverOnConflict`: wird die Bot-Nummer anderswo in WhatsApp Web geöffnet, übernimmt der Server die Sitzung wieder
+- „Trennen“ funktioniert auch ohne Antwort von WhatsApp, löscht die Kopplung und startet genau einen neuen Client
+- `sendWhatsApp` fragt die Chat-ID per `getNumberId` ab; Rufnummern mit `00` werden erkannt
+- `getUserByPhone` vergleicht nur Ziffern, auch bei gespeicherten Nummern mit `-`, `/` oder Klammern
+
+### Neu
+- `POST /api/whatsapp/restart` und Knopf „Neu verbinden“; Status zeigt „Verbindung wird aufgebaut“ und den letzten Fehler
+
 ## [1.34.0] - 2026-11-01
 
 ### Neu
