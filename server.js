@@ -3,6 +3,7 @@
    =========================== */
 
 const permissions = require('./permissions');
+const serverWatch = require('./server-watch');
 const { exec } = require('child_process');
 const express = require('express');
 const puppeteer = require('puppeteer');
@@ -443,7 +444,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), serverText: () => serverWatch.text(), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -928,6 +929,33 @@ cron.schedule('*/10 * * * *', async () => {
 });
 setTimeout(runNukiCleanup, 90 * 1000);
 
+// Running under PM2 without the watchdog (e.g. updated from the admin's update button, which does not run
+// update.sh): start it once. WATCHDOG_AUTOSTART=0 in .env turns this off.
+if (process.env.pm_id !== undefined && process.env.WATCHDOG_AUTOSTART !== '0') {
+    setTimeout(() => {
+        exec('pm2 jlist', { timeout: 20000, cwd: __dirname, maxBuffer: 20 * 1024 * 1024 }, (err, stdout) => {
+            if (err) return; // pm2 not callable from here
+            let list;
+            try { const t = String(stdout); list = JSON.parse(t.slice(t.indexOf('['))); } catch (e) { return; }
+            if (!Array.isArray(list) || list.some(p => p && p.name === 'beckhome-watchdog')) return;
+            const script = path.join(__dirname, 'watchdog.js');
+            exec(`pm2 start "${script}" --name beckhome-watchdog --cwd "${__dirname}" && pm2 save`, { timeout: 30000, cwd: __dirname }, (e2, out, errOut) => {
+                if (e2) console.warn('⚠️ Server-Wächter konnte nicht gestartet werden:', String(errOut || e2.message).trim());
+                else console.log('🛡️ Server-Wächter in PM2 gestartet (beckhome-watchdog)');
+            });
+        });
+    }, 60 * 1000);
+}
+
+// Job 1d: is the server watchdog (own PM2 process, reports app/tunnel outages) still running? - every 10 minutes
+cron.schedule('*/10 * * * *', () => {
+    serverWatch.check(async (msg, type) => {
+        const sent = await sendToAllRecipients(msg, { type });
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    }, { get: () => db.getSetting('watchdog_alert'), set: v => db.setSetting('watchdog_alert', v) })
+        .catch(e => console.error('\u274c Server-Wächter-Prüfung Fehler:', e.message));
+});
+
 // Job 2: Reminder Check (daily at 08:00)
 cron.schedule('0 8 * * *', async () => {
     try {
@@ -1322,6 +1350,7 @@ app.use((req, res, next) => {
     if (!g || String(req.hostname || '').toLowerCase() !== g.host) return next();
     const p = req.path;
     const qs = req.url.slice(req.path.length);
+    if (p === '/api/health') return next(); // server watchdog checks the domain through the tunnel
     if (!g.root) {
         if (req.method === 'GET' && (p === '/' || p === '/index.html')) return res.redirect(302, '/gast/');
         return next();
@@ -1357,8 +1386,16 @@ app.use(express.static(PUBLIC_DIR, {
 // =======================
 // 6b. HEALTH CHECK
 // =======================
+// Also used by the server watchdog (watchdog.js): locally and through the Cloudflare Tunnel. Touches the database,
+// so a broken/locked database counts as "down" too.
 app.get('/api/health', (req, res) => {
-    res.json({ ok: true });
+    res.set('Cache-Control', 'no-store');
+    try {
+        db.getSetting('__health__');
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(503).json({ ok: false });
+    }
 });
 
 // =======================
@@ -2036,7 +2073,7 @@ let nukiStatusCache = { at: 0, value: null };
 app.get('/api/status', apiLimiter, async (req, res) => {
     try {
         const s = db.getAllSettings();
-        const result = { telegram: { configured: !!s.tg_token, running: !!tgBot } };
+        const result = { telegram: { configured: !!s.tg_token, running: !!tgBot }, watchdog: serverWatch.status() };
 
         const nuki = s.nuki;
         if (!nuki || !nuki.token || !nuki.lockId) {
@@ -2074,7 +2111,7 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 // the mask back unchanged when it was not edited. Server-only settings are neither sent nor accepted.
 const SECRET_MASK = '••••••••';
 const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
-const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state'];
+const SERVER_ONLY_SETTINGS = ['watchdog_alert', 'push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state'];
 
 function secretPath(settings, [key, field]) {
     const holder = field ? settings[key] : settings;
@@ -3723,6 +3760,9 @@ app.post('/api/update', apiLimiter, (req, res) => {
         } catch (e) {
             console.warn('NPM Install Warning:', e.detail);
         }
+
+        // New watchdog code too (it runs as its own PM2 process)
+        if (process.env.pm_id !== undefined) await tryRun('pm2 restart beckhome-watchdog', { timeout: 20000 });
 
         res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
         setTimeout(() => {

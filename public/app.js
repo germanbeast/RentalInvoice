@@ -2899,8 +2899,28 @@
             set('nuki', !d.nuki.configured ? '' : d.nuki.ok ? 'ok' : 'bad', !d.nuki.configured ? 'Nicht eingerichtet' : d.nuki.ok ? `Verbunden (${d.nuki.codes} Codes)` : 'Fehler: ' + (d.nuki.error || ''));
             const feeds = d.calendars.feeds || [];
             const calCls = !d.calendars.configured.length ? '' : (!feeds.length ? 'warn' : feeds.every(f => f.ok) ? 'ok' : 'bad');
+            renderWatchdog(d.watchdog);
             set('calendars', calCls, !d.calendars.configured.length ? 'Kein Kalender eingerichtet' : calCls === 'ok' ? 'Letzte Abfrage erfolgreich' : calCls === 'bad' ? 'Letzte Abfrage mit Fehler' : 'Noch nicht abgefragt');
         } catch (e) { /* dots stay neutral */ }
+    }
+    function renderWatchdog(w) {
+        const ul = $('#watchdog-status');
+        if (!ul) return;
+        const time = ms => ms ? new Date(ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' Uhr' : '–';
+        const li = (ok, text) => `<li>${ok === null ? 'ℹ️' : ok ? '✅' : '🔴'} ${escapeHtml(text)}</li>`;
+        if (!w || !w.installed) {
+            ul.innerHTML = li(null, 'Noch nicht eingerichtet. Auf dem Server im App-Ordner ./update.sh ausführen, dann startet der Wächter automatisch.');
+            return;
+        }
+        const c = w.checks || {};
+        const rows = [li(w.running, w.running ? `Wächter läuft (letzte Prüfung ${time(w.lastRun)})` : `Wächter läuft nicht! Letzte Prüfung ${time(w.lastRun)}. Auf dem Server: pm2 restart beckhome-watchdog`)];
+        if (c.app) rows.push(li(c.app.ok, c.app.ok ? 'App antwortet' : `App: ${c.app.reason || 'keine Antwort'} (seit ${time(c.app.since)})`));
+        if (c.public) rows.push(li(c.public.ok, c.public.ok ? `${w.publicHost || 'Domain'} über Tunnel erreichbar` : `${w.publicHost || 'Domain'}: ${c.public.reason || 'nicht erreichbar'} (seit ${time(c.public.since)})`));
+        else rows.push(li(null, 'Keine eigene Domain als Öffentliche Adresse eingetragen, Tunnel wird nicht geprüft'));
+        if (c.disk && c.disk.free) rows.push(li(c.disk.ok, `Festplatte: ${(c.disk.free / 1024 ** 3).toFixed(1).replace('.', ',')} GB frei (${String(c.disk.pct).replace('.', ',')} %)`));
+        if (w.noTelegram) rows.push(li(false, 'Kein Telegram-Token oder keine Benachrichtigungs-ID eingetragen, Meldungen können nicht gesendet werden'));
+        rows.push(li(w.heartbeat ? true : null, w.heartbeat ? 'Externer Heartbeat aktiv (meldet auch einen Totalausfall des Servers)' : 'Ohne externen Heartbeat meldet sich ein Totalausfall des Servers erst nach dem Neustart'));
+        ul.innerHTML = rows.join('');
     }
     const settingsBtn = $('#btn-settings');
     if (settingsBtn) settingsBtn.addEventListener('click', () => loadStatusDots(false));

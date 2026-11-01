@@ -1,6 +1,20 @@
 {
-    "currentVersion": "1.36.0",
+    "currentVersion": "1.37.0",
     "releases": [
+        {
+            "version": "1.37.0",
+            "date": "2026-11-01",
+            "title": "Server-Wächter",
+            "features": [
+                "Neuer Server-Wächter als eigener Prozess: meldet per Telegram, wenn die App nicht antwortet (nach 3 Minuten), beckhome.cloud über den Cloudflare Tunnel nicht erreichbar ist (nach 5 Minuten), die Festplatte fast voll ist oder der Server neu gestartet wurde, jeweils auch wenn alles wieder läuft",
+                "Solange etwas ausgefallen ist, kommt alle 6 Stunden eine Erinnerung; Meldungen, die wegen fehlendem Internet nicht rausgingen, werden nachgeschickt",
+                "Telegram-Befehl /server und Übersicht unter Einstellungen → Telegram Bot zeigen den aktuellen Stand",
+                "Die App warnt, wenn der Wächter selbst nicht mehr läuft",
+                "Optional: externer Heartbeat (z. B. healthchecks.io), damit auch ein Totalausfall des Servers sofort gemeldet wird",
+                "Startet automatisch mit ./update.sh oder nach dem Update über den Knopf im Admin"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.36.0",
             "date": "2026-11-01",
