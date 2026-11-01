@@ -427,3 +427,22 @@ dialog[open] { animation: rise .35s var(--ease); }
 .invoice-sum .invoice-total { color: var(--ink); font-weight: 600; padding-top: .5rem; }
 .invoice-sum p { margin: .4rem 0 0; font-size: .86rem; color: var(--muted); }
 .invoice-form .btn[disabled] { opacity: .6; cursor: progress; }
+
+/* WhatsApp chat with the host (guest-chat.js) */
+.wa-btn {
+    display: inline-flex; align-items: center; gap: .5rem; margin-top: .6rem;
+    padding: .6rem 1rem; border-radius: 999px; background: #1f8f4e; color: #fff;
+    font-weight: 600; text-decoration: none; font-size: .95rem;
+}
+.wa-btn:hover { background: #18773f; }
+.wa-btn svg, .wa-fab svg { width: 1.25em; height: 1.25em; fill: currentColor; flex: none; }
+.wa-note { margin: .4rem 0 0; color: var(--ink-soft); font-size: .9rem; }
+.wa-fab {
+    position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+    display: inline-flex; align-items: center; gap: .45rem; padding: .7rem 1rem;
+    border-radius: 999px; background: #1f8f4e; color: #fff; text-decoration: none; font-weight: 600;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+}
+.wa-fab:hover { background: #18773f; }
+@media (max-width: 560px) { .wa-fab span { display: none; } .wa-fab { padding: .8rem; } }
+@media print { .wa-fab { display: none; } }

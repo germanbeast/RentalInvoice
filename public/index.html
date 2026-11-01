@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=5.2">
+    <link rel="stylesheet" href="styles.css?v=5.3">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 </head>
 
@@ -108,6 +108,10 @@
                 <button class="sidebar-item" id="nav-website" title="Webseite &amp; Anfragen">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.6L3 21l1.4-5.6A8.5 8.5 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 14h4.5"/></svg>
                     <span>Anfragen</span><i class="nav-badge" id="website-badge" hidden></i>
+                </button>
+                <button class="sidebar-item" id="nav-chat" title="Nachrichten mit Gästen (WhatsApp &amp; SMS)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M7.5 9.5h9M7.5 13h6"/></svg>
+                    <span>Nachrichten</span><i class="nav-badge" id="chat-badge" hidden></i>
                 </button>
                 <button class="sidebar-item" id="nav-occupancy" title="Auslastung &amp; Jahresrückblick">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 2.6A9 9 0 0 1 21.4 9H15z"/></svg>
@@ -283,6 +287,28 @@
             </div>
 
             <!-- VIEW: AUSLASTUNG (Jahresrückblick) -->
+            <div id="view-chat" class="content-view" style="display:none;">
+                <div class="content-header">
+                    <div class="content-breadcrumb"><h2>Nachrichten</h2></div>
+                    <div class="content-actions">
+                        <span class="chat-status" id="chat-status"></span>
+                        <button type="button" class="pill pill-primary" id="chat-new">Neue Nachricht</button>
+                    </div>
+                </div>
+                <section class="chat-layout" id="chat-layout">
+                    <aside class="chat-list card" aria-label="Unterhaltungen">
+                        <input type="search" class="chat-search" id="chat-search" placeholder="Name, Nummer oder Text suchen" aria-label="Unterhaltungen suchen">
+                        <div class="chat-convs" id="chat-convs"></div>
+                    </aside>
+                    <div class="chat-thread card" id="chat-thread">
+                        <div class="chat-empty">
+                            <p><strong>Wähle links eine Unterhaltung.</strong></p>
+                            <p>Gäste schreiben an deine gekoppelte WhatsApp-Nummer oder per SMS. Die Nachrichten erscheinen hier, automatisch der Buchung zugeordnet.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
             <div id="view-occupancy" class="content-view" style="display:none;">
                 <div class="content-header">
                     <div class="content-breadcrumb"><h2>Auslastung</h2></div>
@@ -1598,6 +1624,7 @@
                             <a href="#" class="nav-item" data-target="settings-paperless">Paperless NGX</a>
                             <a href="#" class="nav-item" data-target="settings-booking">Booking.com &amp; Airbnb <i class="status-dot" data-status="calendars"></i></a>
                             <a href="#" class="nav-item" data-target="settings-whatsapp">WhatsApp Web</a>
+                            <a href="#" class="nav-item" data-target="settings-chat">Gäste-Chat &amp; SMS</a>
                             <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot <i class="status-dot" data-status="telegram"></i></a>
                             <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
                             <a href="#" class="nav-item" data-target="settings-users">Benutzer (2FA)</a>
@@ -2129,6 +2156,70 @@
                                 </div>
                             </section>
 
+                            <!-- GÄSTE-CHAT & SMS -->
+                            <section id="settings-chat" class="settings-page">
+                                <h2>Gäste-Chat &amp; SMS</h2>
+                                <p class="text-muted">Gäste schreiben dir per WhatsApp an die gekoppelte Nummer oder per SMS. Du liest und antwortest im Admin unter „Nachrichten“ oder direkt in Telegram, indem du auf die Hinweis-Nachricht antwortest.</p>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 class="chat-set-h">WhatsApp</h3>
+                                    <label class="chat-check"><input type="checkbox" id="chat-enabled"> Nachrichten von Gästen annehmen</label>
+                                    <label class="chat-check"><input type="checkbox" id="chat-show-button"> Knopf „Per WhatsApp schreiben“ auf der Webseite und in Meine Buchung</label>
+                                    <div class="form-group">
+                                        <label for="chat-wa-number">Nummer für Gäste</label>
+                                        <input type="tel" id="chat-wa-number" placeholder="leer = Nummer der gekoppelten WhatsApp">
+                                        <small class="text-muted" id="chat-wa-hint"></small>
+                                    </div>
+                                    <label class="chat-check"><input type="checkbox" id="chat-notify-tg"> Neue Gastnachrichten per Telegram melden</label>
+                                    <label class="chat-check"><input type="checkbox" id="chat-notify-push"> Neue Gastnachrichten als Push auf dem Handy</label>
+                                </div>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 class="chat-set-h">SMS über ein Android-Handy</h3>
+                                    <p class="text-muted" style="margin-top:0">Für Gäste ohne WhatsApp. Ein Android-Handy mit SIM-Karte verschickt die SMS über die kostenlose App <a href="https://sms-gate.app" target="_blank" rel="noopener">SMS Gateway for Android</a>.</p>
+                                    <ol class="chat-steps">
+                                        <li>App auf dem Handy installieren (Google Play oder sms-gate.app) und SMS-Rechte erlauben.</li>
+                                        <li>In der App <b>Cloud Server</b> einschalten (oder <b>Local Server</b>, wenn Handy und Server im selben WLAN sind) und auf „Online“ tippen.</li>
+                                        <li>Benutzername und Passwort aus der App hier eintragen, speichern und eine Test-SMS schicken.</li>
+                                        <li>Für Antworten der Gäste auf „Eingehende SMS einrichten“ tippen. Das Handy braucht dafür eine https-Adresse dieses Servers.</li>
+                                    </ol>
+                                    <label class="chat-check"><input type="checkbox" id="chat-sms-enabled"> SMS einschalten</label>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="chat-sms-mode">Verbindung</label>
+                                            <select id="chat-sms-mode">
+                                                <option value="cloud">Cloud Server (empfohlen)</option>
+                                                <option value="local">Local Server im WLAN</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="chat-sms-sim">SIM-Karte</label>
+                                            <select id="chat-sms-sim"><option value="">Standard</option><option value="1">SIM 1</option><option value="2">SIM 2</option></select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" id="chat-sms-url-group">
+                                        <label for="chat-sms-url">Adresse des Handys</label>
+                                        <input type="url" id="chat-sms-url" placeholder="http://192.168.178.50:8080">
+                                        <small class="text-muted">Steht in der App unter „Local Server“.</small>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group"><label for="chat-sms-user">Benutzername</label><input type="text" id="chat-sms-user" autocomplete="off"></div>
+                                        <div class="form-group"><label for="chat-sms-pass">Passwort</label><input type="password" id="chat-sms-pass" autocomplete="new-password"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="chat-sms-hook">Adresse für eingehende SMS <small>optional</small></label>
+                                        <input type="url" id="chat-sms-hook" placeholder="leer = öffentliche Adresse der Webseite">
+                                        <small class="text-muted" id="chat-sms-hook-hint"></small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="chat-sms-test-phone">Test-SMS an</label>
+                                        <input type="tel" id="chat-sms-test-phone" placeholder="0176 12345678">
+                                    </div>
+                                    <div class="btn-group" style="margin-top: .5rem;">
+                                        <button type="button" class="btn btn-outline btn-sm" id="chat-sms-test">Test-SMS senden</button>
+                                        <button type="button" class="btn btn-outline btn-sm" id="chat-sms-hook-btn">Eingehende SMS einrichten</button>
+                                    </div>
+                                </div>
+                            </section>
+
                             <!-- TELEGRAM -->
                             <section id="settings-telegram" class="settings-page">
                                 <div class="section-header-flex"
@@ -2451,7 +2542,26 @@
     <!-- TOAST -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script defer src="app.js?v=3.9"></script>
+    <dialog class="chat-dialog" id="chat-new-dialog" aria-label="Neue Nachricht">
+        <form method="dialog" id="chat-new-form">
+            <h3>Neue Nachricht</h3>
+            <div class="form-group">
+                <label for="chat-new-booking">Buchung</label>
+                <select id="chat-new-booking"><option value="">– ohne Buchung –</option></select>
+            </div>
+            <div class="form-group">
+                <label for="chat-new-phone">Telefonnummer</label>
+                <input type="tel" id="chat-new-phone" placeholder="leer = Nummer aus der Buchung">
+            </div>
+            <p class="chat-new-error" id="chat-new-error" hidden></p>
+            <div class="btn-group">
+                <button type="button" class="btn btn-ghost" value="cancel" id="chat-new-cancel">Abbrechen</button>
+                <button type="submit" class="btn btn-primary" value="ok">Unterhaltung öffnen</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script defer src="app.js?v=4.0"></script>
 </body>
 
 </html>

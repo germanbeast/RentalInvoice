@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.31.1",
+    "currentVersion": "1.32.0",
     "releases": [
+        {
+            "version": "1.32.0",
+            "date": "2026-10-31",
+            "title": "WhatsApp-Chat und SMS mit Gästen",
+            "features": [
+                "Neue Seite „Nachrichten“: Gäste schreiben per WhatsApp an deine gekoppelte Nummer, du antwortest direkt im Admin",
+                "Jede Unterhaltung wird automatisch der passenden Buchung zugeordnet (Buchungscode oder Telefonnummer)",
+                "Vor dem Schreiben wird geprüft, ob die Nummer WhatsApp hat, sonst geht die Nachricht per SMS",
+                "SMS über ein Android-Handy mit der kostenlosen App „SMS Gateway for Android“",
+                "Neue Gastnachrichten kommen per Telegram und Push, in Telegram einfach auf die Nachricht antworten",
+                "WhatsApp-Knopf auf der Webseite und in „Meine Buchung“"
+            ]
+        },
         {
             "version": "1.31.1",
             "date": "2026-10-31",

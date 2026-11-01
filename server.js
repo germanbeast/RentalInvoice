@@ -168,11 +168,27 @@ function initWhatsApp() {
             if (msg.fromMe) {
                 return;
             }
+            if (msg.from === 'status@broadcast' || msg.from.includes('@g.us') || msg.from.includes('@newsletter') || msg.isStatus) return;
 
-            await waCommands.processMessage(msg, waClient, MessageMedia);
+            // Admin users get the commands, everybody else is a guest: the message goes to "Nachrichten"
+            const phone = await waPhoneOf(msg.from, msg);
+            if (db.getUserByPhone(msg.from) || (phone && db.getUserByPhone(phone))) {
+                await waCommands.processMessage(msg, waClient, MessageMedia);
+            } else if (guestChat) {
+                await guestChat.receiveWhatsApp(msg, phone);
+            }
         } catch (e) {
             console.error('❌ Fehler in waCommands.processMessage:', e);
         }
+    });
+
+    // Messages the host types directly on the WhatsApp phone appear in the guest conversation too
+    waClient.on('message_create', async (msg) => {
+        try {
+            if (!msg.fromMe || !guestChat || !msg.to || !/@(c\.us|lid)$/.test(msg.to)) return;
+            const phone = await waPhoneOf(msg.to);
+            await guestChat.recordOwnWhatsApp(msg, phone);
+        } catch (e) { /* only a mirror */ }
     });
 
     waClient.on('authenticated', () => {
@@ -202,6 +218,23 @@ function initWhatsApp() {
         console.error('\u274c WhatsApp init fehlgeschlagen:', e.message);
         waStatus = 'disconnected';
     });
+}
+
+/** Phone number (digits with country code) behind a WhatsApp id; newer accounts send ids ending in @lid. */
+async function waPhoneOf(id, msg) {
+    const { normPhone } = require('./guest-chat');
+    if (/@c\.us$/.test(id)) return normPhone(id);
+    try {
+        if (waClient && typeof waClient.getContactLidAndPhone === 'function') {
+            const r = await waClient.getContactLidAndPhone([id]);
+            if (r && r[0] && r[0].pn) return normPhone(r[0].pn);
+        }
+    } catch (e) { /* older whatsapp-web.js */ }
+    try {
+        const c = msg ? await msg.getContact() : await waClient.getContactById(id);
+        if (c && c.number && !/@lid$/.test(c.id && c.id._serialized ? c.id._serialized : '')) return normPhone(c.number);
+    } catch (e) { /* unknown contact */ }
+    return '';
 }
 
 async function sendWhatsApp(phone, message) {
@@ -270,7 +303,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -1038,6 +1071,7 @@ app.use('/icons', express.static(path.join(PUBLIC_DIR, 'icons'), { maxAge: '7d' 
 app.use('/styles.css', express.static(path.join(PUBLIC_DIR, 'styles.css')));
 app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
 
+let guestChat = null; // created below, the guest pages ask it for the WhatsApp button
 // Public guest website (description, availability, booking requests, guest login + status)
 const guestPortal = require('./guest-portal')({
     express, rateLimit, db, nodemailer, multer,
@@ -1046,6 +1080,7 @@ const guestPortal = require('./guest-portal')({
         const sent = await sendToAllRecipients(msg);
         db.logNotification(type, msg, sent ? 'sent' : 'failed');
     },
+    chatButton: (booking) => guestChat ? guestChat.guestButton(booking) : null,
     createNukiPin: (arrival, departure, name) => createNukiPin(arrival, departure, name),
     deleteNukiPin: (authId) => deleteNukiPin(authId),
     berlinToday: () => berlinToday(),
@@ -1089,6 +1124,27 @@ const meldeschein = require('./meldeschein')({
         db.logNotification(type, msg, sent ? 'sent' : 'failed');
     }
 });
+// Guest chat: WhatsApp + SMS with guests in the admin (see guest-chat.js)
+guestChat = require('./guest-chat')({
+    express, rateLimit, db, push, guestMessage,
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortal.getSite(),
+    berlinToday: () => berlinToday(),
+    formatDateDE: (d) => formatDateDE(d),
+    telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
+    wa: {
+        status: () => ({ ready: waReady, number: (waReady && waClient && waClient.info && waClient.info.wid && waClient.info.wid.user) || '' }),
+        chatIdFor: async (phone) => {
+            const id = await waClient.getNumberId(phone);
+            return id ? id._serialized : null;
+        },
+        send: async (chatId, text) => {
+            const m = await waClient.sendMessage(chatId, text);
+            return m && m.id ? m.id._serialized : null;
+        }
+    }
+});
+app.use('/gast', guestChat.router);
 app.use('/gast', guestMessage.router);
 app.use('/gast', meldeschein.router);
 app.use('/gast', emergencyDoor.router);
@@ -1399,6 +1455,7 @@ function loadBookingRows() {
 
 // Guest website admin: settings, photos, booking requests
 guestPortal.registerAdminRoutes(app, apiLimiter);
+guestChat.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
 meldeschein.registerAdminRoutes(app, apiLimiter);
 
@@ -1735,7 +1792,7 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 // the mask back unchanged when it was not edited. Server-only settings are neither sent nor accepted.
 const SECRET_MASK = '••••••••';
 const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
-const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests'];
+const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat'];
 
 function secretPath(settings, [key, field]) {
     const holder = field ? settings[key] : settings;

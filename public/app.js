@@ -130,6 +130,7 @@
         }, 10);
         init(); // Start the app
         refreshSiteBadge();
+        refreshChatBadge();
         loadTopbarUser();
     }
 
@@ -1378,13 +1379,15 @@
             refresh = loadExpenses;
         } else if (viewId === 'bookings') {
             refresh = () => { if (!document.querySelector('#bookings-list input')) loadBookings(); };
+        } else if (viewId === 'chat') {
+            refresh = () => { loadChatQuiet(); };
         } else if (viewId === 'website') {
             refresh = () => { if (siteTab === 'requests' && !document.querySelector('#site-requests input')) loadSiteRequests(); };
         }
         // 'invoice' view has no background data to poll
         // Skip refreshes while the tab is hidden (saves CPU/battery on weak devices)
         viewRefresh = refresh;
-        if (refresh) viewPollInterval = setInterval(() => { if (!document.hidden) refresh(); }, POLL_MS);
+        if (refresh) viewPollInterval = setInterval(() => { if (!document.hidden) refresh(); }, viewId === 'chat' ? 6000 : POLL_MS);
     }
 
     // Catch up immediately when the tab becomes visible again
@@ -1393,8 +1396,8 @@
     });
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar, viewOccupancy, viewFinance];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar, navOccupancy, navFinance];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar, viewOccupancy, viewFinance, $('#view-chat')];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar, navOccupancy, navFinance, $('#nav-chat')];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1437,6 +1440,10 @@
             viewOccupancy.style.display = 'flex';
             navOccupancy.classList.add('active');
             loadReview(reviewYear);
+        } else if (viewId === 'chat' && $('#view-chat')) {
+            $('#view-chat').style.display = 'flex';
+            $('#nav-chat').classList.add('active');
+            loadChat();
         } else if (viewId === 'finance' && viewFinance) {
             viewFinance.style.display = 'flex';
             navFinance.classList.add('active');
@@ -1462,6 +1469,7 @@
     if (navWebsite) navWebsite.addEventListener('click', () => switchView('website'));
     if (navOccupancy) navOccupancy.addEventListener('click', () => switchView('occupancy'));
     if (navFinance) navFinance.addEventListener('click', () => switchView('finance'));
+    if ($('#nav-chat')) $('#nav-chat').addEventListener('click', () => switchView('chat'));
 
     if (navWelcome) {
         navWelcome.addEventListener('click', () => {
@@ -1663,6 +1671,7 @@
                 <div class="booking-actions">
                     <button class="btn-mini" data-act="name">${b.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
                     ${b.state !== 'past' && b.guestCode ? '<button class="btn-mini" data-act="guestlink" title="Nachricht mit Link und Buchungscode für den Gast kopieren">Gastlink</button>' : ''}
+                    <button class="btn-mini" data-act="chat" title="WhatsApp oder SMS an den Gast">Nachricht</button>
                     <button class="btn-mini" data-act="invoice">Rechnung erstellen</button>
                 </div>
             </div>`;
@@ -1715,6 +1724,7 @@
             if (!b) return;
             if (btn.dataset.act === 'name') startNameEdit(card, b);
             else if (btn.dataset.act === 'guestlink') copyGuestMessage(b);
+            else if (btn.dataset.act === 'chat') chatWithBooking(b);
             else invoiceFromBooking(b);
         });
         $$('#bookings-filter button').forEach(btn => btn.addEventListener('click', () => { bookingsFilter = btn.dataset.filter; loadBookings(); }));
@@ -1966,6 +1976,7 @@
                 ${bk.meldescheinId ? '<button type="button" class="pill" data-pop="meldeschein">Meldeschein</button>' : ''}
                 ${bk.state !== 'past' ? `<button type="button" class="pill" data-pop="doorcode">${bk.hasCode ? 'Türcode bearbeiten' : 'Türcode anlegen'}</button>` : ''}
                 ${bk.state !== 'past' && bk.guestCode ? '<button type="button" class="pill" data-pop="guestlink">Gastlink kopieren</button>' : ''}
+                <button type="button" class="pill" data-pop="chat">Nachricht</button>
                 ${bk.manualEntry ? '<button type="button" class="pill pill-danger" data-pop="delete">Löschen</button>' : ''}
             </div>`;
         tlPop.dataset.bid = bk.id;
@@ -2030,6 +2041,7 @@
             if (!bk) return hideTlPop();
             if (act === 'invoice') { hideTlPop(); return invoiceFromBooking(bk); }
             if (act === 'guestlink') return copyGuestMessage(bk);
+            if (act === 'chat') { hideTlPop(); return chatWithBooking(bk); }
             if (act === 'meldeschein') { hideTlPop(); return window.open(`/api/meldescheine/${bk.meldescheinId}/druck`, '_blank', 'noopener'); }
             if (act === 'doorcode') { hideTlPop(); return openDoorCode(bk); }
             if (act === 'delete') {
@@ -4556,7 +4568,7 @@
 
         // Default to the calendar (Smoobu-style home); a tapped push notification opens /?view=bookings
         const startView = new URLSearchParams(location.search).get('view');
-        switchView(['bookings', 'expenses', 'invoice', 'dashboard', 'occupancy', 'finance'].includes(startView) ? startView : 'calendar');
+        switchView(['bookings', 'expenses', 'invoice', 'dashboard', 'occupancy', 'finance', 'chat'].includes(startView) ? startView : 'calendar');
         if (startView) history.replaceState(null, '', '/');
 
         registerServiceWorker();
@@ -6585,6 +6597,429 @@
         } catch (err) {
             showToast('Sync-Fehler: ' + err.message, 'error');
         }
+    }
+    // =======================
+    // Nachrichten: WhatsApp & SMS mit Gästen (guest-chat.js)
+    // =======================
+    const chat = { convs: [], current: null, thread: null, query: '', status: null, sending: false };
+    const viewChat = $('#view-chat');
+    const navChat = $('#nav-chat');
+    const chatTime = s => s ? new Date(String(s).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? '' : 'Z')) : null;
+    const chatPhone = p => p ? '+' + p : '';
+    const chatChannel = c => c === 'sms' ? 'SMS' : 'WhatsApp';
+
+    function chatWhen(s, long) {
+        const d = chatTime(s);
+        if (!d || isNaN(d)) return '';
+        const now = new Date();
+        const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        if (d.toDateString() === now.toDateString()) return time;
+        const y = new Date(now); y.setDate(now.getDate() - 1);
+        if (d.toDateString() === y.toDateString()) return long ? `Gestern ${time}` : 'Gestern';
+        const date = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', ...(d.getFullYear() !== now.getFullYear() ? { year: '2-digit' } : {}) });
+        return long ? `${date} ${time}` : date;
+    }
+
+    function chatBookingLabel(b) {
+        if (!b) return '';
+        return `${fmtDE(b.checkin)}–${fmtDE(b.checkout)}${b.source ? ` · ${b.source}` : ''}`;
+    }
+
+    async function refreshChatBadge() {
+        try {
+            const d = await apiJson('/api/chat/unread');
+            const badge = $('#chat-badge');
+            if (!badge || !d.success) return;
+            badge.textContent = d.unread;
+            badge.hidden = !d.unread;
+        } catch (e) { /* badge stays */ }
+    }
+    setInterval(() => { if (!document.hidden && appWrapper.classList.contains('authenticated') && currentView !== 'chat') refreshChatBadge(); }, 30000);
+
+    const loadChatQuiet = () => loadChat(true);
+    async function loadChat(quiet) {
+        try {
+            const [d, st] = await Promise.all([apiJson('/api/chat/conversations'), apiJson('/api/chat/status')]);
+            if (!d.success) return;
+            chat.convs = d.conversations;
+            chat.status = st.success ? st : null;
+            const badge = $('#chat-badge');
+            if (badge) { badge.textContent = d.unread; badge.hidden = !d.unread; }
+            renderChatStatus();
+            renderChatList();
+            if (chat.current) loadChatThread(chat.current, true);
+        } catch (e) { if (!quiet) showToast('Nachrichten konnten nicht geladen werden', 'error'); }
+    }
+
+    function renderChatStatus() {
+        const el = $('#chat-status');
+        if (!el) return;
+        const st = chat.status;
+        if (!st) { el.innerHTML = ''; return; }
+        el.innerHTML = `<span class="chat-dot ${st.whatsapp ? 'on' : 'off'}"></span>WhatsApp ${st.whatsapp ? 'verbunden' : 'getrennt'}`
+            + `<span class="chat-dot ${st.sms ? 'on' : 'off'}"></span>SMS ${st.sms ? 'bereit' : 'aus'}`;
+    }
+
+    function renderChatList() {
+        const el = $('#chat-convs');
+        if (!el) return;
+        const q = chat.query.toLowerCase();
+        const list = chat.convs.filter(c => !q || [c.name, c.phone, c.lastBody, c.booking && c.booking.code].some(v => v && String(v).toLowerCase().includes(q)));
+        if (!list.length) {
+            el.innerHTML = `<p class="chat-none">${chat.convs.length ? 'Nichts gefunden.' : 'Noch keine Nachrichten. Sobald ein Gast schreibt, erscheint die Unterhaltung hier.'}</p>`;
+            return;
+        }
+        el.innerHTML = list.map(c => `
+            <button type="button" class="chat-conv${c.conv === chat.current ? ' active' : ''}${c.unread ? ' unread' : ''}" data-conv="${escapeHtml(c.conv)}">
+                <span class="chat-avatar">${escapeHtml((c.name || '#').trim().charAt(0).toUpperCase())}</span>
+                <span class="chat-conv-main">
+                    <span class="chat-conv-top"><strong>${escapeHtml(c.name || chatPhone(c.phone) || 'Unbekannt')}</strong><time>${chatWhen(c.lastAt)}</time></span>
+                    <span class="chat-conv-sub">${c.booking ? `<span class="chat-tag">${escapeHtml(chatBookingLabel(c.booking))}</span>` : ''}${c.lastChannel === 'sms' ? '<span class="chat-tag sms">SMS</span>' : ''}</span>
+                    <span class="chat-conv-last">${c.lastDir === 'out' ? 'Du: ' : ''}${escapeHtml(String(c.lastBody || '').slice(0, 90))}</span>
+                </span>
+                ${c.unread ? `<i class="chat-unread">${c.unread}</i>` : ''}
+            </button>`).join('');
+    }
+
+    async function loadChatThread(conv, quiet) {
+        try {
+            const d = await apiJson(`/api/chat/thread/${encodeURIComponent(conv)}`);
+            if (chat.current !== conv) return; // another conversation was opened meanwhile
+            if (!d.success) { if (!quiet) showToast(d.error || 'Unterhaltung nicht gefunden', 'error'); return; }
+            const same = chat.thread && chat.thread.conv === conv;
+            const changed = !same || chat.thread.messages.length !== d.thread.messages.length ||
+                JSON.stringify(chat.thread.booking) !== JSON.stringify(d.thread.booking) ||
+                chat.thread.messages.some((m, i) => m.status !== d.thread.messages[i].status);
+            chat.current = conv;
+            if (same && chat.thread.whatsapp && d.thread.whatsapp === 'unknown') d.thread.whatsapp = chat.thread.whatsapp;
+            chat.thread = d.thread;
+            if (changed) renderChatThread(!same);
+            if (!same && d.thread.whatsapp !== 'yes') checkChatWhatsApp(conv);
+            const c = chat.convs.find(x => x.conv === conv);
+            if (c && c.unread) { c.unread = 0; renderChatList(); refreshChatBadge(); }
+        } catch (e) { if (!quiet) showToast('Unterhaltung konnte nicht geladen werden', 'error'); }
+    }
+
+    // Before writing by WhatsApp: does this number exist on WhatsApp? Without it the message goes by SMS.
+    async function checkChatWhatsApp(conv, force) {
+        if (chat.thread && chat.thread.conv === conv) { chat.thread.whatsapp = 'checking'; renderChatWaHint(); }
+        const d = await apiJson(`/api/chat/thread/${encodeURIComponent(conv)}/whatsapp${force ? '?force=1' : ''}`).catch(() => null);
+        if (!chat.thread || chat.thread.conv !== conv) return;
+        chat.thread.whatsapp = d && d.success ? d.whatsapp : 'unknown';
+        chat.thread.waConnected = d ? d.connected : false;
+        const sel = $('#chat-channel');
+        if (sel && chat.thread.whatsapp === 'no' && !(chat.status && chat.status.sms === false && sel.value === 'sms')) sel.value = 'sms';
+        renderChatWaHint();
+    }
+
+    function renderChatWaHint() {
+        const el = $('#chat-wa-hint');
+        const t = chat.thread;
+        if (!el || !t) return;
+        const sel = $('#chat-channel');
+        const waOpt = sel && sel.querySelector('option[value="wa"]');
+        const st = chat.status || {};
+        if (waOpt) waOpt.disabled = t.whatsapp === 'no';
+        if (sel && t.whatsapp === 'no' && sel.value === 'wa' && st.sms) sel.value = 'sms';
+        const msg = {
+            yes: '<span class="ok">✓ Diese Nummer hat WhatsApp.</span>',
+            no: `<span class="bad">✕ Diese Nummer gibt es nicht bei WhatsApp.</span> ${st.sms ? 'Die Nachricht geht per SMS.' : 'Bitte SMS einrichten (Einstellungen → Gäste-Chat &amp; SMS) oder den Gast anrufen.'} <button type="button" class="linkish" data-chat="recheck">Erneut prüfen</button>`,
+            checking: 'Prüfe, ob die Nummer WhatsApp hat …',
+            unknown: (t.waConnected === false || st.whatsapp === false) ? 'WhatsApp ist nicht verbunden, deshalb kann nicht geprüft werden, ob die Nummer WhatsApp hat.' : 'Konnte nicht prüfen, ob die Nummer WhatsApp hat. <button type="button" class="linkish" data-chat="recheck">Erneut prüfen</button>'
+        }[t.whatsapp] || '';
+        el.innerHTML = msg;
+        el.hidden = !msg || (t.whatsapp === 'yes' && t.messages.some(m => m.channel === 'wa'));
+    }
+
+    function renderChatThread(fresh) {
+        const el = $('#chat-thread');
+        const t = chat.thread;
+        if (!el || !t) return;
+        $('#chat-layout').classList.add('has-thread');
+        const draft = !fresh && $('#chat-text') ? $('#chat-text').value : '';
+        const channel = !fresh && $('#chat-channel') ? $('#chat-channel').value : (t.whatsapp === 'no' ? 'sms' : (t.lastChannel || 'wa'));
+        const st = chat.status || {};
+        let lastDay = '';
+        const msgs = t.messages.map(m => {
+            const d = chatTime(m.at);
+            const day = d ? d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+            const sep = day !== lastDay ? `<div class="chat-day">${day}</div>` : '';
+            lastDay = day;
+            let media = '';
+            if (m.media) {
+                media = /^image\//.test(m.mediaType || '') ? `<a href="${m.media}" target="_blank" rel="noopener"><img class="chat-img" src="${m.media}" alt="Bild vom Gast" loading="lazy"></a>`
+                    : /^audio\//.test(m.mediaType || '') ? `<audio controls preload="none" src="${m.media}"></audio>`
+                        : /^video\//.test(m.mediaType || '') ? `<video controls preload="none" src="${m.media}"></video>`
+                            : `<a class="chat-file" href="${m.media}" target="_blank" rel="noopener">📎 Anhang öffnen</a>`;
+            }
+            const meta = [d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '', chatChannel(m.channel), m.direction === 'out' && m.author ? m.author : '']
+                .filter(Boolean).join(' · ');
+            return `${sep}<div class="chat-msg ${m.direction}${m.status === 'failed' ? ' failed' : ''}">
+                ${media}${m.body ? `<div class="chat-body">${escapeHtml(m.body).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')}</div>` : ''}
+                <div class="chat-meta">${escapeHtml(meta)}${m.status === 'failed' ? ` · <span class="bad">nicht gesendet: ${escapeHtml(m.error || '')}</span>` : ''}</div>
+            </div>`;
+        }).join('');
+        const b = t.booking;
+        el.innerHTML = `
+            <div class="chat-head">
+                <button type="button" class="chat-back" data-chat="back" aria-label="Zurück zur Liste">‹</button>
+                <div class="chat-head-main">
+                    <strong>${escapeHtml(t.name || chatPhone(t.phone) || 'Unbekannt')}</strong>
+                    <span>${t.phone ? `<a href="tel:+${escapeHtml(t.phone)}">${escapeHtml(chatPhone(t.phone))}</a>` : 'Nummer unbekannt'}${b ? ` · Buchung ${escapeHtml(chatBookingLabel(b))}${b.code ? ` · <code>${escapeHtml(b.code)}</code>` : ''}` : ' · keiner Buchung zugeordnet'}</span>
+                </div>
+                <div class="chat-head-actions">
+                    <button type="button" class="pill" data-chat="booking">${b ? 'Buchung ändern' : 'Buchung zuordnen'}</button>
+                    <button type="button" class="pill" data-chat="unread" title="Als ungelesen markieren">Ungelesen</button>
+                    <button type="button" class="pill pill-danger" data-chat="delete" title="Unterhaltung löschen">Löschen</button>
+                </div>
+            </div>
+            <div class="chat-msgs" id="chat-msgs">${msgs || '<p class="chat-none">Noch keine Nachrichten. Schreib dem Gast die erste.</p>'}</div>
+            <form class="chat-compose" id="chat-compose">
+                <div class="chat-compose-tools">
+                    <select id="chat-channel" aria-label="Senden per">
+                        <option value="wa"${channel === 'wa' ? ' selected' : ''}>WhatsApp${st.whatsapp === false ? ' (getrennt)' : ''}</option>
+                        <option value="sms"${channel === 'sms' ? ' selected' : ''}${st.sms ? '' : ' disabled'}>SMS${st.sms ? '' : ' (nicht eingerichtet)'}</option>
+                    </select>
+                    ${b ? '<button type="button" class="pill" data-chat="template">Gästenachricht einfügen</button><button type="button" class="pill" data-chat="template-en">Englisch</button>' : ''}
+                </div>
+                <p class="chat-wa-hint" id="chat-wa-hint" hidden></p>
+                <div class="chat-compose-row">
+                    <textarea id="chat-text" rows="2" maxlength="4000" placeholder="Nachricht an den Gast …  (Enter sendet, Umschalt+Enter neue Zeile)"></textarea>
+                    <button type="submit" class="btn btn-primary" id="chat-send">Senden</button>
+                </div>
+            </form>`;
+        const ta = $('#chat-text');
+        ta.value = draft;
+        renderChatWaHint();
+        const box = $('#chat-msgs');
+        box.scrollTop = box.scrollHeight;
+        if (fresh && window.innerWidth > 768) ta.focus();
+        renderChatList();
+    }
+
+    async function sendChat() {
+        const ta = $('#chat-text');
+        const text = ta.value.trim();
+        if (!text || chat.sending || !chat.current) return;
+        if ($('#chat-channel').value === 'wa' && chat.thread && chat.thread.whatsapp === 'no') return showToast('Diese Nummer gibt es nicht bei WhatsApp. Bitte SMS wählen.', 'error', 6000);
+        chat.sending = true;
+        $('#chat-send').disabled = true;
+        try {
+            const d = await apiJson(`/api/chat/thread/${encodeURIComponent(chat.current)}/send`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, channel: $('#chat-channel').value })
+            });
+            if (d.success) ta.value = '';
+            else showToast(d.error || 'Nicht gesendet', 'error', 6000);
+            await loadChatThread(chat.current, true);
+            const c = await apiJson('/api/chat/conversations');
+            if (c.success) { chat.convs = c.conversations; renderChatList(); }
+        } catch (e) {
+            showToast('Nicht gesendet: ' + e.message, 'error');
+        } finally {
+            chat.sending = false;
+            const btn = $('#chat-send');
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function chooseChatBooking() {
+        const d = await apiJson('/api/chat/bookings').catch(() => null);
+        if (!d || !d.success) return showToast('Buchungen konnten nicht geladen werden', 'error');
+        openChatDialog({ title: 'Buchung zuordnen', bookings: d.bookings, current: chat.thread.booking && chat.thread.booking.id, phone: false });
+    }
+
+    let chatDialogMode = null;
+    function fillChatBookings(list, current) {
+        const sel = $('#chat-new-booking');
+        sel.innerHTML = '<option value="">– ohne Buchung –</option>' + list.map(b =>
+            `<option value="${b.id}"${String(b.id) === String(current) ? ' selected' : ''}>${escapeHtml(`${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)} · ${b.name || b.source || 'Buchung'}`)}</option>`).join('');
+    }
+
+    function openChatDialog({ title, bookings, current, phone }) {
+        const dlg = $('#chat-new-dialog');
+        dlg.querySelector('h3').textContent = title;
+        fillChatBookings(bookings, current);
+        $('#chat-new-phone').closest('.form-group').hidden = !phone;
+        $('#chat-new-phone').value = '';
+        $('#chat-new-error').hidden = true;
+        dlg.querySelector('button[type="submit"]').textContent = phone ? 'Unterhaltung öffnen' : 'Speichern';
+        chatDialogMode = phone ? 'new' : 'assign';
+        dlg.showModal();
+    }
+
+    async function openChat(conv) {
+        if (currentView !== 'chat') switchView('chat');
+        chat.thread = null;
+        chat.current = conv;
+        await loadChatThread(conv);
+    }
+
+    async function startChat(bookingId, phone) {
+        const d = await apiJson('/api/chat/start', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId, phone })
+        });
+        return d;
+    }
+
+    // From the booking popover / list: open (or start) the conversation with this guest
+    async function chatWithBooking(bk) {
+        const d = await startChat(bk.id).catch(() => null);
+        if (d && d.success) return openChat(d.conv);
+        if (d && d.needPhone) {
+            const bookings = (await apiJson('/api/chat/bookings').catch(() => ({ bookings: [] }))).bookings || [];
+            if (!bookings.some(b => b.id === bk.id)) bookings.unshift({ id: bk.id, checkin: bk.checkin, checkout: bk.checkout, name: bk.name, source: bk.source });
+            if (currentView !== 'chat') switchView('chat');
+            openChatDialog({ title: 'Nachricht an den Gast', bookings, current: bk.id, phone: true });
+            const err = $('#chat-new-error');
+            err.textContent = d.error; err.hidden = false;
+            $('#chat-new-phone').focus();
+            return;
+        }
+        showToast((d && d.error) || 'Unterhaltung konnte nicht geöffnet werden', 'error');
+    }
+
+    if (viewChat) {
+        $('#chat-search').addEventListener('input', e => { chat.query = e.target.value.trim(); renderChatList(); });
+        $('#chat-convs').addEventListener('click', e => {
+            const btn = e.target.closest('[data-conv]');
+            if (btn) openChat(btn.dataset.conv);
+        });
+        $('#chat-new').addEventListener('click', async () => {
+            const d = await apiJson('/api/chat/bookings').catch(() => null);
+            const list = d && d.success ? d.bookings : [];
+            openChatDialog({ title: 'Neue Nachricht', bookings: list, current: null, phone: true });
+        });
+        $('#chat-new-cancel').addEventListener('click', () => $('#chat-new-dialog').close());
+        $('#chat-new-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const bookingId = parseInt($('#chat-new-booking').value, 10) || null;
+            const err = $('#chat-new-error');
+            if (chatDialogMode === 'assign') {
+                const d = await apiJson(`/api/chat/thread/${encodeURIComponent(chat.current)}/booking`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingId })
+                }).catch(() => null);
+                if (!d || !d.success) { err.textContent = (d && d.error) || 'Speichern fehlgeschlagen'; err.hidden = false; return; }
+                $('#chat-new-dialog').close();
+                showToast(bookingId ? 'Buchung zugeordnet' : 'Zuordnung entfernt', 'success');
+                return loadChat();
+            }
+            const d = await startChat(bookingId, $('#chat-new-phone').value.trim()).catch(() => null);
+            if (!d || !d.success) { err.textContent = (d && d.error) || 'Unterhaltung konnte nicht geöffnet werden'; err.hidden = false; return; }
+            $('#chat-new-dialog').close();
+            await loadChat();
+            openChat(d.conv);
+        });
+
+        $('#chat-thread').addEventListener('submit', e => { e.preventDefault(); sendChat(); });
+        $('#chat-thread').addEventListener('keydown', e => {
+            if (e.target.id === 'chat-text' && e.key === 'Enter' && !e.shiftKey && !e.isComposing && window.innerWidth > 768) { e.preventDefault(); sendChat(); }
+        });
+        $('#chat-thread').addEventListener('click', async e => {
+            const btn = e.target.closest('[data-chat]');
+            if (!btn || !chat.thread) return;
+            const act = btn.dataset.chat;
+            const conv = chat.current;
+            if (act === 'back') { $('#chat-layout').classList.remove('has-thread'); chat.current = null; chat.thread = null; renderChatList(); return; }
+            if (act === 'booking') return chooseChatBooking();
+            if (act === 'recheck') return checkChatWhatsApp(conv, true);
+            if (act === 'template' || act === 'template-en') {
+                const d = await apiJson(`/api/chat/template/${chat.thread.booking.id}${act === 'template-en' ? '?lang=en' : ''}`).catch(() => null);
+                if (!d || !d.success) return showToast((d && d.error) || 'Gästenachricht nicht verfügbar', 'error');
+                const ta = $('#chat-text');
+                ta.value = d.text;
+                ta.focus();
+                (d.warnings || []).forEach(w => showToast(w, 'info', 6000));
+                return;
+            }
+            if (act === 'unread') {
+                await apiJson(`/api/chat/thread/${encodeURIComponent(conv)}/read`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unread: true }) });
+                $('#chat-layout').classList.remove('has-thread');
+                chat.current = null; chat.thread = null;
+                $('#chat-thread').innerHTML = '<div class="chat-empty"><p>Als ungelesen markiert.</p></div>';
+                return loadChat();
+            }
+            if (act === 'delete') {
+                if (!confirm(`Unterhaltung mit ${chat.thread.name || chatPhone(chat.thread.phone)} löschen? Die Nachrichten im WhatsApp des Handys bleiben erhalten.`)) return;
+                await apiJson(`/api/chat/thread/${encodeURIComponent(conv)}`, { method: 'DELETE' });
+                $('#chat-layout').classList.remove('has-thread');
+                chat.current = null; chat.thread = null;
+                $('#chat-thread').innerHTML = '<div class="chat-empty"><p>Unterhaltung gelöscht.</p></div>';
+                return loadChat();
+            }
+        });
+    }
+
+    // ---- Settings: Gäste-Chat & SMS ----
+    let chatSettingsLoaded = false;
+    async function loadChatSettings() {
+        const d = await apiJson('/api/chat/settings').catch(() => null);
+        if (!d || !d.success) return;
+        chatSettingsLoaded = true;
+        const s = d.settings;
+        $('#chat-enabled').checked = s.enabled;
+        $('#chat-show-button').checked = s.show_button;
+        $('#chat-wa-number').value = s.wa_number ? '+' + s.wa_number : '';
+        $('#chat-wa-hint').textContent = d.waNumber ? `Gekoppelte WhatsApp-Nummer: +${d.waNumber}` : 'WhatsApp ist gerade nicht verbunden, die Nummer wird nach dem Koppeln automatisch erkannt.';
+        $('#chat-notify-tg').checked = s.notify_telegram;
+        $('#chat-notify-push').checked = s.notify_push;
+        $('#chat-sms-enabled').checked = s.sms.enabled;
+        $('#chat-sms-mode').value = s.sms.mode;
+        $('#chat-sms-sim').value = s.sms.sim || '';
+        $('#chat-sms-url').value = s.sms.url || '';
+        $('#chat-sms-user').value = s.sms.username || '';
+        $('#chat-sms-pass').value = s.sms.password || '';
+        $('#chat-sms-hook').value = s.sms.hook_base || '';
+        chatHookHint(d.hookUrl);
+        chatModeUi();
+    }
+
+    function chatHookHint(url) {
+        $('#chat-sms-hook-hint').textContent = url ? `Das Handy meldet neue SMS an: ${url.replace(/[^/]+$/, '…')}` : 'Noch keine Adresse: bitte unter Webseite → Einrichtung die öffentliche Adresse eintragen oder hier eine angeben.';
+    }
+    function chatModeUi() {
+        const local = $('#chat-sms-mode').value === 'local';
+        $('#chat-sms-url-group').hidden = !local;
+    }
+
+    async function saveChatSettings(silent) {
+        const body = {
+            enabled: $('#chat-enabled').checked,
+            show_button: $('#chat-show-button').checked,
+            wa_number: $('#chat-wa-number').value,
+            notify_telegram: $('#chat-notify-tg').checked,
+            notify_push: $('#chat-notify-push').checked,
+            sms: {
+                enabled: $('#chat-sms-enabled').checked, mode: $('#chat-sms-mode').value, sim: $('#chat-sms-sim').value,
+                url: $('#chat-sms-url').value, username: $('#chat-sms-user').value, password: $('#chat-sms-pass').value,
+                hook_base: $('#chat-sms-hook').value
+            }
+        };
+        const d = await apiJson('/api/chat/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+        if (!d || !d.success) { showToast('Speichern fehlgeschlagen', 'error'); return false; }
+        chatHookHint(d.hookUrl);
+        if (!silent) showToast('Gäste-Chat gespeichert', 'success');
+        return true;
+    }
+
+    if ($('#settings-chat')) {
+        $('#chat-sms-mode').addEventListener('change', chatModeUi);
+        // Saved together with the other settings ("Einstellungen speichern"), once the page was opened
+        const saveAll = $('#btn-save-settings');
+        if (saveAll) saveAll.addEventListener('click', () => { if (chatSettingsLoaded) saveChatSettings(true); });
+        $('#chat-sms-test').addEventListener('click', async () => {
+            if (!(await saveChatSettings(true))) return;
+            const d = await apiJson('/api/chat/sms/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: $('#chat-sms-test-phone').value }) }).catch(() => null);
+            showToast(d ? (d.message || d.error) : 'SMS-Gateway nicht erreichbar', d && d.success ? 'success' : 'error', 7000);
+        });
+        $('#chat-sms-hook-btn').addEventListener('click', async () => {
+            if (!(await saveChatSettings(true))) return;
+            const d = await apiJson('/api/chat/sms/webhook', { method: 'POST' }).catch(() => null);
+            showToast(d ? (d.message || d.error) : 'SMS-Gateway nicht erreichbar', d && d.success ? 'success' : 'error', 8000);
+        });
+        const nav = document.querySelector('.nav-item[data-target="settings-chat"]');
+        if (nav) nav.addEventListener('click', () => loadChatSettings());
     }
 })();
 // Version 3.0 - SQLite Database Migration
