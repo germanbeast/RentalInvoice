@@ -410,8 +410,9 @@ function initDefaultUser() {
         const hashed = bcrypt.hashSync(defaultPassword, 12);
         const recoveryKey = createUser('admin', hashed, 'owner');
         console.log(`✅ Standard-Benutzer "admin" erstellt. Wiederherstellungs-Schlüssel (nur jetzt sichtbar): ${recoveryKey}`);
-    } else if (existing) {
-        // Sync password if ADMIN_PASSWORD env var changed
+    } else if (existing && process.env.ADMIN_PASSWORD) {
+        // Sync password if ADMIN_PASSWORD env var changed. Without ADMIN_PASSWORD in .env the password set in the
+        // app stays; before it was reset to the default "admin123" on every start (dangerous once online).
         if (!bcrypt.compareSync(defaultPassword, existing.password)) {
             console.log('🔄 ADMIN_PASSWORD hat sich geändert. Aktualisiere...');
             updateUserPassword('admin', bcrypt.hashSync(defaultPassword, 12));

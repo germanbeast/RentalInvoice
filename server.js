@@ -995,7 +995,8 @@ app.use(session({
     rolling: true,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        // 'auto': secure cookie over https (domain via Cloudflare/proxy), still works over http in the home network
+        secure: 'auto',
         httpOnly: true,
         sameSite: 'strict',
         maxAge: SESSION_MS
@@ -1165,6 +1166,22 @@ app.use('/gast', guestMessage.router);
 app.use('/gast', meldeschein.router);
 app.use('/gast', emergencyDoor.router);
 app.use('/gast', guestPortal.router);
+
+// Own domain (e.g. https://beckhome.cloud/gast under Webseite → Einrichtung): on that host the bare domain opens
+// the guest website instead of the admin login. The admin stays reachable on any other host name
+// (admin.beckhome.cloud, local IP) and at /admin on the guest domain.
+function guestHostName() {
+    try {
+        const u = guestPortal.getSite().public_url;
+        return u ? new URL(u).hostname.toLowerCase() : '';
+    } catch (e) { return ''; }
+}
+app.get(['/', '/index.html'], (req, res, next) => {
+    const host = guestHostName();
+    if (host && String(req.hostname || '').toLowerCase() === host) return res.redirect(302, '/gast/');
+    next();
+});
+app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
 app.use(ensureAuthenticated);
 // Roles & rights: every /api route (and /uploads) is checked here, see permissions.js

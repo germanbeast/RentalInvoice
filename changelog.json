@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.33.1",
+    "currentVersion": "1.34.0",
     "releases": [
+        {
+            "version": "1.34.0",
+            "date": "2026-11-01",
+            "title": "Eigene Domain (beckhome.cloud)",
+            "features": [
+                "Ist unter Webseite → Einrichtung eine eigene Adresse wie https://beckhome.cloud/gast eingetragen, öffnet die Domain selbst direkt die Gäste-Webseite",
+                "Der Admin bleibt unter einer anderen Adresse (z. B. admin.beckhome.cloud oder der Heimnetz-IP) und unter /admin erreichbar"
+            ],
+            "fixes": [
+                "Login-Cookie ist über https automatisch „Secure“ und funktioniert im Heimnetz weiter über http",
+                "Ohne ADMIN_PASSWORD in der .env wird das Admin-Passwort beim Neustart nicht mehr auf „admin123“ zurückgesetzt"
+            ]
+        },
         {
             "version": "1.33.1",
             "date": "2026-11-01",

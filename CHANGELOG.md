@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.34.0] - 2026-11-01
+
+### Neu
+- Eigene Domain: entspricht der Host der Anfrage der „Öffentlichen Adresse“ der Webseite (z. B. `https://beckhome.cloud/gast`), leitet `/` auf `/gast/` weiter. Andere Host-Namen (z. B. `admin.beckhome.cloud`, Heimnetz-IP) zeigen weiter den Admin-Login; zusätzlich ist der Admin unter `/admin` erreichbar
+
+### Geändert
+- Session-Cookie `secure: 'auto'`: hinter Cloudflare Tunnel/Reverse-Proxy (X-Forwarded-Proto https) als Secure, im Heimnetz über http weiter nutzbar
+
+### Behoben
+- Fehlt `ADMIN_PASSWORD` in der `.env`, wurde das Admin-Passwort bei jedem Start auf `admin123` gesetzt; jetzt wird nur noch synchronisiert, wenn die Variable gesetzt ist
+
 ## [1.33.0] - 2026-10-31
 
 ### Neu
