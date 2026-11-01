@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.35.0",
+    "currentVersion": "1.36.0",
     "releases": [
+        {
+            "version": "1.36.0",
+            "date": "2026-11-01",
+            "title": "Webseite ohne /gast",
+            "features": [
+                "Steht unter Webseite → Einrichtung nur die Domain (https://beckhome.cloud), läuft die Gäste-Webseite direkt dort: beckhome.cloud, beckhome.cloud/meine-buchung, beckhome.cloud/notfall",
+                "Alte Links mit /gast (QR-Code an der Tür, iCal-Export, E-Mails) funktionieren weiter",
+                "beckhome.cloud/admin leitet auf admin.beckhome.cloud weiter"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.35.0",
             "date": "2026-11-01",

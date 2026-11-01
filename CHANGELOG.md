@@ -5,6 +5,12 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.0] - 2026-11-01
+
+### Neu
+- Gäste-Webseite direkt auf der Domain: ist die „Öffentliche Adresse“ nur eine Domain ohne Pfad (z. B. `https://beckhome.cloud`), werden Anfragen dieses Hosts intern auf `/gast` abgebildet (`/`, `/meine-buchung`, `/notfall`, `/api/info` …). `/gast` und `/gast/` leiten auf `/` um, tiefere `/gast/…`-Links (QR-Code, iCal, Direktlinks) funktionieren unverändert. `/admin` leitet dort auf `https://admin.<domain>/` um
+- Mit `https://<domain>/gast` als Adresse bleibt das bisherige Verhalten (Domain leitet auf `/gast/` um)
+
 ## [1.35.0] - 2026-11-01
 
 ### Neu

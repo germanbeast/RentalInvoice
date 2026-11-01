@@ -1304,27 +1304,42 @@ guestChat = require('./guest-chat')({
         }
     }
 });
+// Own domain for the guest website, from "Öffentliche Adresse" under Webseite → Einrichtung:
+// - https://beckhome.cloud      → the website lives at the root of that host (beckhome.cloud/, /meine-buchung …);
+//   requests are mapped to /gast internally, old /gast/… links (QR code, iCal, e-mails) keep working.
+// - https://beckhome.cloud/gast → the bare domain redirects to /gast/.
+// The admin stays on any other host name (admin.beckhome.cloud, IP).
+function guestDomain() {
+    try {
+        const u = guestPortal.getSite().public_url;
+        if (!u) return null;
+        const url = new URL(u);
+        return { host: url.hostname.toLowerCase(), root: url.pathname.replace(/\/+$/, '') === '' };
+    } catch (e) { return null; }
+}
+app.use((req, res, next) => {
+    const g = guestDomain();
+    if (!g || String(req.hostname || '').toLowerCase() !== g.host) return next();
+    const p = req.path;
+    const qs = req.url.slice(req.path.length);
+    if (!g.root) {
+        if (req.method === 'GET' && (p === '/' || p === '/index.html')) return res.redirect(302, '/gast/');
+        return next();
+    }
+    if (req.method === 'GET' && (p === '/gast' || p === '/gast/')) return res.redirect(301, '/' + qs);
+    if (p === '/gast' || p.startsWith('/gast/')) return next();
+    if (req.method === 'GET' && p === '/admin') return res.redirect(302, `https://admin.${g.host}/`);
+    req.url = '/gast' + req.url;
+    next();
+});
+app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+
 app.use('/gast', guestChat.router);
 app.use('/gast', guestMessage.router);
 app.use('/gast', meldeschein.router);
 app.use('/gast', emergencyDoor.router);
 app.use('/gast', guestPortal.router);
 
-// Own domain (e.g. https://beckhome.cloud/gast under Webseite → Einrichtung): on that host the bare domain opens
-// the guest website instead of the admin login. The admin stays reachable on any other host name
-// (admin.beckhome.cloud, local IP) and at /admin on the guest domain.
-function guestHostName() {
-    try {
-        const u = guestPortal.getSite().public_url;
-        return u ? new URL(u).hostname.toLowerCase() : '';
-    } catch (e) { return ''; }
-}
-app.get(['/', '/index.html'], (req, res, next) => {
-    const host = guestHostName();
-    if (host && String(req.hostname || '').toLowerCase() === host) return res.redirect(302, '/gast/');
-    next();
-});
-app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
 app.use(ensureAuthenticated);
 // Roles & rights: every /api route (and /uploads) is checked here, see permissions.js
