@@ -1629,6 +1629,7 @@
                             <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot <i class="status-dot" data-status="telegram"></i></a>
                             <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
                             <a href="#" class="nav-item" data-target="settings-users">Benutzer &amp; Rechte</a>
+                            <a href="#" class="nav-item" data-target="settings-backup">Datensicherung <i class="status-dot" data-status="backup"></i></a>
                             <a href="#" class="nav-item" data-target="settings-system">System & Update</a>
                         </nav>
                     </aside>
@@ -2326,6 +2327,128 @@
                                 <div id="users-list-container" class="users-list"></div>
                                 <button type="button" id="btn-add-user-modal" class="btn btn-primary"
                                     style="width:100%; margin-top:1rem;">Neuen Benutzer anlegen</button>
+                            </section>
+
+                            <!-- DATENSICHERUNG -->
+                            <section id="settings-backup" class="settings-page">
+                                <h2>Datensicherung</h2>
+                                <p class="nb-hint" style="margin-top:.6rem;">Jeden Tag wird eine verschlüsselte Sicherung von Datenbank (Buchungen, Rechnungen, Gäste, Meldescheine, Einstellungen), <code>.env</code> und allen hochgeladenen Dateien erstellt. Auf dem Server bleiben die letzten Sicherungen liegen, zusätzlich sollte mindestens ein externes Ziel aktiv sein, damit bei einem Server-Ausfall nichts verloren geht. Die Wiederherstellung steht in <code>BACKUP.md</code>.</p>
+
+                                <div class="card bk-status" id="bk-status"><p class="text-muted" style="margin:0;">Wird geladen…</p></div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 style="margin-top: 0;">Zeitplan &amp; Passwort</h3>
+                                    <div class="toggle-row bk-toggle">
+                                        <label class="toggle-label" for="bk-enabled">Tägliche Sicherung aktiv</label>
+                                        <label class="toggle-switch"><input type="checkbox" id="bk-enabled"><span class="toggle-slider"></span></label>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="bk-time">Uhrzeit</label>
+                                            <input type="time" id="bk-time" value="03:30">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="bk-keep-local">Auf dem Server behalten</label>
+                                            <input type="number" id="bk-keep-local" min="1" max="365" value="7">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="bk-keep-remote">Extern behalten (0 = alle)</label>
+                                            <input type="number" id="bk-keep-remote" min="0" max="3650" value="30">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bk-password">Backup-Passwort (mind. 10 Zeichen)</label>
+                                        <input type="password" id="bk-password" autocomplete="new-password" placeholder="Langes Passwort, z. B. vier zufällige Wörter">
+                                        <p class="nb-hint" style="margin:.4rem 0 0;">⚠️ Ohne dieses Passwort lässt sich keine Sicherung öffnen, auch nicht von mir oder einem Techniker. Bitte im Passwort-Manager oder auf Papier aufbewahren, nicht nur auf diesem Server.</p>
+                                    </div>
+                                    <div class="toggle-row bk-toggle">
+                                        <label class="toggle-label" for="bk-whatsapp">WhatsApp-Anmeldung mitsichern (spart neues QR-Scannen, macht die Sicherung größer)</label>
+                                        <label class="toggle-switch"><input type="checkbox" id="bk-whatsapp"><span class="toggle-slider"></span></label>
+                                    </div>
+                                    <div class="toggle-row bk-toggle">
+                                        <label class="toggle-label" for="bk-notify-success">Auch bei Erfolg benachrichtigen (Fehler werden immer gemeldet)</label>
+                                        <label class="toggle-switch"><input type="checkbox" id="bk-notify-success"><span class="toggle-slider"></span></label>
+                                    </div>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 style="margin-top: 0;">Cloud-Speicher (S3: Cloudflare R2, Backblaze, Hetzner)</h3>
+                                    <div class="toggle-row bk-toggle">
+                                        <label class="toggle-label" for="bk-s3-enabled">Hochladen aktiv</label>
+                                        <label class="toggle-switch"><input type="checkbox" id="bk-s3-enabled"><span class="toggle-slider"></span></label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bk-s3-endpoint">Endpunkt</label>
+                                        <input type="url" id="bk-s3-endpoint" placeholder="https://&lt;account-id&gt;.r2.cloudflarestorage.com">
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="bk-s3-bucket">Bucket</label>
+                                            <input type="text" id="bk-s3-bucket" placeholder="beckhome-backup">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="bk-s3-region">Region</label>
+                                            <input type="text" id="bk-s3-region" placeholder="auto">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="bk-s3-prefix">Ordner im Bucket</label>
+                                            <input type="text" id="bk-s3-prefix" placeholder="beckhome/">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="bk-s3-access">Access Key ID</label>
+                                            <input type="text" id="bk-s3-access" autocomplete="off">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="bk-s3-secret">Secret Access Key</label>
+                                            <input type="password" id="bk-s3-secret" autocomplete="new-password">
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-outline btn-sm bk-test" data-kind="s3">Verbindung testen</button>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 style="margin-top: 0;">WebDAV (Nextcloud, Hetzner Storage Box)</h3>
+                                    <div class="toggle-row bk-toggle">
+                                        <label class="toggle-label" for="bk-dav-enabled">Hochladen aktiv</label>
+                                        <label class="toggle-switch"><input type="checkbox" id="bk-dav-enabled"><span class="toggle-slider"></span></label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bk-dav-url">Ordner-Adresse</label>
+                                        <input type="url" id="bk-dav-url" placeholder="https://next.example.de/remote.php/dav/files/NAME/Backups">
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="bk-dav-user">Benutzer</label>
+                                            <input type="text" id="bk-dav-user" autocomplete="off">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="bk-dav-pass">Passwort / App-Passwort</label>
+                                            <input type="password" id="bk-dav-pass" autocomplete="new-password">
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-outline btn-sm bk-test" data-kind="webdav">Verbindung testen</button>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 style="margin-top: 0;">Telegram</h3>
+                                    <div class="toggle-row bk-toggle">
+                                        <label class="toggle-label" for="bk-tg-enabled">Sicherung als Datei an die Telegram-Empfänger schicken (bis 49 MB)</label>
+                                        <label class="toggle-switch"><input type="checkbox" id="bk-tg-enabled"><span class="toggle-slider"></span></label>
+                                    </div>
+                                    <button type="button" class="btn btn-outline btn-sm bk-test" data-kind="telegram">Prüfen</button>
+                                </div>
+
+                                <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem;">
+                                    <button type="button" id="btn-bk-save" class="btn btn-primary">Datensicherung speichern</button>
+                                    <button type="button" id="btn-bk-run" class="btn btn-outline">Jetzt sichern</button>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h3 style="margin-top: 0;">Sicherungen auf dem Server</h3>
+                                    <div id="bk-local"><p class="text-muted">Noch keine.</p></div>
+                                </div>
                             </section>
 
                             <!-- SYSTEM -->

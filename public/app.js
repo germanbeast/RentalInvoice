@@ -124,7 +124,7 @@
         'nav-chat': ['messages'], 'nav-welcome': ['settings'], 'btn-settings': ['settings'], 'nav-users': ['users'],
         'btn-new-booking': [['bookings', 'edit']], 'cal-sync-btn': [['calendar', 'edit']]
     };
-    const SETTINGS_PAGE_RIGHTS = { 'settings-users': 'users', 'settings-push': null };
+    const SETTINGS_PAGE_RIGHTS = { 'settings-users': 'users', 'settings-push': null, 'settings-backup': 'users' };
     const START_VIEWS = [['calendar', 'calendar'], ['bookings', 'bookings'], ['invoice', 'invoices'], ['occupancy', 'finance'], ['finance', 'finance'], ['website', 'website']];
 
     function applyPermissions() {
@@ -1713,7 +1713,7 @@
             if (d.openInvoices && d.openInvoices.count > 0) todo.push(`<div>🧾 ${d.openInvoices.count} offene Rechnung${d.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(d.openInvoices.total)})</div>`);
             d.warnings.forEach(w => {
                 const bad = w.type === 'overlap' || w.type === 'sync' || w.bad;
-                const icon = w.type === 'lock' ? '🔋' : '⚠️';
+                const icon = w.type === 'lock' ? '🔋' : w.type === 'backup' ? '💾' : '⚠️';
                 const ack = w.type === 'overlap' && w.key ? ` <button class="today-link" data-ack="${escapeHtml(w.key)}">ist in Ordnung</button>` : '';
                 todo.push(`<div class="${bad ? 'today-bad' : 'today-warn'}">${icon} ${escapeHtml(w.text)}${ack}</div>`);
             });
@@ -2899,9 +2899,108 @@
             set('nuki', !d.nuki.configured ? '' : d.nuki.ok ? 'ok' : 'bad', !d.nuki.configured ? 'Nicht eingerichtet' : d.nuki.ok ? `Verbunden (${d.nuki.codes} Codes)` : 'Fehler: ' + (d.nuki.error || ''));
             const feeds = d.calendars.feeds || [];
             const calCls = !d.calendars.configured.length ? '' : (!feeds.length ? 'warn' : feeds.every(f => f.ok) ? 'ok' : 'bad');
+            if (canDo('users')) {
+                const b = await apiJson('/api/backup').catch(() => null);
+                if (b && b.success) set('backup', ...backupDot(b));
+            }
             set('calendars', calCls, !d.calendars.configured.length ? 'Kein Kalender eingerichtet' : calCls === 'ok' ? 'Letzte Abfrage erfolgreich' : calCls === 'bad' ? 'Letzte Abfrage mit Fehler' : 'Noch nicht abgefragt');
         } catch (e) { /* dots stay neutral */ }
     }
+
+    // ---- Datensicherung
+    function backupDot(b) {
+        if (!b.config.enabled) return ['warn', 'Aus'];
+        if (b.last && !b.last.ok) return ['bad', 'Letzte Sicherung fehlgeschlagen'];
+        if (!b.lastOk) return ['warn', 'Noch keine Sicherung'];
+        return ['ok', 'Letzte Sicherung ' + new Date(b.lastOk.at).toLocaleString('de-DE')];
+    }
+    const fmtBytes = n => n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+    const fmtWhen = iso => new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    function backupFormConfig() {
+        const v = id => ($('#' + id) || {}).value || '';
+        const c = id => !!($('#' + id) || {}).checked;
+        return {
+            enabled: c('bk-enabled'), time: v('bk-time'), password: v('bk-password'),
+            keepLocal: v('bk-keep-local'), keepRemote: v('bk-keep-remote'),
+            includeWhatsApp: c('bk-whatsapp'), notifySuccess: c('bk-notify-success'),
+            s3: { enabled: c('bk-s3-enabled'), endpoint: v('bk-s3-endpoint'), bucket: v('bk-s3-bucket'), region: v('bk-s3-region'), prefix: v('bk-s3-prefix'), accessKey: v('bk-s3-access'), secretKey: v('bk-s3-secret') },
+            webdav: { enabled: c('bk-dav-enabled'), url: v('bk-dav-url'), user: v('bk-dav-user'), pass: v('bk-dav-pass') },
+            telegram: { enabled: c('bk-tg-enabled') }
+        };
+    }
+
+    function renderBackup(b) {
+        const c = b.config;
+        const setV = (id, val) => { const el = $('#' + id); if (el) el.value = val == null ? '' : val; };
+        const setC = (id, val) => { const el = $('#' + id); if (el) el.checked = !!val; };
+        setC('bk-enabled', c.enabled); setV('bk-time', c.time); setV('bk-password', c.password);
+        setV('bk-keep-local', c.keepLocal); setV('bk-keep-remote', c.keepRemote);
+        setC('bk-whatsapp', c.includeWhatsApp); setC('bk-notify-success', c.notifySuccess);
+        setC('bk-s3-enabled', c.s3.enabled); setV('bk-s3-endpoint', c.s3.endpoint); setV('bk-s3-bucket', c.s3.bucket);
+        setV('bk-s3-region', c.s3.region); setV('bk-s3-prefix', c.s3.prefix); setV('bk-s3-access', c.s3.accessKey); setV('bk-s3-secret', c.s3.secretKey);
+        setC('bk-dav-enabled', c.webdav.enabled); setV('bk-dav-url', c.webdav.url); setV('bk-dav-user', c.webdav.user); setV('bk-dav-pass', c.webdav.pass);
+        setC('bk-tg-enabled', c.telegram.enabled);
+
+        const st = $('#bk-status');
+        const [cls, title] = backupDot(b);
+        const last = b.last;
+        let html = `<div class="bk-head"><i class="status-dot ${cls}"></i><strong>${escapeHtml(title)}</strong></div>`;
+        if (b.running) html += '<p class="text-muted">⏳ Sicherung läuft gerade…</p>';
+        if (last) {
+            html += `<p class="bk-line">${last.ok ? '✅' : '❌'} ${fmtWhen(last.at)} · ${last.trigger === 'auto' ? 'automatisch' : 'von Hand'}${last.size ? ' · ' + fmtBytes(last.size) + ' · ' + last.files + ' Dateien' : ''}</p>`;
+            if (last.error) html += `<p class="bk-line bad">${escapeHtml(last.error)}</p>`;
+            (last.targets || []).forEach(t => { html += `<p class="bk-line ${t.ok ? '' : 'bad'}">${t.ok ? '✓' : '✗'} ${escapeHtml(t.label)}: ${escapeHtml(t.ok ? t.info : t.error)}</p>`; });
+            if (last.warning) html += `<p class="bk-line warn">${escapeHtml(last.warning)}</p>`;
+        } else {
+            html += '<p class="text-muted" style="margin:.3rem 0 0;">Noch keine Sicherung erstellt.</p>';
+        }
+        if (c.enabled) html += `<p class="text-muted" style="margin:.4rem 0 0;"><small>Nächste automatische Sicherung täglich um ${escapeHtml(c.time)} Uhr.</small></p>`;
+        st.innerHTML = html;
+
+        const list = $('#bk-local');
+        list.innerHTML = b.local.length ? b.local.map(f => `<div class="bk-file"><span>${fmtWhen(f.at)} <small class="text-muted">${fmtBytes(f.size)}</small></span>
+            <a class="btn btn-ghost btn-sm" href="/api/backup/download/${encodeURIComponent(f.name)}" download>Herunterladen</a></div>`).join('')
+            : '<p class="text-muted">Noch keine.</p>';
+        $$('.status-dot[data-status="backup"]').forEach(el => { el.className = 'status-dot ' + cls; el.title = title; });
+    }
+
+    async function loadBackup() {
+        const d = await apiJson('/api/backup').catch(() => null);
+        if (!d || !d.success) { $('#bk-status').innerHTML = `<p class="bk-line bad">${escapeHtml((d && d.error) || 'Konnte nicht geladen werden')}</p>`; return; }
+        renderBackup(d);
+    }
+
+    async function saveBackup(quiet) {
+        const d = await apiJson('/api/backup', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: backupFormConfig() }) }).catch(() => null);
+        if (!d || !d.success) { showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error', 6000); return false; }
+        if (!quiet) showToast('Datensicherung gespeichert');
+        await loadBackup();
+        return true;
+    }
+
+    const bkSave = $('#btn-bk-save');
+    if (bkSave) bkSave.addEventListener('click', () => saveBackup(false));
+    const bkRun = $('#btn-bk-run');
+    if (bkRun) bkRun.addEventListener('click', async () => {
+        if (!(await saveBackup(true))) return;
+        bkRun.disabled = true;
+        const old = bkRun.textContent;
+        bkRun.textContent = 'Sichere…';
+        const d = await apiJson('/api/backup/run', { method: 'POST' }).catch(() => null);
+        bkRun.disabled = false;
+        bkRun.textContent = old;
+        showToast(d && d.success ? 'Sicherung erstellt' : 'Sicherung: ' + ((d && d.error) || 'fehlgeschlagen'), d && d.success ? 'success' : 'error', 6000);
+        loadBackup();
+    });
+    $$('.bk-test').forEach(btn => btn.addEventListener('click', async () => {
+        const kind = btn.dataset.kind;
+        btn.disabled = true;
+        const d = await apiJson('/api/backup/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, config: backupFormConfig()[kind] }) }).catch(() => null);
+        btn.disabled = false;
+        showToast(d ? d.message : 'Test fehlgeschlagen', d && d.success ? 'success' : 'error', 7000);
+    }));
+
     const settingsBtn = $('#btn-settings');
     if (settingsBtn) settingsBtn.addEventListener('click', () => loadStatusDots(false));
 
@@ -3670,6 +3769,10 @@
 
                 if (targetId === 'settings-push') loadPushSettings();
                 if (targetId === 'settings-users') loadUsers();
+                if (targetId === 'settings-backup') loadBackup();
+                // The backup page saves with its own button (separate API); the general save button would confuse there
+                const cf = document.querySelector('#modal-settings .content-footer');
+                if (cf) cf.style.display = targetId === 'settings-backup' ? 'none' : '';
 
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {

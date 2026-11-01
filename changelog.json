@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.36.1",
+    "currentVersion": "1.38.0",
     "releases": [
+        {
+            "version": "1.38.0",
+            "date": "2026-11-01",
+            "title": "Automatische Datensicherung",
+            "features": [
+                "Jede Nacht eine verschlüsselte Sicherung von Buchungen, Rechnungen, Gästen, Einstellungen und allen Fotos/Dateien",
+                "Hochladen zu Cloudflare R2 (oder anderem S3-Speicher), Nextcloud/Hetzner Storage Box per WebDAV oder als Datei per Telegram",
+                "Einstellungen → Datensicherung: Status, Verbindung testen, Jetzt sichern, Sicherungen herunterladen",
+                "Meldung per Telegram/WhatsApp/Push, wenn eine Sicherung fehlschlägt; Hinweis im Dashboard"
+            ],
+            "fixes": []
+
+        },
         {
             "version": "1.36.1",
             "date": "2026-11-01",
