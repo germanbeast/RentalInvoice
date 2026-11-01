@@ -187,8 +187,8 @@ async function createNukiPinDirect(arrival, departure, guestName) {
     };
     const generatedCode = generateValidPin();
 
-    const allowedFrom = `${arrival}T15:00:00.000Z`;
-    const allowedUntil = `${departure}T11:00:00.000Z`;
+    const allowedFrom = `${arrival}${DEFAULT_FROM_TIME}`; // codes always work from 11:00 on arrival day
+    const allowedUntil = `${departure}${DEFAULT_UNTIL_TIME}`;
     const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
 
     const lockId = parseInt(nuki.lockId, 10) || nuki.lockId;
@@ -314,7 +314,8 @@ async function updateNukiAuth(authId, patch, known = null) {
 // Door code of a booking: find it, keep it in sync (dates + name) instead of creating new ones
 // ---------------------------------------------------------------------------
 const NUKI_NAME_MAX = 20;
-const DEFAULT_FROM_TIME = 'T15:00:00.000Z';
+const DEFAULT_FROM_TIME = 'T11:00:00.000Z';  // door codes always work from 11:00 on arrival day
+const OLD_FROM_TIME = 'T15:00:00.000Z';      // earlier default, moved to 11:00 by reconcileBookingCodes
 const DEFAULT_UNTIL_TIME = 'T11:00:00.000Z';
 
 /** Name of a guest's keypad code as shown in the Nuki app ("Gast: Max Muster", max. 20 characters). */
@@ -364,7 +365,7 @@ function withDay(iso, ymd, fallbackTime) {
 
 /**
  * Changes the existing door code of a booking in place.
- * changes: { from, until } as YYYY-MM-DD (time of day of the code is kept), { name } raw code name,
+ * changes: { from, until } as YYYY-MM-DD (from always starts 11:00, the until time of day is kept), { name } raw code name,
  *          or { guestName } -> "Gast: <name>".
  * Returns { updated: true, pin, authId, name, from, until } or { updated: false, missing: true } when the
  * booking has no code that still exists in Nuki.
@@ -379,7 +380,7 @@ async function syncBookingCode(bookingOrId, changes = {}, auths = null) {
     if (!cur) return { updated: false, missing: true };
 
     const patch = {};
-    if (changes.from) patch.allowedFromDate = withDay(cur.allowedFromDate, changes.from, DEFAULT_FROM_TIME);
+    if (changes.from) patch.allowedFromDate = `${changes.from}${DEFAULT_FROM_TIME}`;
     if (changes.until) patch.allowedUntilDate = withDay(cur.allowedUntilDate, changes.until, DEFAULT_UNTIL_TIME);
     if (changes.name) patch.name = String(changes.name).trim().substring(0, NUKI_NAME_MAX);
     else if (changes.guestName) patch.name = nukiCodeName(changes.guestName);
@@ -462,12 +463,27 @@ async function reconcileBookingCodes() {
         WHERE b.checkout >= ?
           AND ((b.nuki_auth_id IS NOT NULL AND b.nuki_auth_id != '') OR (b.nuki_pin IS NOT NULL AND b.nuki_pin != ''))
     `).all(today);
-    if (!rows.length) return { renamed: [] };
+    if (!rows.length) return { renamed: [], moved: [] };
     const auths = await fetchNukiAuths();
     const renamed = [];
+    const moved = [];
     for (const b of rows) {
         const cur = findBookingAuth(b, auths);
-        if (!cur || !b.guest_name || isPlaceholderGuestName(b.guest_name)) continue;
+        if (!cur) continue;
+        // Codes created with the old 15:00 start are moved to 11:00 as long as the arrival is still ahead
+        if (b.checkin >= today && cur.allowedFromDate
+            && new Date(cur.allowedFromDate).getTime() === new Date(`${b.checkin}${OLD_FROM_TIME}`).getTime()) {
+            try {
+                const want = `${b.checkin}${DEFAULT_FROM_TIME}`;
+                await updateNukiAuth(cur.id, { allowedFromDate: want }, cur);
+                cur.allowedFromDate = want;
+                moved.push(`${cur.name || 'ohne Namen'} ab ${b.checkin} 11:00`);
+                await new Promise(r => setTimeout(r, 500));
+            } catch (e) {
+                console.warn(`⚠️ Türcode von Buchung ${b.id} konnte nicht auf 11 Uhr gesetzt werden:`, e.message);
+            }
+        }
+        if (!b.guest_name || isPlaceholderGuestName(b.guest_name)) continue;
         if (!isPlaceholderCodeName(cur.name)) continue;
         const want = nukiCodeName(b.guest_name);
         if (cur.name === want) continue;
@@ -481,7 +497,7 @@ async function reconcileBookingCodes() {
             console.warn(`⚠️ Türcode von Buchung ${b.id} konnte nicht umbenannt werden:`, e.message);
         }
     }
-    return { renamed };
+    return { renamed, moved };
 }
 
 // ---------------------------------------------------------------------------
