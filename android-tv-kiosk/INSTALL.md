@@ -8,8 +8,13 @@
 
 Das Skript lädt adb und die neueste App selbst herunter (Release `tvbox`, gebaut von GitHub Actions),
 installiert sie, stellt sie als Startbildschirm ein, schaltet Bildschirmschoner/Standby ab und
-setzt die Server-Adresse auf **https://beckhome.cloud**. Optional schaltet es den echten Kiosk-Modus
-(Geräte-Eigentümer, sperrt Home/Zurück) ein, das geht nur ohne angemeldetes Google-Konto.
+setzt die Server-Adresse auf **https://beckhome.cloud**. Den bisherigen Startbildschirm der Box schaltet es ab
+(`pm disable-user`), so führt die Home-Taste immer zum Welcome-Screen zurück, auch aus Netflix & Co.
+Optional (Standard: ja) kommt der echte Kiosk-Modus dazu (Geräte-Eigentümer + Lock Task): nur Welcome-Screen
+und die Streaming-Apps lassen sich öffnen. Das geht nur ohne angemeldetes Google-Konto.
+
+Alles rückgängig: `TV-Box-zuruecksetzen.bat` (schaltet die abgeschalteten Startbildschirme aus
+`deaktivierte-launcher.txt` wieder ein, beendet den Kiosk-Modus, deinstalliert auf Wunsch).
 
 Einstellungen in der App: Menü-Taste der Fernbedienung oder **OK ca. 3 Sekunden halten**.
 Einstellungen per adb setzen: `adb shell am start -n com.beckhome.tvwelcome/.MainActivity --es server_url https://beckhome.cloud`

@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
@@ -28,6 +29,13 @@ public class MainActivity extends Activity {
             "server_url", "guest_name", "wifi_name", "wifi_password", "checkin_time", "checkout_time", "contact_phone"
     };
     private static final long RETRY_MS = 20000;
+    /** Apps, die die Knöpfe auf dem Welcome-Screen starten dürfen (auch im Kiosk-Modus). */
+    private static final String[] ALLOWED_APPS = {
+            "de.exaring.waiputv", "com.netflix.mediaclient", "com.netflix.ninja",
+            "com.google.android.youtube.tv", "com.google.android.youtube",
+            "com.amazon.avod.thirdpartyclient", "com.amazon.amazonvideo.livingroom",
+            "com.disney.disneyplus", "com.zdf.android.mediathek", "de.swr.ard.avp.mobile.android.amazon"
+    };
 
     private WebView webView;
     private final Handler retryHandler = new Handler();
@@ -84,15 +92,10 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                // Handle app launch intents
+                // Knöpfe für Waipu, Netflix … (intent://…;package=…;end)
                 if (url.startsWith("intent://")) {
-                    try {
-                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-                        startActivity(intent);
-                        return true;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                    launchApp(url);
+                    return true;
                 }
                 return false;
             }
@@ -130,6 +133,24 @@ public class MainActivity extends Activity {
 
         // Load welcome page
         loadWelcomePage();
+    }
+
+    private void launchApp(String url) {
+        try {
+            Intent parsed = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+            String pkg = parsed.getPackage();
+            Intent launch = null;
+            if (pkg != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    launch = getPackageManager().getLeanbackLaunchIntentForPackage(pkg);
+                }
+                if (launch == null) launch = getPackageManager().getLaunchIntentForPackage(pkg);
+            }
+            startActivity(launch != null ? launch : parsed);
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this, "Diese App ist auf dem Fernseher nicht installiert.",
+                    android.widget.Toast.LENGTH_LONG).show();
+        }
     }
 
     /** Übernimmt per adb mitgegebene Einstellungen dauerhaft. */
@@ -229,7 +250,7 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Echter Kiosk-Modus (Lock Task): Home, Zurück und Übersicht der Fernbedienung sind gesperrt.
+     * Echter Kiosk-Modus (Lock Task): nur diese App und die Streaming-Apps laufen, Home führt immer hierher.
      * Funktioniert nur, wenn die App Geräte-Eigentümer ist:
      * adb shell dpm set-device-owner com.beckhome.tvwelcome/.AdminReceiver
      */
@@ -238,9 +259,17 @@ public class MainActivity extends Activity {
         if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) return;
         try {
             ComponentName admin = new ComponentName(this, AdminReceiver.class);
-            dpm.setLockTaskPackages(admin, new String[]{getPackageName()});
+            String[] allowed = new String[ALLOWED_APPS.length + 1];
+            allowed[0] = getPackageName();
+            System.arraycopy(ALLOWED_APPS, 0, allowed, 1, ALLOWED_APPS.length);
+            dpm.setLockTaskPackages(admin, allowed);
+            // Home-Taste bleibt aktiv und führt immer hierher zurück (z.B. aus Netflix)
+            IntentFilter home = new IntentFilter(Intent.ACTION_MAIN);
+            home.addCategory(Intent.CATEGORY_HOME);
+            home.addCategory(Intent.CATEGORY_DEFAULT);
+            dpm.addPersistentPreferredActivity(admin, home, new ComponentName(this, MainActivity.class));
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+                dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_HOME);
             }
             startLockTask();
         } catch (Exception e) {
@@ -255,6 +284,10 @@ public class MainActivity extends Activity {
         }
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
+            try {
+                dpm.clearPackagePersistentPreferredActivities(new ComponentName(this, AdminReceiver.class), getPackageName());
+            } catch (Exception ignored) {
+            }
             dpm.clearDeviceOwnerApp(getPackageName());
         }
     }
