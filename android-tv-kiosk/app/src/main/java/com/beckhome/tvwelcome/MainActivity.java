@@ -13,13 +13,30 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
 
+    /** Öffentliche Adresse der Gäste-Webseite; welcome.html + /api/welcome laufen dort ohne Login. */
+    static final String DEFAULT_SERVER_URL = "https://beckhome.cloud";
+    /** Einstellungen, die das Einrichtungs-Skript per adb mitgeben kann (am start ... --es server_url ...). */
+    private static final String[] PREF_KEYS = {
+            "server_url", "guest_name", "wifi_name", "wifi_password", "checkin_time", "checkout_time", "contact_phone"
+    };
+    private static final long RETRY_MS = 20000;
+
     private WebView webView;
+    private final Handler retryHandler = new Handler();
+    private final Runnable retryRunnable = new Runnable() {
+        @Override
+        public void run() {
+            loadWelcomePage();
+        }
+    };
     private SharedPreferences prefs;
 
     // Settings tap gesture
@@ -39,6 +56,7 @@ public class MainActivity extends Activity {
 
         // Load preferences
         prefs = getSharedPreferences("WelcomeSettings", MODE_PRIVATE);
+        applySettingsFromIntent(getIntent());
 
         // Kiosk beenden, falls per adb angefordert (siehe INSTALL.md)
         if (getIntent().getBooleanExtra("exit_kiosk", false)) {
@@ -78,6 +96,22 @@ public class MainActivity extends Activity {
                 }
                 return false;
             }
+
+            // Kein Internet (z.B. Box startet schneller als das WLAN): Hinweis zeigen und neu versuchen
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request.isForMainFrame()) {
+                    showOfflineAndRetry();
+                }
+            }
+
+            @SuppressWarnings("deprecation")
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                    showOfflineAndRetry();
+                }
+            }
         });
 
         // Add touch listener for settings gesture (5x tap)
@@ -96,6 +130,33 @@ public class MainActivity extends Activity {
 
         // Load welcome page
         loadWelcomePage();
+    }
+
+    /** Übernimmt per adb mitgegebene Einstellungen dauerhaft. */
+    private void applySettingsFromIntent(Intent intent) {
+        if (intent == null) return;
+        SharedPreferences.Editor editor = prefs.edit();
+        boolean changed = false;
+        for (String key : PREF_KEYS) {
+            String value = intent.getStringExtra(key);
+            if (value != null) {
+                if (key.equals("server_url")) value = value.trim().replaceAll("/+$", "");
+                editor.putString(key, value);
+                changed = true;
+            }
+        }
+        if (changed) editor.apply();
+    }
+
+    private void showOfflineAndRetry() {
+        retryHandler.removeCallbacks(retryRunnable);
+        String html = "<html><body style='margin:0;background:#1f1c18;color:#f5f0e8;font-family:sans-serif;"
+                + "display:flex;align-items:center;justify-content:center;height:100vh;text-align:center'>"
+                + "<div><div style='font-size:42px'>Willkommen in der Ferienwohnung Beckhome</div>"
+                + "<div style='font-size:22px;opacity:.7;margin-top:24px'>Verbindung zum Internet wird hergestellt …</div>"
+                + "</div></body></html>";
+        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        retryHandler.postDelayed(retryRunnable, RETRY_MS);
     }
 
     private void handleSettingsTap() {
@@ -119,7 +180,9 @@ public class MainActivity extends Activity {
 
     private void loadWelcomePage() {
         // Get settings from SharedPreferences
-        String serverUrl = prefs.getString("server_url", "http://192.168.1.100:3000");
+        retryHandler.removeCallbacks(retryRunnable);
+        String serverUrl = prefs.getString("server_url", DEFAULT_SERVER_URL);
+        if (serverUrl.trim().isEmpty()) serverUrl = DEFAULT_SERVER_URL;
         String guestName = prefs.getString("guest_name", "Willkommen");
 
         // Get guest name from intent (if provided)
@@ -200,6 +263,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        applySettingsFromIntent(intent);
         if (intent.getBooleanExtra("exit_kiosk", false)) {
             exitKioskMode();
         }
@@ -213,10 +277,23 @@ public class MainActivity extends Activity {
         }
     }
 
+    // Fernbedienungen ohne Menü-Taste: OK etwa 3 Sekunden gedrückt halten öffnet die Einstellungen.
+    // dispatchKeyEvent, weil die WebView OK sonst selbst verbraucht.
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int code = event.getKeyCode();
+        if ((code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)
+                && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 60) {
+            openSettings();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // Open settings with MENU key (for easier access in emulator/testing)
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
+        // Einstellungen: MENU- oder Einstellungen-Taste der Fernbedienung
+        if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_SETTINGS) {
             openSettings();
             return true;
         }

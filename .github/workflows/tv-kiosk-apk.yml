@@ -1,0 +1,52 @@
+# Baut die Welcome-App für die TV-Box (android-tv-kiosk).
+# Auf main wird die APK als Release "tvbox" veröffentlicht, damit TV-Box-einrichten.bat sie
+# unter einer festen Adresse herunterladen kann:
+# https://github.com/germanbeast/RentalInvoice/releases/download/tvbox/beckhome-tv.apk
+name: TV-Box-App bauen
+
+on:
+  push:
+    paths:
+      - 'android-tv-kiosk/**'
+      - '.github/workflows/tv-kiosk-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-tv-kiosk
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: APK bauen
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk beckhome-tv.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beckhome-tv-apk
+          path: android-tv-kiosk/beckhome-tv.apk
+
+      - name: Als Release "tvbox" veröffentlichen
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tvbox
+          name: TV-Box-App (Welcome-Screen)
+          body: Neueste Welcome-App für die TV-Box. Installieren mit TV-Box-einrichten.bat.
+          make_latest: false
+          files: android-tv-kiosk/beckhome-tv.apk

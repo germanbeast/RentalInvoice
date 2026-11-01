@@ -1,4 +1,22 @@
-# 📱 Installation auf Google TV - Schritt für Schritt
+# 📱 Installation auf der TV-Box
+
+## ⚡ Schnellweg: TV-Box-einrichten.bat (Windows)
+
+1. Auf der Box: Entwickleroptionen freischalten (Einstellungen → Info → 7x auf „Build“), dann **USB-Debugging** (und falls vorhanden **ADB über Netzwerk**) einschalten.
+2. IP-Adresse der Box notieren (Einstellungen → Netzwerk).
+3. `TV-Box-einrichten.bat` auf dem PC (im selben WLAN) doppelklicken und die IP eingeben.
+
+Das Skript lädt adb und die neueste App selbst herunter (Release `tvbox`, gebaut von GitHub Actions),
+installiert sie, stellt sie als Startbildschirm ein, schaltet Bildschirmschoner/Standby ab und
+setzt die Server-Adresse auf **https://beckhome.cloud**. Optional schaltet es den echten Kiosk-Modus
+(Geräte-Eigentümer, sperrt Home/Zurück) ein, das geht nur ohne angemeldetes Google-Konto.
+
+Einstellungen in der App: Menü-Taste der Fernbedienung oder **OK ca. 3 Sekunden halten**.
+Einstellungen per adb setzen: `adb shell am start -n com.beckhome.tvwelcome/.MainActivity --es server_url https://beckhome.cloud`
+(ebenso `guest_name`, `wifi_name`, `wifi_password`, `checkin_time`, `checkout_time`, `contact_phone`).
+
+---
+
 
 ## ✨ NEU: Alles in der App konfigurierbar!
 

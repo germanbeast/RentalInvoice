@@ -12,6 +12,8 @@ Diese APK zeigt einen Welcome Screen für Gäste auf Google TV / Android TV.
 
 ## Installation
 
+👉 Einfachster Weg: **TV-Box-einrichten.bat** (siehe [INSTALL.md](INSTALL.md)). Standard-Server ist https://beckhome.cloud.
+
 ### Voraussetzungen
 - Android TV / Google TV Gerät
 - ADB installiert auf deinem PC
