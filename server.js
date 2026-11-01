@@ -32,6 +32,9 @@ const push = require('./push')({ db });
 require('dotenv').config();
 
 const app = express();
+// Routes match case-sensitively: the rights check (permissions.js) compares exact paths, so /API/users must not
+// reach the /api/users handler.
+app.set('case sensitive routing', true);
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const UPLOADS_DIR = path.join(__dirname, 'uploads', 'estate');
@@ -51,8 +54,8 @@ const storage = multer.diskStorage({
         cb(null, UPLOADS_DIR);
     },
     filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+        const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(6).toString('hex');
+        cb(null, uniqueSuffix + path.extname(file.originalname).toLowerCase());
     }
 });
 
@@ -60,9 +63,8 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|pdf|gif/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
+        const extname = /^\.(jpe?g|png|pdf|gif)$/.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = /^(image\/(jpeg|png|gif)|application\/pdf)$/.test(file.mimetype);
         if (extname && mimetype) {
             return cb(null, true);
         } else {
@@ -473,6 +475,13 @@ async function sendTelegram(chatId, message, replyMarkup) {
         console.error('❌ Telegram Fehler:', e.message);
         return false;
     }
+}
+
+/** Login code via Telegram to the chat ID linked with the user (Benutzerverwaltung); false without one. */
+async function sendLoginCodeTelegram(user, message) {
+    const chatId = String((user && user.telegram_id) || '').trim();
+    if (!tgBot || !chatId) return false;
+    return sendTelegram(chatId, message);
 }
 
 function telegramIds(allSettings) {
@@ -1325,9 +1334,15 @@ function guestDomain() {
         return { host: url.hostname.toLowerCase(), root: url.pathname.replace(/\/+$/, '') === '' };
     } catch (e) { return null; }
 }
+// Host name of the request from the Host header only. req.hostname would prefer X-Forwarded-Host (trusted proxy),
+// which a visitor can set himself: "beckhome.cloud" + "X-Forwarded-Host: admin.beckhome.cloud" would reach the
+// admin API past Cloudflare Access. cloudflared passes the real host name in Host.
+function requestHost(req) {
+    return String(req.headers.host || '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
+}
 app.use((req, res, next) => {
     const g = guestDomain();
-    if (!g || String(req.hostname || '').toLowerCase() !== g.host) return next();
+    if (!g || requestHost(req) !== g.host) return next();
     const p = req.path;
     const qs = req.url.slice(req.path.length);
     if (!g.root) {
@@ -1404,13 +1419,14 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
     if (waReady && twoFaEnabled && user.phone) {
         // Generate 6-digit code
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const code = crypto.randomInt(100000, 1000000).toString();
         const sessionId = crypto.randomBytes(16).toString('hex');
         pending2FA.set(sessionId, {
             code,
             username: user.username,
             remember,
-            expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
+            expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+            attempts: 0
         });
 
         // Clean expired codes
@@ -1420,14 +1436,21 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
         // Send code via WhatsApp to user's phone
         const msg = `\ud83d\udd10 Dein Login-Code: *${code}*\n\nG\u00fcltig f\u00fcr 5 Minuten.`;
-        const sent = await sendWhatsApp(user.phone, msg);
+        let sent = await sendWhatsApp(user.phone, msg);
 
+        // WhatsApp failed: try Telegram (linked chat ID of the user). Without any channel the login stops here;
+        // before it skipped the second factor, so the password alone was enough whenever WhatsApp hiccuped.
+        let via = 'WhatsApp';
         if (!sent) {
-            // Fallback: skip 2FA if WhatsApp send fails
-            return req.session.regenerate((err) => {
-                if (err) return res.status(500).json({ success: false, message: 'Server-Fehler' });
-                startUserSession(req, { id: user.id, username: user.username, role: user.role }, remember);
-                res.json({ success: true, user: req.session.user });
+            via = 'Telegram';
+            sent = await sendLoginCodeTelegram(user, `\ud83d\udd10 Dein Login-Code: ${code}\n\nG\u00fcltig f\u00fcr 5 Minuten.`);
+        }
+        if (!sent) {
+            pending2FA.delete(sessionId);
+            console.warn(`\u26a0\ufe0f 2FA-Code f\u00fcr ${user.username} konnte weder per WhatsApp noch per Telegram gesendet werden`);
+            return res.status(503).json({
+                success: false,
+                message: 'Der Login-Code konnte gerade nicht gesendet werden. Bitte gleich noch einmal versuchen oder mit dem Recovery-Key anmelden.'
             });
         }
 
@@ -1435,7 +1458,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             success: true,
             requires2fa: true,
             sessionId,
-            message: 'Code per WhatsApp gesendet'
+            message: `Code per ${via} gesendet`
         });
     }
 
@@ -1454,7 +1477,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 app.post('/api/login/verify', loginLimiter, (req, res) => {
     const { sessionId, code } = req.body;
 
-    if (!sessionId || !code) {
+    if (!sessionId || !code || typeof sessionId !== 'string' || typeof code !== 'string') {
         return res.status(400).json({ success: false, message: 'Code und Session-ID erforderlich' });
     }
 
@@ -1468,7 +1491,15 @@ app.post('/api/login/verify', loginLimiter, (req, res) => {
         return res.status(401).json({ success: false, message: 'Code abgelaufen. Bitte erneut anmelden.' });
     }
 
-    if (entry.code !== code.trim()) {
+    const given = Buffer.from(String(code).trim());
+    const expected = Buffer.from(entry.code);
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+        // Max 5 tries per code, independent of the IP: then the login has to start again with the password
+        entry.attempts = (entry.attempts || 0) + 1;
+        if (entry.attempts >= 5) {
+            pending2FA.delete(sessionId);
+            return res.status(401).json({ success: false, message: 'Zu viele falsche Codes. Bitte erneut anmelden.' });
+        }
         return res.status(401).json({ success: false, message: 'Falscher Code' });
     }
 
@@ -3480,8 +3511,11 @@ app.post('/api/generate-pdf', apiLimiter, async (req, res) => {
         const page = await browser.newPage();
 
         await page.setRequestInterception(true);
+        // Only the page itself and inline data: nothing from the network or the server (no iframes to
+        // http://localhost/…, file:// or the local network)
         page.on('request', (request) => {
-            if (request.resourceType() === 'document' || request.url().startsWith('data:')) {
+            const mainDoc = request.resourceType() === 'document' && request.frame() === page.mainFrame() && request.url() === 'about:blank';
+            if (mainDoc || request.url().startsWith('data:')) {
                 request.continue();
             } else {
                 request.abort();
