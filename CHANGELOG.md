@@ -5,6 +5,14 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0] - 2026-11-01
+
+### Neu
+- Automatische Datensicherung (`backup.js`): täglich zur eingestellten Uhrzeit ein konsistenter SQLite-Schnappschuss plus `.env`, `users.json`, `uploads/` (optional `.wwebjs_auth/`) als tar.gz, verschlüsselt mit AES-256-CBC/PBKDF2 im `openssl enc`-Format, mit `MANIFEST.json` (SHA-256 je Datei)
+- Ziele: lokal `backups/` (Rotation), S3-kompatibel (Cloudflare R2, Backblaze, Hetzner; eigene SigV4-Signatur ohne neue Abhängigkeit), WebDAV (Nextcloud, Hetzner Storage Box), Telegram-Datei; alte externe Sicherungen werden nach Anzahl gelöscht
+- Admin: Einstellungen → Datensicherung (nur Inhaber/Admin) mit Status, Verbindungstest, „Jetzt sichern“ und Download; Hinweis im Dashboard bei ausgeschalteter, fehlgeschlagener oder veralteter Sicherung; Fehlermeldung über alle Benachrichtigungswege
+- `backup-restore.js`: entschlüsselt, prüft Prüfsummen und spielt mit `--apply` zurück (alte Daten nach `pre-restore-*/`); Anleitung in `BACKUP.md`
+
 ## [1.36.0] - 2026-11-01
 
 ### Neu

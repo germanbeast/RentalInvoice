@@ -3519,3 +3519,14 @@ a.pill { text-decoration: none; }
     .user-card .user-actions { width: 100%; justify-content: flex-start; }
 }
 .sidebar-item[hidden], .nav-group[hidden], #modal-settings .nav-item[hidden], #modal-settings .nav-section[hidden], .topbar-cta[hidden], #cal-sync-btn[hidden], #btn-save-settings[hidden], #btn-add-user-modal[hidden] { display: none !important; }
+
+/* Datensicherung */
+#settings-backup .bk-status { margin-top: 1rem; }
+#settings-backup .bk-head { display: flex; align-items: center; gap: .5rem; }
+#settings-backup .bk-head .status-dot { margin-left: 0; }
+#settings-backup .bk-line { margin: .3rem 0 0; font-size: .88rem; overflow-wrap: anywhere; }
+#settings-backup .bk-line.bad { color: var(--bad); }
+#settings-backup .bk-line.warn { color: var(--warn); }
+#settings-backup .bk-toggle { margin-bottom: .9rem; gap: .75rem; }
+#settings-backup .bk-file { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08)); }
+#settings-backup .bk-file:last-child { border-bottom: 0; }

@@ -25,3 +25,8 @@ android-tv-kiosk/app/build/
 android-tv-kiosk/local.properties
 uploads/chat/
 .wwebjs_cache/
+
+# Datensicherungen (verschlüsselt) und entpackte Wiederherstellungen
+backups/
+restore-*/
+pre-restore-*/

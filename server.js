@@ -928,6 +928,14 @@ cron.schedule('*/10 * * * *', async () => {
 });
 setTimeout(runNukiCleanup, 90 * 1000);
 
+// Job 1d: daily encrypted backup (time + targets under Einstellungen -> Datensicherung, see BACKUP.md)
+const backup = require('./backup');
+backup.init({
+    db,
+    notify: (msg) => sendToAllRecipients(msg),
+    telegram: () => ({ bot: tgBot, ids: telegramIds(db.getAllSettings()) })
+});
+
 // Job 2: Reminder Check (daily at 08:00)
 cron.schedule('0 8 * * *', async () => {
     try {
@@ -2009,6 +2017,11 @@ app.get('/api/overview', apiLimiter, (req, res) => {
             sync.feeds.filter(f => !f.ok).forEach(f => warnings.push({ type: 'sync', text: `${f.source}: Kalenderabfrage fehlgeschlagen (${f.error})` }));
         }
 
+        if (permissions.isFull(req.user.permissions)) {
+            const bw = backup.warning();
+            if (bw) warnings.push({ type: 'backup', text: bw });
+        }
+
         const perms = req.user.permissions;
         const redact = r => permissions.redactBooking(r, perms);
         res.json({
@@ -2074,7 +2087,7 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 // the mask back unchanged when it was not edited. Server-only settings are neither sent nor accepted.
 const SECRET_MASK = '••••••••';
 const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
-const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state'];
+const SERVER_ONLY_SETTINGS = ['backup', 'backup_state', 'push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state'];
 
 function secretPath(settings, [key, field]) {
     const holder = field ? settings[key] : settings;
@@ -2127,6 +2140,37 @@ app.get('/api/settings', apiLimiter, (req, res) => {
         console.error('Settings GET Error:', e.message);
         res.status(500).json({ error: 'Einstellungen konnten nicht geladen werden' });
     }
+});
+
+// =======================
+// DATENSICHERUNG (only owner/admin: these paths match no permission rule)
+// =======================
+app.get('/api/backup', apiLimiter, async (req, res) => {
+    try { res.json({ success: true, ...(await backup.status()) }); } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.put('/api/backup', apiLimiter, (req, res) => {
+    try { res.json({ success: true, config: backup.saveConfig(req.body && req.body.config) }); } catch (e) { res.status(400).json({ success: false, error: e.message }); }
+});
+
+app.post('/api/backup/run', apiLimiter, async (req, res) => {
+    try {
+        const entry = await backup.runNow('manual');
+        res.json({ success: entry.ok, entry, error: entry.ok ? undefined : (entry.error || 'Nicht alle Ziele erreicht') });
+    } catch (e) { res.status(400).json({ success: false, error: e.message }); }
+});
+
+app.post('/api/backup/test', apiLimiter, async (req, res) => {
+    const { kind, config } = req.body || {};
+    if (!['s3', 'webdav', 'telegram'].includes(kind)) return res.status(400).json({ success: false, error: 'Unbekanntes Ziel' });
+    const r = await backup.testTarget(kind, config && typeof config === 'object' ? config : {});
+    res.json({ success: r.ok, message: r.message });
+});
+
+app.get('/api/backup/download/:name', apiLimiter, (req, res) => {
+    const p = backup.localFile(req.params.name);
+    if (!p) return res.status(404).json({ success: false, error: 'Datei nicht gefunden' });
+    res.download(p, path.basename(p));
 });
 
 // =======================
