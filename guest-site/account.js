@@ -146,6 +146,12 @@
         $$('#app-tabs [data-tab]').forEach(b => { b.hidden = !avail.includes(b.dataset.tab); });
         $('#tab-guests-dot').hidden = !(ms && !ms.form);
         $('[data-pane="stay"]').innerHTML = renderStay(s);
+        if (s.chat && s.chat.url && !$('#app-menu-wa')) {
+            const a = document.createElement('a');
+            a.id = 'app-menu-wa'; a.href = s.chat.url; a.target = '_blank'; a.rel = 'noopener';
+            a.textContent = 'Per WhatsApp schreiben';
+            $('#app-menu-contact').after(a);
+        }
         $('[data-pane="guests"]').innerHTML = avail.includes('guests') ? renderGuests(s) : '';
         $('[data-pane="az"]').innerHTML = avail.includes('az') ? renderAZ(s) : '';
         $('[data-pane="area"]').innerHTML = avail.includes('area') ? renderArea(s) : '';
@@ -184,7 +190,7 @@
         if (s.status === 'gone') {
             return `<div class="gapp-cols"><div class="gapp-col"><div class="gcard"><h3>Buchung ${esc(s.code || '')}</h3><span class="badge ${cls}">${label}</span>
                 <p style="margin-top:1rem">Diese Buchung finden wir nicht mehr. Möglicherweise wurde sie über das Buchungsportal storniert. Bei Fragen melden Sie sich gerne bei uns.</p></div></div>
-                <div class="gapp-col">${contactHtml(s.contact)}</div></div>`;
+                <div class="gapp-col">${contactHtml(s.contact, s.chat)}</div></div>`;
         }
         const guests = s.guests ? `${s.guests.adults} Erw.${s.guests.children ? ` + ${s.guests.children} Kind${s.guests.children === 1 ? '' : 'er'}` : ''}` : '';
         const left = [];
@@ -243,7 +249,7 @@
         }
         if (s.status === 'declined') right.push('<div class="gcard"><p>Für den gewünschten Zeitraum können wir Ihnen leider keine Zusage geben. Schauen Sie gerne nach einem anderen Termin im Kalender.</p></div>');
         if (s.status === 'cancelled') right.push('<div class="gcard"><p>Diese Buchung wurde storniert. Bei Fragen melden Sie sich gerne bei uns.</p></div>');
-        right.push(contactHtml(s.contact));
+        right.push(contactHtml(s.contact, s.chat));
         return `<div class="gapp-cols"><div class="gapp-col">${left.join('')}</div><div class="gapp-col">${right.join('')}</div></div>`;
     }
 
@@ -390,7 +396,7 @@
         if (s.parking) add('Parken', `<div class="prose">${esc(s.parking)}</div>`);
         if (s.houseRules) add('Hausregeln', `<div class="prose">${esc(s.houseRules)}</div>`);
         const c = s.contact;
-        if (c && (c.phone || c.email)) add('Kontakt & Notfall', `<p>${c.name ? esc(c.name) + '<br>' : ''}${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : ''}${c.phone && c.email ? '<br>' : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</p>`);
+        if ((c && (c.phone || c.email)) || (s.chat && s.chat.url)) add('Kontakt & Notfall', `${c && (c.phone || c.email) ? `<p>${c.name ? esc(c.name) + '<br>' : ''}${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : ''}${c.phone && c.email ? '<br>' : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</p>` : ''}${waButton(s.chat)}`);
         (s.guide || []).forEach(g => add(g.title, `<div class="prose">${esc(g.text)}</div>`));
 
         const key = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
@@ -420,9 +426,14 @@
             ${cards.length ? `<div class="area-grid">${cards.join('')}</div>` : '<p class="area-empty">Unsere Tipps folgen in Kürze.</p>'}`;
     }
 
-    function contactHtml(c) {
-        if (!c || (!c.phone && !c.email)) return '';
-        return `<div class="gcard"><div class="info-block"><h4>Kontakt</h4><p>${c.name ? esc(c.name) + '<br>' : ''}${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : ''}${c.phone && c.email ? ' · ' : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</p></div></div>`;
+    const WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2A9.8 9.8 0 0 0 3.6 17l-1.4 4.8 5-1.3A9.8 9.8 0 1 0 12 2.2zm0 17.9a8.1 8.1 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.1 8.1 0 1 1 12 20.1zm4.5-6c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.4-.3z"/></svg>';
+    const waButton = chat => chat && chat.url ? `<a class="wa-btn" href="${esc(chat.url)}" target="_blank" rel="noopener">${WA_ICON}<span>Per WhatsApp schreiben</span></a>` : '';
+
+    function contactHtml(c, chat) {
+        const hasContact = c && (c.phone || c.email);
+        if (!hasContact && !(chat && chat.url)) return '';
+        const lines = hasContact ? `<p>${c.name ? esc(c.name) + '<br>' : ''}${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : ''}${c.phone && c.email ? ' · ' : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</p>` : '';
+        return `<div class="gcard"><div class="info-block"><h4>Kontakt</h4>${lines}${chat && chat.url ? `<p class="wa-note">Fragen zum Aufenthalt? Schreiben Sie uns einfach, wir antworten so schnell wie möglich.</p>${waButton(chat)}` : ''}</div></div>`;
     }
 
     // Existing invoice: download + correction request. Otherwise the guest can create it once.

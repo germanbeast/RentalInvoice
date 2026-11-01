@@ -63,7 +63,7 @@ const RATING_PLATFORMS = { booking: { name: 'Booking.com', max: 10 }, airbnb: { 
 const MAX_REVIEWS = 40;
 const MAX_TIPS = 24;
 
-function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, createNukiPin, deleteNukiPin, berlinToday, addDays, nightsBetween, formatDateDE }) {
+function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, chatButton, createNukiPin, deleteNukiPin, berlinToday, addDays, nightsBetween, formatDateDE }) {
     if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
     const sql = () => db.getDb();
@@ -79,6 +79,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
     // -----------------------------------------------------------------------
     // Settings & helpers
     // -----------------------------------------------------------------------
+    const chatFor = b => { try { return chatButton ? chatButton(b) : null; } catch (e) { return null; } };
+
     function getSite() {
         const s = db.getAllSettings().site;
         return { ...SITE_DEFAULTS, ...(s && typeof s === 'object' ? s : {}) };
@@ -204,7 +206,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             arrivalInfo: site.arrival_info || '', houseRules: site.house_rules || '', location: site.location || '',
             pin: showPin ? b.nuki_pin : null,
             pinLater: !showPin && Number(site.pin_days) > 0 && !!b.nuki_pin && state === 'upcoming' ? Number(site.pin_days) : null,
-            contact: site.show_contact ? contactInfo(settings) : null
+            contact: site.show_contact ? contactInfo(settings) : null,
+            chat: state !== 'past' ? chatFor(b) : null
         };
         if (state !== 'past') {
             v.wifi = site.wifi_name ? { name: site.wifi_name, password: site.wifi_password || '' } : null;
@@ -286,6 +289,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             hostNote: r.host_note || '', source: 'Direkt',
             details: { name: r.name, email: r.email, phone: r.phone || '' },
             contact: site.show_contact ? contactInfo(settings) : null,
+            chat: chatFor({ guest_code: r.code, checkin: r.checkin, checkout: r.checkout }),
             createdAt: r.created_at
         };
     }
@@ -400,6 +404,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             pricePerNight: p.night || null, cleaningFee: p.cleaning || null,
             photos: (s.photos || []).map(f => `bilder/${encodeURIComponent(f)}`),
             contact: s.show_contact ? contactInfo(settings) : null,
+            chat: chatFor(null),
             imprint: s.imprint || '', privacy: s.privacy || '',
             bedrooms: Number(s.bedrooms) || 0, sizeSqm: Number(s.size_sqm) || 0,
             testimonials: String(s.testimonials || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
