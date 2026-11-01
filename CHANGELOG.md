@@ -5,6 +5,18 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.35.0] - 2026-11-01
+
+### Neu
+- Eigene Domain: entspricht der Host der Anfrage der „Öffentlichen Adresse“ der Webseite (z. B. `https://beckhome.cloud/gast`), leitet `/` auf `/gast/` weiter. Andere Host-Namen (z. B. `admin.beckhome.cloud`, Heimnetz-IP) zeigen weiter den Admin-Login; zusätzlich ist der Admin unter `/admin` erreichbar
+
+### Geändert
+- Neue Option `LISTEN_HOST` in der `.env`: mit `127.0.0.1` lauscht die App nur lokal (für Cloudflare Tunnel/Proxy auf demselben Server), Port 3000 ist dann von außen nicht mehr erreichbar
+- Session-Cookie `secure: 'auto'`: hinter Cloudflare Tunnel/Reverse-Proxy (X-Forwarded-Proto https) als Secure, im Heimnetz über http weiter nutzbar
+
+### Behoben
+- Fehlt `ADMIN_PASSWORD` in der `.env`, wurde das Admin-Passwort bei jedem Start auf `admin123` gesetzt; jetzt wird nur noch synchronisiert, wenn die Variable gesetzt ist
+
 ## [1.34.1] - 2026-11-01
 
 ### Behoben
