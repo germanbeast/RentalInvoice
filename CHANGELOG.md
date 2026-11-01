@@ -5,7 +5,7 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.33.2] - 2026-11-01
+## [1.34.1] - 2026-11-01
 
 ### Behoben
 - WhatsApp-Bot: Admin-Befehle kamen bei Absendern mit `@lid`-ID nicht an, weil `wa-commands.js` den Benutzer erneut über `msg.from` suchte. Der in `server.js` über die Telefonnummer gefundene Benutzer wird jetzt durchgereicht
@@ -20,6 +20,17 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Neu
 - `POST /api/whatsapp/restart` und Knopf „Neu verbinden“; Status zeigt „Verbindung wird aufgebaut“ und den letzten Fehler
+
+## [1.34.0] - 2026-11-01
+
+### Neu
+- Gäste-Chat: E-Mail als dritter Kanal neben WhatsApp und SMS, gedacht für die Booking.com-Gastadresse (`…@guest.booking.com`). Die Adresse wird von Hand gepflegt (Dialog „E-Mail eintragen“ in der Unterhaltung oder Feld „E-Mail“ bei „Neue Nachricht“) und beim Gast gespeichert, wenn dort noch keine steht
+- Versand über den SMTP-Zugang aus Einstellungen → E-Mail; Antworten mit `In-Reply-To` und „Re:“-Betreff. Booking.com leitet nur Mails von der im Extranet hinterlegten Adresse weiter
+- Optionaler Abruf per IMAP (`imapflow` + `mailparser`), alle 2 Minuten, nur lesend (UID-Stand in `guest_chat_mail_state`, beim ersten Abruf ab „jetzt“). Übernommen werden Mails von Booking.com-Gastadressen, von Adressen bekannter Unterhaltungen und von Gästen aktueller Buchungen; zitierter Text und Booking.com-Antwortmarker werden abgeschnitten, erster Anhang wird gespeichert
+- Neue Routen `PUT /api/chat/thread/:conv/email`, `POST /api/chat/mail/check` (Recht Einstellungen); Spalten `guest_chat_contacts.email`, `guest_chat_messages.subject`
+
+### Behoben
+- Chat-Dialoge waren durch den globalen `margin: 0`-Reset oben links statt mittig
 
 ## [1.33.0] - 2026-10-31
 
