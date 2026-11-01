@@ -3414,6 +3414,7 @@ a.pill { text-decoration: none; }
 .chat-dot:first-child { margin-left: 0; }
 .chat-dot.on { background: var(--ok); }
 .chat-dot.off { background: var(--bad); }
+.chat-dot.warn { background: var(--warn); }
 .chat-layout { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 1rem; height: calc(100vh - 190px); min-height: 460px; }
 .chat-layout > .card { padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .chat-search { margin: .75rem; width: auto; padding: .55rem .75rem; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: var(--paper-2); }
@@ -3432,6 +3433,7 @@ a.pill { text-decoration: none; }
 .chat-conv-sub:empty { display: none; }
 .chat-tag { font-size: .7rem; padding: 0 .4rem; border-radius: 6px; background: var(--paper-2); color: var(--ink-soft); line-height: 1.5; }
 .chat-tag.sms { background: var(--warn-soft); color: var(--warn); }
+.chat-tag.mail { background: var(--paper-2); color: var(--ink); border: 1px solid var(--line, rgba(0,0,0,.12)); }
 .chat-conv-last { font-size: .82rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-unread { position: absolute; right: .9rem; bottom: .8rem; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--ok); color: #fff; font-size: .72rem; font-style: normal; line-height: 20px; text-align: center; }
 .chat-none, .chat-empty { padding: 1.5rem; color: var(--muted); }
@@ -3459,7 +3461,7 @@ a.pill { text-decoration: none; }
 .chat-compose-tools select { padding: .35rem .5rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: .85rem; background: var(--card); }
 .chat-compose-row { display: flex; gap: .6rem; align-items: flex-end; }
 .chat-compose-row textarea { flex: 1; resize: vertical; min-height: 44px; max-height: 40vh; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
-.chat-dialog { border: 0; border-radius: 14px; padding: 1.4rem; width: min(440px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0, 0, 0, .2); }
+.chat-dialog { margin: auto; border: 0; border-radius: 14px; padding: 1.4rem; width: min(440px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0, 0, 0, .2); }
 .chat-dialog::backdrop { background: rgba(20, 24, 33, .4); }
 .chat-dialog h3 { margin: 0 0 1rem; }
 .chat-dialog select, .chat-dialog input { width: 100%; }

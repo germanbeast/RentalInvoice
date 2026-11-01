@@ -5,7 +5,7 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.34.0] - 2026-11-01
+## [1.35.0] - 2026-11-01
 
 ### Neu
 - Eigene Domain: entspricht der Host der Anfrage der „Öffentlichen Adresse“ der Webseite (z. B. `https://beckhome.cloud/gast`), leitet `/` auf `/gast/` weiter. Andere Host-Namen (z. B. `admin.beckhome.cloud`, Heimnetz-IP) zeigen weiter den Admin-Login; zusätzlich ist der Admin unter `/admin` erreichbar
@@ -16,6 +16,33 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Behoben
 - Fehlt `ADMIN_PASSWORD` in der `.env`, wurde das Admin-Passwort bei jedem Start auf `admin123` gesetzt; jetzt wird nur noch synchronisiert, wenn die Variable gesetzt ist
+
+## [1.34.1] - 2026-11-01
+
+### Behoben
+- WhatsApp-Bot: Admin-Befehle kamen bei Absendern mit `@lid`-ID nicht an, weil `wa-commands.js` den Benutzer erneut über `msg.from` suchte. Der in `server.js` über die Telefonnummer gefundene Benutzer wird jetzt durchgereicht
+- WhatsApp Web wird immer live geladen (`webVersionCache: none`), statt eine alte, im lokalen Cache festgehaltene Version zu nutzen
+- Nach `disconnected` wird ein neuer Client gebaut statt `initialize()` auf dem geschlossenen alten aufzurufen; fehlgeschlagene Starts werden mit wachsender Wartezeit (30 s bis 10 min) wiederholt; Ereignisse alter Clients werden ignoriert
+- Watchdog prüft alle 2 Minuten `getState()` und startet neu, wenn WhatsApp nicht antwortet oder über 5 Minuten beim Verbinden hängt
+- Vor dem Start werden verwaiste Chromium-Prozesse des WhatsApp-Profils beendet und `SingletonLock` entfernt; beim Beenden (auch beim Update aus der App) wird der Browser geschlossen
+- `takeoverOnConflict`: wird die Bot-Nummer anderswo in WhatsApp Web geöffnet, übernimmt der Server die Sitzung wieder
+- „Trennen“ funktioniert auch ohne Antwort von WhatsApp, löscht die Kopplung und startet genau einen neuen Client
+- `sendWhatsApp` fragt die Chat-ID per `getNumberId` ab; Rufnummern mit `00` werden erkannt
+- `getUserByPhone` vergleicht nur Ziffern, auch bei gespeicherten Nummern mit `-`, `/` oder Klammern
+
+### Neu
+- `POST /api/whatsapp/restart` und Knopf „Neu verbinden“; Status zeigt „Verbindung wird aufgebaut“ und den letzten Fehler
+
+## [1.34.0] - 2026-11-01
+
+### Neu
+- Gäste-Chat: E-Mail als dritter Kanal neben WhatsApp und SMS, gedacht für die Booking.com-Gastadresse (`…@guest.booking.com`). Die Adresse wird von Hand gepflegt (Dialog „E-Mail eintragen“ in der Unterhaltung oder Feld „E-Mail“ bei „Neue Nachricht“) und beim Gast gespeichert, wenn dort noch keine steht
+- Versand über den SMTP-Zugang aus Einstellungen → E-Mail; Antworten mit `In-Reply-To` und „Re:“-Betreff. Booking.com leitet nur Mails von der im Extranet hinterlegten Adresse weiter
+- Optionaler Abruf per IMAP (`imapflow` + `mailparser`), alle 2 Minuten, nur lesend (UID-Stand in `guest_chat_mail_state`, beim ersten Abruf ab „jetzt“). Übernommen werden Mails von Booking.com-Gastadressen, von Adressen bekannter Unterhaltungen und von Gästen aktueller Buchungen; zitierter Text und Booking.com-Antwortmarker werden abgeschnitten, erster Anhang wird gespeichert
+- Neue Routen `PUT /api/chat/thread/:conv/email`, `POST /api/chat/mail/check` (Recht Einstellungen); Spalten `guest_chat_contacts.email`, `guest_chat_messages.subject`
+
+### Behoben
+- Chat-Dialoge waren durch den globalen `margin: 0`-Reset oben links statt mittig
 
 ## [1.33.0] - 2026-10-31
 

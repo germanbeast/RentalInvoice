@@ -293,11 +293,9 @@ function getUserByPhone(phone) {
     // Use the last 9 digits for matching (German mobile standard)
     const suffix = cleaned.slice(-9);
 
-    // Search in DB, also normalizing the stored numbers on the fly
-    return getDb().prepare(`
-        SELECT * FROM users 
-        WHERE REPLACE(REPLACE(phone, '+', ''), ' ', '') LIKE ?
-    `).get(`%${suffix}`);
+    // Compare digits only, so stored numbers like "+49 151 / 123-45 67" match too
+    const rows = getDb().prepare("SELECT * FROM users WHERE phone IS NOT NULL AND phone != ''").all();
+    return rows.find(u => String(u.phone).replace(/[^\d]/g, '').endsWith(suffix)) || null;
 }
 
 function getUserByTelegramId(tgId) {
