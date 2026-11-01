@@ -769,8 +769,9 @@ async function runNukiCleanup() {
         if (failed > 0) console.warn(`⚠️ ${failed} Nuki-Code(s) konnten nicht gelöscht werden (nächster Versuch in 1 Stunde).`);
         // Codes still called "Gast: Booking 12.03." although the guest has a real name -> rename them
         try {
-            const { renamed } = await require('./bot-logic').reconcileBookingCodes();
+            const { renamed, moved } = await require('./bot-logic').reconcileBookingCodes();
             if (renamed.length) console.log(`✏️ ${renamed.length} Türcode(s) umbenannt: ${renamed.join(', ')}`);
+            if (moved.length) console.log(`🕚 ${moved.length} Türcode(s) auf 11 Uhr vorgezogen: ${moved.join(', ')}`);
         } catch (re) {
             console.warn('⚠️ Türcode-Namen konnten nicht abgeglichen werden:', re.message);
         }
@@ -855,7 +856,7 @@ async function createNukiPin(arrival, departure, guestName) {
     };
     const generatedCode = generateValidPin();
 
-    const allowedFrom = `${arrival}T15:00:00.000Z`;
+    const allowedFrom = `${arrival}T11:00:00.000Z`; // codes always work from 11:00 on arrival day
     const allowedUntil = `${departure}T11:00:00.000Z`;
     const safeName = `Gast: ${guestName || 'Gast'}`.substring(0, 20);
 

@@ -17,6 +17,17 @@
             ]
         },
         {
+            "version": "1.33.1",
+            "date": "2026-11-01",
+            "title": "Türcodes ab 11 Uhr",
+            "features": [
+                "Neue Türcodes gelten immer ab 11:00 Uhr am Anreisetag (bisher 15:00 Uhr), bis 11:00 Uhr am Abreisetag",
+                "Wird das Anreisedatum geändert, gilt der Code ebenfalls ab 11:00 Uhr",
+                "Bereits angelegte Codes kommender Buchungen mit Start 15:00 Uhr werden beim stündlichen Abgleich automatisch auf 11:00 Uhr vorgezogen"
+            ],
+            "fixes": []
+        },
+        {
             "version": "1.33.0",
             "date": "2026-10-31",
             "title": "Benutzerverwaltung mit Rechten",
