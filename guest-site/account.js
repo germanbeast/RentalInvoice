@@ -88,12 +88,13 @@
     let msEditing = false;
     let newCodeShown = null;
     const tabParam = new URLSearchParams(location.search).get('tab');
-    let tab = tabParam === 'meldeschein' ? 'guests' : (() => { try { return sessionStorage.getItem('gapp-tab') || 'stay'; } catch (e) { return 'stay'; } })();
+    let tab = tabParam === 'meldeschein' ? 'guests' : tabParam === 'ankunft' ? 'arrival' : (() => { try { return sessionStorage.getItem('gapp-tab') || 'stay'; } catch (e) { return 'stay'; } })();
 
     const isStay = s => s && s.kind === 'booking' && s.status === 'confirmed';
     const tabsFor = s => {
         const t = ['stay'];
         if (isStay(s) && s.state !== 'past') t.unshift('guests');
+        if (isStay(s) && s.state !== 'past' && s.arrival) t.push('arrival');
         if (s.status === 'confirmed' && s.state !== 'past') t.push('az');
         if ((info && (info.tips.length || info.address || info.directions || info.location)) || liveHas()) t.push('area');
         return t;
@@ -170,6 +171,7 @@
             $('#app-menu-contact').after(a);
         }
         $('[data-pane="guests"]').innerHTML = avail.includes('guests') ? renderGuests(s) : '';
+        $('[data-pane="arrival"]').innerHTML = avail.includes('arrival') ? renderArrival(s) : '';
         $('[data-pane="az"]').innerHTML = avail.includes('az') ? renderAZ(s) : '';
         $('[data-pane="area"]').innerHTML = avail.includes('area') ? renderArea(s) : '';
         bindApp();
@@ -244,6 +246,11 @@
                 right.push(`<div class="gcard gpin"><h3>Ihr Türcode</h3>
                     <p>Ihr persönlicher Türcode erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise${s.daysUntil > s.pinLater ? `, also ab ${fmt(addDays(s.checkin, -s.pinLater))}` : ''}.</p></div>`);
             }
+        }
+        if (isStay(s) && s.arrival && (s.state === 'upcoming' || s.state === 'inhouse') && s.daysUntil >= 0 && s.daysUntil <= 1) {
+            right.push(`<div class="gcard gcallout"><h3>${s.daysUntil === 0 ? 'Heute ist Anreise' : 'Morgen ist Anreise'}</h3>
+                <p>Route, Parken und wie Sie die Haustür öffnen, Schritt für Schritt mit Fotos.</p>
+                <button type="button" class="btn btn-dark btn-small" data-goto="arrival">So kommen Sie hinein</button></div>`);
         }
         if (ms) {
             right.push(ms.form
@@ -393,6 +400,45 @@
             <div class="gapp-cols"><div class="gapp-col">${parts.join('') || details}</div><div class="gapp-col">${parts.length ? details : ''}</div></div>`;
     }
     const fmtDate = ymd => ymd ? new Date(ymd + 'T12:00:00').toLocaleDateString('de-DE') : '–';
+
+    // ---- Ankunft: Route, Parken, Haustür Schritt für Schritt ----------------
+    function renderArrival(s) {
+        const a = s.arrival;
+        const photo = (src, alt) => src ? `<figure class="arr-fig"><img src="${esc(src)}" alt="${esc(alt)}" loading="lazy"></figure>` : '';
+        const left = [];
+        const right = [];
+        if (a.address || a.routeNote) {
+            left.push(`<div class="gcard arr-card"><span class="arr-kicker">Anfahrt</span><h3>Route</h3>
+                ${a.address ? `<p class="prose">${esc(a.address)}</p>` : ''}${a.routeNote ? `<p class="prose">${esc(a.routeNote)}</p>` : ''}
+                ${a.routeUrl ? `<a class="btn btn-dark btn-small" href="${esc(a.routeUrl)}" target="_blank" rel="noopener">Route in Google Maps starten</a>` : ''}</div>`);
+        }
+        if (a.parking || a.parkingPhoto) {
+            left.push(`<div class="gcard arr-card"><span class="arr-kicker">Ankommen</span><h3>Parken</h3>
+                ${a.parking ? `<p class="prose">${esc(a.parking)}</p>` : ''}${photo(a.parkingPhoto, 'Parkplatz')}</div>`);
+        }
+        if (a.door || a.doorPhoto) {
+            left.push(`<div class="gcard arr-card"><span class="arr-kicker">Eingang</span><h3>Die Haustür</h3>
+                ${a.door ? `<p class="prose">${esc(a.door)}</p>` : ''}${photo(a.doorPhoto, 'Haustür')}</div>`);
+        }
+        if (s.pin) {
+            right.push(`<div class="gcard gpin"><h3>Ihr Türcode</h3><div class="pin">${esc(s.pin)}</div>
+                <p>Gültig ab Anreisetag ${esc(s.checkinTime)} Uhr bis Abreisetag ${esc(s.checkoutTime)} Uhr.</p></div>`);
+        } else if (s.pinLater) {
+            right.push(`<div class="gcard gpin"><h3>Ihr Türcode</h3>
+                <p>Erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise${s.daysUntil > s.pinLater ? `, also ab ${fmt(addDays(s.checkin, -s.pinLater))}` : ''}. Am Anreisetag schicken wir ihn Ihnen auch zu.</p></div>`);
+        }
+        if (a.steps.length) {
+            right.push(`<div class="gcard arr-card"><span class="arr-kicker">Tür öffnen</span><h3>Schritt für Schritt</h3>
+                <ol class="arr-steps">${a.steps.map((st, i) => `<li><span class="arr-n">${i + 1}</span><div>${st.text ? `<p>${esc(st.text)}</p>` : ''}${photo(st.photo, `Schritt ${i + 1}`)}</div></li>`).join('')}</ol>
+                ${a.emergency ? '<p class="arr-help">Reagiert das Tastenfeld nicht? Scannen Sie den QR-Code an der Tür, damit öffnen Sie während Ihres Aufenthalts die Tür mit dem Handy.</p>' : ''}</div>`);
+        } else if (a.emergency) {
+            right.push('<div class="gcard"><p class="arr-help" style="margin:0">Reagiert das Tastenfeld nicht? Scannen Sie den QR-Code an der Tür, damit öffnen Sie während Ihres Aufenthalts die Tür mit dem Handy.</p></div>');
+        }
+        right.push(contactHtml(s.contact, s.chat));
+        const when = s.daysUntil === 0 ? 'Heute ist Ihr Anreisetag.' : s.state === 'upcoming' ? ( `Anreise am ${fmt(s.checkin)}${s.checkinTime ? ` ab ${esc(s.checkinTime)} Uhr` : ''}.`) : 'Zum Nachschlagen während Ihres Aufenthalts.';
+        return `<div class="gapp-pane-head"><h2>Ihre Ankunft</h2><p>${when} So finden Sie zu uns und kommen ins Haus.</p></div>
+            <div class="gapp-cols"><div class="gapp-col">${left.join('')}</div><div class="gapp-col">${right.join('')}</div></div>`;
+    }
 
     // ---- A – Z Gästemappe --------------------------------------------------
     function renderAZ(s) {

@@ -5,6 +5,15 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.0] - 2026-11-02
+
+### Neu
+- Anfahrts-Assistent (`arrival-guide.js`, Setting `arrival_guide`): Texte und Fotos für Anfahrt, Parken, Haustür und Öffnungs-Schritte unter Webseite → Ankunft (Rechte-Bereich „Gäste-Webseite“, Senden: „Nachrichten“). Fotos als `uploads/site/arr-*`, für Gäste nur mit laufender Buchung über `/gast/api/me/ankunft/bild/:file`
+- Automatischer Versand am Anreisetag (alle 5 Min. geprüft, Uhrzeit einstellbar) über `guestChat.sendToBooking`: WhatsApp → SMS (kurzer Text ohne Emoji) → E-Mail; ohne Kanal oder nach 3 Versuchen (alle 15 Min.) Text per Telegram. Spalten `arrival_*` an `bookings`, verschobene Buchungen werden am neuen Tag erneut versendet
+- Sprache Englisch automatisch, wenn der Meldeschein eine andere Staatsangehörigkeit als DE/AT/CH nennt
+- Direktlink `/b/<token>/ankunft` öffnet „Meine Buchung“ im neuen Tab „Ankunft“
+- Admin-Endpunkte `GET/PUT /api/site/arrival`, `POST /api/site/arrival/photo`, `GET /api/site/arrival/preview/:id`, `POST /api/site/arrival/send/:id`; Push-Typ `arrival_guide`
+
 ## [1.39.0] - 2026-11-02
 
 ### Neu
