@@ -1214,12 +1214,22 @@ app.get('/api/welcome', (req, res) => {
         res.json({
             success: true, today,
             guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
-            phone: (s.vermieter && s.vermieter.telefon) || ''
+            phone: (s.vermieter && s.vermieter.telefon) || '',
+            checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
+            title: (s.site && s.site.title) || ''
         });
     } catch (e) {
         res.status(500).json({ success: false });
     }
 });
+
+// Live tips (weather, events, opening hours) for the TV welcome screen and "Meine Buchung", see local-live.js.
+// Registered before the guest-domain rewrite, so /api/live also answers on the guest host (TV box, root mode).
+const localLive = require('./local-live')({ db, axios, ical: require('node-ical') });
+const liveLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+app.get('/api/live', liveLimiter, localLive.publicHandler);
+app.get('/gast/api/live', liveLimiter, localLive.publicHandler);
+app.get('/live-icons.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'live-icons.js')); });
 
 // Web app (PWA) files: browsers and the OS fetch them without the session cookie
 app.get('/sw.js', (req, res) => {
@@ -1766,6 +1776,7 @@ guestPortal.registerAdminRoutes(app, apiLimiter);
 guestChat.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
 meldeschein.registerAdminRoutes(app, apiLimiter);
+localLive.registerAdminRoutes(app, apiLimiter);
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {

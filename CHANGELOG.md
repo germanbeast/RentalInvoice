@@ -5,6 +5,19 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.0] - 2026-11-02
+
+### Neu
+- Live-Tipps (`local-live.js`, Setting `site_live`): Wetter, Veranstaltungen und Öffnungszeiten auf dem TV-Welcome-Screen und in „Meine Buchung“ (Tab Umgebung). Öffentlich über `GET /api/live?for=tv|app[&from&to]` (auch `/gast/api/live`), vor dem Gast-Domain-Rewrite registriert
+- Wetter: Open-Meteo (ohne Schlüssel), Ort per Open-Meteo-Geocoding, 30 Min. Cache
+- Öffnungszeiten: Orte von Hand oder aus OpenStreetMap (Overpass, Umkreissuche im Admin); übernommene Orte holen ihre Zeiten täglich neu. `opening-hours.js` liest das OSM-Format (Wochentage, mehrere Zeiten, über Mitternacht, Monate, `PH` mit bundesweiten Feiertagen, `24/7`)
+- Veranstaltungen: eigene Termine, bis zu 5 iCal-Links (inkl. Wiederholungen) und optional Ticketmaster Discovery API (Schlüssel bleibt auf dem Server); 3 h Cache, Duplikate werden zusammengefasst
+- Admin: Webseite → Live-Tipps mit Ortssuche, OSM-Suche, Terminliste und Vorschau (Rechte-Bereich „Gäste-Webseite“)
+
+### Geändert
+- TV-Welcome-Screen neu im Boutique-Stil (dunkle Variante), feste 16:9-Aufteilung ohne Scrollen, Listen kürzen sich auf den verfügbaren Platz; Fokus auf der ersten App für die Fernbedienung
+- `/api/welcome` liefert zusätzlich Anreise-/Abreisezeit und Titel der Webseite
+
 ## [1.36.1] - 2026-11-01
 
 ### Sicherheit

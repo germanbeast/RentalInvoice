@@ -6,239 +6,167 @@
     <title>Willkommen - Ferienwohnung</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* TV-Welcome-Screen im Boutique-Stil der Gäste-Webseite (Papier, Tinte, Rost), dunkle Variante für den Fernseher.
+           Alles in rem, die Grundgröße folgt der Bildschirmgröße: passt ohne Scrollen auf jeden 16:9-Fernseher. */
+        :root {
+            --paper: #f5f0e8;
+            --ink: #1f1c18;
+            --ink-2: #2a2520;
+            --card: #2b2621;
+            --line: rgba(245, 240, 232, .14);
+            --soft: rgba(245, 240, 232, .72);
+            --muted: rgba(245, 240, 232, .52);
+            --accent: #c27a4f;
+            --accent-deep: #8a4b2a;
+            --ok: #8fbf8f;
+            --warn: #e2b25c;
+            --bad: #e08a80;
+            --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+            --sans: 'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif;
         }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { font-size: 1.04vw; font-size: min(1.04vw, 1.85vh); }
         body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            font-family: var(--sans);
+            background: radial-gradient(110% 90% at 15% 0%, #4a3d31 0%, var(--ink) 62%) fixed, var(--ink);
+            color: var(--paper);
             min-height: 100vh;
-            overflow-x: hidden;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
+        .tv { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; gap: 2rem; padding: 2.6rem 4.4rem 2.6rem; }
 
-        .welcome-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 60px 80px;
-        }
+        .tv-top { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--line); padding-bottom: 1.4rem; }
+        .tv-brand { font: italic 400 2.3rem/1 var(--serif); color: var(--soft); }
+        .tv-clock { text-align: right; }
+        .tv-time { font: 400 4.4rem/1 var(--serif); letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+        .tv-date { font-size: 1.15rem; color: var(--muted); margin-top: .4rem; letter-spacing: .04em; }
 
-        .welcome-header {
-            text-align: center;
-            margin-bottom: 50px;
-        }
+        .tv-main { display: grid; grid-template-columns: 1fr; gap: 3rem; min-height: 0; }
+        .tv-main.with-live { grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); }
 
-        .welcome-logo {
-            font-family: Georgia, serif;
-            font-size: 2.5rem;
-            font-style: italic;
-            margin-bottom: 20px;
-            color: #e0e7ff;
-        }
+        .tv-hello { display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+        .tv-main:not(.with-live) .tv-hello { align-items: center; text-align: center; }
+        .eyebrow { font-size: 1rem; letter-spacing: .22em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
+        .tv-name { font: 400 6.2rem/.98 var(--serif); letter-spacing: -.01em; margin-bottom: 1.2rem; overflow-wrap: anywhere; }
+        .tv-msg { font-size: 1.5rem; color: var(--soft); max-width: 34ch; }
+        .tv-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin-top: 2.6rem; border-top: 1px solid var(--line); width: 100%; max-width: 46rem; }
+        .tv-main:not(.with-live) .tv-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 72rem; text-align: left; }
+        .fact { padding: 1.1rem 1.2rem 1.1rem 0; border-bottom: 1px solid var(--line); min-width: 0; }
+        .fact span { display: block; font-size: .85rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; }
+        .fact strong { display: block; font: 400 1.9rem/1.15 var(--serif); overflow-wrap: anywhere; }
+        .fact small { display: block; font-size: 1.05rem; color: var(--soft); margin-top: .2rem; overflow-wrap: anywhere; }
 
-        .welcome-time {
-            font-size: 4rem;
-            font-weight: 300;
-            letter-spacing: 2px;
-            margin-bottom: 10px;
-        }
+        /* Live column */
+        .tv-live { display: grid; grid-template-rows: auto 1fr; gap: 1.4rem; min-height: 0; }
+        .panel { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1.3rem 1.6rem; min-height: 0; overflow: hidden; }
+        .panel-h { display: flex; justify-content: space-between; align-items: baseline; font-size: .85rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: .8rem; }
+        .panel-h b { font-weight: 500; color: var(--accent); }
+        .wx-wrap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.6rem; align-items: center; }
+        .wx-now { display: grid; grid-template-columns: auto auto; gap: 1rem; align-items: center; }
+        .wx-now .wx { width: 4.4rem; height: 4.4rem; color: var(--paper); }
+        .wx-temp { font: 400 4.2rem/1 var(--serif); }
+        .wx-label { font-size: 1.2rem; color: var(--soft); margin-top: .2rem; }
+        .wx-sub { font-size: .95rem; color: var(--muted); margin-top: 1rem; }
+        .wx-days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-left: 1px solid var(--line); }
+        .wx-day { text-align: center; padding: .2rem 0; }
+        .wx-day + .wx-day { border-left: 1px solid var(--line); }
+        .wx-day span { display: block; font-size: .9rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+        .wx-day .wx { width: 2.2rem; height: 2.2rem; margin: .4rem auto .25rem; display: block; color: var(--soft); }
+        .wx-day strong { font-weight: 500; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+        .wx-day small { color: var(--muted); font-size: 1.05rem; }
+        .wx-day em { display: block; font-style: normal; font-size: .85rem; color: var(--accent); margin-top: .15rem; min-height: 1.1em; }
 
-        .welcome-date {
-            font-size: 1.5rem;
-            color: rgba(255, 255, 255, 0.8);
-            font-weight: 300;
-        }
+        .tv-lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.4rem; min-height: 0; }
+        .tv-lists.single { grid-template-columns: 1fr; }
+        .list { list-style: none; display: grid; gap: 0; }
+        .list li { padding: .55rem 0; border-top: 1px solid var(--line); min-width: 0; }
+        .list li:first-child { border-top: 0; padding-top: 0; }
+        .li-name { font: 400 1.45rem/1.15 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .li-sub { font-size: .98rem; color: var(--soft); margin-top: .15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; margin-right: .45rem; background: var(--muted); vertical-align: .05em; }
+        .dot.open { background: var(--ok); }
+        .dot.soon { background: var(--warn); }
+        .dot.closed { background: var(--bad); }
+        .ev-date { color: var(--accent); font-weight: 500; }
+        .empty { color: var(--muted); font-size: 1.05rem; }
 
-        .welcome-main {
-            text-align: center;
-            padding: 40px 0;
-            margin-bottom: 50px;
+        /* Apps */
+        .tv-apps { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 1.2rem; align-items: stretch; }
+        .tv-apps-title { align-self: center; font-size: .95rem; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); padding-right: 1rem; }
+        .app-btn {
+            display: flex; align-items: center; justify-content: center; gap: .8rem;
+            padding: 1.25rem 1rem; border: 1px solid var(--line); border-radius: 4px;
+            background: var(--ink-2); color: var(--paper); font: 500 1.35rem/1 var(--sans); cursor: pointer;
+            transition: background .2s ease, border-color .2s ease, color .2s ease;
         }
-
-        .welcome-title {
-            font-size: 3rem;
-            font-weight: 300;
-            margin-bottom: 20px;
-        }
-
-        .welcome-guest-name {
-            font-size: 4.5rem;
-            font-weight: 700;
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 10px rgba(0,0,0,0.2);
-        }
-
-        .welcome-message {
-            font-size: 1.8rem;
-            font-weight: 300;
-            opacity: 0.9;
-        }
-
-        .welcome-info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-bottom: 50px;
-        }
-
-        .welcome-info-card {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 20px;
-            padding: 30px;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .welcome-info-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
-        }
-
-        .welcome-info-label {
-            font-size: 1.2rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            opacity: 0.8;
-            margin-bottom: 10px;
-        }
-
-        .welcome-info-value {
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-
-        .welcome-info-sub {
-            font-size: 1.2rem;
-            opacity: 0.7;
-        }
-
-        .welcome-apps {
-            margin-top: 60px;
-        }
-
-        .welcome-apps-title {
-            text-align: center;
-            font-size: 2rem;
-            font-weight: 400;
-            margin-bottom: 30px;
-        }
-
-        .welcome-apps-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-
-        .welcome-app-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 15px;
-            padding: 30px;
-            cursor: pointer;
-            transition: background 0.3s ease, transform 0.3s ease;
-            text-align: center;
-        }
-
-        .welcome-app-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-
-        .welcome-app-icon {
-            font-size: 4rem;
-            margin-bottom: 15px;
-        }
-
-        .welcome-app-name {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        .welcome-footer {
-            text-align: center;
-            margin-top: 60px;
-            font-size: 1.2rem;
-            opacity: 0.7;
-        }
+        .app-btn svg { width: 1.7rem; height: 1.7rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+        .app-btn:hover, .app-btn:focus { outline: none; background: var(--paper); color: var(--ink); border-color: var(--paper); }
+        .app-btn:focus-visible { box-shadow: 0 0 0 .25rem var(--accent); }
+        svg.wx { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        [hidden] { display: none !important; }
     </style>
 </head>
 <body>
-    <div class="welcome-container">
-        <div class="welcome-header">
-            <div class="welcome-logo" id="welcome-logo">Ferienwohnung Beckhome</div>
-            <div class="welcome-time" id="welcome-time">12:30</div>
-            <div class="welcome-date" id="welcome-date">Freitag, 21. Februar 2026</div>
-        </div>
-
-        <div class="welcome-main">
-            <h1 class="welcome-title">Willkommen</h1>
-            <h2 class="welcome-guest-name" id="welcome-guest-name">Liebe Gäste</h2>
-            <p class="welcome-message">Wir wünschen Ihnen einen angenehmen Aufenthalt!</p>
-        </div>
-
-        <div class="welcome-info-grid">
-            <div class="welcome-info-card">
-                <div class="welcome-info-icon">📶</div>
-                <div class="welcome-info-label">WLAN</div>
-                <div class="welcome-info-value" id="welcome-wifi-name">Gäste-WLAN</div>
-                <div class="welcome-info-sub" id="welcome-wifi-pass">Passwort: ********</div>
+    <div class="tv">
+        <header class="tv-top">
+            <div class="tv-brand" id="welcome-logo">Ferienwohnung Beckhome</div>
+            <div class="tv-clock">
+                <div class="tv-time" id="welcome-time">12:30</div>
+                <div class="tv-date" id="welcome-date">Freitag, 21. Februar 2026</div>
             </div>
+        </header>
 
-            <div class="welcome-info-card">
-                <div class="welcome-info-icon">🔑</div>
-                <div class="welcome-info-label">Check-in</div>
-                <div class="welcome-info-value" id="welcome-checkin">15:00 Uhr</div>
-            </div>
+        <main class="tv-main" id="tv-main">
+            <section class="tv-hello">
+                <div class="eyebrow">Willkommen</div>
+                <h1 class="tv-name" id="welcome-guest-name">Liebe Gäste</h1>
+                <p class="tv-msg">Wir wünschen Ihnen einen angenehmen Aufenthalt!</p>
+                <div class="tv-facts">
+                    <div class="fact"><span>WLAN</span><strong id="welcome-wifi-name">Gäste-WLAN</strong><small id="welcome-wifi-pass">Passwort: ********</small></div>
+                    <div class="fact"><span>Kontakt</span><strong id="welcome-phone">+49 123 456789</strong></div>
+                    <div class="fact"><span>Check-in</span><strong id="welcome-checkin">15:00 Uhr</strong></div>
+                    <div class="fact"><span>Check-out</span><strong id="welcome-checkout">10:00 Uhr</strong></div>
+                </div>
+            </section>
 
-            <div class="welcome-info-card">
-                <div class="welcome-info-icon">🚪</div>
-                <div class="welcome-info-label">Check-out</div>
-                <div class="welcome-info-value" id="welcome-checkout">10:00 Uhr</div>
-            </div>
+            <aside class="tv-live" id="tv-live" hidden>
+                <div class="panel" id="tv-weather" hidden>
+                    <div class="panel-h"><span>Wetter</span><b id="tv-place"></b></div>
+                    <div class="wx-wrap"><div class="wx-now" id="tv-wx-now"></div><div class="wx-days" id="tv-wx-days"></div></div>
+                    <div class="wx-sub" id="tv-wx-sub"></div>
+                </div>
+                <div class="tv-lists" id="tv-lists">
+                    <div class="panel" id="tv-places" hidden>
+                        <div class="panel-h"><span>Jetzt geöffnet?</span></div>
+                        <ul class="list" id="tv-places-list"></ul>
+                    </div>
+                    <div class="panel" id="tv-events" hidden>
+                        <div class="panel-h"><span>Veranstaltungen</span></div>
+                        <ul class="list" id="tv-events-list"></ul>
+                    </div>
+                </div>
+            </aside>
+        </main>
 
-            <div class="welcome-info-card">
-                <div class="welcome-info-icon">📞</div>
-                <div class="welcome-info-label">Kontakt</div>
-                <div class="welcome-info-value" id="welcome-phone">+49 123 456789</div>
-            </div>
-        </div>
-
-        <div class="welcome-apps">
-            <h3 class="welcome-apps-title">TV & Unterhaltung</h3>
-            <div class="welcome-apps-grid">
-                <button class="welcome-app-btn" id="btn-launch-waipu">
-                    <div class="welcome-app-icon">📺</div>
-                    <div class="welcome-app-name">Waipu TV</div>
-                </button>
-                <button class="welcome-app-btn" id="btn-launch-netflix">
-                    <div class="welcome-app-icon">🎬</div>
-                    <div class="welcome-app-name">Netflix</div>
-                </button>
-                <button class="welcome-app-btn" id="btn-launch-youtube">
-                    <div class="welcome-app-icon">▶️</div>
-                    <div class="welcome-app-name">YouTube</div>
-                </button>
-                <button class="welcome-app-btn" id="btn-launch-prime">
-                    <div class="welcome-app-icon">📦</div>
-                    <div class="welcome-app-name">Prime Video</div>
-                </button>
-            </div>
-        </div>
-
-        <div class="welcome-footer">
-            <p>Bei Fragen stehen wir Ihnen jederzeit gerne zur Verfügung</p>
-        </div>
+        <nav class="tv-apps" aria-label="TV &amp; Unterhaltung">
+            <div class="tv-apps-title">TV &amp; Apps</div>
+            <button class="app-btn" id="btn-launch-waipu"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg>Waipu TV</button>
+            <button class="app-btn" id="btn-launch-netflix"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M17 3v18M7 3l10 18"/></svg>Netflix</button>
+            <button class="app-btn" id="btn-launch-youtube"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="3"/><path d="m10 9.5 5 2.5-5 2.5z"/></svg>YouTube</button>
+            <button class="app-btn" id="btn-launch-prime"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5z"/><path d="M4 8.5 12 13l8-4.5M12 13v7"/></svg>Prime Video</button>
+        </nav>
     </div>
 
+    <script src="/live-icons.js"></script>
     <script>
-        // Get URL parameters
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const icon = (k, c) => (window.liveWeatherIcon ? window.liveWeatherIcon(k, c) : '');
+
+        // URL parameters (from the TV app) win over the server data
         const urlParams = new URLSearchParams(window.location.search);
         const guestName = urlParams.get('welcome') || urlParams.get('guest');
         const wifiName = urlParams.get('wifi');
@@ -246,88 +174,126 @@
         const checkin = urlParams.get('checkin');
         const checkout = urlParams.get('checkout');
         const phone = urlParams.get('phone');
+        const has = v => v && v.trim();
 
-        // Set guest name
-        if (guestName) {
-            document.getElementById('welcome-guest-name').textContent = decodeURIComponent(guestName);
-        }
+        if (has(guestName)) $('welcome-guest-name').textContent = guestName;
+        if (has(wifiName)) $('welcome-wifi-name').textContent = wifiName;
+        if (has(wifiPass)) $('welcome-wifi-pass').textContent = 'Passwort: ' + wifiPass;
+        if (has(checkin)) $('welcome-checkin').textContent = checkin;
+        if (has(checkout)) $('welcome-checkout').textContent = checkout;
+        if (has(phone)) $('welcome-phone').textContent = phone;
 
-        // Set WLAN info
-        if (wifiName && wifiName.trim()) {
-            document.getElementById('welcome-wifi-name').textContent = decodeURIComponent(wifiName);
-        }
-        if (wifiPass && wifiPass.trim()) {
-            document.getElementById('welcome-wifi-pass').textContent = 'Passwort: ' + decodeURIComponent(wifiPass);
-        }
-
-        // Set times
-        if (checkin && checkin.trim()) {
-            document.getElementById('welcome-checkin').textContent = decodeURIComponent(checkin);
-        }
-        if (checkout && checkout.trim()) {
-            document.getElementById('welcome-checkout').textContent = decodeURIComponent(checkout);
-        }
-
-        // Set phone
-        if (phone && phone.trim()) {
-            document.getElementById('welcome-phone').textContent = decodeURIComponent(phone);
-        }
-
-        // Update time and date – only touch the DOM when the minute changes,
-        // so weak TV boxes don't repaint the page every second
-        const timeEl = document.getElementById('welcome-time');
-        const dateEl = document.getElementById('welcome-date');
+        // Clock: only touch the DOM when the minute changes (weak TV boxes)
+        const timeEl = $('welcome-time');
+        const dateEl = $('welcome-date');
         function updateTime() {
             const now = new Date();
             const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
             if (timeEl.textContent !== time) {
                 timeEl.textContent = time;
-                dateEl.textContent = now.toLocaleDateString('de-DE', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
+                dateEl.textContent = now.toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             }
             setTimeout(updateTime, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 50);
         }
-
         updateTime();
 
-        // Automatic guest data from the server (only if no name was passed in the URL)
+        // Guest name, phone, times and title from the server
         async function loadFromServer() {
             try {
                 const r = await fetch('/api/welcome', { cache: 'no-store' });
                 const d = await r.json();
                 if (!d || !d.success) return;
-                if (!guestName) {
-                    const el = document.getElementById('welcome-guest-name');
-                    if (d.guest && d.guest.name) el.textContent = d.guest.name;
-                }
-                if (!phone && d.phone) document.getElementById('welcome-phone').textContent = d.phone;
+                if (!has(guestName)) $('welcome-guest-name').textContent = (d.guest && d.guest.name) || 'Liebe Gäste';
+                if (!has(phone) && d.phone) $('welcome-phone').textContent = d.phone;
+                if (!has(checkin) && d.checkinTime) $('welcome-checkin').textContent = `ab ${d.checkinTime} Uhr`;
+                if (!has(checkout) && d.checkoutTime) $('welcome-checkout').textContent = `bis ${d.checkoutTime} Uhr`;
+                if (d.title) $('welcome-logo').textContent = d.title;
             } catch (e) { /* offline: keep what is shown */ }
         }
-        if (!guestName || !phone) {
-            loadFromServer();
-            setInterval(loadFromServer, 10 * 60 * 1000);
+        loadFromServer();
+        setInterval(loadFromServer, 10 * 60 * 1000);
+
+        // ---- Live-Tipps: Wetter, Öffnungszeiten, Veranstaltungen ----
+        const dayShort = ymd => new Date(ymd + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
+        function evDate(e, today) {
+            const tomorrow = new Date(today + 'T12:00:00'); tomorrow.setDate(tomorrow.getDate() + 1);
+            const t = tomorrow.toISOString().slice(0, 10);
+            const ongoing = e.end && e.date < today && e.end >= today;
+            const label = ongoing ? `bis ${new Date(e.end + 'T12:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}`
+                : e.date === today ? 'Heute' : e.date === t ? 'Morgen'
+                : new Date(e.date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+            return label + (e.time && !ongoing ? ` · ${e.time}` : '');
         }
 
+        function renderLive(d) {
+            const main = $('tv-main');
+            const live = $('tv-live');
+            const w = d && d.enabled ? d.weather : null;
+            const places = d && d.enabled ? d.places.slice(0, 5) : [];
+            const events = d && d.enabled ? d.events.slice(0, 4) : [];
+            const any = !!(w || places.length || events.length);
+            live.hidden = !any;
+            main.classList.toggle('with-live', any);
+            if (!any) return;
+
+            $('tv-weather').hidden = !w;
+            if (w) {
+                $('tv-place').textContent = d.place || '';
+                const today = w.days[0];
+                $('tv-wx-now').innerHTML = `${icon(w.now.icon)}<div>
+                    <div class="wx-temp">${esc(w.now.temp)}°</div>
+                    <div class="wx-label">${esc(w.now.label)}</div></div>`;
+                $('tv-wx-sub').textContent = `Heute ${today.min}° bis ${today.max}°${today.rain != null ? ` · Regenrisiko ${today.rain} %` : ''}${w.now.feels != null && w.now.feels !== w.now.temp ? ` · gefühlt ${w.now.feels}°` : ''}${today.sunset ? ` · Sonnenuntergang ${today.sunset} Uhr` : ''}`;
+                $('tv-wx-days').innerHTML = w.days.slice(1, 5).map(x => `<div class="wx-day"><span>${esc(dayShort(x.date))}</span>${icon(x.icon)}
+                    <strong>${esc(x.max)}°</strong> <small>${esc(x.min)}°</small><em>${x.rain >= 30 ? `${esc(x.rain)} % Regen` : ''}</em></div>`).join('');
+            }
+            $('tv-places').hidden = !places.length;
+            $('tv-places-list').innerHTML = places.map(p => {
+                const cls = p.open === true ? (p.soon ? 'soon' : 'open') : p.open === false ? 'closed' : '';
+                return `<li><div class="li-name">${esc(p.name)}</div><div class="li-sub"><span class="dot ${cls}"></span>${esc(p.state || p.hours || p.kind || '')}</div></li>`;
+            }).join('');
+            $('tv-events').hidden = !events.length;
+            $('tv-events-list').innerHTML = events.map(e => `<li><div class="li-name">${esc(e.title)}</div>
+                <div class="li-sub"><span class="ev-date">${esc(evDate(e, d.today))}</span>${e.place ? ` · ${esc(e.place)}` : ''}</div></li>`).join('');
+            $('tv-lists').classList.toggle('single', !(places.length && events.length));
+            $('tv-lists').hidden = !(places.length || events.length);
+            fitLists();
+        }
+
+        // Only as many entries as fit into the panel (TV screens differ, no scrolling with a remote)
+        function fitLists() {
+            ['tv-places', 'tv-events'].forEach(id => {
+                const panel = $(id);
+                if (panel.hidden) return;
+                const items = [...panel.querySelectorAll('li')];
+                items.forEach(li => { li.hidden = false; });
+                const bottom = panel.getBoundingClientRect().bottom - parseFloat(getComputedStyle(panel).paddingBottom);
+                const cut = items.map(li => li.getBoundingClientRect().bottom > bottom + 1);
+                items.forEach((li, i) => { if (i > 0 && cut[i]) li.hidden = true; });
+            });
+        }
+        window.addEventListener('resize', fitLists);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitLists);
+
+        let lastLive = null;
+        async function loadLive() {
+            try {
+                const r = await fetch('/api/live?for=tv', { cache: 'no-store' });
+                const d = await r.json();
+                if (d && d.success) { lastLive = d; renderLive(d); }
+            } catch (e) { if (lastLive) renderLive(lastLive); }
+        }
+        loadLive();
+        setInterval(loadLive, 10 * 60 * 1000);
+
         // App launch buttons
-        document.getElementById('btn-launch-waipu').addEventListener('click', () => {
-            window.location.href = 'intent://de.exaring.waiputv#Intent;scheme=app;package=de.exaring.waiputv;end';
-        });
-
-        document.getElementById('btn-launch-netflix').addEventListener('click', () => {
-            window.location.href = 'intent://com.netflix.mediaclient#Intent;scheme=app;package=com.netflix.mediaclient;end';
-        });
-
-        document.getElementById('btn-launch-youtube').addEventListener('click', () => {
-            window.location.href = 'intent://com.google.android.youtube.tv#Intent;scheme=app;package=com.google.android.youtube.tv;end';
-        });
-
-        document.getElementById('btn-launch-prime').addEventListener('click', () => {
-            window.location.href = 'intent://com.amazon.avod.thirdpartyclient#Intent;scheme=app;package=com.amazon.avod.thirdpartyclient;end';
-        });
+        const launch = pkg => () => { window.location.href = `intent://${pkg}#Intent;scheme=app;package=${pkg};end`; };
+        $('btn-launch-waipu').addEventListener('click', launch('de.exaring.waiputv'));
+        $('btn-launch-netflix').addEventListener('click', launch('com.netflix.mediaclient'));
+        $('btn-launch-youtube').addEventListener('click', launch('com.google.android.youtube.tv'));
+        $('btn-launch-prime').addEventListener('click', launch('com.amazon.avod.thirdpartyclient'));
+        // Remote control: first app button has focus, so OK works right away
+        setTimeout(() => $('btn-launch-waipu').focus(), 300);
     </script>
 </body>
 </html>

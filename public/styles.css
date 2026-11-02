@@ -2775,6 +2775,27 @@ input[type="checkbox"]:focus-visible {
     .rating-row > :last-child { grid-column: 1 / -1; }
     .list-item { grid-template-columns: 1fr 1fr; }
 }
+.live-results { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow: auto; margin-bottom: .6rem; }
+.live-results:empty { display: none; }
+.live-result { display: grid; grid-template-columns: auto 1fr; gap: 0 .6rem; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; font: inherit; font-size: .88rem; }
+.live-result span { color: var(--text-secondary); }
+.live-result small { grid-column: 1 / -1; color: var(--text-secondary); font-family: ui-monospace, monospace; font-size: .75rem; overflow-wrap: anywhere; }
+.live-result:hover:not(:disabled) { border-color: var(--accent); }
+.live-result:disabled { opacity: .5; cursor: default; }
+.live-osm { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.live-osm input { flex: 1; min-width: 180px; }
+.live-osm select { width: auto; flex: none; }
+.live-tm-clear { display: flex; gap: .5rem; align-items: center; margin: -.3rem 0 .8rem; }
+.live-tm-clear[hidden] { display: none; }
+.live-preview { display: grid; gap: 12px; font-size: .88rem; }
+.live-preview ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.live-prev-h { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 3px; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--line); vertical-align: 1px; }
+.live-dot.open { background: var(--accent-green); }
+.live-dot.soon { background: var(--warn); }
+.live-dot.closed { background: var(--bad); }
+.live-errors { font-size: .82rem; color: var(--bad); display: grid; gap: 2px; }
+.site-card code { font-size: .8rem; background: var(--bg-secondary); padding: 1px 4px; border-radius: 4px; }
 .req-card { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1.4fr) auto; gap: 14px; align-items: start; padding: 14px 16px; }
 .req-card .req-msg { grid-column: 1 / -1; font-size: .85rem; color: var(--text-secondary); white-space: pre-line; }
 .req-status { display: inline-block; font-size: .7rem; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }

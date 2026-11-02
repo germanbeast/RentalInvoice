@@ -1,6 +1,21 @@
 {
-    "currentVersion": "1.36.1",
+    "currentVersion": "1.39.0",
     "releases": [
+        {
+            "version": "1.39.0",
+            "date": "2026-11-02",
+            "title": "Live-Tipps: Wetter, Veranstaltungen, Öffnungszeiten",
+            "features": [
+                "Neuer Bereich Webseite → Live-Tipps: Ort wählen, Wetter, Öffnungszeiten und Veranstaltungen für Fernseher und „Meine Buchung“",
+                "Wetter live von Open-Meteo (kostenlos, ohne Schlüssel): jetzt plus die nächsten 4 Tage",
+                "Öffnungszeiten: Geschäfte in der Nähe aus OpenStreetMap übernehmen oder von Hand eintragen; Gäste sehen „Geöffnet bis 18:00“ oder „Öffnet morgen 08:00“, inklusive Feiertagen",
+                "Veranstaltungen aus eigenen Terminen, Kalender-Links (iCal) und optional Ticketmaster; in „Meine Buchung“ nur die Termine während des Aufenthalts",
+                "TV-Welcome-Screen im Boutique-Stil mit Wetter, Öffnungszeiten und Veranstaltungen, passt ohne Scrollen auf jeden Fernseher"
+            ],
+            "fixes": [
+                "TV-Welcome-Screen zeigt Anreise- und Abreisezeit aus den Webseiten-Einstellungen"
+            ]
+        },
         {
             "version": "1.36.1",
             "date": "2026-11-01",

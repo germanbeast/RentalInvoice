@@ -539,6 +539,7 @@
                         <button type="button" data-tab="requests" class="active">Anfragen</button>
                         <button type="button" data-tab="meldescheine">Meldescheine</button>
                         <button type="button" data-tab="content">Inhalte</button>
+                        <button type="button" data-tab="live">Live-Tipps</button>
                         <button type="button" data-tab="setup">Einrichtung</button>
                     </div>
                 </div>
@@ -648,6 +649,64 @@
                         <div class="form-group"><label for="site-privacy">Datenschutzerklärung</label><textarea id="site-privacy" rows="6"></textarea></div>
                     </div>
                     <button type="button" class="btn btn-primary site-save">Speichern</button>
+                </div>
+
+                <div class="site-pane" data-pane="live" style="display:none;">
+                    <div class="card site-card">
+                        <div class="today-title">Live-Tipps: Wetter, Veranstaltungen, Öffnungszeiten</div>
+                        <p class="text-muted" style="font-size:.85rem">Erscheinen auf dem TV-Welcome-Screen und auf „Meine Buchung“ im Tab Umgebung. Wetter kommt von Open-Meteo, Öffnungszeiten auf Wunsch aus OpenStreetMap (beides kostenlos, ohne Schlüssel). Die Daten holt der Server, die Geräte der Gäste sprechen nur mit deiner Webseite.</p>
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem"><input type="checkbox" id="live-enabled"> Live-Tipps einschalten</label>
+                        <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem">
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="live-show-tv"> Auf dem Fernseher</label>
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="live-show-app"> Auf „Meine Buchung“</label>
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="live-weather"> Wetter zeigen</label>
+                        </div>
+                        <div class="form-group" style="margin-bottom:.4rem"><label for="live-place-q">Ort <small>(für Wetter, Veranstaltungen und die Suche nach Geschäften)</small></label>
+                            <div style="display:flex;gap:.5rem;flex-wrap:wrap"><input type="text" id="live-place-q" maxlength="100" placeholder="z. B. Altena oder 58762" style="flex:1;min-width:200px"><button type="button" class="btn-mini" id="live-place-search">Ort suchen</button></div>
+                        </div>
+                        <div id="live-place-results" class="live-results"></div>
+                        <p class="text-muted" style="font-size:.85rem;margin:.3rem 0 0" id="live-place-current"></p>
+                    </div>
+
+                    <div class="card site-card">
+                        <div class="today-title">Öffnungszeiten in der Nähe</div>
+                        <p class="text-muted" style="font-size:.85rem">Bäcker, Supermarkt, Apotheke, Restaurants … Gäste sehen sofort „Geöffnet bis 18:00“ oder „Öffnet morgen 08:00“. Öffnungszeiten im OpenStreetMap-Format, z. B. <code>Mo-Fr 08:00-18:00; Sa 08:00-13:00; So,PH off</code> (PH = Feiertag). Aus OpenStreetMap übernommene Orte holen ihre Zeiten einmal am Tag neu.</p>
+                        <div class="live-osm">
+                            <select id="live-osm-radius" aria-label="Umkreis">
+                                <option value="1000">1 km</option><option value="3000" selected>3 km</option><option value="5000">5 km</option><option value="10000">10 km</option>
+                            </select>
+                            <input type="text" id="live-osm-q" maxlength="60" placeholder="Name (optional), z. B. Bäckerei">
+                            <button type="button" class="btn-mini" id="live-osm-search">In OpenStreetMap suchen</button>
+                        </div>
+                        <div id="live-osm-results" class="live-results"></div>
+                        <div class="list-editor" id="live-places"></div>
+                        <button type="button" class="btn-mini" id="live-place-add" style="align-self:flex-start">+ Ort von Hand hinzufügen</button>
+                    </div>
+
+                    <div class="card site-card">
+                        <div class="today-title">Veranstaltungen</div>
+                        <p class="text-muted" style="font-size:.85rem">Drei Quellen, die zusammen angezeigt werden: deine eigenen Einträge, Kalender-Links (iCal, z. B. vom Stadtmarketing, Verein oder Theater) und optional Ticketmaster. In „Meine Buchung“ sieht der Gast die Termine während seines Aufenthalts.</p>
+                        <div class="form-row form-row-3">
+                            <div class="form-group"><label for="live-events-days">Tage voraus <small>(Fernseher)</small></label><input type="number" id="live-events-days" min="1" max="60"></div>
+                            <div class="form-group"><label for="live-radius">Umkreis Ticketmaster <small>(km)</small></label><input type="number" id="live-radius" min="1" max="100"></div>
+                            <div class="form-group"><label for="live-tm-key">Ticketmaster-API-Schlüssel <small>(optional, kostenlos auf developer.ticketmaster.com)</small></label><input type="password" id="live-tm-key" maxlength="100" autocomplete="off"></div>
+                        </div>
+                        <label class="live-tm-clear" id="live-tm-clear-wrap" hidden><input type="checkbox" id="live-tm-clear"> Gespeicherten Schlüssel entfernen</label>
+                        <div class="form-group"><label for="live-ics">Kalender-Links <small>(einer pro Zeile, .ics oder webcal://, höchstens 5)</small></label><textarea id="live-ics" rows="3" placeholder="https://www.stadt-beispiel.de/veranstaltungen.ics"></textarea></div>
+                        <div class="form-group" style="margin-bottom:.4rem"><label>Eigene Termine</label></div>
+                        <div class="list-editor" id="live-events"></div>
+                        <button type="button" class="btn-mini" id="live-event-add" style="align-self:flex-start">+ Termin hinzufügen</button>
+                    </div>
+
+                    <div class="card site-card">
+                        <div class="today-title">Vorschau</div>
+                        <div id="live-preview" class="live-preview"><p class="text-muted" style="font-size:.85rem">Nach dem Speichern siehst du hier, was die Gäste gerade sehen.</p></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem">
+                            <button type="button" class="btn-mini" id="live-refresh">Jetzt neu abrufen</button>
+                            <a class="btn-mini" href="/welcome.html" target="_blank" rel="noopener">TV-Ansicht öffnen</a>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="live-save" style="align-self:flex-start">Speichern</button>
                 </div>
 
                 <div class="site-pane" data-pane="setup" style="display:none;">
