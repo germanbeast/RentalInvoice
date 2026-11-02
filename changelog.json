@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.41.0",
+    "currentVersion": "1.42.0",
     "releases": [
+        {
+            "version": "1.42.0",
+            "date": "2026-11-02",
+            "title": "WLAN für Gäste mit eigenem Passwort pro Buchung",
+            "features": [
+                "Neuer Bereich Webseite → WLAN: festes Passwort oder eigenes WLAN-Passwort pro Buchung über die FRITZ!Box",
+                "Mit FRITZ!Box: der Server stellt das Gast-WLAN zum Gästewechsel automatisch auf das Passwort des neuen Gastes um, zwischen zwei Gästen gilt ein Zufallspasswort (oder das Gast-WLAN geht aus)",
+                "Leicht tippbare Passwörter wie „Sonne-Wald-4827“, pro Buchung neu erzeugbar; stündliche Prüfung, Telegram-Meldung mit dem Passwort, falls die Box nicht erreichbar ist",
+                "Gäste sehen Netzwerk, Passwort und einen QR-Code zum Verbinden auf „Meine Buchung“ (ab Anreisetag), in der Anfahrts-Nachricht und auf dem Fernseher",
+                "Schritt-für-Schritt-Anleitung zur Einrichtung der FRITZ!Box und „Verbindung testen“ direkt in der Admin-Seite"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.41.0",
             "date": "2026-11-02",

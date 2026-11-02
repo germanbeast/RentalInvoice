@@ -204,6 +204,27 @@
         </div>`;
     }
 
+
+    // ---- WLAN card (own password per stay via the FRITZ!Box, or the fixed one) ----
+    function wifiCard(s) {
+        const w = s.wifi;
+        if (!w || !w.name) return '';
+        if (w.later) {
+            return `<div class="gcard gwifi"><h3>WLAN</h3><p class="gwifi-note">Ihr persönliches WLAN-Passwort erscheint hier am Anreisetag (${fmt(w.from)}) und gilt ab ${esc(w.switchTime || s.checkoutTime)} Uhr.</p></div>`;
+        }
+        const until = w.personal && w.until ? `<p class="gwifi-note">Gilt nur für Ihren Aufenthalt, ab Anreisetag ${esc(w.switchTime)} Uhr bis Abreisetag ${esc(w.switchTime)} Uhr.</p>` : '';
+        return `<div class="gcard gwifi"><h3>WLAN</h3>
+            <div class="gwifi-body">
+                ${w.qr ? `<div class="gwifi-qr" role="img" aria-label="QR-Code: mit der Handykamera scannen, um sich mit dem WLAN zu verbinden">${w.qr}</div>` : ''}
+                <dl class="guide-dl">
+                    <div><dt>Netzwerk</dt><dd>${esc(w.name)}</dd></div>
+                    ${w.password ? `<div><dt>Passwort</dt><dd><span class="mono-ish">${esc(w.password)}</span>
+                        <button type="button" class="copy-btn" data-copy="${esc(w.password)}">${COPY_ICON}<span>Kopieren</span></button></dd></div>` : ''}
+                </dl>
+            </div>
+            ${w.qr ? '<p class="gwifi-note">QR-Code mit der Handykamera scannen, dann verbindet sich das Handy von selbst.</p>' : ''}${until}</div>`;
+    }
+
     function renderStay(s) {
         const [cls, label] = STATUS[s.status] || STATUS.pending;
         if (s.status === 'gone') {
@@ -248,6 +269,7 @@
                     <p>Ihr persönlicher Türcode erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise${s.daysUntil > s.pinLater ? `, also ab ${fmt(addDays(s.checkin, -s.pinLater))}` : ''}.</p></div>`);
             }
         }
+        if (s.status === 'confirmed' && s.state !== 'past' && s.wifi && s.daysUntil <= 1) right.push(wifiCard(s));
         if (isStay(s) && s.arrival && (s.state === 'upcoming' || s.state === 'inhouse') && s.daysUntil >= 0 && s.daysUntil <= 1) {
             right.push(`<div class="gcard gcallout"><h3>${s.daysUntil === 0 ? 'Heute ist Anreise' : 'Morgen ist Anreise'}</h3>
                 <p>Route, Parken und wie Sie die Haustür öffnen, Schritt für Schritt mit Fotos.</p>
@@ -428,6 +450,7 @@
             right.push(`<div class="gcard gpin"><h3>Ihr Türcode</h3>
                 <p>Erscheint hier ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise${s.daysUntil > s.pinLater ? `, also ab ${fmt(addDays(s.checkin, -s.pinLater))}` : ''}. Am Anreisetag schicken wir ihn Ihnen auch zu.</p></div>`);
         }
+        if (s.wifi) right.push(wifiCard(s));
         if (a.steps.length) {
             right.push(`<div class="gcard arr-card"><span class="arr-kicker">Tür öffnen</span><h3>Schritt für Schritt</h3>
                 <ol class="arr-steps">${a.steps.map((st, i) => `<li><span class="arr-n">${i + 1}</span><div>${st.text ? `<p>${esc(st.text)}</p>` : ''}${photo(st.photo, `Schritt ${i + 1}`)}</div></li>`).join('')}</ol>
@@ -447,11 +470,7 @@
         const add = (title, html) => { if (html) items.push({ title, html }); };
         if (s.pin) add('Türcode', `<div class="pin" style="font-size:2.4rem">${esc(s.pin)}</div><p class="guide-fine">Gültig ab Anreisetag ${esc(s.checkinTime)} Uhr bis Abreisetag ${esc(s.checkoutTime)} Uhr.</p>`);
         else if (s.pinLater) add('Türcode', `<p>Erscheint ${s.pinLater === 1 ? 'einen Tag' : `${s.pinLater} Tage`} vor der Anreise unter „Aufenthalt“.</p>`);
-        if (s.wifi) {
-            add('WLAN', `<dl class="guide-dl"><div><dt>Netzwerk</dt><dd>${esc(s.wifi.name)}</dd></div>
-                ${s.wifi.password ? `<div><dt>Passwort</dt><dd><span class="mono-ish">${esc(s.wifi.password)}</span>
-                <button type="button" class="copy-btn" data-copy="${esc(s.wifi.password)}">${COPY_ICON}<span>Kopieren</span></button></dd></div>` : ''}</dl>`);
-        }
+        if (s.wifi) add('WLAN', wifiCard(s).replace(/^<div class="gcard gwifi"><h3>WLAN<\/h3>/, '<div class="gwifi">'));
         add('An- & Abreise', `<dl class="guide-dl"><div><dt>Anreise</dt><dd>${fmt(s.checkin)}, ab ${esc(s.checkinTime)} Uhr</dd></div>
             <div><dt>Abreise</dt><dd>${fmt(s.checkout)}, bis ${esc(s.checkoutTime)} Uhr</dd></div></dl>
             ${s.arrivalInfo ? `<div class="prose">${esc(s.arrivalInfo)}</div>` : ''}`);
