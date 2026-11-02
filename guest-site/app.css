@@ -224,3 +224,15 @@ svg.wx { width: 44px; height: 44px; stroke-width: 1.4; flex: none; }
 .gapp-menu a:hover, .gapp-menu button:hover { color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) { .gapp-hero-media img, .gapp-pane { animation: none; } .gcarousel-track { scroll-behavior: auto; } }
+
+/* ---------- Ankunft ---------- */
+.arr-kicker { display: block; font: 500 .74rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .55rem; }
+.arr-card .btn { margin-top: .4rem; }
+.arr-fig { margin: .9rem 0 0; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; background: var(--paper-2); }
+.arr-fig img { display: block; width: 100%; max-height: 420px; object-fit: cover; }
+.arr-steps { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: 1.1rem; counter-reset: none; }
+.arr-steps li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: .8rem; align-items: start; }
+.arr-steps li p { margin: .3rem 0 0; line-height: 1.55; }
+.arr-steps .arr-fig { margin-top: .6rem; }
+.arr-n { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--paper); font: 500 .95rem/1 var(--sans); }
+.arr-help { margin: 1.2rem 0 0; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .92rem; }

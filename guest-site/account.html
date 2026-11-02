@@ -87,6 +87,10 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="m9 14 2 2 4-4"/></svg>
                 <span>Aufenthalt</span>
             </button>
+            <button type="button" role="tab" data-tab="arrival" id="tab-arrival">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>
+                <span>Ankunft</span>
+            </button>
             <button type="button" role="tab" data-tab="az" id="tab-az">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3.5 5v13.5c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5z"/><path d="M12 6.5V20"/></svg>
                 <span>A – Z</span>
@@ -100,6 +104,7 @@
         <main class="gapp-main">
             <section class="gapp-pane" data-pane="stay" role="tabpanel" aria-labelledby="tab-stay"></section>
             <section class="gapp-pane" data-pane="guests" role="tabpanel" aria-labelledby="tab-guests" hidden></section>
+            <section class="gapp-pane" data-pane="arrival" role="tabpanel" aria-labelledby="tab-arrival" hidden></section>
             <section class="gapp-pane" data-pane="az" role="tabpanel" aria-labelledby="tab-az" hidden></section>
             <section class="gapp-pane" data-pane="area" role="tabpanel" aria-labelledby="tab-area" hidden></section>
         </main>

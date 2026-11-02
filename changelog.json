@@ -1,8 +1,8 @@
 {
-    "currentVersion": "1.40.0",
+    "currentVersion": "1.41.0",
     "releases": [
         {
-            "version": "1.40.0",
+            "version": "1.41.0",
             "date": "2026-11-02",
             "title": "Gutscheine für Gäste",
             "features": [
@@ -13,7 +13,21 @@
                 "Rechnungen für einen Aufenthalt mit Gutschein (Telegram-Bot, Gast-Rechnung) bekommen die Rabatt-Position automatisch",
                 "„Gutschein schenken“ direkt aus dem Kalender-Popup oder beim Gast; jeder Gutschein gilt einmal, eingelöste bleiben nachvollziehbar",
                 "Neues Recht „Gutscheine“ in der Benutzerverwaltung"
-            ]
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.40.0",
+            "date": "2026-11-02",
+            "title": "Anfahrts-Assistent am Anreisetag",
+            "features": [
+                "Neuer Bereich Webseite → Ankunft: Hinweis für die letzten Meter, Parken mit Foto, Beschreibung der Haustür mit Foto und Schritt für Schritt zum Öffnen (bis zu 10 Schritte, je mit Foto, {code} wird zum Türcode)",
+                "Am Anreisetag zur eingestellten Uhrzeit (Standard 10:00) bekommt der Gast automatisch Adresse, Routen-Link, Parkhinweis, Türcode und den Ablauf: per WhatsApp, sonst SMS (kurze Fassung), sonst E-Mail",
+                "Ohne Weg zum Gast (oft Booking.com/Airbnb) oder nach 3 Fehlversuchen kommt der fertige Text per Telegram zum Weiterleiten",
+                "„Meine Buchung“ hat den neuen Tab „Ankunft“ mit Route, Fotos und Schritten; am Vortag und Anreisetag zeigt „Aufenthalt“ einen Hinweis darauf",
+                "Vorschau, Englisch-Version und „Jetzt senden“ für jede Anreise der nächsten 30 Tage"
+            ],
+            "fixes": []
         },
         {
             "version": "1.39.0",

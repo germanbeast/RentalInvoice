@@ -810,6 +810,54 @@ function createGuestChat({ imap, mailParser, express, rateLimit, db, botLogic, g
         return id;
     }
 
+    /**
+     * Automatic message to the guest of a booking (Anfahrts-Assistent): WhatsApp if the number has it, else SMS,
+     * else e-mail (smsText: shorter text for SMS). Returns { channel, conv }. Throws with err.noChannel when there is no way to reach the guest.
+     */
+    async function sendToBooking(bookingId, text, { author, smsText } = {}) {
+        const cfg = getConfig();
+        const noChannel = msg => Object.assign(new Error(msg), { noChannel: true });
+        if (!cfg.enabled) throw noChannel('Der Gäste-Chat ist ausgeschaltet.');
+        let conv;
+        try { conv = start({ bookingId }); } catch (e) {
+            if (e.needPhone) throw noChannel('Für die Buchung ist weder Telefonnummer noch E-Mail-Adresse bekannt.');
+            throw e;
+        }
+        let c = getContact(conv);
+        const failed = [];
+        let possible = false;
+        if (c.phone || c.wa_chat) {
+            if (wa.status().ready) {
+                const has = await checkWhatsApp(conv, true);
+                if (has === 'yes') {
+                    possible = true;
+                    try { await send(conv, text, { channel: 'wa', author }); return { channel: 'wa', conv }; } catch (e) { failed.push(`WhatsApp: ${e.message}`); }
+                } else failed.push(has === 'no' ? 'Die Nummer hat kein WhatsApp' : 'WhatsApp-Prüfung nicht möglich');
+            } else failed.push('WhatsApp ist nicht verbunden');
+            if (c.phone && smsReady(cfg)) {
+                possible = true;
+                try { await send(conv, smsText || text, { channel: 'sms', author }); return { channel: 'sms', conv }; } catch (e) { failed.push(`SMS: ${e.message}`); }
+            } else if (c.phone) failed.push('SMS ist nicht eingerichtet');
+        }
+        c = getContact(conv);
+        const email = c.email || bookingEmail(bookingById(c.booking_id || bookingId));
+        if (email && mailReady(cfg)) {
+            possible = true;
+            if (!c.email) upsertContact(conv, { email });
+            try { await send(conv, text, { channel: 'mail', author }); return { channel: 'mail', conv }; } catch (e) { failed.push(`E-Mail: ${e.message}`); }
+        } else if (email) failed.push('E-Mail-Versand ist nicht eingerichtet');
+        else failed.push('keine E-Mail-Adresse bekannt');
+        const err = new Error(failed.join(' · '));
+        err.noChannel = !possible;
+        throw err;
+    }
+
+    /** What the automatic messages can use right now (for the admin). */
+    function channelStatus() {
+        const cfg = getConfig();
+        return { enabled: !!cfg.enabled, whatsapp: !!wa.status().ready, sms: smsReady(cfg), mail: mailReady(cfg) };
+    }
+
     /** Start (or reopen) a conversation for a booking or a typed number. Returns the conversation key. */
     function start({ bookingId, phone, email }) {
         let b = bookingId ? bookingById(bookingId) : null;
@@ -1108,7 +1156,7 @@ function createGuestChat({ imap, mailParser, express, rateLimit, db, botLogic, g
         });
     }
 
-    return { router, registerAdminRoutes, receiveWhatsApp, recordOwnWhatsApp, checkWhatsApp, handleTelegramReply, guestButton, start, send, setEmail, normPhone, _internal: { pickBooking, bookingsForPhone, bookingsForEmail, receive, handleMail, guestAddress, pollMail } };
+    return { router, registerAdminRoutes, receiveWhatsApp, recordOwnWhatsApp, checkWhatsApp, handleTelegramReply, guestButton, start, send, sendToBooking, channelStatus, setEmail, normPhone, _internal: { pickBooking, bookingsForPhone, bookingsForEmail, receive, handleMail, guestAddress, pollMail } };
 }
 
 module.exports = createGuestChat;
