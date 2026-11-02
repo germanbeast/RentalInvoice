@@ -2523,6 +2523,7 @@
         $$('#website-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         $$('#view-website .site-pane').forEach(p => { p.style.display = p.dataset.pane === tab ? 'flex' : 'none'; });
         if (tab === 'meldescheine') loadMeldescheine();
+        if (tab === 'live') loadLive();
     }
     $$('#website-tabs button').forEach(b => b.addEventListener('click', () => setSiteTab(b.dataset.tab)));
 
@@ -2761,6 +2762,184 @@
 
     $('#site-ical-copy').addEventListener('click', async () => {
         if (await copyText($('#site-ical-url').value)) showToast('Kalender-Link kopiert', 'success');
+    });
+
+    // ---- Live-Tipps (Wetter, Veranstaltungen, Öffnungszeiten), see local-live.js ----
+    let liveCfg = null;
+
+    function livePlaceRow(p = {}) {
+        return `<div class="list-item" data-kind="place"${p.osm ? ` data-osm="${escapeHtml(p.osm)}"` : ''}>
+            <div style="grid-column:span 2"><label>Name</label><input type="text" data-f="name" maxlength="100" value="${escapeHtml(p.name || '')}" placeholder="z. B. Bäckerei Schmidt"></div>
+            <div><label>Art</label><input type="text" data-f="kind" maxlength="40" value="${escapeHtml(p.kind || '')}" placeholder="z. B. Bäckerei"></div>
+            <div><label>Entfernung</label><input type="text" data-f="distance" maxlength="40" value="${escapeHtml(p.distance || '')}" placeholder="z. B. 400 m"></div>
+            <div class="li-wide"><label>Öffnungszeiten${p.osm ? ' <small>(aus OpenStreetMap, wird täglich aktualisiert)</small>' : ''}</label><input type="text" data-f="hours" maxlength="300" value="${escapeHtml(p.hours || '')}" placeholder="Mo-Fr 07:00-18:00; Sa 07:00-12:00; So off"></div>
+            <div class="li-wide"><label>Link <small>(optional)</small></label><input type="url" data-f="url" maxlength="500" value="${escapeHtml(p.url || '')}" placeholder="https://…"></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function liveEventRow(e = {}) {
+        return `<div class="list-item" data-kind="event">
+            <div style="grid-column:span 2"><label>Titel</label><input type="text" data-f="title" maxlength="120" value="${escapeHtml(e.title || '')}" placeholder="z. B. Weihnachtsmarkt"></div>
+            <div><label>Datum</label><input type="date" data-f="date" value="${escapeHtml(e.date || '')}"></div>
+            <div><label>bis <small>(optional)</small></label><input type="date" data-f="end" value="${escapeHtml(e.end || '')}"></div>
+            <div><label>Uhrzeit <small>(optional)</small></label><input type="time" data-f="time" value="${escapeHtml(e.time || '')}"></div>
+            <div><label>Ort</label><input type="text" data-f="place" maxlength="120" value="${escapeHtml(e.place || '')}" placeholder="z. B. Marktplatz"></div>
+            <div style="grid-column:span 2"><label>Link <small>(optional)</small></label><input type="url" data-f="url" maxlength="500" value="${escapeHtml(e.url || '')}" placeholder="https://…"></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function showLivePlace() {
+        const c = liveCfg || {};
+        $('#live-place-current').textContent = c.lat != null
+            ? `Gewählt: ${c.place || 'Ort'} (${String(c.lat).replace('.', ',')}, ${String(c.lon).replace('.', ',')})`
+            : 'Noch kein Ort gewählt: ohne Ort gibt es kein Wetter und keine Suche in OpenStreetMap.';
+    }
+
+    function fillLive(c) {
+        liveCfg = c;
+        $('#live-enabled').checked = !!c.enabled;
+        $('#live-show-tv').checked = c.show_tv !== false;
+        $('#live-show-app').checked = c.show_app !== false;
+        $('#live-weather').checked = c.weather !== false;
+        $('#live-place-q').value = c.place || '';
+        $('#live-events-days').value = c.events_days || 14;
+        $('#live-radius').value = c.radius_km || 25;
+        $('#live-tm-key').value = '';
+        $('#live-tm-key').placeholder = c.has_ticketmaster_key ? '•••••• gespeichert' : 'leer = ohne Ticketmaster';
+        $('#live-tm-clear').checked = false;
+        $('#live-tm-clear-wrap').hidden = !c.has_ticketmaster_key;
+        $('#live-ics').value = (c.ics_urls || []).join('\n');
+        $('#live-places').innerHTML = (c.places || []).map(livePlaceRow).join('');
+        $('#live-events').innerHTML = (c.events || []).map(liveEventRow).join('');
+        $('#live-place-results').innerHTML = '';
+        $('#live-osm-results').innerHTML = '';
+        showLivePlace();
+    }
+
+    const fmtLiveDate = ymd => new Date(ymd + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+
+    function renderLivePreview(p, st) {
+        const box = $('#live-preview');
+        const errs = (st && st.errors) || [];
+        const errHtml = errs.length ? `<div class="live-errors">${errs.map(e => `<div>⚠️ ${escapeHtml(e)}</div>`).join('')}</div>` : '';
+        if (!p || !p.enabled) { box.innerHTML = `<p class="text-muted" style="font-size:.85rem">Live-Tipps sind ausgeschaltet.</p>${errHtml}`; return; }
+        const w = p.weather;
+        const weather = w ? `<div><strong>${w.now.temp}°</strong> ${escapeHtml(w.now.label)} · gefühlt ${w.now.feels}° · ${w.days.slice(1, 4).map(d => `${fmtLiveDate(d.date).split(',')[0]} ${d.min}–${d.max}°`).join(' · ')}</div>`
+            : '<div class="text-muted">Kein Wetter (Ort fehlt oder Abruf fehlgeschlagen).</div>';
+        const places = p.places.length ? `<ul>${p.places.map(x => `<li><span class="live-dot ${x.open === true ? (x.soon ? 'soon' : 'open') : x.open === false ? 'closed' : ''}"></span><strong>${escapeHtml(x.name)}</strong> ${escapeHtml(x.state || x.hours || '')}${x.open == null && x.hours ? ' <small class="text-muted">(Format nicht erkannt, wird so angezeigt)</small>' : ''}</li>`).join('')}</ul>` : '<div class="text-muted">Keine Orte.</div>';
+        const events = p.events.length ? `<ul>${p.events.slice(0, 8).map(e => `<li>${fmtLiveDate(e.date)}${e.time ? ` ${escapeHtml(e.time)}` : ''} · <strong>${escapeHtml(e.title)}</strong>${e.place ? ` · ${escapeHtml(e.place)}` : ''}</li>`).join('')}</ul>${p.events.length > 8 ? `<div class="text-muted">… und ${p.events.length - 8} weitere</div>` : ''}` : '<div class="text-muted">Keine Termine in den nächsten Tagen.</div>';
+        box.innerHTML = `<div class="live-prev-sec"><div class="live-prev-h">Wetter ${escapeHtml(p.place || '')}</div>${weather}</div>
+            <div class="live-prev-sec"><div class="live-prev-h">Öffnungszeiten jetzt</div>${places}</div>
+            <div class="live-prev-sec"><div class="live-prev-h">Veranstaltungen</div>${events}</div>${errHtml}`;
+    }
+
+    async function loadLive() {
+        try {
+            const d = await apiJson('/api/site/live');
+            if (!d.success) return;
+            fillLive(d.config);
+            if (d.config.enabled) {
+                const pv = await apiJson('/api/site/live/preview');
+                if (pv.success) renderLivePreview(pv.preview, pv.status);
+            } else renderLivePreview(null, d.status);
+        } catch (e) { showToast('Live-Tipps konnten nicht geladen werden', 'error'); }
+    }
+
+    $('#live-place-search').addEventListener('click', async () => {
+        const q = $('#live-place-q').value.trim();
+        const box = $('#live-place-results');
+        if (q.length < 2) return showToast('Bitte einen Ort oder eine PLZ eingeben', 'error');
+        box.innerHTML = '<div class="text-muted">Suche …</div>';
+        try {
+            const d = await apiJson(`/api/site/live/geocode?q=${encodeURIComponent(q)}`);
+            if (!d.success) { box.innerHTML = `<div class="text-muted">${escapeHtml(d.error || 'Suche fehlgeschlagen')}</div>`; return; }
+            if (!d.results.length) { box.innerHTML = '<div class="text-muted">Nichts gefunden. Versuch es mit dem Ortsnamen ohne Straße.</div>'; return; }
+            box.innerHTML = d.results.map((r, i) => `<button type="button" class="live-result" data-i="${i}"><strong>${escapeHtml(r.name)}</strong> <span>${escapeHtml([r.postcode, r.region].filter(Boolean).join(' · '))}</span></button>`).join('');
+            box.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => {
+                const r = d.results[+b.dataset.i];
+                liveCfg = { ...(liveCfg || {}), place: r.name, lat: r.lat, lon: r.lon };
+                $('#live-place-q').value = r.name;
+                box.innerHTML = '';
+                showLivePlace();
+                showToast('Ort übernommen – bitte speichern', 'success');
+            }));
+        } catch (e) { box.innerHTML = '<div class="text-muted">Suche fehlgeschlagen</div>'; }
+    });
+    $('#live-place-q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#live-place-search').click(); } });
+
+    $('#live-osm-search').addEventListener('click', async () => {
+        const box = $('#live-osm-results');
+        if (!liveCfg || liveCfg.lat == null) return showToast('Bitte zuerst oben den Ort wählen und speichern', 'error');
+        box.innerHTML = '<div class="text-muted">Suche in OpenStreetMap … (kann bis zu 30 Sekunden dauern)</div>';
+        try {
+            const d = await apiJson(`/api/site/live/osm?radius=${encodeURIComponent($('#live-osm-radius').value)}&q=${encodeURIComponent($('#live-osm-q').value.trim())}`);
+            if (!d.success) { box.innerHTML = `<div class="text-muted">${escapeHtml(d.error || 'Suche fehlgeschlagen')}</div>`; return; }
+            const have = new Set(Array.from($$('#live-places .list-item')).map(el => el.dataset.osm).filter(Boolean));
+            if (!d.places.length) { box.innerHTML = '<div class="text-muted">Keine Orte mit Öffnungszeiten gefunden. Größeren Umkreis probieren oder von Hand eintragen.</div>'; return; }
+            box.innerHTML = `<div class="text-muted" style="font-size:.8rem;margin-bottom:4px">${d.places.length} Orte mit Öffnungszeiten. Klick übernimmt den Ort in die Liste.</div>` +
+                d.places.map((p, i) => `<button type="button" class="live-result" data-i="${i}"${have.has(p.osm) ? ' disabled' : ''}><strong>${escapeHtml(p.name)}</strong> <span>${escapeHtml([p.kind, p.distance].filter(Boolean).join(' · '))}</span><small>${escapeHtml(p.hours)}${p.readable ? '' : ' (Format nicht erkannt)'}</small></button>`).join('');
+            box.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => {
+                const p = d.places[+b.dataset.i];
+                $('#live-places').insertAdjacentHTML('beforeend', livePlaceRow(p));
+                b.disabled = true;
+            }));
+        } catch (e) { box.innerHTML = '<div class="text-muted">Suche fehlgeschlagen</div>'; }
+    });
+
+    $('#live-place-add').addEventListener('click', () => {
+        $('#live-places').insertAdjacentHTML('beforeend', livePlaceRow());
+        $('#live-places').lastElementChild.querySelector('input').focus();
+    });
+    $('#live-event-add').addEventListener('click', () => {
+        $('#live-events').insertAdjacentHTML('beforeend', liveEventRow());
+        $('#live-events').lastElementChild.querySelector('input').focus();
+    });
+    ['#live-places', '#live-events'].forEach(sel => $(sel).addEventListener('click', e => {
+        const btn = e.target.closest('[data-li]');
+        if (!btn) return;
+        const item = btn.closest('.list-item');
+        if (btn.dataset.li === 'del') item.remove();
+        else if (item.previousElementSibling) item.parentNode.insertBefore(item, item.previousElementSibling);
+    }));
+
+    $('#live-save').addEventListener('click', async () => {
+        const rows = sel => Array.from($$(`${sel} .list-item`)).map(item => {
+            const o = {};
+            item.querySelectorAll('[data-f]').forEach(el => { o[el.dataset.f] = el.value; });
+            if (item.dataset.osm) o.osm = item.dataset.osm;
+            return o;
+        });
+        const c = liveCfg || {};
+        const live = {
+            enabled: $('#live-enabled').checked, show_tv: $('#live-show-tv').checked, show_app: $('#live-show-app').checked,
+            weather: $('#live-weather').checked,
+            place: c.lat != null ? (c.place || $('#live-place-q').value.trim()) : $('#live-place-q').value.trim(), lat: c.lat, lon: c.lon,
+            events_days: $('#live-events-days').value, radius_km: $('#live-radius').value,
+            ics_urls: $('#live-ics').value.split(/\s+/).filter(Boolean),
+            ticketmaster_key: $('#live-tm-key').value, ticketmaster_key_clear: $('#live-tm-clear').checked,
+            places: rows('#live-places'), events: rows('#live-events')
+        };
+        try {
+            const d = await apiJson('/api/site/live', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ live }) });
+            if (!d.success) return showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+            showToast('Live-Tipps gespeichert', 'success');
+            loadLive();
+        } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
+    });
+
+    $('#live-refresh').addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try {
+            const d = await apiJson('/api/site/live/refresh', { method: 'POST' });
+            if (d.success) {
+                renderLivePreview(d.preview, d.status);
+                if (d.hours && d.hours.updated) { showToast(`${d.hours.updated} Öffnungszeit(en) aktualisiert`, 'success'); const c = await apiJson('/api/site/live'); if (c.success) fillLive(c.config); }
+            }
+        } catch (x) { showToast('Abruf fehlgeschlagen', 'error'); }
+        btn.disabled = false;
     });
 
     async function loadSiteRequests() {

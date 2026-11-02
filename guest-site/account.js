@@ -82,6 +82,8 @@
     const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg>';
 
     let me = null;       // booking status
+    let live = null;     // Live-Tipps: weather, opening hours, events (api/live)
+    let liveFor = '';
     let ms = null;       // Meldeschein state
     let msEditing = false;
     let newCodeShown = null;
@@ -93,7 +95,7 @@
         const t = ['stay'];
         if (isStay(s) && s.state !== 'past') t.unshift('guests');
         if (s.status === 'confirmed' && s.state !== 'past') t.push('az');
-        if (info && (info.tips.length || info.address || info.directions || info.location)) t.push('area');
+        if ((info && (info.tips.length || info.address || info.directions || info.location)) || liveHas()) t.push('area');
         return t;
     };
 
@@ -124,6 +126,21 @@
             if (m && m.success && m.enabled) ms = m;
         }
         renderApp();
+        loadLive(me);
+    }
+
+    // Live-Tipps load after the app is shown; only the Umgebung tab is redrawn (forms elsewhere keep their input)
+    const liveHas = () => !!(live && (live.weather || live.places.length || live.events.length));
+    async function loadLive(s) {
+        const q = s && s.checkin && s.checkout && s.state !== 'past' ? `&from=${encodeURIComponent(s.checkin)}&to=${encodeURIComponent(s.checkout)}` : '';
+        liveFor = q;
+        const d = await api(`live?for=app${q}`).catch(() => null);
+        if (liveFor !== q) return;
+        live = d && d.success && d.enabled ? d : null;
+        if (!me || !document.body.classList.contains('signed-in')) return;
+        const avail = tabsFor(me);
+        $$('#app-tabs [data-tab]').forEach(b => { b.hidden = !avail.includes(b.dataset.tab); });
+        $('[data-pane="area"]').innerHTML = avail.includes('area') ? renderArea(me) : '';
     }
 
     function stateLine(s) {
@@ -413,17 +430,54 @@
     }
 
     // ---- Umgebung ---------------------------------------------------------
-    function renderArea() {
+    const wxIcon = k => (window.liveWeatherIcon ? window.liveWeatherIcon(k, 'wx') : '');
+    const dayName = (ymd, today) => ymd === today ? 'Heute' : ymd === addDays(today, 1) ? 'Morgen'
+        : new Date(ymd + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
+
+    function liveHtml(s) {
+        if (!liveHas()) return '';
+        const out = [];
+        const w = live.weather;
+        if (w) {
+            const t = w.days[0];
+            out.push(`<div class="gcard live-wx"><span class="dist">Wetter${live.place ? ` in ${esc(live.place)}` : ''} · jetzt</span>
+                <div class="wx-now">${wxIcon(w.now.icon)}<div><strong>${esc(w.now.temp)}°</strong><span>${esc(w.now.label)}</span></div></div>
+                <p class="wx-line">Heute ${esc(t.min)}° bis ${esc(t.max)}°${t.rain != null ? ` · Regenrisiko ${esc(t.rain)} %` : ''}${w.now.wind != null ? ` · Wind ${esc(w.now.wind)} km/h` : ''}${t.sunset ? ` · Sonnenuntergang ${esc(t.sunset)}` : ''}</p>
+                <div class="wx-days">${w.days.slice(1, 5).map(x => `<div><span>${esc(dayName(x.date, live.today))}</span>${wxIcon(x.icon)}<b>${esc(x.max)}°</b> <small>${esc(x.min)}°</small>${x.rain >= 30 ? `<em>${esc(x.rain)} %</em>` : ''}</div>`).join('')}</div></div>`);
+        }
+        if (live.places.length) {
+            out.push(`<div class="gcard live-places"><span class="dist">Öffnungszeiten · jetzt</span><h3>Einkaufen &amp; Essen</h3>
+                <ul>${live.places.map(p => {
+                    const cls = p.open === true ? (p.soon ? 'soon' : 'open') : p.open === false ? 'closed' : '';
+                    const meta = [p.kind, p.distance].filter(Boolean).map(esc).join(' · ');
+                    const week = p.week ? `<details><summary>Alle Zeiten</summary><dl>${p.week.map(d => `<dt>${esc(d.day)}</dt><dd>${esc(d.hours)}</dd>`).join('')}</dl></details>` : '';
+                    return `<li><div class="lp-head"><strong>${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>` : esc(p.name)}</strong>${meta ? `<small>${meta}</small>` : ''}</div>
+                        <div class="lp-state ${cls}"><i></i>${esc(p.state || p.hours || '')}${p.today && p.open !== null ? `<small>Heute ${esc(p.today)}</small>` : ''}</div>${week}</li>`;
+                }).join('')}</ul></div>`);
+        }
+        const during = s && s.status === 'confirmed' && s.state !== 'past' && live.range && live.range.to === s.checkout;
+        out.push(`<div class="gcard live-events"><span class="dist">${during ? 'Während Ihres Aufenthalts' : 'In den nächsten Tagen'}</span><h3>Veranstaltungen</h3>
+            ${live.events.length ? `<ul>${live.events.map(e => {
+                const ongoing = e.end && e.date < live.today;
+                const when = ongoing ? `bis ${fmtShort(e.end)}` : `${dayName(e.date, live.today)}${e.date !== live.today && e.date !== addDays(live.today, 1) ? `, ${fmtShort(e.date)}` : ''}${e.end ? ` – ${fmtShort(e.end)}` : ''}${e.time ? ` · ${esc(e.time)} Uhr` : ''}`;
+                return `<li><span class="ev-when">${esc(when)}</span><strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title)}</strong>${e.place ? `<small>${esc(e.place)}</small>` : ''}</li>`;
+            }).join('')}</ul>` : '<p class="area-empty">Uns sind für diese Tage keine Veranstaltungen bekannt. Fragen Sie uns gerne nach Tipps.</p>'}</div>`);
+        return `<div class="live-grid">${out.join('')}</div>`;
+    }
+
+    function renderArea(s) {
         const cards = [];
-        if (info.address || info.directions) {
+        if (info && (info.address || info.directions)) {
             cards.push(`<div class="gcard tip"><span class="dist">So finden Sie uns</span><h3>Anfahrt</h3>
                 ${info.address ? `<p class="prose">${esc(info.address)}</p>` : ''}${info.directions ? `<p class="prose">${esc(info.directions)}</p>` : ''}
                 ${info.address ? `<a class="text-link" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(info.address)}" target="_blank" rel="noopener">Route planen</a>` : ''}</div>`);
         }
-        info.tips.forEach(t => cards.push(`<div class="gcard tip">${t.distance ? `<span class="dist">${esc(t.distance)}</span>` : ''}<h3>${esc(t.name)}</h3>
+        (info ? info.tips : []).forEach(t => cards.push(`<div class="gcard tip">${t.distance ? `<span class="dist">${esc(t.distance)}</span>` : ''}<h3>${esc(t.name)}</h3>
             ${t.text ? `<p class="prose">${esc(t.text)}</p>` : ''}${t.url ? `<a class="text-link" href="${esc(t.url)}" target="_blank" rel="noopener">Mehr erfahren</a>` : ''}</div>`));
-        return `<div class="gapp-pane-head"><h2>Umgebung &amp; Highlights</h2>${info.location ? `<p class="prose">${esc(info.location)}</p>` : '<p>Unsere Tipps für Ausflüge und den Alltag vor Ort.</p>'}</div>
-            ${cards.length ? `<div class="area-grid">${cards.join('')}</div>` : '<p class="area-empty">Unsere Tipps folgen in Kürze.</p>'}`;
+        const lv = liveHtml(s);
+        return `<div class="gapp-pane-head"><h2>Umgebung &amp; Highlights</h2>${info && info.location ? `<p class="prose">${esc(info.location)}</p>` : '<p>Unsere Tipps für Ausflüge und den Alltag vor Ort.</p>'}</div>
+            ${lv}${lv && cards.length ? '<h3 class="area-sub">Unsere Ausflugstipps</h3>' : ''}
+            ${cards.length ? `<div class="area-grid">${cards.join('')}</div>` : lv ? '' : '<p class="area-empty">Unsere Tipps folgen in Kürze.</p>'}`;
     }
 
     const WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2A9.8 9.8 0 0 0 3.6 17l-1.4 4.8 5-1.3A9.8 9.8 0 1 0 12 2.2zm0 17.9a8.1 8.1 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.1 8.1 0 1 1 12 20.1zm4.5-6c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.4-.3z"/></svg>';

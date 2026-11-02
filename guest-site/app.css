@@ -147,6 +147,54 @@ body.signed-in { background: var(--paper); }
 .tip .text-link { font-size: .92rem; }
 .area-empty { color: var(--muted); }
 
+/* ---------- Live-Tipps: Wetter, Öffnungszeiten, Veranstaltungen ---------- */
+.live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 14px; margin-bottom: clamp(24px, 4vw, 40px); align-items: start; }
+@media (min-width: 900px) { .live-grid { gap: 20px; } }
+.live-grid .dist { display: inline-block; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .6rem; }
+.live-grid h3 { font-size: 1.5rem; margin-bottom: .8rem; }
+.live-grid ul { list-style: none; margin: 0; padding: 0; }
+.live-grid li { padding: .75rem 0; border-top: 1px solid var(--line); min-width: 0; }
+.live-grid li:first-child { border-top: 0; padding-top: 0; }
+.live-grid li:last-child { padding-bottom: 0; }
+.live-grid a { text-decoration: none; }
+.live-grid a:hover { color: var(--accent); }
+svg.wx { width: 44px; height: 44px; stroke-width: 1.4; flex: none; }
+.live-wx { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.live-wx .dist { color: color-mix(in srgb, var(--accent-soft) 85%, transparent); }
+.wx-now { display: flex; align-items: center; gap: 1rem; }
+.wx-now svg.wx { width: 64px; height: 64px; }
+.wx-now strong { display: block; font: 400 clamp(3.2rem, 8vw, 4.2rem)/1 var(--serif); }
+.wx-now span { display: block; color: color-mix(in srgb, var(--paper) 78%, transparent); margin-top: .2rem; }
+.wx-line { margin: .9rem 0 0; font-size: .92rem; color: color-mix(in srgb, var(--paper) 70%, transparent); }
+.wx-days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1.1rem; border-top: 1px solid color-mix(in srgb, var(--paper) 16%, transparent); }
+.wx-days > div { padding-top: .9rem; text-align: center; font-variant-numeric: tabular-nums; }
+.wx-days > div + div { border-left: 1px solid color-mix(in srgb, var(--paper) 16%, transparent); }
+.wx-days span { display: block; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--paper) 60%, transparent); }
+.wx-days svg.wx { width: 30px; height: 30px; margin: .35rem auto .2rem; display: block; }
+.wx-days small { color: color-mix(in srgb, var(--paper) 60%, transparent); }
+.wx-days em { display: block; font-style: normal; font-size: .75rem; color: var(--accent-soft); }
+.lp-head { display: flex; justify-content: space-between; align-items: baseline; gap: .2rem .8rem; flex-wrap: wrap; }
+.lp-head strong { font: 400 1.25rem/1.2 var(--serif); }
+.lp-head small, .live-events small { color: var(--muted); font-size: .82rem; }
+.lp-state { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 .5rem; margin-top: .2rem; font-size: .92rem; color: var(--ink-soft); }
+.lp-state i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; align-self: center; }
+.lp-state.open i { background: var(--ok); }
+.lp-state.soon i { background: #c08a2e; }
+.lp-state.closed i { background: var(--bad); }
+.lp-state.open { color: var(--ok); }
+.lp-state.closed { color: var(--bad); }
+.lp-state small { color: var(--muted); font-size: .82rem; }
+.live-places details { margin-top: .35rem; font-size: .86rem; }
+.live-places summary { cursor: pointer; color: var(--muted); width: max-content; }
+.live-places summary:hover { color: var(--accent); }
+.live-places dl { display: grid; grid-template-columns: 2.4rem 1fr; gap: .1rem .4rem; margin: .4rem 0 0; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.live-places dt { color: var(--muted); }
+.live-places dd { margin: 0; }
+.live-events li { display: grid; gap: .1rem; }
+.ev-when { font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.live-events strong { font: 400 1.25rem/1.2 var(--serif); }
+.area-sub { font-size: clamp(1.6rem, 3.4vw, 2rem); margin: 0 0 1rem; }
+
 /* ---------- Meldeschein ---------- */
 .ms-form fieldset { border: 0; padding: 0; margin: 0 0 1.4rem; min-width: 0; }
 .ms-form legend { padding: 0; margin-bottom: .9rem; font: 400 1.45rem/1.2 var(--serif); }
