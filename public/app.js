@@ -2524,6 +2524,7 @@
         $$('#view-website .site-pane').forEach(p => { p.style.display = p.dataset.pane === tab ? 'flex' : 'none'; });
         if (tab === 'meldescheine') loadMeldescheine();
         if (tab === 'live') loadLive();
+        if (tab === 'arrival') loadArrival();
     }
     $$('#website-tabs button').forEach(b => b.addEventListener('click', () => setSiteTab(b.dataset.tab)));
 
@@ -2940,6 +2941,189 @@
             }
         } catch (x) { showToast('Abruf fehlgeschlagen', 'error'); }
         btn.disabled = false;
+    });
+
+    // ---- Anfahrts-Assistent (Webseite → Ankunft) ----------------------------
+    let arrCfg = null;
+    const ARR_CH = { wa: 'WhatsApp', sms: 'SMS', mail: 'E-Mail', telegram: 'Telegram (von Hand weitergeleitet)' };
+    const arrPhotoUrl = f => `/api/site/arrival/photo/${encodeURIComponent(f)}`;
+
+    function arrSlotHtml(file, label = 'Foto') {
+        return file
+            ? `<div class="site-photo" data-file="${escapeHtml(file)}"><img src="${arrPhotoUrl(file)}" alt=""><div class="site-photo-actions"><span></span><button type="button" class="btn-mini" data-arr="del-photo" title="Foto entfernen">✕</button></div></div>`
+            : `<label class="btn-mini" style="display:inline-block">+ ${label}<input type="file" accept="image/jpeg,image/png,image/webp" data-arr="upload" hidden></label>`;
+    }
+
+    function arrFillSlot(slot, file) {
+        slot.dataset.file = file || '';
+        slot.innerHTML = arrSlotHtml(file, slot.dataset.label || 'Foto');
+    }
+
+    function arrStepRow(st = {}) {
+        return `<div class="list-item arr-step">
+            <span class="arr-num"></span>
+            <div><textarea data-f="text" rows="2" maxlength="500" placeholder="z. B. Türcode eingeben: {code}">${escapeHtml(st.text || '')}</textarea></div>
+            <span></span>
+            <div class="arr-photo-slot" data-label="Foto zum Schritt"></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function arrNumber() {
+        $$('#arr-steps .arr-step').forEach((el, i) => { el.querySelector('.arr-num').textContent = i + 1; });
+        $('#arr-step-add').disabled = $$('#arr-steps .arr-step').length >= 10;
+    }
+
+    function arrAddStep(st) {
+        $('#arr-steps').insertAdjacentHTML('beforeend', arrStepRow(st));
+        arrFillSlot($('#arr-steps').lastElementChild.querySelector('.arr-photo-slot'), st && st.photo);
+        arrNumber();
+    }
+
+    function fillArrival(d) {
+        const c = d.config;
+        arrCfg = c;
+        $('#arr-auto').checked = !!c.auto_send;
+        $('#arr-time').value = c.send_time || '10:00';
+        $('#arr-notify').checked = c.notify_host !== false;
+        $('#arr-route-note').value = c.route_note || '';
+        $('#arr-parking').value = c.parking || '';
+        $('#arr-parking').placeholder = d.site.parking || 'z. B. Stellplatz Nr. 3 im Hof, kostenlos';
+        $('#arr-parking-hint').textContent = d.site.parking ? '(leer = Text aus der Gästemappe)' : '';
+        $('#arr-door').value = c.door_text || '';
+        $('#arr-address-hint').innerHTML = d.site.address
+            ? `Route führt zu <b>${escapeHtml(d.site.address)}</b> (Google Maps). Ändern unter Inhalte → Lage &amp; Umgebung.`
+            : 'Noch keine Adresse: unter Inhalte → Lage &amp; Umgebung eintragen, dann bekommt der Gast einen Routen-Link.';
+        const slots = $$('#view-website [data-pane="arrival"] > .card .arr-photo-slot[data-slot]');
+        slots.forEach(sl => { sl.dataset.label = sl.dataset.slot === 'door_photo' ? 'Foto der Haustür' : 'Foto vom Parkplatz'; arrFillSlot(sl, c[sl.dataset.slot]); });
+        $('#arr-steps').innerHTML = '';
+        (c.steps || []).forEach(arrAddStep);
+        arrNumber();
+        const ch = d.channels || {};
+        const ways = [ch.whatsapp ? 'WhatsApp verbunden' : 'WhatsApp nicht verbunden', ch.sms ? 'SMS eingerichtet' : 'SMS nicht eingerichtet', ch.mail ? 'E-Mail eingerichtet' : 'E-Mail nicht eingerichtet'];
+        $('#arr-channels').textContent = ch.enabled === false
+            ? 'Der Gäste-Chat ist ausgeschaltet: du bekommst die Nachricht immer per Telegram zum Weiterleiten.'
+            : `Stand jetzt: ${ways.join(' · ')}.${d.site.public_url ? '' : ' Ohne öffentliche Adresse der Webseite (Einrichtung) fehlt der Link zu den Fotos.'}`;
+        renderArrUpcoming(d.upcoming, d.today);
+    }
+
+    function renderArrUpcoming(list, today) {
+        const box = $('#arr-upcoming');
+        if (!list || !list.length) { box.innerHTML = '<div class="text-muted" style="font-size:.85rem">Keine Anreisen in den nächsten 30 Tagen.</div>'; return; }
+        box.innerHTML = list.map(b => {
+            let st = '', cls = '';
+            if (b.sentAt) { st = `Gesendet per ${ARR_CH[b.channel] || b.channel}, ${new Date(b.sentAt.replace(' ', 'T') + 'Z').toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`; cls = 'ok'; }
+            else if (b.error) { st = `Nicht gesendet: ${b.error}`; cls = 'bad'; }
+            else if (b.checkin === today) st = arrCfg && arrCfg.auto_send ? `Heute, wird um ${arrCfg.send_time} gesendet` : 'Heute, automatisches Senden ist aus';
+            else st = arrCfg && arrCfg.auto_send ? `Wird am ${fmtDEfull(b.checkin)} um ${arrCfg.send_time} gesendet` : 'Automatisches Senden ist aus';
+            if (!b.hasPin) st += ' · kein Türcode';
+            return `<div class="arr-row" data-id="${b.id}">
+                <div class="arr-who"><strong>${escapeHtml(b.name || 'Gast')} · ${weekdayDE(b.checkin)} ${fmtDEfull(b.checkin)}</strong><span class="arr-state ${cls}">${escapeHtml(b.source || '')}${b.source ? ' · ' : ''}${escapeHtml(st)}</span></div>
+                <div class="arr-actions"><button type="button" class="btn-mini" data-arr="preview">Vorschau</button><button type="button" class="btn-mini" data-arr="send">${b.sentAt ? 'Erneut senden' : 'Jetzt senden'}</button></div>
+            </div>`;
+        }).join('');
+    }
+
+    async function loadArrival() {
+        try {
+            const d = await apiJson('/api/site/arrival');
+            if (d.success) fillArrival(d);
+        } catch (e) { showToast('Ankunft konnte nicht geladen werden', 'error'); }
+    }
+
+    function arrCollect() {
+        const slot = name => ($(`#view-website .arr-photo-slot[data-slot="${name}"]`).dataset.file || '');
+        return {
+            auto_send: $('#arr-auto').checked, send_time: $('#arr-time').value, notify_host: $('#arr-notify').checked,
+            route_note: $('#arr-route-note').value, parking: $('#arr-parking').value, door_text: $('#arr-door').value,
+            parking_photo: slot('parking_photo'), door_photo: slot('door_photo'),
+            steps: Array.from($$('#arr-steps .arr-step')).map(el => ({ text: el.querySelector('[data-f="text"]').value, photo: el.querySelector('.arr-photo-slot').dataset.file || '' }))
+        };
+    }
+
+    $('#view-website [data-pane="arrival"]').addEventListener('change', async e => {
+        const input = e.target.closest('[data-arr="upload"]');
+        if (!input) return;
+        const file = input.files && input.files[0];
+        const slot = input.closest('.arr-photo-slot');
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('photo', file);
+        try {
+            const d = await apiJson('/api/site/arrival/photo', { method: 'POST', body: fd });
+            if (d.success) { arrFillSlot(slot, d.file); showToast('Foto hochgeladen – bitte speichern', 'success'); }
+            else showToast(d.error || 'Upload fehlgeschlagen', 'error');
+        } catch (x) { showToast('Upload fehlgeschlagen', 'error'); }
+    });
+
+    $('#view-website [data-pane="arrival"]').addEventListener('click', async e => {
+        const del = e.target.closest('[data-arr="del-photo"]');
+        if (del) { arrFillSlot(del.closest('.arr-photo-slot'), ''); return; }
+        const li = e.target.closest('#arr-steps [data-li]');
+        if (li) {
+            const item = li.closest('.list-item');
+            if (li.dataset.li === 'del') item.remove();
+            else if (item.previousElementSibling) item.parentNode.insertBefore(item, item.previousElementSibling);
+            arrNumber();
+            return;
+        }
+        const act = e.target.closest('.arr-row [data-arr]');
+        if (!act) return;
+        const id = act.closest('.arr-row').dataset.id;
+        const box = $('#arr-preview');
+        if (act.dataset.arr === 'preview') {
+            const d = await apiJson(`/api/site/arrival/preview/${id}`);
+            if (!d.success) return showToast(d.error || 'Vorschau fehlgeschlagen', 'error');
+            box.hidden = false;
+            box.innerHTML = `<pre>${escapeHtml(d.text)}</pre>${d.warnings.map(w => `<p class="arr-warn">⚠️ ${escapeHtml(w)}</p>`).join('')}
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem"><button type="button" class="btn-mini" id="arr-copy">Text kopieren</button>
+                <button type="button" class="btn-mini" id="arr-lang">${d.lang === 'en' ? 'Auf Deutsch' : 'Auf Englisch'}</button></div>`;
+            $('#arr-copy').onclick = () => navigator.clipboard.writeText(d.text).then(() => showToast('Kopiert', 'success'), () => showToast('Kopieren nicht möglich', 'error'));
+            $('#arr-lang').onclick = async () => {
+                const x = await apiJson(`/api/site/arrival/preview/${id}?lang=${d.lang === 'en' ? 'de' : 'en'}`);
+                if (x.success) { d.text = x.text; d.lang = x.lang; box.querySelector('pre').textContent = x.text; $('#arr-lang').textContent = x.lang === 'en' ? 'Auf Deutsch' : 'Auf Englisch'; }
+            };
+            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
+        if (act.dataset.arr === 'send') {
+            if (!confirm('Anfahrts-Infos jetzt an den Gast senden?')) return;
+            act.disabled = true;
+            let d = await apiJson(`/api/site/arrival/send/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            if (!d.success && d.noChannel && confirm(`${d.error}\n\nStattdessen den Text per Telegram an dich schicken, damit du ihn über Booking.com oder Airbnb weiterleitest?`)) {
+                d = await apiJson(`/api/site/arrival/send/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ telegram: true }) });
+            }
+            if (d.success) showToast(`Gesendet per ${d.channelName}`, 'success');
+            else showToast(d.error || 'Senden fehlgeschlagen', 'error', 7000);
+            if (d.upcoming) renderArrUpcoming(d.upcoming, (await apiJson('/api/site/arrival')).today);
+            act.disabled = false;
+        }
+    });
+
+    $('#arr-step-add').addEventListener('click', () => {
+        arrAddStep({});
+        $('#arr-steps').lastElementChild.querySelector('textarea').focus();
+    });
+    $('#arr-step-sample').addEventListener('click', () => {
+        if ($$('#arr-steps .arr-step').length && !confirm('Die vorhandenen Schritte durch das Beispiel ersetzen?')) return;
+        $('#arr-steps').innerHTML = '';
+        [
+            'Einmal auf das Tastenfeld tippen, damit es aufleuchtet.',
+            'Türcode eingeben: {code}',
+            'Mit der Taste mit dem Nuki-Symbol (unten rechts) bestätigen.',
+            'Kurz warten, bis das Schloss summt und die Tür entriegelt (ca. 3 Sekunden), dann die Tür aufdrücken.',
+            'Beim Gehen die Tür einfach zuziehen, sie schließt von selbst ab.'
+        ].forEach(text => arrAddStep({ text }));
+        showToast('Beispiel eingesetzt – bitte anpassen und speichern', 'success');
+    });
+
+    $('#arr-save').addEventListener('click', async () => {
+        try {
+            const d = await apiJson('/api/site/arrival', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arrival: arrCollect() }) });
+            if (!d.success) return showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+            fillArrival(d);
+            showToast('Ankunft gespeichert', 'success');
+        } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
     });
 
     async function loadSiteRequests() {

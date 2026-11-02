@@ -1247,6 +1247,7 @@ app.use('/styles.css', express.static(path.join(PUBLIC_DIR, 'styles.css')));
 app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
 
 let guestChat = null; // created below, the guest pages ask it for the WhatsApp button
+let arrivalGuide = null; // created below, "Meine Buchung" asks it for the tab Ankunft
 // Public guest website (description, availability, booking requests, guest login + status)
 const guestPortal = require('./guest-portal')({
     express, rateLimit, db, nodemailer, multer,
@@ -1256,6 +1257,7 @@ const guestPortal = require('./guest-portal')({
         db.logNotification(type, msg, sent ? 'sent' : 'failed');
     },
     chatButton: (booking) => guestChat ? guestChat.guestButton(booking) : null,
+    arrivalFor: (booking, pin) => arrivalGuide ? arrivalGuide.guestView(booking, pin) : null,
     createNukiPin: (arrival, departure, name) => createNukiPin(arrival, departure, name),
     deleteNukiPin: (authId) => deleteNukiPin(authId),
     berlinToday: () => berlinToday(),
@@ -1359,7 +1361,20 @@ app.use((req, res, next) => {
 });
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
+// Anfahrts-Assistent: route, parking, door code and how to open the house door on the arrival day (see arrival-guide.js)
+arrivalGuide = require('./arrival-guide')({
+    express, rateLimit, db, multer, push, guestMessage, emergencyDoor, guestChat,
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortal.getSite(),
+    guestBooking: (sess) => guestPortal.guestBooking(sess),
+    telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
+    berlinToday: () => berlinToday(),
+    formatDateDE: (d) => formatDateDE(d)
+});
+arrivalGuide.startScheduler();
+
 app.use('/gast', guestChat.router);
+app.use('/gast', arrivalGuide.router);
 app.use('/gast', guestMessage.router);
 app.use('/gast', meldeschein.router);
 app.use('/gast', emergencyDoor.router);
@@ -1777,6 +1792,7 @@ guestChat.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
 meldeschein.registerAdminRoutes(app, apiLimiter);
 localLive.registerAdminRoutes(app, apiLimiter);
+arrivalGuide.registerAdminRoutes(app, apiLimiter);
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {

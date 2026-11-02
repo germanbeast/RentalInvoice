@@ -539,6 +539,7 @@
                         <button type="button" data-tab="requests" class="active">Anfragen</button>
                         <button type="button" data-tab="meldescheine">Meldescheine</button>
                         <button type="button" data-tab="content">Inhalte</button>
+                        <button type="button" data-tab="arrival">Ankunft</button>
                         <button type="button" data-tab="live">Live-Tipps</button>
                         <button type="button" data-tab="setup">Einrichtung</button>
                     </div>
@@ -649,6 +650,44 @@
                         <div class="form-group"><label for="site-privacy">Datenschutzerklärung</label><textarea id="site-privacy" rows="6"></textarea></div>
                     </div>
                     <button type="button" class="btn btn-primary site-save">Speichern</button>
+                </div>
+
+                <div class="site-pane" data-pane="arrival" style="display:none;">
+                    <div class="card site-card">
+                        <div class="today-title">Anfahrts-Assistent</div>
+                        <p class="text-muted" style="font-size:.85rem">Am Anreisetag bekommt der Gast automatisch Route, Parkhinweis, Türcode und den Ablauf zum Öffnen der Haustür. Gesendet wird über den Gäste-Chat: WhatsApp, wenn die Nummer WhatsApp hat, sonst SMS, sonst E-Mail. Kennen wir keinen Weg zum Gast (oft bei Booking.com und Airbnb), bekommst du den fertigen Text per Telegram zum Weiterleiten. Auf „Meine Buchung“ steht alles mit Fotos im Tab „Ankunft“.</p>
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem"><input type="checkbox" id="arr-auto"> Am Anreisetag automatisch senden</label>
+                        <div class="form-row">
+                            <div class="form-group"><label for="arr-time">Uhrzeit <small>(Türcodes gelten ab 11:00)</small></label><input type="time" id="arr-time"></div>
+                            <div class="form-group" style="align-self:end"><label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="arr-notify"> Mir per Telegram Bescheid geben, wenn gesendet</label></div>
+                        </div>
+                        <p class="text-muted" style="font-size:.82rem;margin:0" id="arr-channels"></p>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Anfahrt &amp; Parken</div>
+                        <p class="text-muted" style="font-size:.85rem;margin-top:0" id="arr-address-hint"></p>
+                        <div class="form-group"><label for="arr-route-note">Hinweis für die letzten Meter <small>(optional)</small></label><textarea id="arr-route-note" rows="2" maxlength="1000" placeholder="z. B. Im Navi „Musterstraße 1“ eingeben, die Einfahrt ist direkt hinter der Bäckerei."></textarea></div>
+                        <div class="form-group"><label for="arr-parking">Parken <small id="arr-parking-hint"></small></label><textarea id="arr-parking" rows="2" maxlength="1000"></textarea></div>
+                        <div class="arr-photo-slot" data-slot="parking_photo"></div>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Haustür</div>
+                        <div class="form-group"><label for="arr-door">Beschreibung <small>(wo ist die Tür, wo das Tastenfeld)</small></label><textarea id="arr-door" rows="3" maxlength="1500" placeholder="z. B. Die Haustür ist die graue Tür links neben der Garage. Das Tastenfeld hängt rechts neben der Tür auf Brusthöhe."></textarea></div>
+                        <div class="arr-photo-slot" data-slot="door_photo"></div>
+                        <div class="form-group" style="margin:1rem 0 .4rem"><label>Schritt für Schritt zum Öffnen <small>(höchstens 10, <code>{code}</code> wird zum Türcode des Gastes)</small></label></div>
+                        <div class="list-editor" id="arr-steps"></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                            <button type="button" class="btn-mini" id="arr-step-add">+ Schritt hinzufügen</button>
+                            <button type="button" class="btn-mini" id="arr-step-sample">Beispiel für Nuki-Tastenfeld einsetzen</button>
+                        </div>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Vorschau &amp; Versand</div>
+                        <p class="text-muted" style="font-size:.85rem;margin-top:0">Anreisen der nächsten 30 Tage. „Vorschau“ zeigt die Nachricht so, wie der Gast sie bekommt. Erst speichern, dann ansehen.</p>
+                        <div id="arr-upcoming" class="arr-upcoming"></div>
+                        <div id="arr-preview" class="arr-preview" hidden></div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="arr-save" style="align-self:flex-start">Speichern</button>
                 </div>
 
                 <div class="site-pane" data-pane="live" style="display:none;">

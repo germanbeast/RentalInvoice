@@ -63,7 +63,7 @@ const RATING_PLATFORMS = { booking: { name: 'Booking.com', max: 10 }, airbnb: { 
 const MAX_REVIEWS = 40;
 const MAX_TIPS = 24;
 
-function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, chatButton, createNukiPin, deleteNukiPin, berlinToday, addDays, nightsBetween, formatDateDE }) {
+function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, chatButton, arrivalFor, createNukiPin, deleteNukiPin, berlinToday, addDays, nightsBetween, formatDateDE }) {
     if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
     const sql = () => db.getDb();
@@ -213,6 +213,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             v.wifi = site.wifi_name ? { name: site.wifi_name, password: site.wifi_password || '' } : null;
             v.parking = site.parking || '';
             v.guide = guideSections(site.guide);
+            v.arrival = arrivalFor ? arrivalFor(b, showPin ? b.nuki_pin : null) : null;
         }
         const inv = invoiceFor(b);
         if (inv) v.invoice = { number: inv.invoice_number, date: inv.invoice_date, paid: !!inv.is_paid, byGuest: !!inv.by_guest };

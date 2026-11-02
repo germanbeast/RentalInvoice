@@ -227,6 +227,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
                     'Dieser Link ist abgelaufen oder wurde gesperrt. Sie können sich mit Ihrem Buchungscode und dem Anreisedatum anmelden.');
             }
             let dest = `${req.baseUrl}/meine-buchung`;
+            if (target === 'ankunft') dest += '?tab=ankunft';
             if (target === 'notfall') {
                 const c = emergencyDoor.getConfig();
                 if (c.enabled) dest = `${req.baseUrl}/notfall?k=${encodeURIComponent(c.key)}`;
@@ -244,6 +245,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
 
     router.get('/b/:token', linkLimiter, openLink('portal'));
     router.get('/b/:token/notfall', linkLimiter, openLink('notfall'));
+    router.get('/b/:token/ankunft', linkLimiter, openLink('ankunft'));
 
     return { router, compose, ensureLink, revokeLink, upcoming, LINK_GRACE_DAYS };
 }

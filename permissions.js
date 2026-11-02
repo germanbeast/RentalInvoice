@@ -101,6 +101,7 @@ const RULES = [
 
     // Messages to guests
     R('*', /^\/api\/site\/guest-message(\/|$)/, 'messages'),
+    R('*', /^\/api\/site\/arrival\/send(\/|$)/, 'messages'),
     R('*', /^\/api\/chat\/(settings|sms|mail)(\/|$)/, 'settings'),
     R('PUT', /^\/api\/chat\/thread\/[^/]+\/read$/, 'messages', 'view'), // opening a chat marks it read
     R('*', /^\/api\/chat(\/|$)/, 'messages'),
