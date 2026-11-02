@@ -236,3 +236,11 @@ svg.wx { width: 44px; height: 44px; stroke-width: 1.4; flex: none; }
 .arr-steps .arr-fig { margin-top: .6rem; }
 .arr-n { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--paper); font: 500 .95rem/1 var(--sans); }
 .arr-help { margin: 1.2rem 0 0; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .92rem; }
+
+/* WLAN card: QR code (scan = connect) next to network and password */
+.gwifi h3 { margin-bottom: .7rem; }
+.gwifi-body { display: flex; gap: 1.1rem; align-items: center; flex-wrap: wrap; }
+.gwifi-qr { flex: 0 0 auto; width: 132px; height: 132px; background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 6px; }
+.gwifi-qr svg { display: block; width: 100%; height: 100%; }
+.gwifi-body .guide-dl { flex: 1 1 200px; margin: 0; }
+.gwifi-note { color: var(--ink-soft); font-size: .88rem; margin: .7rem 0 0; }

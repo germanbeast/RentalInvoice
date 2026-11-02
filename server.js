@@ -1197,7 +1197,8 @@ app.get('/welcome.html', (req, res) => {
     res.sendFile(filePath);
 });
 
-// Public, minimal data for the TV welcome screen (no secrets: no WLAN, no codes, no invoices).
+// Public, minimal data for the TV welcome screen (no door codes, no invoices). The guest WLAN only while a guest stays
+// and only when "Auf dem Fernseher zeigen" is on (Webseite → WLAN): with the FRITZ!Box it is that guest's own password.
 // Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
 app.get('/api/welcome', (req, res) => {
     try {
@@ -1218,7 +1219,8 @@ app.get('/api/welcome', (req, res) => {
             guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
             phone: (s.vermieter && s.vermieter.telefon) || '',
             checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
-            title: (s.site && s.site.title) || ''
+            title: (s.site && s.site.title) || '',
+            wifi: current ? guestWifi.tvView() : null
         });
     } catch (e) {
         res.status(500).json({ success: false });
@@ -1250,6 +1252,17 @@ app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
 
 let guestChat = null; // created below, the guest pages ask it for the WhatsApp button
 let arrivalGuide = null; // created below, "Meine Buchung" asks it for the tab Ankunft
+// WLAN für Gäste: own password per booking via the FRITZ!Box, or the fixed one from Webseite → Inhalte (see wifi.js)
+let guestPortalRef = null;
+const guestWifi = require('./wifi')({
+    db, axios, qrcode,
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortalRef.getSite(),
+    telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
+    berlinToday: () => berlinToday(),
+    addDays: (ymd, n) => addDays(ymd, n),
+    formatDateDE: (d) => formatDateDE(d)
+});
 // Public guest website (description, availability, booking requests, guest login + status)
 const guestPortal = require('./guest-portal')({
     express, rateLimit, db, nodemailer, multer,
@@ -1260,6 +1273,7 @@ const guestPortal = require('./guest-portal')({
     },
     chatButton: (booking) => guestChat ? guestChat.guestButton(booking) : null,
     arrivalFor: (booking, pin) => arrivalGuide ? arrivalGuide.guestView(booking, pin) : null,
+    wifiFor: (booking) => guestWifi.guestView(booking),
     createNukiPin: (arrival, departure, name) => createNukiPin(arrival, departure, name),
     deleteNukiPin: (authId) => deleteNukiPin(authId),
     berlinToday: () => berlinToday(),
@@ -1267,6 +1281,9 @@ const guestPortal = require('./guest-portal')({
     nightsBetween: (a, b) => nightsBetween(a, b),
     formatDateDE: (d) => formatDateDE(d)
 });
+
+guestPortalRef = guestPortal;
+guestWifi.startScheduler();
 
 // Emergency door opening for guests (QR code at the door, see emergency-door.js)
 const emergencyDoor = require('./emergency-door')({
@@ -1366,6 +1383,7 @@ app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')
 // Anfahrts-Assistent: route, parking, door code and how to open the house door on the arrival day (see arrival-guide.js)
 arrivalGuide = require('./arrival-guide')({
     express, rateLimit, db, multer, push, guestMessage, emergencyDoor, guestChat,
+    wifiFor: (booking) => guestWifi.arrivalView(booking),
     botLogic: require('./bot-logic'),
     getSite: () => guestPortal.getSite(),
     guestBooking: (sess) => guestPortal.guestBooking(sess),
@@ -1797,6 +1815,7 @@ meldeschein.registerAdminRoutes(app, apiLimiter);
 vouchers.registerAdminRoutes(app, apiLimiter, { getSite: () => guestPortal.getSite(), permissions });
 localLive.registerAdminRoutes(app, apiLimiter);
 arrivalGuide.registerAdminRoutes(app, apiLimiter);
+guestWifi.registerAdminRoutes(app, apiLimiter);
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {
@@ -2145,7 +2164,7 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 // the mask back unchanged when it was not edited. Server-only settings are neither sent nor accepted.
 const SECRET_MASK = '••••••••';
 const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
-const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state'];
+const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state', 'guest_wifi', 'guest_wifi_state'];
 
 function secretPath(settings, [key, field]) {
     const holder = field ? settings[key] : settings;

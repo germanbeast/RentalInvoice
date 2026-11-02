@@ -35,7 +35,7 @@ const DEFAULTS = {
     steps: []           // [{ text, photo }]
 };
 
-function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite, guestBooking, guestMessage, emergencyDoor, guestChat, telegram, push, berlinToday, formatDateDE }) {
+function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite, guestBooking, guestMessage, emergencyDoor, guestChat, wifiFor, telegram, push, berlinToday, formatDateDE }) {
     const sql = () => db.getDb();
 
     const cols = sql().prepare('PRAGMA table_info(bookings)').all().map(c => c.name);
@@ -135,6 +135,8 @@ function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite,
             intro: t => `heute ist dein Anreisetag, wir freuen uns auf dich! 🚗 Hier ist alles für eine entspannte Ankunft.${t ? ` Einchecken kannst du ab ${t} Uhr.` : ''}`,
             address: 'Adresse', route: 'Route', parking: 'Parken', door: 'Haustür',
             pin: p => `🔑 Dein Türcode: ${p}`,
+            wifi: (n, p) => `📶 WLAN: ${n}${p ? `\nPasswort: ${p}` : ''}`,
+            wifiOwn: (t, l) => `Das Passwort gilt nur für deinen Aufenthalt${t ? `, ab ${t} Uhr` : ''}.${l ? ' Unter dem Link unten gibt es dazu einen QR-Code zum Scannen.' : ''}`,
             nopin: '(dein Türcode)',
             steps: 'So öffnest du die Tür:',
             photos: '📸 Alle Schritte mit Fotos:',
@@ -147,6 +149,8 @@ function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite,
             intro: t => `today is your arrival day, we are looking forward to welcoming you! 🚗 Here is everything for a smooth arrival.${t ? ` Check-in is from ${t}.` : ''}`,
             address: 'Address', route: 'Route', parking: 'Parking', door: 'Front door',
             pin: p => `🔑 Your door code: ${p}`,
+            wifi: (n, p) => `📶 Wi-Fi: ${n}${p ? `\nPassword: ${p}` : ''}`,
+            wifiOwn: (t, l) => `The password is valid for your stay only${t ? `, from ${t}` : ''}.${l ? ' The page linked below also has a QR code to scan.' : ''}`,
             nopin: '(your door code)',
             steps: 'How to open the door:',
             photos: '📸 All steps with photos:',
@@ -213,6 +217,11 @@ function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite,
             lines.push('', L.steps);
             c.steps.filter(s => s.text).forEach((s, i) => lines.push(`${i + 1}. ${withCode(s.text, b.nuki_pin, L.nopin)}`));
         }
+        const wifi = wifiFor ? wifiFor(b) : null;
+        if (wifi && wifi.name) {
+            lines.push('', L.wifi(wifi.name, wifi.password));
+            if (wifi.personal) lines.push(L.wifiOwn(wifi.switchTime, !!link));
+        }
         if (link) lines.push('', L.photos, link);
         if (emergencyLink) lines.push('', L.emergency, emergencyLink);
         lines.push('', L.contact(host.telefon || ''), L.bye);
@@ -225,6 +234,7 @@ function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite,
         const sms = [P.hi(firstName(name))];
         if (site.address) sms.push(`${P.addr}: ${site.address}.`);
         if (b.nuki_pin) sms.push(`${P.code}: ${b.nuki_pin}.`);
+        if (wifi && wifi.name) sms.push(`${lang === 'en' ? 'Wi-Fi' : 'WLAN'}: ${wifi.name}${wifi.password ? ` / ${wifi.password}` : ''}`);
         if (link) sms.push(`${P.link}: ${link}`);
         else {
             if (parking) sms.push(`${L.parking}: ${parking}`);

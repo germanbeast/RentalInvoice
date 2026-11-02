@@ -564,6 +564,7 @@
                         <button type="button" data-tab="meldescheine">Meldescheine</button>
                         <button type="button" data-tab="content">Inhalte</button>
                         <button type="button" data-tab="arrival">Ankunft</button>
+                        <button type="button" data-tab="wifi">WLAN</button>
                         <button type="button" data-tab="live">Live-Tipps</button>
                         <button type="button" data-tab="setup">Einrichtung</button>
                     </div>
@@ -712,6 +713,67 @@
                         <div id="arr-preview" class="arr-preview" hidden></div>
                     </div>
                     <button type="button" class="btn btn-primary" id="arr-save" style="align-self:flex-start">Speichern</button>
+                </div>
+
+                <div class="site-pane" data-pane="wifi" style="display:none;">
+                    <div class="card site-card">
+                        <div class="today-title">WLAN für Gäste</div>
+                        <p class="text-muted" style="font-size:.85rem">Gäste sehen Netzwerk, Passwort und einen QR-Code zum Scannen auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher. Mit der FRITZ!Box bekommt jede Buchung ihr eigenes WLAN-Passwort, das nur während des Aufenthalts gilt.</p>
+                        <div class="wifi-modes">
+                            <label class="wifi-mode"><input type="radio" name="wifi-mode" value="static"><span><b>Festes Passwort</b><small>Netzwerk und Passwort aus Inhalte → Gästemappe, für alle Gäste gleich.</small></span></label>
+                            <label class="wifi-mode"><input type="radio" name="wifi-mode" value="fritzbox"><span><b>Eigenes Passwort pro Buchung (FRITZ!Box)</b><small>Der Server stellt das Gast-WLAN der FRITZ!Box zum Gästewechsel um. Der vorige Gast ist dann automatisch raus.</small></span></label>
+                        </div>
+                        <p class="text-muted" style="font-size:.82rem;margin:.4rem 0 0" id="wifi-static-hint"></p>
+                        <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:.8rem">
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-show-arrival"> In der Anfahrts-Nachricht</label>
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-show-tv"> Auf dem Fernseher (während ein Gast da ist)</label>
+                        </div>
+                    </div>
+
+                    <div class="card site-card" id="wifi-fritz-card">
+                        <div class="today-title">FRITZ!Box</div>
+                        <div id="wifi-status" class="wifi-status"></div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-url">Adresse <small>(MyFRITZ!-Adresse mit HTTPS-Port)</small></label><input type="text" id="wifi-url" maxlength="200" placeholder="https://abc123xyz.myfritz.net:46123" autocomplete="off" spellcheck="false"></div>
+                            <div class="form-group"><label for="wifi-index">Gast-WLAN</label><select id="wifi-index"><option value="0">Automatisch (Gastzugang)</option></select></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-user">FRITZ!Box-Benutzer</label><input type="text" id="wifi-user" maxlength="100" autocomplete="off" spellcheck="false"></div>
+                            <div class="form-group"><label for="wifi-pass">Kennwort</label><input type="password" id="wifi-pass" maxlength="200" autocomplete="new-password"></div>
+                        </div>
+                        <label style="display:flex;gap:.5rem;align-items:center;font-size:.85rem;margin-bottom:.6rem"><input type="checkbox" id="wifi-insecure"> Selbstsigniertes Zertifikat erlauben <small class="text-muted">(nur nötig ohne MyFRITZ!-Adresse)</small></label>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem">
+                            <button type="button" class="btn-mini" id="wifi-test">Verbindung testen</button>
+                            <button type="button" class="btn-mini" id="wifi-apply">Jetzt umstellen</button>
+                        </div>
+                        <div id="wifi-test-result" class="text-muted" style="font-size:.85rem"></div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-switch-time">Wechsel um <small id="wifi-switch-hint">(leer = Check-out-Zeit)</small></label><input type="time" id="wifi-switch-time"></div>
+                            <div class="form-group" style="align-self:end;display:grid;gap:.4rem">
+                                <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-vacant-off"> Gast-WLAN ausschalten, wenn niemand da ist</label>
+                                <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-notify"> Per Telegram melden, wenn das Umstellen nicht klappt</label>
+                            </div>
+                        </div>
+                        <details class="wifi-howto">
+                            <summary>So richtest du die FRITZ!Box ein (einmalig, ca. 5 Minuten)</summary>
+                            <ol>
+                                <li><b>Gastzugang einschalten:</b> WLAN → Gastzugang → „Privater WLAN-Gastzugang aktiv“, Name z. B. „Beckhome Gäste“. Verschlüsselung WPA2 (oder WPA2 + WPA3). Den Haken „automatisch deaktivieren“ <b>nicht</b> setzen, das macht der Server.</li>
+                                <li><b>Benutzer anlegen:</b> System → FRITZ!Box-Benutzer → Benutzer hinzufügen, z. B. „beckhome“, mit eigenem Kennwort. Haken bei <b>„Zugang auch aus dem Internet erlaubt“</b> und bei <b>„FRITZ!Box Einstellungen“</b>. Alle anderen Rechte aus.</li>
+                                <li><b>Zugriff für Anwendungen:</b> Heimnetz → Netzwerk → Netzwerkeinstellungen → „Zugriff für Anwendungen zulassen“ einschalten (heißt auch TR-064).</li>
+                                <li><b>Internetzugriff:</b> Internet → MyFRITZ!-Konto: MyFRITZ! einrichten. Dann unter Internet → Freigaben → FRITZ!Box-Dienste „Internetzugriff auf die FRITZ!Box über HTTPS“ einschalten. Dort stehen die <b>MyFRITZ!-Adresse</b> und der <b>Port</b>, z. B. <code>https://abc123xyz.myfritz.net:46123</code>, das kommt oben ins Feld „Adresse“.</li>
+                                <li><b>Geräte prüfen:</b> TV-Box, Nuki-Bridge und alles, was fest in der Wohnung bleibt, gehören ins normale WLAN (oder per Kabel), nicht ins Gast-WLAN, sonst fliegen sie beim Wechsel raus.</li>
+                                <li>Hier „Verbindung testen“, das Gast-WLAN wählen, speichern. Fertig.</li>
+                            </ol>
+                            <p class="text-muted" style="font-size:.82rem">Hat der Anschluss keine eigene IPv4-Adresse (z. B. manche Glasfaser- oder Kabelanschlüsse, DS-Lite), erreicht MyFRITZ! die Box nur über IPv6. Klappt der Test dann nicht, kurz Bescheid geben.</p>
+                        </details>
+                    </div>
+
+                    <div class="card site-card" id="wifi-list-card">
+                        <div class="today-title">Passwörter der nächsten Buchungen</div>
+                        <p class="text-muted" style="font-size:.85rem;margin-top:0">Jede Buchung bekommt automatisch ein leicht tippbares Passwort. Der Gast sieht es ab dem Anreisetag. „Neu“ erzeugt ein anderes Passwort, ist der Gast gerade da, wird die FRITZ!Box sofort umgestellt.</p>
+                        <div id="wifi-upcoming" class="arr-upcoming"></div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="wifi-save" style="align-self:flex-start">Speichern</button>
                 </div>
 
                 <div class="site-pane" data-pane="live" style="display:none;">

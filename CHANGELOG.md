@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.42.0] - 2026-11-02
+
+### Neu
+- WLAN für Gäste (`wifi.js`, Einstellung `guest_wifi`, Zustand `guest_wifi_state`, Spalte `bookings.wifi_password`): Modus „Festes Passwort“ (Inhalte → Gästemappe) oder „Eigenes Passwort pro Buchung (FRITZ!Box)“
+- FRITZ!Box-Anbindung über TR-064 (`fritzbox.js`, Digest-Auth, MyFRITZ!-Adresse mit `/tr064` oder lokal Port 49000): Gast-WLAN erkennen (`WLANConfiguration:N`, letzte Schnittstelle), `SetSecurityKeys` mit Kontrolle über `GetSecurityKeys`, `SetEnable`
+- Wechsel jeden Tag zur Wechselzeit (Standard Check-out-Zeit) auf die Buchung der kommenden Nacht; ohne Gast Zufallspasswort, optional Gast-WLAN aus. Prüfung alle 5 Min. bzw. stündlich gegen die Box, Telegram-Meldung bei Fehler (mit Passwort zum Setzen von Hand) und wenn es wieder klappt
+- Admin Webseite → WLAN: Modus, Anzeige-Optionen, Zugangsdaten (Kennwort nur maskiert zurück), „Verbindung testen“, „Jetzt umstellen“, Passwörter der nächsten 60 Tage mit „Neu“ und QR-Code, Einrichtungs-Anleitung
+- „Meine Buchung“: WLAN-Karte mit QR-Code (Aufenthalt, Ankunft, A–Z), persönliches Passwort ab Anreisetag
+- Anfahrts-Nachricht enthält WLAN-Name und Passwort (auch SMS-Kurzfassung)
+- TV-Welcome-Screen: WLAN mit QR-Code aus `/api/welcome`, nur während ein Gast da ist und wenn „Auf dem Fernseher“ an ist
+
 ## [1.41.0] - 2026-11-02
 
 ### Neu

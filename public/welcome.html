@@ -53,7 +53,7 @@
         .tv-name { font: 400 6.2rem/.98 var(--serif); letter-spacing: -.01em; margin-bottom: 1.2rem; overflow-wrap: anywhere; }
         .tv-msg { font-size: 1.5rem; color: var(--soft); max-width: 34ch; }
         .tv-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin-top: 2.6rem; border-top: 1px solid var(--line); width: 100%; max-width: 46rem; }
-        .tv-main:not(.with-live) .tv-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 72rem; text-align: left; }
+        .tv-main:not(.with-live) .tv-facts { grid-template-columns: minmax(0, 1.7fr) repeat(3, minmax(0, 1fr)); max-width: 72rem; text-align: left; }
         .fact { padding: 1.1rem 1.2rem 1.1rem 0; border-bottom: 1px solid var(--line); min-width: 0; }
         .fact span { display: block; font-size: .85rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; }
         .fact strong { display: block; font: 400 1.9rem/1.15 var(--serif); overflow-wrap: anywhere; }
@@ -106,6 +106,12 @@
         .app-btn:hover, .app-btn:focus { outline: none; background: var(--paper); color: var(--ink); border-color: var(--paper); }
         .app-btn:focus-visible { box-shadow: 0 0 0 .25rem var(--accent); }
         svg.wx { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        .fact-wifi { display: flex; gap: 1.1rem; align-items: center; }
+        .fact-wifi > div { min-width: 0; flex: 1 1 auto; }
+        .fact-wifi > .wifi-qr { flex: 0 0 auto; }
+        .wifi-qr { width: 6.4rem; height: 6.4rem; background: #fff; border-radius: 3px; padding: .3rem; }
+        .wifi-qr svg { display: block; width: 100%; height: 100%; }
+        .wifi-qr + div small.scan { color: var(--accent); font-size: .9rem; }
         [hidden] { display: none !important; }
     </style>
 </head>
@@ -125,7 +131,7 @@
                 <h1 class="tv-name" id="welcome-guest-name">Liebe Gäste</h1>
                 <p class="tv-msg">Wir wünschen Ihnen einen angenehmen Aufenthalt!</p>
                 <div class="tv-facts">
-                    <div class="fact"><span>WLAN</span><strong id="welcome-wifi-name">Gäste-WLAN</strong><small id="welcome-wifi-pass">Passwort: ********</small></div>
+                    <div class="fact fact-wifi"><div class="wifi-qr" id="welcome-wifi-qr" hidden></div><div><span>WLAN</span><strong id="welcome-wifi-name">Gäste-WLAN</strong><small id="welcome-wifi-pass">Passwort: ********</small><small class="scan" id="welcome-wifi-scan" hidden>QR-Code scannen zum Verbinden</small></div></div>
                     <div class="fact"><span>Kontakt</span><strong id="welcome-phone">+49 123 456789</strong></div>
                     <div class="fact"><span>Check-in</span><strong id="welcome-checkin">15:00 Uhr</strong></div>
                     <div class="fact"><span>Check-out</span><strong id="welcome-checkout">10:00 Uhr</strong></div>
@@ -208,6 +214,15 @@
                 if (!has(checkin) && d.checkinTime) $('welcome-checkin').textContent = `ab ${d.checkinTime} Uhr`;
                 if (!has(checkout) && d.checkoutTime) $('welcome-checkout').textContent = `bis ${d.checkoutTime} Uhr`;
                 if (d.title) $('welcome-logo').textContent = d.title;
+                // WLAN of the current guest (own password with the FRITZ!Box) with QR code; URL parameters win
+                if (!has(wifiName) && !has(wifiPass)) {
+                    const w = d.wifi;
+                    $('welcome-wifi-name').textContent = (w && w.name) || 'Gäste-WLAN';
+                    $('welcome-wifi-pass').textContent = w ? (w.password ? 'Passwort: ' + w.password : 'ohne Passwort') : 'Zugangsdaten in Ihrer Buchung';
+                    const qr = $('welcome-wifi-qr');
+                    if (w && w.qr && /^<svg[\s>]/.test(w.qr)) { qr.innerHTML = w.qr; qr.hidden = false; $('welcome-wifi-scan').hidden = false; }
+                    else { qr.innerHTML = ''; qr.hidden = true; $('welcome-wifi-scan').hidden = true; }
+                }
             } catch (e) { /* offline: keep what is shown */ }
         }
         loadFromServer();
