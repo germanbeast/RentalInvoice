@@ -3279,6 +3279,35 @@ button.alert:hover { text-decoration: underline; }
 /* Druck: das Admin-Layout (Ränder, Abstände, Rahmen der Vorschau) darf nicht
    auf die gedruckte Rechnung durchschlagen. Steht am Ende, damit es die
    Boutique-Regeln oben überstimmt. */
+/* ===== Gutscheine ===== */
+#view-vouchers .content-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.vc-kpis { margin-bottom: 0; }
+.vc-code { font: 600 .95rem/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; background: var(--bg-secondary, #f3f5f9); border: 1px dashed #b9c2d3; padding: .3rem .5rem; border-radius: 6px; }
+.vc-label { font-size: 1.02rem; font-weight: 600; margin: .35rem 0 .15rem; }
+.vc-label small { font-weight: 400; color: var(--text-secondary); }
+.vc-card { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.vc-card .booking-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: .2rem; }
+.vc-help { font-size: .82rem; color: var(--text-secondary); max-width: 70ch; }
+.req-status.redeemed { background: rgba(43, 98, 227, .12); color: var(--accent); }
+.vc-kind { display: flex; width: 100%; }
+.vc-kind button { flex: 1; }
+.inv-voucher-form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .6rem; }
+.inv-voucher-form input { flex: 1; min-width: 180px; text-transform: uppercase; }
+.inv-voucher-info, .nb-voucher-info { display: block; margin-top: .45rem; font-size: .82rem; color: var(--accent-green, #2f7a4b); }
+.inv-voucher-info.bad, .nb-voucher-info.bad { color: var(--bad); }
+#nb-voucher { text-transform: uppercase; }
+#btn-inv-voucher { margin-top: .5rem; }
+.inv-voucher-form[hidden], .inv-voucher-info[hidden], .nb-voucher-info[hidden], #btn-inv-voucher[hidden], #btn-guest-voucher[hidden], #nav-vouchers[hidden], #vc-code-wrap[hidden] { display: none !important; }
+.guest-detail-header { gap: .5rem; flex-wrap: wrap; }
+.guest-detail-header #btn-guest-voucher { margin-left: auto; }
+@media (max-width: 768px) {
+    .vc-card { grid-template-columns: 1fr; }
+    .vc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+    .vc-kpis .stat-card { padding: .8rem .75rem; }
+    .vc-kpis .stat-label { font-size: .72rem; }
+    .vc-card .booking-actions { justify-content: flex-start; }
+}
+
 @media print {
     .topbar,
     .tl-pop {

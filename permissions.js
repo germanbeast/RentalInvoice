@@ -9,6 +9,7 @@ const AREAS = [
     { key: 'calendar', label: 'Kalender & Startseite', hint: 'Belegungskalender, heutige An-/Abreisen, Kalender-Abgleich' },
     { key: 'bookings', label: 'Buchungen, Gäste & Anfragen', hint: 'Buchungsliste, Buchungen eintragen/löschen, Gästeliste, Anfragen der Webseite' },
     { key: 'invoices', label: 'Rechnungen', hint: 'Rechnungen erstellen, ansehen, versenden' },
+    { key: 'vouchers', label: 'Gutscheine', hint: 'Gutscheine anlegen, drucken, entwerten (einlösen geht auch mit Rechnungen/Buchungen)' },
     { key: 'finance', label: 'Finanzen & Exporte', hint: 'Umsätze, Auslastung & Jahresrückblick, Ausgaben, Erbverwaltung, Excel/CSV/ZIP' },
     { key: 'door', label: 'Türcodes & Notfall-Öffnen', hint: 'Nuki-Codes ansehen/anlegen/löschen, Notfall-Öffnen' },
     { key: 'messages', label: 'Gast-Nachrichten & Chat', hint: 'Gast-Nachricht/Link, WhatsApp/SMS-Postfach' },
@@ -28,7 +29,7 @@ const ROLES = {
     manager: {
         label: 'Manager',
         permissions: {
-            calendar: 'edit', bookings: 'edit', invoices: 'edit', finance: 'view', door: 'edit',
+            calendar: 'edit', bookings: 'edit', invoices: 'edit', vouchers: 'edit', finance: 'view', door: 'edit',
             messages: 'edit', meldescheine: 'edit', website: 'edit', settings: 'none', users: 'none'
         }
     },
@@ -114,6 +115,10 @@ const RULES = [
     R('*', /^\/api\/(generate-pdf|send-email)$/, 'invoices', 'edit'),
     R('GET', /^\/api\/branding(\/|$)/, 'invoices', 'view'),
     R('*', /^\/api\/branding(\/|$)/, 'settings'),
+
+    // Vouchers (/api/vouchers/check also allows invoices/bookings edit, checked in vouchers.js)
+    R('GET', /^\/api\/vouchers\/check$/, 'any'),
+    R('*', /^\/api\/vouchers(\/|$)/, 'vouchers'),
 
     // Finance
     R('*', /^\/api\/(finance|expenses|estate|stats|review)(\/|$)/, 'finance'),

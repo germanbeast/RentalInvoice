@@ -1,6 +1,21 @@
 {
-    "currentVersion": "1.40.0",
+    "currentVersion": "1.41.0",
     "releases": [
+        {
+            "version": "1.41.0",
+            "date": "2026-11-02",
+            "title": "Gutscheine für Gäste",
+            "features": [
+                "Neue Seite „Gutscheine“: Gratisnächte, Betrag oder Rabatt in Prozent, mit Code, Gast, Gültigkeit, Mindestaufenthalt und persönlichem Text",
+                "Gutschein drucken (A5-Karte, auch als PDF) oder fertigen Text mit Buchungslink für WhatsApp/E-Mail kopieren",
+                "Gäste lösen den Code bei der Buchungsanfrage auf der Webseite ein und sehen den Rabatt sofort im Preis",
+                "„Buchung eintragen“ und das Rechnungsformular („Gutschein einlösen“) verrechnen Gutscheine für Telefon- und Stammgast-Buchungen",
+                "Rechnungen für einen Aufenthalt mit Gutschein (Telegram-Bot, Gast-Rechnung) bekommen die Rabatt-Position automatisch",
+                "„Gutschein schenken“ direkt aus dem Kalender-Popup oder beim Gast; jeder Gutschein gilt einmal, eingelöste bleiben nachvollziehbar",
+                "Neues Recht „Gutscheine“ in der Benutzerverwaltung"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.40.0",
             "date": "2026-11-02",

@@ -23,6 +23,7 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const multer = require('multer');
 const db = require('./db');
+const vouchers = require('./vouchers');
 const waCommands = require('./wa-commands');
 const tgCommands = require('./tg-commands');
 const TelegramBot = require('node-telegram-bot-api');
@@ -128,6 +129,7 @@ function createPaperlessHttpsAgent() {
 // 1. DATABASE INIT
 // =======================
 db.init();
+vouchers.ensureSchema();
 
 // =======================
 // 1b. WhatsApp Web Client
@@ -1760,7 +1762,8 @@ function loadBookingRows() {
     const rows = db.getDb().prepare(`
         SELECT b.id, b.uid, b.summary, b.checkin, b.checkout, b.source, b.nuki_pin, b.nuki_auth_id, b.guest_code,
                b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email,
-               (SELECT id FROM guest_registrations r WHERE r.booking_id = b.id) AS meldeschein_id
+               (SELECT id FROM guest_registrations r WHERE r.booking_id = b.id) AS meldeschein_id,
+               (SELECT code FROM vouchers v WHERE v.booking_id = b.id AND v.status = 'redeemed' ORDER BY v.id LIMIT 1) AS voucher_code
         FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
         WHERE b.checkin IS NOT NULL AND b.checkout IS NOT NULL
         ORDER BY b.checkin DESC
@@ -1780,7 +1783,7 @@ function loadBookingRows() {
             checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout),
             hasCode: !!(r.nuki_auth_id || r.nuki_pin), pin: r.nuki_pin || null,
             arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state,
-            guestCode: r.guest_code || null, meldescheinId: r.meldeschein_id || null,
+            guestCode: r.guest_code || null, meldescheinId: r.meldeschein_id || null, voucherCode: r.voucher_code || null,
             manualEntry: String(r.uid).startsWith('direct-manual-')
         };
     });
@@ -1791,6 +1794,7 @@ guestPortal.registerAdminRoutes(app, apiLimiter);
 guestChat.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
 meldeschein.registerAdminRoutes(app, apiLimiter);
+vouchers.registerAdminRoutes(app, apiLimiter, { getSite: () => guestPortal.getSite(), permissions });
 localLive.registerAdminRoutes(app, apiLimiter);
 arrivalGuide.registerAdminRoutes(app, apiLimiter);
 
@@ -1872,6 +1876,13 @@ app.post('/api/bookings', apiLimiter, async (req, res) => {
             return res.status(409).json({ success: false, conflict: true, error: `Zeitraum überschneidet sich mit ${clash.source || 'einer Buchung'} ${formatDateDE(clash.checkin)} – ${formatDateDE(clash.checkout)}.` });
         }
 
+        // Optional voucher: checked before anything is saved, redeemed for the new booking
+        let voucher = null;
+        if (String(b.voucherCode || '').trim()) {
+            voucher = vouchers.check(b.voucherCode, { checkin, checkout });
+            if (!voucher.ok) return res.status(400).json({ success: false, error: `Gutschein: ${voucher.error}` });
+        }
+
         const guest = db.findOrCreateGuest(name, email || null, null);
         if (phone && !guest.phone) db.updateGuest(guest.id, { ...guest, phone });
         const note = String(b.note || '').trim().substring(0, 1000);
@@ -1880,6 +1891,7 @@ app.post('/api/bookings', apiLimiter, async (req, res) => {
             VALUES (?, ?, ?, ?, ?, 'Direkt', ?)
         `).run(`direct-manual-${Date.now()}`, `Direkt: ${name}`, checkin, checkout, note || 'Im Admin eingetragen', guest.id);
         const bookingId = Number(ins.lastInsertRowid);
+        if (voucher) vouchers.redeem(voucher.voucher.id, { bookingId, checkin, checkout, value: voucher.discount, via: 'Buchung eingetragen', guestId: guest.id });
 
         let pin = null, pinError = null;
         if (b.createPin) {
@@ -1888,7 +1900,7 @@ app.post('/api/bookings', apiLimiter, async (req, res) => {
                 if (n && n.success) { db.updateBookingNukiData(bookingId, n.pin, n.authId); pin = n.pin; }
             } catch (e) { pinError = e.message; }
         }
-        res.json({ success: true, bookingId, pin, pinError });
+        res.json({ success: true, bookingId, pin, pinError, voucher: voucher ? { code: voucher.voucher.code, label: voucher.label, discount: voucher.discount } : null });
     } catch (e) {
         console.error('Manual booking Error:', e.message);
         res.status(500).json({ success: false, error: 'Buchung konnte nicht gespeichert werden' });
@@ -1906,6 +1918,7 @@ app.delete('/api/bookings/:id', apiLimiter, async (req, res) => {
             try { await deleteNukiPin(row.nuki_auth_id); } catch (e) { console.warn('Nuki PIN Löschen fehlgeschlagen:', e.message); }
         }
         db.getDb().prepare('DELETE FROM bookings WHERE id = ?').run(id);
+        vouchers.releaseBooking(id);
         res.json({ success: true });
     } catch (e) {
         console.error('Booking delete Error:', e.message);
@@ -2742,9 +2755,33 @@ app.post('/api/invoices', apiLimiter, (req, res) => {
         if (!data.rNummer && !data.invoice_number) {
             return res.status(400).json({ error: 'Rechnungsnummer ist erforderlich' });
         }
+        // Voucher redeemed in the invoice form ("Gutschein einlösen")
+        let voucherWarning = null, redeemVoucher = null;
+        if (data.voucherCode) {
+            const arrival = data.aAnreise || data.arrival || null;
+            const departure = data.aAbreise || data.departure || null;
+            const known = vouchers.getByCode(data.voucherCode);
+            const sameInvoice = known && known.invoice_id && db.getDb().prepare('SELECT 1 FROM invoices WHERE id = ? AND invoice_number = ?').get(known.invoice_id, data.rNummer || data.invoice_number);
+            const c = sameInvoice ? { ok: true, voucher: known } : vouchers.check(data.voucherCode, { checkin: arrival, checkout: departure });
+            if (!c.ok) { voucherWarning = c.error; delete data.voucherCode; }
+            else {
+                data.voucherCode = c.voucher.code;
+                redeemVoucher = c.voucher;
+            }
+        }
         const result = db.saveInvoice(data);
+        if (redeemVoucher) {
+            const line = (data.positions || []).filter(p => String(p.desc || '').startsWith(`Gutschein ${redeemVoucher.code}`));
+            const net = -line.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.price) || 0), 0);
+            const gross = data.kleinunternehmer ? net : net * (1 + (Number(data.mwstSatz) || 0) / 100);
+            const stay = db.getDb().prepare('SELECT id FROM bookings WHERE checkin = ? AND checkout = ? LIMIT 1').get(data.aAnreise || null, data.aAbreise || null);
+            vouchers.redeem(redeemVoucher.id, {
+                invoiceId: result.id, bookingId: stay ? stay.id : null, checkin: data.aAnreise || null, checkout: data.aAbreise || null,
+                value: gross > 0 ? Math.round(gross * 100) / 100 : null, via: 'Rechnung'
+            });
+        }
         const message = result.updated ? 'Rechnung aktualisiert' : 'Rechnung archiviert';
-        res.json({ success: true, message, id: result.id });
+        res.json({ success: true, message, id: result.id, voucherWarning });
     } catch (e) {
         console.error('Invoice POST Error:', e.message);
         res.status(500).json({ error: 'Rechnung konnte nicht gespeichert werden' });
