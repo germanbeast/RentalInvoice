@@ -266,7 +266,12 @@
 
     async function updateQuote() {
         const q = $('#quote');
-        const d = await api('quote', { checkin: selIn, checkout: selOut });
+        const voucher = $('#f-voucher').value.trim();
+        const d = await api('quote', { checkin: selIn, checkout: selOut, voucher });
+        const vm = $('#voucher-msg');
+        vm.hidden = !voucher || !d.success;
+        vm.classList.toggle('bad', !!d.voucherError);
+        vm.textContent = d.voucherError ? d.voucherError : (d.voucher ? `Gutschein „${d.voucher.label}“ wird verrechnet.` : '');
         q.classList.toggle('q-error', !d.success);
         if (!d.success) {
             q.hidden = false;
@@ -280,10 +285,21 @@
             q.innerHTML = `
                 <div class="q-row"><span>${nightsTxt(d.nights)} × ${money(d.night)}</span><span>${money(d.nights * d.night)}</span></div>
                 ${d.cleaning ? `<div class="q-row"><span>Endreinigung</span><span>${money(d.cleaning)}</span></div>` : ''}
+                ${d.voucher ? `<div class="q-row q-voucher"><span>Gutschein ${esc(d.voucher.code)} · ${esc(d.voucher.label)}</span><span>−${money(d.voucher.discount)}</span></div>` : ''}
                 <div class="q-row q-total"><span>Voraussichtlich gesamt</span><span>${money(d.total)}</span></div>`;
         }
-        $('#request-submit').disabled = false;
+        $('#request-submit').disabled = !!d.voucherError;
     }
+
+    // Voucher code: from a link (?gutschein=GS-…) or typed in; the quote shows the discount
+    (() => {
+        const fromLink = new URLSearchParams(location.search).get('gutschein');
+        if (fromLink) $('#f-voucher').value = fromLink.slice(0, 24);
+        let t = null;
+        const recheck = () => { clearTimeout(t); t = setTimeout(() => { if (selIn && selOut) updateQuote(); else $('#voucher-msg').hidden = true; }, 500); };
+        $('#f-voucher').addEventListener('input', recheck);
+        $('#f-voucher').addEventListener('change', recheck);
+    })();
 
     // ------------------------------------------------------------------
     // Booking request
@@ -307,6 +323,7 @@
             if (!d.success) { showError(err, d.error || 'Die Anfrage konnte nicht gesendet werden.'); return; }
             showError(err, '');
             f.reset();
+            $('#voucher-msg').hidden = true;
             selIn = selOut = null;
             $('#quote').hidden = true;
             renderCalendar();

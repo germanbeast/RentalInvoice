@@ -216,6 +216,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .quote .q-row { display: flex; justify-content: space-between; gap: 1rem; padding: .15rem 0; }
 .quote .q-total { font-weight: 600; border-top: 1px solid var(--line); margin-top: .5rem; padding-top: .55rem; }
 .quote.q-error { background: var(--bad-soft); color: var(--bad); }
+.quote .q-voucher { color: var(--ok, #2f6b4f); }
+.voucher-msg { margin: -.6rem 0 1rem; font-size: .88rem; color: var(--ok, #2f6b4f); }
+.voucher-msg.bad { color: var(--bad); }
 
 /* ---------- Meine Buchung (eigene Seite) ---------- */
 .account { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100svh; }

@@ -232,6 +232,7 @@
                     <div><span>Aufenthalt</span><strong>${nightsTxt(s.nights)}${guests ? ` · ${guests}` : ''}</strong></div>
                     <div><span>Gebucht über</span><strong>${esc(s.source)}</strong></div>
                     ${s.priceTotal ? `<div><span>Preis</span><strong>${money(s.priceTotal)}</strong></div>` : ''}
+                    ${s.voucher ? `<div><span>Gutschein</span><strong>${esc(s.voucher.code)}${s.voucher.discount ? ` · −${money(s.voucher.discount)}` : ''}</strong></div>` : ''}
                 </div>
             </div>
         </div>`);

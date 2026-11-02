@@ -121,7 +121,7 @@
         'nav-dashboard': ['calendar'], 'nav-calendar': ['calendar'], 'nav-bookings': ['bookings'],
         'nav-invoice': ['invoices'], 'nav-guests': ['bookings'], 'nav-website': ['bookings', 'website'],
         'nav-occupancy': ['finance'], 'nav-finance': ['finance'], 'nav-expenses': ['finance'], 'nav-estate': ['finance'],
-        'nav-chat': ['messages'], 'nav-welcome': ['settings'], 'btn-settings': ['settings'], 'nav-users': ['users'],
+        'nav-chat': ['messages'], 'nav-vouchers': ['vouchers'], 'btn-guest-voucher': [['vouchers', 'edit']], 'btn-inv-voucher': [['vouchers', 'view'], ['invoices', 'edit']], 'nav-welcome': ['settings'], 'btn-settings': ['settings'], 'nav-users': ['users'],
         'btn-new-booking': [['bookings', 'edit']], 'cal-sync-btn': [['calendar', 'edit']]
     };
     const SETTINGS_PAGE_RIGHTS = { 'settings-users': 'users', 'settings-push': null };
@@ -156,7 +156,7 @@
 
     /** First view the user may open (calendar for most, otherwise the first allowed one). */
     function allowedStartView(wanted) {
-        const area = { bookings: 'bookings', expenses: 'finance', invoice: 'invoices', dashboard: 'calendar', occupancy: 'finance', finance: 'finance', calendar: 'calendar', chat: 'messages' }[wanted];
+        const area = { bookings: 'bookings', expenses: 'finance', invoice: 'invoices', dashboard: 'calendar', occupancy: 'finance', finance: 'finance', calendar: 'calendar', chat: 'messages', vouchers: 'vouchers' }[wanted];
         if (wanted && area && canDo(area)) return wanted;
         const first = START_VIEWS.find(([, a]) => canDo(a));
         return first ? first[0] : null;
@@ -399,7 +399,7 @@
                     <input type="number" value="${pos.qty}" data-id="${pos.id}" data-field="qty" min="0" step="1" class="pos-input">
                 </td>
                 <td>
-                    <input type="number" value="${pos.price}" data-id="${pos.id}" data-field="price" min="0" step="0.01" class="pos-input">
+                    <input type="number" value="${pos.price}" data-id="${pos.id}" data-field="price" step="0.01" class="pos-input">
                 </td>
                 <td class="pos-total">${formatCurrency(total)}</td>
                 <td>
@@ -1408,6 +1408,7 @@
             zShowBank: $('#z-show-bank').checked,
             nukiPin: $('#nuki-pin-result').style.display !== 'none' ? $('#nuki-pin-code').textContent : null,
             positions: positions.map(p => ({ desc: p.desc, qty: p.qty, price: p.price })),
+            voucherCode: invoiceVoucherCode(),
             timestamp: Date.now()
         };
     }
@@ -1538,6 +1539,7 @@
             const data = await res.json();
             if (data.success) {
                 showToast(`Rechnung ${nummer} ${data.message}`, 'success');
+                if (data.voucherWarning) showToast(`Gutschein nicht eingelöst: ${data.voucherWarning}`, 'error', 7000);
                 await fetchArchive();
                 loadDashboard(); // Refresh stats after archiving
                 return true;
@@ -1589,8 +1591,8 @@
     });
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar, viewOccupancy, viewFinance, $('#view-chat')];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar, navOccupancy, navFinance, $('#nav-chat')];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar, viewOccupancy, viewFinance, $('#view-chat'), $('#view-vouchers')];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar, navOccupancy, navFinance, $('#nav-chat'), $('#nav-vouchers')];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1641,6 +1643,10 @@
             viewFinance.style.display = 'flex';
             navFinance.classList.add('active');
             loadFinance();
+        } else if (viewId === 'vouchers' && $('#view-vouchers')) {
+            $('#view-vouchers').style.display = 'flex';
+            $('#nav-vouchers').classList.add('active');
+            loadVouchers();
         }
 
         startViewPolling(viewId);
@@ -1663,6 +1669,7 @@
     if (navOccupancy) navOccupancy.addEventListener('click', () => switchView('occupancy'));
     if (navFinance) navFinance.addEventListener('click', () => switchView('finance'));
     if ($('#nav-chat')) $('#nav-chat').addEventListener('click', () => switchView('chat'));
+    if ($('#nav-vouchers')) $('#nav-vouchers').addEventListener('click', () => switchView('vouchers'));
 
     if (navWelcome) {
         navWelcome.addEventListener('click', () => {
@@ -1904,6 +1911,7 @@
         set('#a-anreise', b.checkin);
         set('#a-abreise', b.checkout);
         if (!b.name) showToast('Bitte noch den Gastnamen eintragen', 'info');
+        if (b.voucherCode && !invoiceVoucherCode()) setTimeout(() => applyInvoiceVoucher(b.voucherCode, b.id), 300);
     }
 
     const bookingsListEl = $('#bookings-list');
@@ -2162,6 +2170,7 @@
                 ${bk.guestCode ? `<dt>Gastcode</dt><dd><code>${escapeHtml(bk.guestCode)}</code></dd>` : ''}
                 ${bk.guestEmail ? `<dt>E-Mail</dt><dd>${escapeHtml(bk.guestEmail)}</dd>` : ''}
                 <dt>Meldeschein</dt><dd>${bk.meldescheinId ? 'ausgefüllt ✓' : bk.state === 'past' ? '–' : 'fehlt noch'}</dd>
+                ${bk.voucherCode ? `<dt>Gutschein</dt><dd><code>${escapeHtml(bk.voucherCode)}</code> eingelöst</dd>` : ''}
             </dl>
             <div class="pop-actions">
                 <button type="button" class="pill" data-pop="name">${bk.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
@@ -2170,6 +2179,7 @@
                 ${bk.state !== 'past' ? `<button type="button" class="pill" data-pop="doorcode">${bk.hasCode ? 'Türcode bearbeiten' : 'Türcode anlegen'}</button>` : ''}
                 ${bk.state !== 'past' && bk.guestCode ? '<button type="button" class="pill" data-pop="guestlink">Gastlink kopieren</button>' : ''}
                 <button type="button" class="pill" data-pop="chat">Nachricht</button>
+                ${bk.name && canDo('vouchers', 'edit') ? '<button type="button" class="pill" data-pop="voucher">Gutschein schenken</button>' : ''}
                 ${bk.manualEntry ? '<button type="button" class="pill pill-danger" data-pop="delete">Löschen</button>' : ''}
             </div>`;
         tlPop.dataset.bid = bk.id;
@@ -2185,6 +2195,7 @@
                 <dt>Dauer</dt><dd>${nightsTxt(rq.nights)}</dd>
                 <dt>Gäste</dt><dd>${rq.adults || 1} Erw.${rq.children ? ` · ${rq.children} Kinder` : ''}</dd>
                 ${rq.price_total ? `<dt>Preis</dt><dd>${formatCurrency(rq.price_total)}</dd>` : ''}
+                ${rq.voucher_code ? `<dt>Gutschein</dt><dd>${escapeHtml(rq.voucher_code)} (−${formatCurrency(rq.voucher_discount || 0)})</dd>` : ''}
                 ${rq.conflict ? `<dt>Achtung</dt><dd class="bad">überschneidet sich mit ${escapeHtml(rq.conflict.source)}</dd>` : ''}
             </dl>
             <div class="pop-actions"><button type="button" class="pill pill-primary" data-pop="request">Anfrage bearbeiten</button></div>`;
@@ -2237,6 +2248,7 @@
             if (act === 'chat') { hideTlPop(); return chatWithBooking(bk); }
             if (act === 'meldeschein') { hideTlPop(); return window.open(`/api/meldescheine/${bk.meldescheinId}/druck`, '_blank', 'noopener'); }
             if (act === 'doorcode') { hideTlPop(); return openDoorCode(bk); }
+            if (act === 'voucher') { hideTlPop(); return openVoucherModal(null, { guestId: bk.guestId, guestName: bk.name }); }
             if (act === 'delete') {
                 if (!confirm(`Buchung von ${bk.name || 'diesem Gast'} (${fmtDEfull(bk.checkin)} – ${fmtDEfull(bk.checkout)}) löschen?${bk.hasCode ? ' Der Türcode wird ebenfalls gelöscht.' : ''}`)) return;
                 const d = await apiJson(`/api/bookings/${bk.id}`, { method: 'DELETE' }).catch(() => null);
@@ -2296,6 +2308,19 @@
         $('#nb-nights').textContent = n > 0 ? nightsTxt(n) : '';
     }
 
+    async function nbCheckVoucher() {
+        const info = $('#nb-voucher-info');
+        const code = $('#nb-voucher').value.trim();
+        if (!code) { info.hidden = true; return; }
+        const q = new URLSearchParams({ code, checkin: $('#nb-checkin').value, checkout: $('#nb-checkout').value });
+        const d = await apiJson(`/api/vouchers/check?${q}`).catch(() => null);
+        info.hidden = false;
+        info.classList.toggle('bad', !(d && d.success));
+        info.textContent = d && d.success
+            ? `✓ ${d.label}${d.voucher.guestName ? ` für ${d.voucher.guestName}` : ''}${d.discount ? ` · entspricht ${formatCurrency(d.discount)}` : ''}`
+            : `✗ ${(d && d.error) || 'Code konnte nicht geprüft werden'}`;
+    }
+
     function openNewBooking(day) {
         if (!modalNewBooking) return;
         hideTlPop();
@@ -2305,6 +2330,7 @@
         $('#nb-checkin').value = from;
         $('#nb-checkout').value = ymdAdd(from, 1);
         $('#nb-msg').hidden = true;
+        $('#nb-voucher-info').hidden = true;
         nbForce = false;
         $('#btn-save-new-booking').textContent = 'Buchung speichern';
         nbUpdateNights();
@@ -2323,7 +2349,10 @@
             nbForce = false;
             $('#btn-save-new-booking').textContent = 'Buchung speichern';
             nbUpdateNights();
+            nbCheckVoucher();
         }));
+        let nbVoucherTimer = null;
+        $('#nb-voucher').addEventListener('input', () => { clearTimeout(nbVoucherTimer); nbVoucherTimer = setTimeout(nbCheckVoucher, 450); });
         $('#nb-form').addEventListener('submit', async e => {
             e.preventDefault();
             const msg = $('#nb-msg');
@@ -2331,7 +2360,7 @@
             const body = {
                 name: $('#nb-name').value.trim(), email: $('#nb-email').value.trim(), phone: $('#nb-phone').value.trim(),
                 checkin: $('#nb-checkin').value, checkout: $('#nb-checkout').value, note: $('#nb-note').value.trim(),
-                createPin: $('#nb-pin').checked, force: nbForce
+                createPin: $('#nb-pin').checked, force: nbForce, voucherCode: $('#nb-voucher').value.trim()
             };
             btn.disabled = true;
             try {
@@ -2339,7 +2368,7 @@
                 const d = await res.json();
                 if (d.success) {
                     closeNewBooking();
-                    showToast(`Buchung gespeichert${d.pin ? ` – Türcode ${d.pin}` : ''}`, 'success', 5000);
+                    showToast(`Buchung gespeichert${d.pin ? ` – Türcode ${d.pin}` : ''}${d.voucher ? ` – Gutschein ${d.voucher.code} eingelöst` : ''}`, 'success', 5000);
                     if (d.pinError) showToast(`Türcode nicht angelegt: ${d.pinError}`, 'error', 6000);
                     tlStart = ymdAdd(body.checkin, -3);
                     if (currentView === 'calendar') loadCalendarHome(); else switchView('calendar');
@@ -2975,7 +3004,7 @@
                 </div>
                 <div>
                     <div>${fmtDEfull(r.checkin)} – ${fmtDEfull(r.checkout)}</div>
-                    <div class="booking-sub">${nightsTxt(r.nights)} · ${guests}${r.price_total ? ' · ' + formatCurrency(r.price_total) : ''}</div>
+                    <div class="booking-sub">${nightsTxt(r.nights)} · ${guests}${r.price_total ? ' · ' + formatCurrency(r.price_total) : ''}${r.voucher_code ? ` · 🎁 ${escapeHtml(r.voucher_code)} (−${formatCurrency(r.voucher_discount || 0)})` : ''}</div>
                     ${r.conflict ? `<div class="req-conflict">⚠️ Belegt durch ${escapeHtml(r.conflict.source)} (${fmtDEfull(r.conflict.checkin)} – ${fmtDEfull(r.conflict.checkout)})</div>` : ''}
                 </div>
                 <div class="booking-actions">${actions}</div>
@@ -4442,6 +4471,7 @@
         // Clear positions
         positions = [];
         renderPositions();
+        if ($('#inv-voucher-info')) $('#inv-voucher-info').hidden = true;
 
         // Clear draft
         clearDraft();
@@ -7466,6 +7496,258 @@
         });
         const nav = document.querySelector('.nav-item[data-target="settings-chat"]');
         if (nav) nav.addEventListener('click', () => loadChatSettings());
+    }
+    // =======================
+    // Gutscheine
+    // =======================
+    let vouchersData = [];
+    let vcFilter = 'open';
+    let vcQuery = '';
+    let vcEditing = null;   // voucher being edited, null = new
+    let vcKind = 'nights';
+    const VC_STATUS = {
+        active: ['Offen', 'confirmed'], reserved: ['Vorgemerkt', 'pending'], upcoming: ['Noch nicht gültig', 'pending'],
+        redeemed: ['Eingelöst', 'redeemed'], expired: ['Abgelaufen', 'cancelled'], cancelled: ['Entwertet', 'cancelled']
+    };
+    const vcDate = ymd => ymd ? fmtDEfull(ymd) : '';
+
+    /** Code of the voucher position in the invoice form ("Gutschein GS-… (…)"), or null. */
+    function invoiceVoucherCode() {
+        const p = positions.find(x => /^Gutschein [A-Z0-9-]{4,}/.test(String(x.desc || '')));
+        return p ? String(p.desc).split(' ')[1] : null;
+    }
+
+    /** Checks a code for the stay in the invoice form and adds the discount position. */
+    async function applyInvoiceVoucher(code, bookingId) {
+        const info = $('#inv-voucher-info');
+        code = String(code || '').trim();
+        if (!code) return;
+        const anreise = $('#a-anreise').value, abreise = $('#a-abreise').value;
+        if (!anreise || !abreise) { showToast('Bitte zuerst An- und Abreise eintragen', 'error'); return; }
+        if (invoiceVoucherCode()) { showToast('Diese Rechnung enthält schon einen Gutschein', 'error'); return; }
+        const nights = calcNights(anreise, abreise);
+        // Nightly price: the position with the nights as quantity, else one called "Übernachtung"
+        const perNight = positions.find(p => p.qty === nights && p.price > 0);
+        const lump = !perNight && positions.find(p => /nacht|übernacht|aufenthalt/i.test(p.desc) && p.qty === 1 && p.price > 0);
+        const nightPrice = perNight ? perNight.price : lump && nights > 0 ? Math.round(lump.price / nights * 100) / 100 : '';
+        const mwst = $('#kleinunternehmer').checked ? 0 : getMwstRate();
+        const subtotal = getSubtotal();
+        const q = new URLSearchParams({ code, checkin: anreise, checkout: abreise, mwst: String(mwst) });
+        if (nightPrice) q.set('nightPrice', String(nightPrice));
+        if (subtotal > 0) q.set('total', String(Math.round(subtotal * (1 + mwst / 100) * 100) / 100));
+        if (bookingId) q.set('bookingId', String(bookingId));
+        const d = await apiJson(`/api/vouchers/check?${q}`).catch(() => null);
+        if (!d || !d.success) {
+            info.hidden = false; info.classList.add('bad');
+            info.textContent = (d && d.error) || 'Gutschein konnte nicht geprüft werden';
+            return;
+        }
+        info.classList.remove('bad');
+        info.hidden = false;
+        info.textContent = `✓ ${d.label}${d.voucher.guestName ? ` (für ${d.voucher.guestName})` : ''} verrechnet: −${formatCurrency(d.discount)}. Wird beim Speichern der Rechnung als eingelöst markiert.`;
+        $('#inv-voucher-form').hidden = true;
+        $('#btn-inv-voucher').hidden = false;
+        addPosition(d.line.desc, d.line.qty, d.line.price);
+    }
+
+    if ($('#btn-inv-voucher')) {
+        $('#btn-inv-voucher').addEventListener('click', () => {
+            $('#inv-voucher-form').hidden = false;
+            $('#btn-inv-voucher').hidden = true;
+            $('#inv-voucher-code').value = '';
+            $('#inv-voucher-code').focus();
+        });
+        $('#btn-inv-voucher-cancel').addEventListener('click', () => {
+            $('#inv-voucher-form').hidden = true;
+            $('#btn-inv-voucher').hidden = false;
+            $('#inv-voucher-info').hidden = true;
+        });
+        $('#btn-inv-voucher-apply').addEventListener('click', () => applyInvoiceVoucher($('#inv-voucher-code').value));
+        $('#inv-voucher-code').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyInvoiceVoucher($('#inv-voucher-code').value); } });
+    }
+
+    async function loadVouchers() {
+        const d = await apiJson('/api/vouchers').catch(() => null);
+        if (!d || !d.success) { $('#vc-list').innerHTML = '<div class="bookings-empty">Gutscheine konnten nicht geladen werden.</div>'; return; }
+        vouchersData = d.vouchers;
+        const sm = d.summary;
+        const tile = (label, value, sub) => `<div class="card stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${sub ? `<div class="review-sub">${sub}</div>` : ''}</div>`;
+        $('#vc-kpis').innerHTML = [
+            tile('Offene Gutscheine', sm.open, sm.open ? [sm.openNights ? `${sm.openNights} Gratisnächte` : '', sm.openAmount ? formatCurrency(sm.openAmount) : '', sm.openPercent ? `${sm.openPercent}× Rabatt` : ''].filter(Boolean).join(' · ') : 'keine offenen'),
+            tile('Eingelöst', sm.redeemed, sm.redeemedValue ? `Wert ${formatCurrency(sm.redeemedValue)}` : ''),
+            tile('Gesamt', vouchersData.length, 'angelegte Gutscheine')
+        ].join('');
+        renderVouchers();
+    }
+
+    function renderVouchers() {
+        const list = $('#vc-list');
+        const q = vcQuery.toLowerCase();
+        const groups = { open: ['active', 'reserved', 'upcoming'], redeemed: ['redeemed'], closed: ['expired', 'cancelled'] };
+        const rows = vouchersData.filter(v => (vcFilter === 'all' || groups[vcFilter].includes(v.status)) &&
+            (!q || [v.code, v.guestName, v.note, v.label].some(x => String(x || '').toLowerCase().includes(q))));
+        if (!rows.length) {
+            list.innerHTML = `<div class="bookings-empty">${vouchersData.length ? 'Keine Gutscheine in dieser Auswahl.' : 'Noch keine Gutscheine. Mit „+ Neuer Gutschein“ z. B. 2 Gratisnächte für einen Stammgast anlegen.'}</div>`;
+            return;
+        }
+        const edit = canDo('vouchers', 'edit');
+        list.innerHTML = rows.map(v => {
+            const [stLabel, stCls] = VC_STATUS[v.status] || [v.status, ''];
+            const validity = [v.validFrom ? `ab ${vcDate(v.validFrom)}` : '', v.validUntil ? `bis ${vcDate(v.validUntil)}` : 'unbegrenzt'].filter(Boolean).join(' ');
+            let redeemed = '';
+            if (v.status === 'redeemed') {
+                redeemed = `Eingelöst${v.redeemedAt ? ` am ${fmtDEfull(String(v.redeemedAt).slice(0, 10))}` : ''}${v.redeemedVia ? ` · ${escapeHtml(v.redeemedVia)}` : ''}` +
+                    `${v.redeemedCheckin ? ` · Aufenthalt ${fmtDEfull(v.redeemedCheckin)} – ${fmtDEfull(v.redeemedCheckout)}` : ''}` +
+                    `${v.redeemedValue ? ` · ${formatCurrency(v.redeemedValue)}` : ''}${v.invoice ? ` · Rechnung ${escapeHtml(v.invoice.number)}` : ''}`;
+            } else if (v.status === 'reserved' && v.request) {
+                redeemed = `Vorgemerkt für Anfrage von ${escapeHtml(v.request.name)} (${fmtDEfull(v.request.checkin)} – ${fmtDEfull(v.request.checkout)})`;
+            }
+            const actions = [
+                '<button class="btn-mini" data-vc="print">Drucken</button>',
+                '<button class="btn-mini" data-vc="text">Text kopieren</button>',
+                edit ? '<button class="btn-mini" data-vc="edit">Bearbeiten</button>' : '',
+                edit && ['active', 'upcoming', 'expired', 'reserved'].includes(v.status) ? '<button class="btn-mini" data-vc="cancel">Entwerten</button>' : '',
+                edit && ['redeemed', 'cancelled'].includes(v.status) ? '<button class="btn-mini" data-vc="activate">Wieder aktivieren</button>' : '',
+                edit && v.status === 'active' ? '<button class="btn-mini" data-vc="redeem">Als eingelöst markieren</button>' : '',
+                edit && v.rawStatus !== 'redeemed' && !v.invoice ? '<button class="btn-mini" data-vc="delete">Löschen</button>' : ''
+            ].join('');
+            return `<div class="card req-card vc-card" data-id="${v.id}">
+                <div>
+                    <div class="booking-name"><code class="vc-code">${escapeHtml(v.code)}</code><span class="req-status ${stCls}">${stLabel}</span></div>
+                    <div class="vc-label">${escapeHtml(v.label)}${v.minNights ? ` <small>· ab ${v.minNights} Nächten</small>` : ''}</div>
+                    <div class="booking-sub">${v.guestName ? `für ${escapeHtml(v.guestName)}` : 'ohne Gast'} · angelegt ${fmtDEfull(String(v.createdAt || '').slice(0, 10))}${v.createdBy ? ` von ${escapeHtml(v.createdBy)}` : ''}</div>
+                </div>
+                <div>
+                    <div>Einlösbar ${validity}</div>
+                    ${redeemed ? `<div class="booking-sub">${redeemed}</div>` : ''}
+                </div>
+                ${v.dedication ? `<div class="req-msg">„${escapeHtml(v.dedication)}“</div>` : ''}
+                ${v.note ? `<div class="req-msg">📝 ${escapeHtml(v.note)}</div>` : ''}
+                <div class="booking-actions">${actions}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function vcSetKind(kind) {
+        vcKind = kind;
+        $$('#vc-kind button').forEach(b => b.classList.toggle('active', b.dataset.kind === kind));
+        const el = $('#vc-value');
+        $('#vc-value-label').textContent = kind === 'nights' ? 'Anzahl Nächte' : kind === 'percent' ? 'Rabatt in %' : 'Betrag in €';
+        el.step = kind === 'amount' ? '0.01' : '1';
+        el.max = kind === 'percent' ? '100' : kind === 'nights' ? '60' : '';
+    }
+
+    async function openVoucherModal(v, preset = {}) {
+        vcEditing = v || null;
+        $('#vc-form').reset();
+        $('#vc-msg').hidden = true;
+        $('#vc-title').textContent = v ? `Gutschein ${v.code} bearbeiten` : 'Neuer Gutschein';
+        $('#btn-save-voucher').textContent = v ? 'Speichern' : 'Gutschein anlegen';
+        $('#vc-code-wrap').hidden = !!v;
+        const today = berlinYmd();
+        vcSetKind(v ? v.kind : 'nights');
+        $('#vc-value').value = v ? v.value : 2;
+        $('#vc-min').value = v && v.minNights ? v.minNights : '';
+        $('#vc-guest').value = v ? v.guestName : (preset.guestName || '');
+        $('#vc-guest').dataset.guestId = v ? (v.guestId || '') : (preset.guestId || '');
+        $('#vc-from').value = v ? v.validFrom : today;
+        // Default: redeemable until the end of the third year (usual period for vouchers in Germany)
+        $('#vc-until').value = v ? v.validUntil : `${Number(today.slice(0, 4)) + 3}-12-31`;
+        $('#vc-dedication').value = v ? v.dedication : '';
+        $('#vc-note').value = v ? v.note : '';
+        $('#modal-voucher').style.display = 'flex';
+        setTimeout(() => $('#vc-value').focus(), 50);
+        // Guest names for the suggestion list (needs the bookings right; without it the field stays free text)
+        const g = await apiJson('/api/guests').catch(() => null);
+        const guests = Array.isArray(g) ? g : (g && (g.guests || g.data)) || [];
+        $('#vc-guest-list').innerHTML = guests.slice(0, 500).map(x => `<option value="${escapeHtml(x.name)}"></option>`).join('');
+        $('#vc-guest-list').dataset.map = JSON.stringify(guests.map(x => [x.name, x.id]));
+    }
+    const closeVoucherModal = () => { $('#modal-voucher').style.display = 'none'; };
+
+    if ($('#modal-voucher')) {
+        $('#btn-new-voucher').addEventListener('click', () => openVoucherModal(null));
+        $('#btn-close-voucher').addEventListener('click', closeVoucherModal);
+        $('#btn-cancel-voucher').addEventListener('click', closeVoucherModal);
+        $('#modal-voucher').addEventListener('click', e => { if (e.target.id === 'modal-voucher') closeVoucherModal(); });
+        $$('#vc-kind button').forEach(b => b.addEventListener('click', () => {
+            vcSetKind(b.dataset.kind);
+            $('#vc-value').value = b.dataset.kind === 'nights' ? 2 : b.dataset.kind === 'percent' ? 10 : 50;
+        }));
+        $('#vc-guest').addEventListener('input', () => { $('#vc-guest').dataset.guestId = ''; });
+        $$('#vc-filter button').forEach(b => b.addEventListener('click', () => {
+            vcFilter = b.dataset.filter;
+            $$('#vc-filter button').forEach(x => x.classList.toggle('active', x === b));
+            renderVouchers();
+        }));
+        $('#vc-search').addEventListener('input', e => { vcQuery = e.target.value.trim(); renderVouchers(); });
+
+        $('#vc-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const msg = $('#vc-msg');
+            const name = $('#vc-guest').value.trim();
+            let guestId = $('#vc-guest').dataset.guestId || '';
+            if (!guestId && name) {
+                try { const hit = JSON.parse($('#vc-guest-list').dataset.map || '[]').find(([n]) => n.toLowerCase() === name.toLowerCase()); if (hit) guestId = hit[1]; } catch (x) { /* free text */ }
+            }
+            const body = {
+                kind: vcKind, value: $('#vc-value').value, minNights: $('#vc-min').value, guestId, guestName: name,
+                validFrom: $('#vc-from').value, validUntil: $('#vc-until').value,
+                dedication: $('#vc-dedication').value, note: $('#vc-note').value, code: vcEditing ? undefined : $('#vc-code').value.trim()
+            };
+            const btn = $('#btn-save-voucher');
+            btn.disabled = true;
+            const d = await apiJson(vcEditing ? `/api/vouchers/${vcEditing.id}` : '/api/vouchers', {
+                method: vcEditing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            }).catch(() => null);
+            btn.disabled = false;
+            if (!d || !d.success) { msg.hidden = false; msg.textContent = (d && d.error) || 'Speichern fehlgeschlagen'; return; }
+            closeVoucherModal();
+            showToast(vcEditing ? 'Gutschein gespeichert' : `Gutschein ${d.voucher.code} angelegt`, 'success', 5000);
+            if (currentView === 'vouchers') loadVouchers(); else switchView('vouchers');
+        });
+
+        $('#vc-list').addEventListener('click', async e => {
+            const btn = e.target.closest('[data-vc]');
+            if (!btn) return;
+            const v = vouchersData.find(x => String(x.id) === btn.closest('.vc-card').dataset.id);
+            if (!v) return;
+            const act = btn.dataset.vc;
+            if (act === 'print') return window.open(`/api/vouchers/${v.id}/print`, '_blank', 'noopener');
+            if (act === 'edit') return openVoucherModal(v);
+            if (act === 'text') {
+                const d = await apiJson(`/api/vouchers/${v.id}/text`).catch(() => null);
+                if (d && d.success) { await copyText(d.text); showToast('Text für den Gast kopiert (WhatsApp, E-Mail …)', 'success'); }
+                else showToast('Text konnte nicht erstellt werden', 'error');
+                return;
+            }
+            let req;
+            if (act === 'delete') {
+                if (!confirm(`Gutschein ${v.code} löschen?`)) return;
+                req = apiJson(`/api/vouchers/${v.id}`, { method: 'DELETE' });
+            } else {
+                const ask = { cancel: `Gutschein ${v.code} entwerten? Er kann danach nicht mehr eingelöst werden.`, activate: `Gutschein ${v.code} wieder aktivieren? Eine Einlösung wird dabei zurückgenommen.` }[act];
+                if (ask && !confirm(ask)) return;
+                const body = { action: act };
+                if (act === 'redeem') {
+                    const val = prompt(`Gutschein ${v.code} (${v.label}) als eingelöst markieren.\n\nWert in € (optional, für die Übersicht):`, '');
+                    if (val === null) return;
+                    if (val.trim()) body.value = parseFloat(val.replace(',', '.'));
+                }
+                req = apiJson(`/api/vouchers/${v.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            }
+            const d = await req.catch(() => null);
+            if (d && d.success) loadVouchers();
+            else showToast((d && d.error) || 'Aktion fehlgeschlagen', 'error');
+        });
+    }
+
+    if ($('#btn-guest-voucher')) {
+        $('#btn-guest-voucher').addEventListener('click', () => {
+            if (!currentGuestId) { showToast('Bitte den Gast zuerst speichern', 'info'); return; }
+            $('#modal-guests').style.display = 'none';
+            openVoucherModal(null, { guestId: currentGuestId, guestName: $('#guest-edit-name').value.trim() });
+        });
     }
 })();
 // Version 3.0 - SQLite Database Migration

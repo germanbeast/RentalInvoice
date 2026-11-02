@@ -5,6 +5,21 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.0] - 2026-11-02
+
+### Neu
+- Gutscheine (`vouchers.js`, Tabelle `vouchers`): Arten Gratisnächte / Betrag / Prozent, Code `GS-XXXXXX` oder eigener Code, optional Gast, einlösbar ab/bis (Datum der Einlösung), Mindestaufenthalt, interne Notiz, Text auf dem Gutschein. Einmalig einlösbar; Status offen / vorgemerkt / eingelöst / abgelaufen / entwertet
+- Admin-Seite „Gutscheine“ (Seitenleiste): Übersicht mit Kennzahlen, Filter, Anlegen/Bearbeiten, Drucken (`GET /api/vouchers/:id/print`, A5 quer), Text für den Gast mit Link `?gutschein=CODE#buchen`, Entwerten, Wieder aktivieren, von Hand einlösen
+- Webseite: Feld „Gutscheincode“ in der Buchungsanfrage, `/gast/api/quote` zeigt den Rabatt (max. 20 Code-Prüfungen pro 15 Min.); die Anfrage merkt den Gutschein vor (`booking_requests.voucher_code/voucher_discount`), Bestätigen löst ihn ein, Ablehnen/Stornieren gibt ihn frei
+- „Buchung eintragen“: optionaler Gutscheincode mit Live-Prüfung; Löschen der Buchung gibt den Gutschein wieder frei
+- Rechnungsformular: „Gutschein einlösen“ fügt eine Rabatt-Position hinzu (`GET /api/vouchers/check`), Speichern markiert den Gutschein als eingelöst. Rechnung aus einer Buchung mit Gutschein übernimmt ihn automatisch
+- `bot-logic.buildInvoiceData()` und die Gast-Rechnung auf „Meine Buchung“ ergänzen die Rabatt-Position eines für den Aufenthalt eingelösten Gutscheins
+- Rechte-Bereich `vouchers` („Gutscheine“, Manager: Bearbeiten); die Code-Prüfung ist auch mit Rechnungen- oder Buchungen-Bearbeiten erlaubt
+
+### Geändert
+- Einzelpreis einer Rechnungsposition darf negativ sein (Rabatte)
+- Kalender-Popup zeigt einen eingelösten Gutschein und bietet „Gutschein schenken“
+
 ## [1.39.0] - 2026-11-02
 
 ### Neu

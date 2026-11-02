@@ -676,6 +676,21 @@ function buildInvoiceData(data) {
         ...(data.extra || {})
     };
 
+    // A voucher redeemed for this stay (website request, "Buchung eintragen") becomes a discount position
+    const hasVoucherLine = invoiceData.positions.some(p => /^Gutschein /.test(String(p.desc || '')));
+    if (!data.noVoucher && !invoiceData.voucherCode && !hasVoucherLine && data.arrival && data.departure) {
+        try {
+            const vl = require('./vouchers').invoiceLineForStay({
+                bookingId: data.bookingId, checkin: data.arrival, checkout: data.departure,
+                nightPrice: Number(pricing.price_per_night) || 0, mwst: pricing.kleinunternehmer ? 0 : (Number(pricing.mwst_rate) || 0)
+            });
+            if (vl) {
+                invoiceData.positions = [...invoiceData.positions, vl.line];
+                invoiceData.voucherCode = vl.voucher.code;
+            }
+        } catch (e) { console.warn('Gutschein für Rechnung nicht geprüft:', e.message); }
+    }
+
     // Calculate totalAmount for correct DB storage
     const subtotal = invoiceData.positions.reduce((sum, p) => sum + (p.qty * p.price), 0);
     const mwst = invoiceData.kleinunternehmer ? 0 : subtotal * ((invoiceData.mwstSatz || 0) / 100);

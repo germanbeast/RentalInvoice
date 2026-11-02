@@ -12,6 +12,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const vouchers = require('./vouchers');
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
 const SITE_DIR = path.join(__dirname, 'guest-site');
@@ -96,6 +97,19 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         const { night, cleaning } = getPricing();
         if (!night) return { nights, total: null };
         return { nights, night, cleaning, total: Math.round((nights * night + cleaning) * 100) / 100 };
+    }
+
+    /** Quote with a voucher code: { voucher: { code, label, discount } | null, voucherError, total (after discount) } */
+    function quoteWithVoucher(checkin, checkout, code) {
+        const q = quote(checkin, checkout);
+        if (!String(code || '').trim()) return { ...q, voucher: null };
+        if (!q.total) return { ...q, voucher: null, voucherError: 'Gutscheine können wir bei dieser Anfrage nur persönlich verrechnen. Bitte den Code in die Nachricht schreiben.' };
+        const c = vouchers.check(code, { checkin, checkout, nightPrice: q.night, total: q.total });
+        if (!c.ok) return { ...q, voucher: null, voucherError: c.error };
+        return {
+            ...q, fullTotal: q.total, total: Math.round((q.total - c.discount) * 100) / 100,
+            voucher: { id: c.voucher.id, code: c.voucher.code, label: c.label, discount: c.discount, freeNights: c.freeNights }
+        };
     }
 
     function randomCode() {
@@ -227,6 +241,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             v.guests = { adults: request.adults, children: request.children };
             v.priceTotal = request.price_total || null;
             v.hostNote = request.host_note || '';
+            if (request.voucher_code) v.voucher = { code: request.voucher_code, discount: request.voucher_discount || 0 };
             if (site.show_bank && request.price_total) v.payment = { text: site.payment_info || '', bank: bankText(), reference: b.guest_code };
         }
         return v;
@@ -260,21 +275,33 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         const nights = nightsBetween(b.checkin, b.checkout);
         if (nights < 1) return null;
         const q = quote(b.checkin, b.checkout);
-        const request = sql().prepare('SELECT price_total FROM booking_requests WHERE booking_id = ?').get(b.id);
+        const request = sql().prepare('SELECT price_total, voucher_discount FROM booking_requests WHERE booking_id = ?').get(b.id);
+        const pricingAll = db.getAllSettings().pricing || {};
+        const vl = vouchers.invoiceLineForStay({
+            bookingId: b.id, checkin: b.checkin, checkout: b.checkout, nightPrice: q.night, total: q.total || undefined,
+            mwst: pricingAll.kleinunternehmer ? 0 : (Number(pricingAll.mwst_rate) || 0)
+        });
+        // The request price is after the voucher discount: compare the price before the discount with the quote
+        const agreed = request && request.price_total ? Math.round((request.price_total + (vl ? (Number(request.voucher_discount) || 0) : 0)) * 100) / 100 : 0;
         let positions;
-        if (request && request.price_total && request.price_total !== q.total) {
+        if (vl && request && request.price_total && agreed !== q.total) {
+            // Price changed by hand on confirmation: agreed price as one position, the voucher is already included
+            positions = [{ desc: `Aufenthalt (${nights} ${nights === 1 ? 'Nacht' : 'Nächte'} inkl. Endreinigung, ${vl.voucher.code} verrechnet)`, qty: 1, price: request.price_total }];
+        } else if (vl && q.total) {
+            positions = [{ desc: 'Übernachtung', qty: nights, price: q.night }, { desc: 'Endreinigung', qty: 1, price: q.cleaning }, vl.line];
+        } else if (request && request.price_total && request.price_total !== q.total) {
             positions = [{ desc: `Aufenthalt (${nights} ${nights === 1 ? 'Nacht' : 'Nächte'} inkl. Endreinigung)`, qty: 1, price: request.price_total }];
         } else if (q.total) {
             positions = [{ desc: 'Übernachtung', qty: nights, price: q.night }, { desc: 'Endreinigung', qty: 1, price: q.cleaning }];
         } else {
             return null; // no prices set up
         }
-        const pricing = db.getAllSettings().pricing || {};
-        const mwstRate = pricing.kleinunternehmer ? 0 : (Number(pricing.mwst_rate) || 0);
+        const mwstRate = pricingAll.kleinunternehmer ? 0 : (Number(pricingAll.mwst_rate) || 0);
         const net = positions.reduce((sum, p) => sum + p.qty * p.price, 0);
         const platform = source === 'Booking.com' || source === 'Airbnb';
         return {
             positions, mwstRate, total: Math.round(net * (1 + mwstRate / 100) * 100) / 100,
+            voucherCode: vl ? vl.voucher.code : null, voucherId: vl ? vl.voucher.id : null,
             payment: platform ? { zBezahlt: true, zMethode: source } : { zBezahlt: false, zShowBank: true }
         };
     }
@@ -286,6 +313,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             kind: 'request', code: r.code, status: r.status,
             checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout), state: stayState(r.checkin, r.checkout),
             name: r.name, guests: { adults: r.adults, children: r.children }, priceTotal: r.price_total || null,
+            voucher: r.voucher_code ? { code: r.voucher_code, discount: r.voucher_discount || 0 } : null,
             hostNote: r.host_note || '', source: 'Direkt',
             details: { name: r.name, email: r.email, phone: r.phone || '' },
             contact: site.show_contact ? contactInfo(settings) : null,
@@ -458,11 +486,20 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         return null;
     }
 
-    router.post('/api/quote', (req, res) => {
-        const { checkin, checkout } = req.body || {};
+    // Voucher codes are checked at most 20 times per 15 minutes per visitor (no guessing of codes)
+    const voucherLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+        skip: req => !String((req.body && req.body.voucher) || '').trim(),
+        message: { success: false, error: 'Zu viele Gutschein-Versuche. Bitte warten Sie 15 Minuten.' }
+    });
+
+    router.post('/api/quote', voucherLimiter, (req, res) => {
+        const { checkin, checkout, voucher } = req.body || {};
         const err = validateStay(String(checkin || ''), String(checkout || ''));
         if (err) return res.json({ success: false, error: err });
-        res.json({ success: true, ...quote(checkin, checkout) });
+        const q = quoteWithVoucher(checkin, checkout, voucher);
+        if (q.voucher) delete q.voucher.id;
+        res.json({ success: true, ...q });
     });
 
     router.post('/api/request', requestLimiter, async (req, res) => {
@@ -484,12 +521,24 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             const err = validateStay(checkin, checkout, adults, children);
             if (err) return res.status(400).json({ success: false, error: err });
 
-            const q = quote(checkin, checkout);
+            const q = quoteWithVoucher(checkin, checkout, b.voucher);
+            if (q.voucherError) return res.status(400).json({ success: false, error: `Gutschein: ${q.voucherError}` });
             const code = newCode();
-            const result = sql().prepare(`
-                INSERT INTO booking_requests (code, name, email, phone, adults, children, checkin, checkout, message, price_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(code, name, email, phone, adults, children, checkin, checkout, message, q.total || 0);
+            const result = sql().transaction(() => {
+                // Checked again inside the transaction: two requests at the same moment never share one voucher
+                if (q.voucher) {
+                    const again = vouchers.check(q.voucher.code, { checkin, checkout, nightPrice: q.night, total: q.fullTotal });
+                    if (!again.ok) return null;
+                }
+                const r = sql().prepare(`
+                    INSERT INTO booking_requests (code, name, email, phone, adults, children, checkin, checkout, message, price_total, voucher_code, voucher_discount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).run(code, name, email, phone, adults, children, checkin, checkout, message, q.total || 0,
+                    q.voucher ? q.voucher.code : null, q.voucher ? q.voucher.discount : 0);
+                if (q.voucher) vouchers.reserveForRequest(q.voucher.id, Number(r.lastInsertRowid));
+                return r;
+            })();
+            if (!result) return res.status(400).json({ success: false, error: 'Gutschein: Dieser Gutschein ist bereits vorgemerkt.' });
 
             // Log the guest in right away so they land on their status page
             req.session.guest = { kind: 'request', id: Number(result.lastInsertRowid), code };
@@ -497,13 +546,15 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             const period = `${formatDateDE(checkin)} – ${formatDateDE(checkout)}`;
             await notify(
                 `📝 *Neue Buchungsanfrage (Webseite)*\n${name}, ${adults} Erw.${children ? ` + ${children} Kind${children === 1 ? '' : 'er'}` : ''}\n` +
-                `📅 ${period} (${q.nights} Nächte)${q.total ? `\n💶 ${money(q.total)}` : ''}\n✉️ ${email}${phone ? ` · ${phone}` : ''}` +
+                `📅 ${period} (${q.nights} Nächte)${q.total ? `\n💶 ${money(q.total)}` : ''}` +
+                `${q.voucher ? `\n🎁 Gutschein ${q.voucher.code}: ${q.voucher.label} (−${money(q.voucher.discount)})` : ''}\n✉️ ${email}${phone ? ` · ${phone}` : ''}` +
                 `${message ? `\n💬 ${message.substring(0, 300)}` : ''}\n\nBitte im Admin unter „Webseite“ bestätigen oder ablehnen.`,
                 'site_request');
 
             const site = getSite();
             await sendMail(email, `Ihre Anfrage bei ${site.title} (${code})`,
                 `Guten Tag ${name},\n\nvielen Dank für Ihre Anfrage für den Zeitraum ${period}.\n` +
+                `${q.voucher ? `Gutschein ${q.voucher.code} (${q.voucher.label}): −${money(q.voucher.discount)}\n` : ''}` +
                 `${q.total ? `Voraussichtlicher Preis: ${money(q.total)}\n` : ''}\n` +
                 `Wir melden uns so schnell wie möglich. Den Stand Ihrer Anfrage sehen Sie jederzeit hier:\n${siteUrl(req)}/meine-buchung\n\n` +
                 `Ihr Buchungscode: ${code}\nAnreisedatum: ${formatDateDE(checkin)}\n\nViele Grüße\n${site.title}`);
@@ -633,10 +684,11 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 const data = botLogic.buildInvoiceData({
                     gName: f.company || f.name,
                     gAdresse: [f.company ? `z. Hd. ${f.name}` : '', address, f.vatId ? `USt-IdNr.: ${f.vatId}` : ''].filter(Boolean).join('\n'),
-                    arrival: b.checkin, departure: b.checkout, positions: plan.positions, ...plan.payment,
-                    extra: { guest_id: guestId, guestInvoice: { ...f, bookingCode: b.guest_code, source: sourceOf(b), createdAt: new Date().toISOString() } }
+                    arrival: b.checkin, departure: b.checkout, positions: plan.positions, ...plan.payment, noVoucher: true,
+                    extra: { guest_id: guestId, ...(plan.voucherCode ? { voucherCode: plan.voucherCode } : {}), guestInvoice: { ...f, bookingCode: b.guest_code, source: sourceOf(b), createdAt: new Date().toISOString() } }
                 });
-                db.saveInvoice(data);
+                const saved = db.saveInvoice(data);
+                if (plan.voucherId) vouchers.redeem(plan.voucherId, { invoiceId: saved.id, bookingId: b.id, checkin: b.checkin, checkout: b.checkout });
                 return data;
             })();
             if (!invoiceData) return res.status(409).json({ success: false, error: 'Für diese Buchung gibt es schon eine Rechnung.' });
@@ -890,6 +942,12 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 const bookingId = Number(ins.lastInsertRowid);
                 sql().prepare(`UPDATE booking_requests SET status = 'confirmed', host_note = ?, price_total = ?, booking_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
                     .run(note, price, bookingId, r.id);
+                if (r.voucher_code) {
+                    const v = vouchers.getByCode(r.voucher_code);
+                    if (v && v.request_id === r.id) {
+                        vouchers.redeem(v.id, { bookingId, checkin: r.checkin, checkout: r.checkout, value: r.voucher_discount || 0, via: 'Webseiten-Anfrage', guestId: guest.id });
+                    }
+                }
 
                 let pin = null;
                 try {
@@ -921,6 +979,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             if (r.status !== 'pending') return res.status(400).json({ success: false, error: 'Anfrage ist nicht mehr offen' });
             const note = String((req.body && req.body.note) || '').trim().substring(0, 1000);
             sql().prepare(`UPDATE booking_requests SET status = 'declined', host_note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(note, r.id);
+            vouchers.releaseRequest(r.id);
             const site = getSite();
             const mailed = await sendMail(r.email, `Ihre Anfrage bei ${site.title} (${r.code})`,
                 `Guten Tag ${r.name},\n\nvielen Dank für Ihr Interesse. Leider können wir Ihre Anfrage für ` +
@@ -940,6 +999,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                 }
             }
             if (b) sql().prepare('DELETE FROM bookings WHERE id = ?').run(b.id);
+            vouchers.releaseRequest(r.id);
+            if (b) vouchers.releaseBooking(b.id);
             const note = String((req.body && req.body.note) || '').trim().substring(0, 1000);
             sql().prepare(`UPDATE booking_requests SET status = 'cancelled', booking_id = NULL, host_note = COALESCE(NULLIF(?, ''), host_note), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(note, r.id);
             res.json({ success: true });
