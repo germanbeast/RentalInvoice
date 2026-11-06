@@ -8,13 +8,27 @@
         android:required="false" />
     <uses-feature
         android:name="android.software.leanback"
-        android:required="true" />
+        android:required="false" />
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Streaming-Apps, die der Welcome-Screen starten darf (Android 11+ braucht das) -->
+    <queries>
+        <package android:name="de.exaring.waiputv" />
+        <package android:name="com.netflix.mediaclient" />
+        <package android:name="com.netflix.ninja" />
+        <package android:name="com.google.android.youtube.tv" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.amazon.avod.thirdpartyclient" />
+        <package android:name="com.amazon.amazonvideo.livingroom" />
+        <package android:name="com.disney.disneyplus" />
+        <package android:name="com.zdf.android.mediathek" />
+        <package android:name="de.swr.ard.avp.mobile.android.amazon" />
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -37,6 +51,11 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- Normale Android-Boxen (ohne Google TV) zeigen nur LAUNCHER-Apps im App-Menü -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 

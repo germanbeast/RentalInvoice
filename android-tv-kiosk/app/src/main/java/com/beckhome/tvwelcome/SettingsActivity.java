@@ -61,7 +61,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void loadSettings() {
-        etServerUrl.setText(prefs.getString("server_url", "http://192.168.1.100:3000"));
+        etServerUrl.setText(prefs.getString("server_url", MainActivity.DEFAULT_SERVER_URL));
         etGuestName.setText(prefs.getString("guest_name", "Gast"));
         etWifiName.setText(prefs.getString("wifi_name", "Ferienwohnung-WLAN"));
         etWifiPassword.setText(prefs.getString("wifi_password", ""));
