@@ -5,6 +5,8 @@
 1. Auf der Box: Entwickleroptionen freischalten (Einstellungen → Info → 7x auf „Build“), dann **USB-Debugging** (und falls vorhanden **ADB über Netzwerk**) einschalten.
 2. IP-Adresse der Box notieren (Einstellungen → Netzwerk).
 3. `TV-Box-einrichten.bat` auf dem PC (im selben WLAN) doppelklicken und die IP eingeben.
+   Bei „Debugging über WLAN“ (Android 11+, Port wie `:41567`) kommt kein „Zulassen?“-Hinweis: Die Box muss einmal
+   über „Gerät mit Kopplungscode koppeln“ gekoppelt werden, das Skript fragt Koppel-Adresse und Code ab.
 
 Das Skript lädt adb und die neueste App selbst herunter (Release `tvbox`, gebaut von GitHub Actions),
 installiert sie, stellt sie als Startbildschirm ein, schaltet Bildschirmschoner/Standby ab und

@@ -39,6 +39,7 @@ rem ---------- IP-Adresse der Box ----------
 set BOX=
 if exist "%~dp0box-ip.txt" set /p BOX=<"%~dp0box-ip.txt"
 set INPUT=
+echo IP-Adresse der Box, bei "Debugging ueber WLAN" mit dem dort angezeigten Port (z.B. 192.168.86.74:41567).
 set /p INPUT=IP-Adresse der Box (Enter = %BOX%): 
 if not "%INPUT%"=="" set BOX=%INPUT%
 if "%BOX%"=="" (
@@ -59,10 +60,28 @@ if not exist "%APK%" (
   exit /b 1
 )
 
+rem ---------- koppeln (Debugging ueber WLAN, Android 11+) ----------
+echo.
+echo Zeigt die Box unter "Debugging ueber WLAN" eine Adresse mit langem Port (z.B. :41567),
+echo muss sie einmal gekoppelt werden: dort "Geraet mit Kopplungscode koppeln" waehlen.
+echo Bei schon gekoppelter Box oder klassischem Port 5555 einfach Enter druecken.
+set PAIR=
+set /p PAIR=Kopplungs-Adresse vom Fernseher (IP:Port, Enter = ueberspringen): 
+if "%PAIR%"=="" goto connect
+set CODE=
+set /p CODE=6-stelliger Kopplungscode: 
+"%ADB%" pair %PAIR% %CODE%
+if errorlevel 1 (
+  echo Koppeln hat nicht geklappt. Code und Port laufen schnell ab, bitte neu anzeigen lassen.
+  pause
+  exit /b 1
+)
+
+:connect
 rem ---------- verbinden ----------
 echo.
 echo Verbinde mit %BOX% ...
-echo Auf dem Fernseher "USB-Debugging zulassen?" bestaetigen (Haken bei "Immer zulassen").
+echo Falls der Fernseher "Debugging zulassen?" fragt: bestaetigen (Haken bei "Immer zulassen").
 "%ADB%" disconnect %BOX% >nul 2>nul
 "%ADB%" connect %BOX%
 set TRIES=0
