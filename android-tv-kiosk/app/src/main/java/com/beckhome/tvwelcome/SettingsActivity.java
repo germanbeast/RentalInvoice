@@ -43,6 +43,7 @@ public class SettingsActivity extends Activity {
 
         // Load saved settings
         loadSettings();
+        askPin();
 
         // Save button
         btnSave.setOnClickListener(new View.OnClickListener() {
@@ -52,22 +53,40 @@ public class SettingsActivity extends Activity {
             }
         });
 
+        findViewById(R.id.btn_wifi_settings).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openSystemScreen(android.provider.Settings.ACTION_WIFI_SETTINGS);
+            }
+        });
+
+        // Kiosk aussetzen: Sperre lösen, Home-Zuordnung aufheben, bis zum nächsten Neustart
+        findViewById(R.id.btn_exit_kiosk).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putBoolean("kiosk_paused", true).apply();
+                android.app.admin.DevicePolicyManager dpm =
+                        (android.app.admin.DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+                if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
+                    try {
+                        dpm.clearPackagePersistentPreferredActivities(
+                                new android.content.ComponentName(SettingsActivity.this, AdminReceiver.class),
+                                getPackageName());
+                    } catch (Exception ignored) {
+                    }
+                }
+                Toast.makeText(SettingsActivity.this,
+                        "Kiosk beendet. Nach einem Neustart ist er wieder aktiv.", Toast.LENGTH_LONG).show();
+                openSystemScreen(android.provider.Settings.ACTION_SETTINGS);
+            }
+        });
+
         // Android-Einstellungen (WLAN, Entwickleroptionen …). Kiosk-Sperre dafür kurz lösen,
         // die Home-Taste führt danach zum Welcome-Screen, der die Sperre wieder setzt.
         findViewById(R.id.btn_android_settings).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                try {
-                    stopLockTask();
-                } catch (Exception ignored) {
-                }
-                try {
-                    Intent i = new Intent(android.provider.Settings.ACTION_SETTINGS);
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(i);
-                } catch (Exception e) {
-                    Toast.makeText(SettingsActivity.this, "Einstellungen nicht verfügbar", Toast.LENGTH_LONG).show();
-                }
+                openSystemScreen(android.provider.Settings.ACTION_SETTINGS);
             }
         });
 
@@ -78,6 +97,69 @@ public class SettingsActivity extends Activity {
                 finish();
             }
         });
+    }
+
+    /** Android-Einstellungen öffnen; die Kiosk-Sperre dafür lösen (Home setzt sie wieder). */
+    private void openSystemScreen(String action) {
+        try {
+            stopLockTask();
+        } catch (Exception ignored) {
+        }
+        try {
+            Intent i = new Intent(action);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception e) {
+            Toast.makeText(this, "Einstellungen nicht verfügbar", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Gäste kommen ohne PIN nicht in die Einstellungen. PIN setzt das Einrichtungs-Skript (admin_pin). */
+    private void askPin() {
+        final String pin = prefs.getString("admin_pin", "");
+        if (pin.isEmpty()) return;
+        final EditText input = new EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setTextSize(28);
+        final android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
+                .setTitle("PIN eingeben")
+                .setView(input)
+                .setCancelable(true)
+                .setPositiveButton("OK", null)
+                .setNegativeButton("Abbrechen", null)
+                .create();
+        dialog.setOnCancelListener(new android.content.DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(android.content.DialogInterface d) {
+                finish();
+            }
+        });
+        dialog.setOnShowListener(new android.content.DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(android.content.DialogInterface d) {
+                dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (pin.equals(input.getText().toString().trim())) {
+                            dialog.dismiss();
+                        } else {
+                            input.setText("");
+                            Toast.makeText(SettingsActivity.this, "Falsche PIN", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+                dialog.getButton(android.app.AlertDialog.BUTTON_NEGATIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        dialog.dismiss();
+                        finish();
+                    }
+                });
+                input.requestFocus();
+            }
+        });
+        dialog.show();
     }
 
     private void loadSettings() {

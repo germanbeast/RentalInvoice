@@ -5,6 +5,13 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.1] - 2026-11-06
+
+### Geändert
+- TV-Welcome-Screen (`welcome.html`): nur noch zwei Knöpfe, „Fernsehen schauen“ (Waipu TV) und „Vor-Ort-Informationen“ (urlaub.saarland im Welcome-Fenster)
+- TV-Box-App 1.3 (`android-tv-kiosk`): PIN-Schutz für die App-Einstellungen mit WLAN-/Android-Einstellungen und „Kiosk beenden (bis zum Neustart)“, WLAN bleibt wach (WifiLock, `wifi_sleep_policy`), Apps werden auch unter abweichendem Paketnamen gefunden (z.B. Waipu), Zurück-Taste und 10-Minuten-Rückkehr von externen Seiten, Fehlergrund auf dem Offline-Bildschirm
+- `TV-Box-einrichten.bat`: fragt die PIN ab, versucht zuerst den echten Kiosk-Modus und schaltet den Startbildschirm nur ohne ihn ab; `TV-Box-zuruecksetzen.bat` geht auch per USB
+
 ## [1.41.0] - 2026-11-02
 
 ### Neu

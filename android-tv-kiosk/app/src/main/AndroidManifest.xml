@@ -15,9 +15,20 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!-- Streaming-Apps, die der Welcome-Screen starten darf (Android 11+ braucht das) -->
     <queries>
+        <!-- alle startbaren Apps, damit z.B. Waipu auch unter anderem Paketnamen gefunden wird -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="de.exaring.waiputv" />
         <package android:name="com.netflix.mediaclient" />
         <package android:name="com.netflix.ninja" />
