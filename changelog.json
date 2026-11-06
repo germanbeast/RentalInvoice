@@ -1,6 +1,16 @@
 {
-    "currentVersion": "1.41.0",
+    "currentVersion": "1.41.1",
     "releases": [
+        {
+            "version": "1.41.1",
+            "date": "2026-11-06",
+            "title": "TV-Box: Welcome-Screen mit PIN-Ausstieg",
+            "features": [
+                "Welcome-Screen am Fernseher zeigt nur noch „Fernsehen schauen“ und „Vor-Ort-Informationen“ (urlaub.saarland)",
+                "TV-App: Einstellungen nur mit PIN, darin WLAN, Android-Einstellungen und „Kiosk beenden“",
+                "WLAN der Box bleibt auch im Dauerbetrieb verbunden, Waipu wird zuverlässig gefunden"
+            ]
+        },
         {
             "version": "1.41.0",
             "date": "2026-11-02",

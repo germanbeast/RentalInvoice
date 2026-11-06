@@ -137,40 +137,62 @@ echo Stelle die Box ein ...
 "%ADB%" -s %BOX% shell settings put secure sleep_timeout 0 >nul 2>nul
 "%ADB%" -s %BOX% shell settings put system screen_off_timeout 2147483647 >nul 2>nul
 "%ADB%" -s %BOX% shell settings put global stay_on_while_plugged_in 7 >nul 2>nul
+rem WLAN nie schlafen legen (Dauerbetrieb)
+"%ADB%" -s %BOX% shell settings put global wifi_sleep_policy 2 >nul 2>nul
 
-rem ---------- Home-Taste: immer zurueck zum Welcome-Screen ----------
+rem ---------- PIN fuer die App-Einstellungen ----------
 echo.
-echo Schalte den bisherigen Startbildschirm der Box ab, damit die Home-Taste
+echo Die Einstellungen der Welcome-App (Menue-Taste oder OK 3 Sek. halten) sind mit einer PIN geschuetzt.
+echo Dort gibt es auch WLAN-Einstellungen, Android-Einstellungen und "Kiosk beenden".
+set PIN=
+set /p PIN=PIN festlegen (nur Ziffern, Enter = bisherige behalten): 
+
+rem ---------- Kiosk-Modus ----------
+echo.
+"%ADB%" -s %BOX% shell dpm list-owners 2>nul | find "%PKG%" >nul
+if not errorlevel 1 goto owner_ok
+echo Echter Kiosk-Modus: nur Welcome-Screen und Fernsehen lassen sich oeffnen,
+echo Home fuehrt immer zum Welcome-Screen, der normale Startbildschirm bleibt erhalten.
+echo (Klappt nur, wenn auf der Box KEIN Google-Konto angemeldet ist.)
+set KIOSK=
+set /p KIOSK=Echten Kiosk-Modus einschalten? (J/n): 
+if /i "%KIOSK%"=="n" goto disable_launchers
+"%ADB%" -s %BOX% shell dpm set-device-owner %PKG%/.AdminReceiver
+"%ADB%" -s %BOX% shell dpm list-owners 2>nul | find "%PKG%" >nul
+if not errorlevel 1 goto owner_ok
+echo Kiosk-Modus hat nicht geklappt ^(meist wegen angemeldetem Google-Konto^).
+
+:disable_launchers
+rem Ohne Kiosk-Modus: bisherigen Startbildschirm abschalten, damit Home zum Welcome-Screen fuehrt
+echo.
+echo Schalte den bisherigen Startbildschirm ab, damit die Home-Taste
 echo immer zum Welcome-Screen fuehrt (rueckgaengig mit TV-Box-zuruecksetzen.bat) ...
 "%ADB%" -s %BOX% shell "for p in $(cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME 2>/dev/null | grep / | cut -d/ -f1 | sort -u); do case $p in %PKG%|com.android.settings|com.android.tv.settings|com.google.android.tvsetup|com.android.provision) ;; *) pm disable-user --user 0 $p >/dev/null 2>&1 && echo $p;; esac; done" >"%TEMP%\bh_launcher.txt"
 type "%TEMP%\bh_launcher.txt" >>"%~dp0deaktivierte-launcher.txt"
 for /f "usebackq delims=" %%p in ("%TEMP%\bh_launcher.txt") do echo   abgeschaltet: %%p
+goto start_app
 
-rem ---------- optional: echter Kiosk-Modus ----------
-echo.
-echo Echter Kiosk-Modus: nur Welcome-Screen und Streaming-Apps (Netflix, Waipu, YouTube ...)
-echo lassen sich oeffnen, Einstellungen und App-Liste sind fuer Gaeste gesperrt.
-echo (Klappt nur, wenn auf der Box KEIN Google-Konto angemeldet ist.)
-set KIOSK=
-set /p KIOSK=Echten Kiosk-Modus einschalten? (J/n): 
-if /i "%KIOSK%"=="n" goto start_app
-"%ADB%" -s %BOX% shell dpm set-device-owner %PKG%/.AdminReceiver
-if errorlevel 1 (
-  echo Hat nicht geklappt ^(meist wegen angemeldetem Google-Konto^).
-  echo Die Home-Taste fuehrt trotzdem immer zum Welcome-Screen.
+:owner_ok
+echo Kiosk-Modus ist aktiv.
+rem Frueher abgeschaltete Startbildschirme wieder einschalten, der Kiosk-Modus braucht das nicht
+if exist "%~dp0deaktivierte-launcher.txt" (
+  for /f "usebackq delims=" %%p in ("%~dp0deaktivierte-launcher.txt") do "%ADB%" -s %BOX% shell pm enable %%p >nul 2>nul
+  del "%~dp0deaktivierte-launcher.txt"
 )
 
 :start_app
 echo.
 echo Starte Welcome-Screen mit %SERVER% ...
+set PINARG=
+if not "%PIN%"=="" set PINARG=--es admin_pin %PIN%
 "%ADB%" -s %BOX% shell am force-stop %PKG% >nul 2>nul
-"%ADB%" -s %BOX% shell am start -n %PKG%/.MainActivity --es server_url %SERVER%
+"%ADB%" -s %BOX% shell am start -n %PKG%/.MainActivity --es server_url %SERVER% %PINARG%
 
 echo.
 echo ============================================
 echo Fertig. Die Box zeigt jetzt den Welcome-Screen und startet ihn nach dem Einschalten.
 echo.
-echo Einstellungen in der App: Menue-Taste der Fernbedienung oder OK ca. 3 Sekunden halten.
+echo Einstellungen in der App: Menue-Taste der Fernbedienung oder OK ca. 3 Sekunden halten, dann PIN.
 echo Alles rueckgaengig machen: TV-Box-zuruecksetzen.bat
 echo ============================================
 pause

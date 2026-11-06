@@ -254,10 +254,40 @@
                 android:layout_marginStart="10dp"/>
         </LinearLayout>
 
+        <Button
+            android:id="@+id/btn_android_settings"
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginTop="20dp"
+            android:text="⚙ Android-Einstellungen öffnen"
+            android:textSize="24sp"
+            android:textColor="#ffffff"
+            android:background="#475569"/>
+
+        <Button
+            android:id="@+id/btn_wifi_settings"
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginTop="20dp"
+            android:text="📶 WLAN-Einstellungen"
+            android:textSize="24sp"
+            android:textColor="#ffffff"
+            android:background="#2563eb"/>
+
+        <Button
+            android:id="@+id/btn_exit_kiosk"
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginTop="20dp"
+            android:text="🔓 Kiosk beenden (bis zum Neustart)"
+            android:textSize="24sp"
+            android:textColor="#ffffff"
+            android:background="#b45309"/>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Tipp: 5x schnell auf Logo tippen um Settings zu öffnen"
+            android:text="Diese Seite öffnen: Menü-Taste oder OK ca. 3 Sekunden halten. Zurück zum Welcome-Screen: Home-Taste."
             android:textSize="18sp"
             android:textColor="#64748b"
             android:gravity="center"
