@@ -18,7 +18,7 @@ und die Streaming-Apps lassen sich öffnen. Das geht nur ohne angemeldetes Googl
 Alles rückgängig: `TV-Box-zuruecksetzen.bat` (schaltet die abgeschalteten Startbildschirme aus
 `deaktivierte-launcher.txt` wieder ein, beendet den Kiosk-Modus, deinstalliert auf Wunsch).
 
-Einstellungen in der App: Menü-Taste der Fernbedienung oder **OK ca. 3 Sekunden halten**.
+Einstellungen in der App: **Zurück-Taste 10 Sekunden halten**, dann PIN (legt das Skript fest). Nach Aus/Ein an der Fernbedienung erscheint immer wieder der Welcome-Screen.
 Einstellungen per adb setzen: `adb shell am start -n com.beckhome.tvwelcome/.MainActivity --es server_url https://beckhome.cloud`
 (ebenso `guest_name`, `wifi_name`, `wifi_password`, `checkin_time`, `checkout_time`, `contact_phone`).
 

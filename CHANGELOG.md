@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.2] - 2026-11-06
+
+### Geändert
+- TV-Box-App 1.4: Einstellungen/PIN nur noch über die Zurück-Taste (10 Sekunden halten), OK- und Menü-Taste öffnen sie nicht mehr. Nach Aus/Ein an der Fernbedienung (Bildschirm aus/an) erscheint immer der Welcome-Screen statt der zuletzt benutzten App
+
 ## [1.41.1] - 2026-11-06
 
 ### Geändert

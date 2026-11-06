@@ -287,7 +287,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Diese Seite öffnen: Menü-Taste oder OK ca. 3 Sekunden halten. Zurück zum Welcome-Screen: Home-Taste."
+            android:text="Diese Seite öffnen: Zurück-Taste 10 Sekunden halten, dann PIN. Zurück zum Welcome-Screen: Home-Taste."
             android:textSize="18sp"
             android:textColor="#64748b"
             android:gravity="center"

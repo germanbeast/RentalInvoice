@@ -142,7 +142,7 @@ rem WLAN nie schlafen legen (Dauerbetrieb)
 
 rem ---------- PIN fuer die App-Einstellungen ----------
 echo.
-echo Die Einstellungen der Welcome-App (Menue-Taste oder OK 3 Sek. halten) sind mit einer PIN geschuetzt.
+echo Die Einstellungen der Welcome-App (Zurueck-Taste 10 Sek. halten) sind mit einer PIN geschuetzt.
 echo Dort gibt es auch WLAN-Einstellungen, Android-Einstellungen und "Kiosk beenden".
 set PIN=
 set /p PIN=PIN festlegen (nur Ziffern, Enter = bisherige behalten): 
@@ -192,7 +192,7 @@ echo.
 echo ============================================
 echo Fertig. Die Box zeigt jetzt den Welcome-Screen und startet ihn nach dem Einschalten.
 echo.
-echo Einstellungen in der App: Menue-Taste der Fernbedienung oder OK ca. 3 Sekunden halten, dann PIN.
+echo Einstellungen in der App: Zurueck-Taste 10 Sekunden halten, dann PIN.
 echo Alles rueckgaengig machen: TV-Box-zuruecksetzen.bat
 echo ============================================
 pause

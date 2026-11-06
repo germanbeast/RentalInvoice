@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.41.1",
+    "currentVersion": "1.41.2",
     "releases": [
+        {
+            "version": "1.41.2",
+            "date": "2026-11-06",
+            "title": "TV-Box: Ausstieg über Zurück-Taste",
+            "features": [
+                "Gastgeber-Menü am Fernseher: Zurück-Taste 10 Sekunden halten, dann PIN",
+                "Nach Aus- und Einschalten zeigt die Box immer den Welcome-Screen statt der zuletzt benutzten App"
+            ]
+        },
         {
             "version": "1.41.1",
             "date": "2026-11-06",
