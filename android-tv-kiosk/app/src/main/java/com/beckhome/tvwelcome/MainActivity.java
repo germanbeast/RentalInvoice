@@ -14,6 +14,8 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.net.http.SslError;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -104,7 +106,7 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request.isForMainFrame()) {
-                    showOfflineAndRetry();
+                    showOfflineAndRetry(error.getDescription() + " (" + error.getErrorCode() + ")");
                 }
             }
 
@@ -112,8 +114,16 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                    showOfflineAndRetry();
+                    showOfflineAndRetry(description + " (" + errorCode + ")");
                 }
+            }
+
+            // Zertifikatsfehler (z.B. falsche Uhrzeit auf der Box): nicht laden, aber Grund anzeigen
+            @Override
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                handler.cancel();
+                showOfflineAndRetry("Zertifikat ungültig (" + error.getPrimaryError()
+                        + "), Datum/Uhrzeit der Box prüfen");
             }
         });
 
@@ -169,12 +179,14 @@ public class MainActivity extends Activity {
         if (changed) editor.apply();
     }
 
-    private void showOfflineAndRetry() {
+    private void showOfflineAndRetry(String detail) {
         retryHandler.removeCallbacks(retryRunnable);
         String html = "<html><body style='margin:0;background:#1f1c18;color:#f5f0e8;font-family:sans-serif;"
                 + "display:flex;align-items:center;justify-content:center;height:100vh;text-align:center'>"
                 + "<div><div style='font-size:42px'>Willkommen in der Ferienwohnung Beckhome</div>"
                 + "<div style='font-size:22px;opacity:.7;margin-top:24px'>Verbindung zum Internet wird hergestellt …</div>"
+                + "<div style='font-size:16px;opacity:.45;margin-top:32px'>" + android.text.TextUtils.htmlEncode(
+                        prefs.getString("server_url", DEFAULT_SERVER_URL) + ": " + detail) + "</div>"
                 + "</div></body></html>";
         webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
         retryHandler.postDelayed(retryRunnable, RETRY_MS);
@@ -203,7 +215,12 @@ public class MainActivity extends Activity {
         // Get settings from SharedPreferences
         retryHandler.removeCallbacks(retryRunnable);
         String serverUrl = prefs.getString("server_url", DEFAULT_SERVER_URL);
-        if (serverUrl.trim().isEmpty()) serverUrl = DEFAULT_SERVER_URL;
+        serverUrl = serverUrl.trim().replaceAll("/+$", "");
+        if (serverUrl.isEmpty()) serverUrl = DEFAULT_SERVER_URL;
+        // "beckhome.cloud" ohne https:// eingetippt → sonst lädt die WebView nichts
+        if (!serverUrl.contains("://")) serverUrl = "https://" + serverUrl;
+        // Wer versehentlich die ganze Adresse der Seite einträgt
+        if (serverUrl.endsWith("/welcome.html")) serverUrl = serverUrl.substring(0, serverUrl.length() - "/welcome.html".length());
         String guestName = prefs.getString("guest_name", "Willkommen");
 
         // Get guest name from intent (if provided)
