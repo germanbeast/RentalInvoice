@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.42.0] - 2026-11-06
+
+### Neu
+- TV-Box-Selbst-Update: Einstellungen → „TV-Box (Welcome-Screen)“ zeigt installierte, freigegebene und neueste App-Version (GitHub-Release `tvbox`, `version.json` mit SHA-256) und gibt Updates frei (`GET /api/settings/tvbox`, `POST /api/settings/tvbox/approve`). Die Box fragt öffentlich `GET /api/tv-app` (meldet dabei ihre Version), lädt die freigegebene APK, prüft die Prüfsumme und installiert sie (TV-App 1.6, im Kiosk-Modus ohne Rückfrage)
+- Workflow signiert mit festem Schlüssel aus den Secrets `TV_KEYSTORE_B64`/`TV_KEYSTORE_PASSWORD`; `tvbox_*`-Einstellungen werden vom allgemeinen Speichern nicht mehr überschrieben
+
+## [1.41.3] - 2026-11-06
+
+### Geändert
+- TV-Box-App 1.5: dauerhafter Wächter-Dienst erkennt Aus/Ein auf mehreren Wegen (Standby, Bildschirm aus, Bildschirmschoner, HDMI getrennt wenn nur der Fernseher ausgeht, Anzeige-Status alle 3 Sekunden) und holt den Welcome-Screen zurück. Das Einrichtungs-Skript lässt die Box per HDMI-CEC mit dem Fernseher schlafen
+
 ## [1.41.2] - 2026-11-06
 
 ### Geändert

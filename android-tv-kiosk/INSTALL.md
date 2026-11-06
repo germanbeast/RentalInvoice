@@ -15,6 +15,13 @@ setzt die Server-Adresse auf **https://beckhome.cloud**. Den bisherigen Startbil
 Optional (Standard: ja) kommt der echte Kiosk-Modus dazu (Geräte-Eigentümer + Lock Task): nur Welcome-Screen
 und die Streaming-Apps lassen sich öffnen. Das geht nur ohne angemeldetes Google-Konto.
 
+**Updates:** GitHub baut jede neue App-Version automatisch (Release `tvbox`). Im Admin unter
+Einstellungen → „TV-Box (Welcome-Screen)“ siehst du installierte, freigegebene und neueste Version
+und gibst Updates mit einem Klick frei. Die Box fragt etwa alle 3 Stunden und nach jedem Einschalten
+nach und installiert das Update selbst (im Kiosk-Modus ohne Rückfrage). Voraussetzung: die
+Repository-Secrets `TV_KEYSTORE_B64` und `TV_KEYSTORE_PASSWORD` mit einem festen Signierschlüssel,
+sonst nimmt Android das Update nicht an.
+
 Alles rückgängig: `TV-Box-zuruecksetzen.bat` (schaltet die abgeschalteten Startbildschirme aus
 `deaktivierte-launcher.txt` wieder ein, beendet den Kiosk-Modus, deinstalliert auf Wunsch).
 

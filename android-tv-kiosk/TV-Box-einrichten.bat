@@ -131,6 +131,8 @@ rem ---------- Box als Welcome-Screen einstellen ----------
 echo.
 echo Stelle die Box ein ...
 "%ADB%" -s %BOX% shell appops set %PKG% SYSTEM_ALERT_WINDOW allow >nul 2>nul
+rem Selbst-Updates (Freigabe im Admin unter Einstellungen -> TV-Box)
+"%ADB%" -s %BOX% shell appops set %PKG% REQUEST_INSTALL_PACKAGES allow >nul 2>nul
 "%ADB%" -s %BOX% shell cmd package set-home-activity %PKG%/.MainActivity >nul 2>nul
 "%ADB%" -s %BOX% shell pm set-home-activity %PKG%/.MainActivity >nul 2>nul
 "%ADB%" -s %BOX% shell settings put secure screensaver_enabled 0 >nul 2>nul

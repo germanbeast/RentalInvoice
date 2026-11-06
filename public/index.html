@@ -1758,6 +1758,7 @@
                             <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot <i class="status-dot" data-status="telegram"></i></a>
                             <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
                             <a href="#" class="nav-item" data-target="settings-users">Benutzer &amp; Rechte</a>
+                            <a href="#" class="nav-item" data-target="settings-tvbox">TV-Box (Welcome-Screen)</a>
                             <a href="#" class="nav-item" data-target="settings-system">System & Update</a>
                         </nav>
                     </aside>
@@ -2458,6 +2459,21 @@
                             </section>
 
                             <!-- SYSTEM -->
+                            <section id="settings-tvbox" class="settings-page">
+                                <h2>TV-Box (Welcome-Screen)</h2>
+                                <p class="text-muted">Neue Versionen der TV-App baut GitHub automatisch. Erst wenn du sie hier freigibst, lädt die Box das Update selbst herunter und installiert es (sie fragt etwa alle 3 Stunden und nach jedem Einschalten nach).</p>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="info-row"><span>Auf der Box installiert:</span> <strong id="tvbox-device">–</strong></div>
+                                    <div class="info-row"><span>Freigegeben:</span> <strong id="tvbox-approved">–</strong></div>
+                                    <div class="info-row"><span>Neueste Version auf GitHub:</span> <strong id="tvbox-latest">–</strong></div>
+                                    <p class="text-muted" id="tvbox-hint" style="font-size:.85rem; margin-top:.75rem"></p>
+                                    <div class="btn-group" style="margin-top: 1rem;">
+                                        <button type="button" id="btn-tvbox-approve" class="btn btn-primary" disabled>Update freigeben</button>
+                                        <button type="button" id="btn-tvbox-refresh" class="btn btn-ghost">Neu laden</button>
+                                    </div>
+                                </div>
+                            </section>
+
                             <section id="settings-system" class="settings-page">
                                 <h2>System & Update</h2>
                                 <div class="card" style="margin-top: 1.5rem;">

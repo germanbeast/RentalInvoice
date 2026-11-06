@@ -16,6 +16,9 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!-- Streaming-Apps, die der Welcome-Screen starten darf (Android 11+ braucht das) -->
@@ -91,6 +94,21 @@
             </intent-filter>
         </receiver>
 
+        <!-- Wächter: nach Aus/Ein (Standby, HDMI, Bildschirm) zurück zum Welcome-Screen -->
+        <service
+            android:name=".WatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Kiosk: Welcome-Screen nach dem Einschalten des Fernsehers anzeigen" />
+        </service>
+
+        <!-- Ergebnis der Selbst-Installation (Update) -->
+        <receiver
+            android:name=".InstallReceiver"
+            android:exported="false" />
+
         <!-- Boot Receiver for Auto-Start -->
         <receiver
             android:name=".BootReceiver"
@@ -99,6 +117,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 
