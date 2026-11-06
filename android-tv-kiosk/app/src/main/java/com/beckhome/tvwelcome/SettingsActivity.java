@@ -1,6 +1,7 @@
 package com.beckhome.tvwelcome;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
@@ -48,6 +49,25 @@ public class SettingsActivity extends Activity {
             @Override
             public void onClick(View v) {
                 saveSettings();
+            }
+        });
+
+        // Android-Einstellungen (WLAN, Entwickleroptionen …). Kiosk-Sperre dafür kurz lösen,
+        // die Home-Taste führt danach zum Welcome-Screen, der die Sperre wieder setzt.
+        findViewById(R.id.btn_android_settings).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    stopLockTask();
+                } catch (Exception ignored) {
+                }
+                try {
+                    Intent i = new Intent(android.provider.Settings.ACTION_SETTINGS);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i);
+                } catch (Exception e) {
+                    Toast.makeText(SettingsActivity.this, "Einstellungen nicht verfügbar", Toast.LENGTH_LONG).show();
+                }
             }
         });
 
