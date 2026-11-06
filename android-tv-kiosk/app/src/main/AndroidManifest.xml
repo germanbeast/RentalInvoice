@@ -42,6 +42,7 @@
     </queries>
 
     <application
+        android:name=".WelcomeApp"
         android:allowBackup="true"
         android:label="Ferienwohnung Welcome"
         android:supportsRtl="true"

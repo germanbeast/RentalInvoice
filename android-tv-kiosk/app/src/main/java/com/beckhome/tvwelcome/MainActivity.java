@@ -38,6 +38,9 @@ public class MainActivity extends Activity {
     private static final String[] APP_KEYWORDS = {"waipu", "netflix", "youtube", "amazon", "disney", "zdf", "ard"};
     /** Externe Seite (z.B. urlaub.saarland): nach so langer Ruhe zurück zum Welcome-Screen. */
     private static final long IDLE_RETURN_MS = 10 * 60 * 1000;
+    private static final long BACK_HOLD_MS = 10 * 1000;
+    /** Extra beim Start nach Aus/Ein: Welcome-Seite neu laden. */
+    static final String EXTRA_RESET = "reset_home";
     private static final long RETRY_MS = 20000;
     /** Apps, die die Knöpfe auf dem Welcome-Screen starten dürfen (auch im Kiosk-Modus). */
     private static final String[] ALLOWED_APPS = {
@@ -56,6 +59,14 @@ public class MainActivity extends Activity {
         }
     };
     private SharedPreferences prefs;
+    private boolean backLongPressFired = false;
+    private final Runnable backLongPress = new Runnable() {
+        @Override
+        public void run() {
+            backLongPressFired = true;
+            openSettings();
+        }
+    };
     private WifiManager.WifiLock wifiLock;
     private final Runnable idleReturn = new Runnable() {
         @Override
@@ -442,33 +453,31 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int code = event.getKeyCode();
-        if ((code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)
-                && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 60) {
-            openSettings();
+        // Zurück-Taste 10 Sekunden halten → PIN-Abfrage für die Einstellungen (Ausstieg für den Gastgeber).
+        // Per Zeitgeber statt Tasten-Wiederholung, weil manche Fernbedienungen Zurück nicht wiederholen.
+        if (code == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                backLongPressFired = false;
+                retryHandler.removeCallbacks(backLongPress);
+                retryHandler.postDelayed(backLongPress, BACK_HOLD_MS);
+            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                retryHandler.removeCallbacks(backLongPress);
+                // kurz gedrückt auf einer externen Seite: eine Seite zurück, sonst zum Welcome-Screen
+                if (!backLongPressFired && !isOnWelcomePage()) {
+                    if (webView.canGoBack()) webView.goBack();
+                    else loadWelcomePage();
+                }
+            }
             return true;
         }
         // Auf einer externen Seite (urlaub.saarland …): nach längerer Ruhe zurück zum Welcome-Screen
         retryHandler.removeCallbacks(idleReturn);
         if (!isOnWelcomePage()) retryHandler.postDelayed(idleReturn, IDLE_RETURN_MS);
-        // Zurück-Taste: auf externen Seiten eine Seite zurück, sonst zum Welcome-Screen
-        if (code == KeyEvent.KEYCODE_BACK && !isOnWelcomePage()) {
-            if (event.getAction() == KeyEvent.ACTION_UP) {
-                if (webView.canGoBack()) webView.goBack();
-                else loadWelcomePage();
-            }
-            return true;
-        }
         return super.dispatchKeyEvent(event);
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // Einstellungen: MENU- oder Einstellungen-Taste der Fernbedienung
-        if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_SETTINGS) {
-            openSettings();
-            return true;
-        }
-
         // Disable back, home, and recent apps buttons
         if (keyCode == KeyEvent.KEYCODE_BACK ||
             keyCode == KeyEvent.KEYCODE_HOME ||
