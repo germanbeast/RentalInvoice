@@ -10,11 +10,29 @@ android {
         applicationId "com.beckhome.tvwelcome"
         minSdk 21
         targetSdk 34
-        versionCode 7
-        versionName "1.5"
+        versionCode 8
+        versionName "1.6"
+    }
+
+    // Fester Signierschlüssel aus GitHub-Secrets (TV_KEYSTORE_B64/TV_KEYSTORE_PASSWORD, siehe Workflow).
+    // Nur damit kann sich die App selbst aktualisieren: Android nimmt ein Update nur mit
+    // demselben Schlüssel an. Ohne die Variablen wird mit dem zufälligen Debug-Schlüssel gebaut.
+    def ks = System.getenv('KIOSK_KEYSTORE')
+    signingConfigs {
+        kiosk {
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('KIOSK_KEYSTORE_PASSWORD')
+                keyAlias 'kiosk'
+                keyPassword System.getenv('KIOSK_KEYSTORE_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (ks) signingConfig signingConfigs.kiosk
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

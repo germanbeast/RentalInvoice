@@ -1197,6 +1197,32 @@ app.get('/welcome.html', (req, res) => {
     res.sendFile(filePath);
 });
 
+// TV-Box app self-update. The box asks here which app version the host has approved
+// (Settings → TV-Box) and reports its own version. Public like /api/welcome: no secrets,
+// only version numbers and the public GitHub download link.
+app.get('/api/tv-app', (req, res) => {
+    try {
+        const v = parseInt(req.query.v, 10);
+        if (Number.isFinite(v) && v > 0) {
+            const prev = db.getSetting('tvbox_device') || {};
+            const now = Date.now();
+            // Write at most every 10 minutes or when the version changes
+            if (prev.versionCode !== v || !prev.lastSeen || now - prev.lastSeen > 10 * 60 * 1000) {
+                db.setSetting('tvbox_device', {
+                    versionCode: v,
+                    versionName: String(req.query.n || '').slice(0, 20),
+                    lastSeen: now
+                });
+            }
+        }
+        const approved = db.getSetting('tvbox_approved');
+        res.set('Cache-Control', 'no-store');
+        res.json({ success: true, approved: approved && approved.versionCode ? approved : null });
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
 // Public, minimal data for the TV welcome screen (no secrets: no WLAN, no codes, no invoices).
 // Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
 app.get('/api/welcome', (req, res) => {
@@ -2257,7 +2283,9 @@ app.put('/api/settings', apiLimiter, (req, res) => {
         if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
             return res.status(400).json({ error: 'Ungültige Einstellungen' });
         }
-        db.setAllSettings(unmaskSettings(settings));
+        const toSave = unmaskSettings(settings);
+        for (const k of Object.keys(toSave)) if (k.startsWith('tvbox_')) delete toSave[k]; // own endpoints
+        db.setAllSettings(toSave);
 
         // Re-init Telegram if token changed
         if (settings.tg_token) {
@@ -2276,6 +2304,69 @@ app.put('/api/settings', apiLimiter, (req, res) => {
     } catch (e) {
         console.error('Settings PUT Error:', e.message);
         res.status(500).json({ error: 'Einstellungen konnten nicht gespeichert werden' });
+    }
+});
+
+// TV-Box app: newest build on GitHub (release "tvbox", see .github/workflows/tv-kiosk-apk.yml),
+// the version the host approved and the version the box last reported.
+const TVBOX_RELEASE_API = 'https://api.github.com/repos/germanbeast/RentalInvoice/releases/tags/tvbox';
+
+function httpsJson(url, redirects = 3) {
+    return new Promise((resolve, reject) => {
+        const req = https.get(url, { headers: { 'User-Agent': 'beckhome-rentalinvoice', 'Accept': 'application/json' }, timeout: 10000 }, r => {
+            if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && redirects > 0) {
+                r.resume();
+                return resolve(httpsJson(new URL(r.headers.location, url).toString(), redirects - 1));
+            }
+            let body = '';
+            r.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+            r.on('end', () => {
+                if (r.statusCode !== 200) return reject(new Error('HTTP ' + r.statusCode));
+                try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+            });
+        });
+        req.on('timeout', () => req.destroy(new Error('Zeitüberschreitung')));
+        req.on('error', reject);
+    });
+}
+
+async function tvboxLatest() {
+    const rel = await httpsJson(TVBOX_RELEASE_API);
+    const assets = rel.assets || [];
+    const apk = assets.find(a => a.name === 'beckhome-tv.apk');
+    const ver = assets.find(a => a.name === 'version.json');
+    if (!apk || !ver) throw new Error('Release unvollständig');
+    const info = await httpsJson(ver.browser_download_url);
+    return {
+        versionCode: parseInt(info.versionCode, 10) || 0,
+        versionName: String(info.versionName || ''),
+        sha256: String(info.sha256 || ''),
+        url: apk.browser_download_url,
+        published: apk.updated_at || rel.published_at || null
+    };
+}
+
+app.get('/api/settings/tvbox', apiLimiter, async (req, res) => {
+    let latest = null, error = null;
+    try { latest = await tvboxLatest(); } catch (e) { error = 'GitHub nicht erreichbar: ' + e.message; }
+    res.json({
+        success: true, latest, error,
+        approved: db.getSetting('tvbox_approved') || null,
+        device: db.getSetting('tvbox_device') || null
+    });
+});
+
+app.post('/api/settings/tvbox/approve', apiLimiter, async (req, res) => {
+    try {
+        const latest = await tvboxLatest();
+        if (!latest.versionCode || !/^[0-9a-f]{64}$/.test(latest.sha256)) {
+            return res.status(400).json({ error: 'Die Version auf GitHub hat keine gültige Prüfsumme.' });
+        }
+        const approved = { ...latest, approvedAt: Date.now() };
+        db.setSetting('tvbox_approved', approved);
+        res.json({ success: true, approved });
+    } catch (e) {
+        res.status(502).json({ error: 'GitHub nicht erreichbar: ' + e.message });
     }
 });
 

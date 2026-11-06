@@ -27,6 +27,7 @@ public class WatchService extends Service {
 
     private static final String CHANNEL = "watch";
     private static final long POLL_MS = 3000;
+    private static final long UPDATE_EVERY_MS = 3 * 60 * 60 * 1000L;
     private static final String HDMI_PLUG = "android.media.action.HDMI_AUDIO_PLUG";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -56,6 +57,14 @@ public class WatchService extends Service {
                     turnedOn();
                     break;
             }
+        }
+    };
+
+    private final Runnable updateCheck = new Runnable() {
+        @Override
+        public void run() {
+            SelfUpdater.checkAsync(WatchService.this);
+            handler.postDelayed(this, UPDATE_EVERY_MS);
         }
     };
 
@@ -97,6 +106,7 @@ public class WatchService extends Service {
         }
         lastOn = isDisplayOn();
         handler.postDelayed(poll, POLL_MS);
+        handler.postDelayed(updateCheck, 60 * 1000); // kurz nach dem Start, dann alle 3 Stunden
     }
 
     @Override
@@ -107,6 +117,7 @@ public class WatchService extends Service {
     @Override
     public void onDestroy() {
         handler.removeCallbacks(poll);
+        handler.removeCallbacks(updateCheck);
         try {
             unregisterReceiver(receiver);
         } catch (Exception ignored) {
@@ -128,6 +139,7 @@ public class WatchService extends Service {
         if (wasOff) {
             wasOff = false;
             showWelcome();
+            SelfUpdater.checkAsync(this);
         }
     }
 

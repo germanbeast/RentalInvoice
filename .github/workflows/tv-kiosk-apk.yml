@@ -33,15 +33,36 @@ jobs:
         with:
           gradle-version: '8.13'
 
+      # Fester Schlüssel für Selbst-Updates (Repository-Secrets TV_KEYSTORE_B64 + TV_KEYSTORE_PASSWORD)
+      - name: Signierschlüssel bereitstellen
+        env:
+          TV_KEYSTORE_B64: ${{ secrets.TV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$TV_KEYSTORE_B64" ]; then
+            echo "$TV_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/kiosk.keystore"
+            echo "KIOSK_KEYSTORE=$RUNNER_TEMP/kiosk.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Kein TV_KEYSTORE_B64-Secret: Build mit Debug-Schlüssel, Selbst-Update nicht möglich"
+          fi
+
       - name: APK bauen
+        env:
+          KIOSK_KEYSTORE_PASSWORD: ${{ secrets.TV_KEYSTORE_PASSWORD }}
         run: |
           gradle --no-daemon assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk beckhome-tv.apk
+          code=$(grep -oP 'versionCode\s+\K[0-9]+' app/build.gradle)
+          name=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle)
+          sum=$(sha256sum beckhome-tv.apk | cut -d' ' -f1)
+          printf '{"versionCode": %s, "versionName": "%s", "sha256": "%s"}\n' "$code" "$name" "$sum" > version.json
+          cat version.json
 
       - uses: actions/upload-artifact@v4
         with:
           name: beckhome-tv-apk
-          path: android-tv-kiosk/beckhome-tv.apk
+          path: |
+            android-tv-kiosk/beckhome-tv.apk
+            android-tv-kiosk/version.json
 
       - name: Als Release "tvbox" veröffentlichen
         if: github.ref == 'refs/heads/main'
@@ -51,4 +72,6 @@ jobs:
           name: TV-Box-App (Welcome-Screen)
           body: Neueste Welcome-App für die TV-Box. Installieren mit TV-Box-einrichten.bat.
           make_latest: false
-          files: android-tv-kiosk/beckhome-tv.apk
+          files: |
+            android-tv-kiosk/beckhome-tv.apk
+            android-tv-kiosk/version.json

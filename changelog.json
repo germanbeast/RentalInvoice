@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.41.3",
+    "currentVersion": "1.42.0",
     "releases": [
+        {
+            "version": "1.42.0",
+            "date": "2026-11-06",
+            "title": "TV-Box aktualisiert sich selbst",
+            "features": [
+                "Neue Einstellungsseite „TV-Box (Welcome-Screen)“: installierte und neueste App-Version auf einen Blick",
+                "Updates für die TV-Box mit einem Klick freigeben, die Box installiert sie danach selbst"
+            ]
+        },
         {
             "version": "1.41.3",
             "date": "2026-11-06",

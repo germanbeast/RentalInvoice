@@ -4062,6 +4062,7 @@
 
                 if (targetId === 'settings-push') loadPushSettings();
                 if (targetId === 'settings-users') loadUsers();
+                if (targetId === 'settings-tvbox') loadTvbox();
 
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {
@@ -5209,6 +5210,38 @@
         const browser = /edg\//i.test(ua) ? 'Edge' : /firefox|fxios/i.test(ua) ? 'Firefox' : /chrome|crios/i.test(ua) ? 'Chrome' : /safari/i.test(ua) ? 'Safari' : '';
         return `${os}${browser ? ' · ' + browser : ''}${isStandalone() ? ' (App)' : ''}`;
     }
+
+    // TV-Box: app versions (GitHub build, approved, installed on the box) and approval
+    async function loadTvbox() {
+        const fmtV = v => v && v.versionCode ? `${v.versionName || '?'} (Build ${v.versionCode})` : '–';
+        const fmtT = t => t ? new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        const btn = $('#btn-tvbox-approve');
+        const hint = $('#tvbox-hint');
+        if (!btn) return;
+        btn.disabled = true;
+        hint.textContent = 'Lade …';
+        const d = await apiJson('/api/settings/tvbox').catch(() => null);
+        if (!d || !d.success) { hint.textContent = 'Konnte den Stand nicht laden.'; return; }
+        $('#tvbox-device').textContent = d.device ? `${fmtV(d.device)}, zuletzt gemeldet ${fmtT(d.device.lastSeen)}` : 'noch nicht gemeldet';
+        $('#tvbox-approved').textContent = d.approved ? `${fmtV(d.approved)}, am ${fmtT(d.approved.approvedAt)}` : 'noch keine';
+        $('#tvbox-latest').textContent = d.latest ? `${fmtV(d.latest)}, gebaut ${fmtT(d.latest.published)}` : '–';
+        const newer = d.latest && (!d.approved || d.latest.versionCode > d.approved.versionCode
+            || (d.latest.versionCode === d.approved.versionCode && d.latest.sha256 !== d.approved.sha256));
+        btn.disabled = !newer;
+        if (d.error) hint.textContent = d.error;
+        else if (newer) hint.textContent = 'Eine neue Version ist da. Nach der Freigabe installiert die Box sie beim nächsten Nachfragen.';
+        else if (d.device && d.approved && d.device.versionCode < d.approved.versionCode) hint.textContent = 'Freigegeben, die Box hat das Update aber noch nicht installiert.';
+        else hint.textContent = 'Alles aktuell.';
+    }
+    if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
+    if ($('#btn-tvbox-approve')) $('#btn-tvbox-approve').addEventListener('click', async () => {
+        const btn = $('#btn-tvbox-approve');
+        btn.disabled = true;
+        const d = await apiJson('/api/settings/tvbox/approve', { method: 'POST' }).catch(() => null);
+        if (d && d.success) showToast('Update für die TV-Box freigegeben', 'success');
+        else showToast((d && d.error) || 'Freigabe fehlgeschlagen', 'error');
+        loadTvbox();
+    });
 
     async function loadPushSettings() {
         const status = $('#push-status');
