@@ -139,6 +139,9 @@ echo Stelle die Box ein ...
 "%ADB%" -s %BOX% shell settings put global stay_on_while_plugged_in 7 >nul 2>nul
 rem WLAN nie schlafen legen (Dauerbetrieb)
 "%ADB%" -s %BOX% shell settings put global wifi_sleep_policy 2 >nul 2>nul
+rem Fernseher aus = Box schlaeft mit (HDMI-CEC), danach zeigt die App wieder den Welcome-Screen
+"%ADB%" -s %BOX% shell settings put global hdmi_control_enabled 1 >nul 2>nul
+"%ADB%" -s %BOX% shell settings put global hdmi_control_auto_device_off_enabled 1 >nul 2>nul
 
 rem ---------- PIN fuer die App-Einstellungen ----------
 echo.
