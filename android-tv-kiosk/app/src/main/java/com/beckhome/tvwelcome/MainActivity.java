@@ -94,6 +94,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("WelcomeSettings", MODE_PRIVATE);
         applySettingsFromIntent(getIntent());
         keepWifiAwake();
+        WatchService.start(this);
 
         // Kiosk beenden, falls per adb angefordert (siehe INSTALL.md)
         if (getIntent().getBooleanExtra("exit_kiosk", false)) {

@@ -11,6 +11,7 @@ public class BootReceiver extends BroadcastReceiver {
             // Per PIN ausgesetzter Kiosk gilt nur bis zum Neustart
             context.getSharedPreferences("WelcomeSettings", Context.MODE_PRIVATE)
                     .edit().putBoolean("kiosk_paused", false).apply();
+            WatchService.start(context);
             // Start MainActivity on boot
             Intent i = new Intent(context, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

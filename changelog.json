@@ -1,6 +1,14 @@
 {
-    "currentVersion": "1.41.2",
+    "currentVersion": "1.41.3",
     "releases": [
+        {
+            "version": "1.41.3",
+            "date": "2026-11-06",
+            "title": "TV-Box: Welcome-Screen nach dem Einschalten",
+            "features": [
+                "Nach dem Aus- und Einschalten des Fernsehers erscheint zuverlässig wieder der Welcome-Screen, auch wenn nur der Fernseher ausgeschaltet wurde"
+            ]
+        },
         {
             "version": "1.41.2",
             "date": "2026-11-06",
