@@ -2474,12 +2474,17 @@
                                 </div>
 
                                 <h3 style="margin-top: 2rem;">Fernsteuerung</h3>
-                                <p class="text-muted">Die Box meldet sich jede Minute. Einstellungen und Befehle von hier übernimmt sie innerhalb von etwa einer Minute. Dafür muss die Box einmal gekoppelt werden.</p>
+                                <p class="text-muted">Die Welcome-Seite zeigt nur die gekoppelte Box (und dir als angemeldetem Gastgeber die Vorschau). Eine neue Box zeigt beim Start einen 6-stelligen Kopplungs-Code auf dem Fernseher: hier eingeben, dann sind Box und Server verbunden. Einstellungen und Befehle übernimmt die Box danach innerhalb von etwa einer Minute.</p>
                                 <div class="card" style="margin-top: 1rem;">
                                     <div class="info-row"><span>Gekoppelte Box:</span> <strong id="tvbox-paired">–</strong></div>
                                     <div id="tvbox-pending" class="info-row" style="display:none"><span>Wartet auf Kopplung:</span> <strong id="tvbox-pending-text">–</strong></div>
-                                    <div class="btn-group" style="margin-top: 1rem;">
-                                        <button type="button" id="btn-tvbox-pair" class="btn btn-primary" style="display:none">Diese Box koppeln</button>
+                                    <div class="form-group" style="margin-top: 1rem;">
+                                        <label for="tvbox-pair-code" id="tvbox-pair-label">Kopplungs-Code vom Fernseher</label>
+                                        <input type="text" id="tvbox-pair-code" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="z.B. 482 913">
+                                    </div>
+                                    <div class="btn-group">
+                                        <button type="button" id="btn-tvbox-pair" class="btn btn-primary">Box koppeln</button>
+                                        <button type="button" id="btn-tvbox-preview" class="btn btn-outline">Welcome-Seite ansehen</button>
                                         <button type="button" id="btn-tvbox-unpair" class="btn btn-ghost btn-danger btn-sm" style="display:none">Kopplung aufheben</button>
                                     </div>
                                 </div>

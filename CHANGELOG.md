@@ -5,6 +5,16 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.0] - 2026-11-07
+
+### Sicherheit
+- `/welcome.html` und `/api/welcome` (Vorname und Daten des aktuellen Gastes) nur noch für die gekoppelte TV-Box (Cookie `tvbox_auth` = Geräte-Kennung + Schlüssel, serverseitig gegen den SHA-256-Hash geprüft) oder eine angemeldete Admin-Sitzung (Vorschau). Alle anderen bekommen 403
+- Kopplung nur noch per 6-stelligem Code, den die Box (TV-App 1.8) auf dem Fernseher zeigt; wartende Boxen liegen nur im Speicher
+
+### Neu
+- TV-App 1.8: Kopplungs-Bildschirm mit Code und Verbindungsstatus; ohne Netzwerk Knöpfe „WLAN einrichten“ und „Netzwerk / LAN-Einstellungen“ (vor der Kopplung frei, danach nur über die PIN). Alter Server ohne `/api/tv-box/sync` (404): Welcome-Seite wie bisher
+- Admin: Code-Eingabe statt „Diese Box koppeln“, Knopf „Welcome-Seite ansehen“
+
 ## [1.43.0] - 2026-11-07
 
 ### Neu

@@ -35,12 +35,39 @@ final class RemoteControl {
     static final String EXTRA_OPEN_SETTINGS = "open_settings";
     private static final String PREFS = "WelcomeSettings";
     private static volatile boolean running = false;
+    /** Letzter Fehler beim Melden (für den Kopplungs-Bildschirm), null = ok. */
+    static volatile String lastError = null;
 
     private RemoteControl() {
     }
 
     private static SharedPreferences prefs(Context ctx) {
         return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    static boolean isPaired(SharedPreferences p) {
+        return p.getBoolean("paired", false);
+    }
+
+    /** Welcome-Seite laden? Nur gekoppelt – oder wenn der Server die Kopplung noch nicht kennt (alte Version). */
+    static boolean mayShowWelcome(SharedPreferences p) {
+        return isPaired(p) || p.getBoolean("server_legacy", false);
+    }
+
+    /** Ausweis für den Server (Cookie tvbox_auth): Kennung.Schlüssel */
+    static String authToken(SharedPreferences p) {
+        deviceId(p);
+        return p.getString("device_id", "") + "." + p.getString("device_key", "");
+    }
+
+    /** 6-stelliger Kopplungs-Code, bleibt bis zur Kopplung gleich. */
+    static synchronized String pairCode(SharedPreferences p) {
+        String c = p.getString("pair_code", "");
+        if (!c.matches("[0-9]{6}")) {
+            c = String.format(java.util.Locale.ROOT, "%06d", new SecureRandom().nextInt(1000000));
+            p.edit().putString("pair_code", c).commit();
+        }
+        return c;
     }
 
     /** Kiosk ist aus: per PIN bis zum Neustart ausgesetzt oder im Admin ausgeschaltet. */
@@ -74,7 +101,7 @@ final class RemoteControl {
         }, "remote-sync").start();
     }
 
-    private static String deviceId(SharedPreferences p) {
+    private static synchronized String deviceId(SharedPreferences p) {
         String id = p.getString("device_id", "");
         String key = p.getString("device_key", "");
         if (id.isEmpty() || key.length() != 64) {
@@ -113,9 +140,25 @@ final class RemoteControl {
         body.put("idleMinutes", (System.currentTimeMillis() - WatchService.lastActive()) / 60000L);
         body.put("ackSeq", p.getLong("remote_ack", 0));
         body.put("configVersion", p.getInt("remote_config_version", 0));
+        body.put("pairCode", pairCode(p));
 
-        JSONObject res = new JSONObject(post(server(p) + "/api/tv-box/sync", body.toString()));
-        if (!res.optBoolean("paired", false)) return;
+        String text;
+        try {
+            text = post(server(p) + "/api/tv-box/sync", body.toString());
+        } catch (LegacyServer e) {
+            // Server kennt die Fernsteuerung noch nicht: Welcome-Seite wie bisher zeigen
+            lastError = null;
+            setState(ctx, p, isPaired(p), true);
+            return;
+        } catch (Exception e) {
+            lastError = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            throw e;
+        }
+        lastError = null;
+        JSONObject res = new JSONObject(text);
+        boolean paired = res.optBoolean("paired", false);
+        setState(ctx, p, paired, false);
+        if (!paired) return;
 
         JSONObject cfg = res.optJSONObject("config");
         if (cfg != null) applyConfig(ctx, p, cfg);
@@ -128,6 +171,19 @@ final class RemoteControl {
                 runCommand(ctx, cmd.optString("type", ""), owner, dpm);
             }
         }
+    }
+
+    /** Kopplungs-Zustand merken; bei Wechsel Welcome-Screen bzw. Kopplungs-Code neu anzeigen. */
+    private static void setState(Context ctx, SharedPreferences p, boolean paired, boolean legacy) {
+        boolean wasPaired = isPaired(p), wasLegacy = p.getBoolean("server_legacy", false);
+        if (wasPaired == paired && wasLegacy == legacy) return;
+        SharedPreferences.Editor e = p.edit().putBoolean("paired", paired).putBoolean("server_legacy", legacy);
+        if (wasPaired && !paired) e.remove("pair_code"); // Kopplung aufgehoben: neuer Code
+        e.commit();
+        showWelcome(ctx, false);
+    }
+
+    private static final class LegacyServer extends Exception {
     }
 
     private static void applyConfig(final Context ctx, SharedPreferences p, JSONObject cfg) {
@@ -231,6 +287,9 @@ final class RemoteControl {
             try (OutputStream os = c.getOutputStream()) {
                 os.write(json.getBytes("UTF-8"));
             }
+            int code = c.getResponseCode();
+            if (code == 404) throw new LegacyServer();
+            if (code != 200) throw new Exception("HTTP " + code);
             try (InputStream in = c.getInputStream()) {
                 java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
                 byte[] buf = new byte[4096];

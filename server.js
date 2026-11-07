@@ -1192,9 +1192,16 @@ function ensureAuthenticated(req, res, next) {
 // 6. PUBLIC STATIC FILES (NO AUTH REQUIRED)
 // =======================
 // Serve welcome.html without authentication for TV Kiosk mode
+// Only for the paired TV box (cookie from the app) or a logged-in admin (preview in Settings → TV-Box).
 app.get('/welcome.html', (req, res) => {
-    const filePath = path.join(PUBLIC_DIR, 'welcome.html');
-    res.sendFile(filePath);
+    res.set('Cache-Control', 'no-store');
+    if (!tvboxViewAllowed(req)) {
+        return res.status(403).type('html').send('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+            + '<title>Nur für die TV-Box</title><body style="font-family:sans-serif;padding:2rem;max-width:32rem;margin:auto">'
+            + '<h1>Nur für die TV-Box</h1><p>Diese Seite zeigt nur die gekoppelte TV-Box in der Ferienwohnung. '
+            + 'Als Gastgeber siehst du die Vorschau im Admin unter Einstellungen → TV-Box.</p></body>');
+    }
+    res.sendFile(path.join(PUBLIC_DIR, 'welcome.html'));
 });
 
 // TV-Box app self-update. The box asks here which app version the host has approved
@@ -1230,6 +1237,25 @@ app.get('/api/tv-app', (req, res) => {
 const TVBOX_COMMANDS = ['show_welcome', 'reload', 'open_settings', 'reboot', 'update_check'];
 const TVBOX_DEFAULT_CONFIG = { kiosk: true, idleHours: 4, adminPin: '' };
 let tvboxLive = null; // last status report (in memory, the DB copy is written at most every 10 min)
+// Boxes waiting for pairing: deviceId -> { keyHash, code, model, ip, versionName, firstSeen, lastSeen }.
+// In memory only: an unpaired box asks every few seconds, so after a restart it is back at once.
+const tvboxPending = new Map();
+
+/** Request comes from the paired TV box (cookie "tvbox_auth" = deviceId.key, set by the app). */
+function tvboxDeviceAuthorized(req) {
+    const paired = db.getSetting('tvbox_paired');
+    const raw = String((req.cookies && req.cookies.tvbox_auth) || req.get('x-tvbox-auth') || '');
+    const dot = raw.lastIndexOf('.');
+    if (!paired || !paired.keyHash || dot < 1) return false;
+    const id = raw.slice(0, dot), key = raw.slice(dot + 1);
+    if (id !== paired.deviceId || !/^[a-f0-9]{64}$/.test(key)) return false;
+    const h = crypto.createHash('sha256').update(key).digest();
+    return crypto.timingSafeEqual(h, Buffer.from(paired.keyHash, 'hex'));
+}
+/** Welcome screen: only the paired box, or a logged-in admin (preview). */
+function tvboxViewAllowed(req) {
+    return !!(req.session && req.session.user) || tvboxDeviceAuthorized(req);
+}
 
 function tvboxConfig() {
     return { ...TVBOX_DEFAULT_CONFIG, ...(db.getSetting('tvbox_config') || {}) };
@@ -1269,10 +1295,12 @@ app.post('/api/tv-box/sync', (req, res) => {
         const isPaired = paired && paired.deviceId === id
             && crypto.timingSafeEqual(Buffer.from(paired.keyHash, 'hex'), Buffer.from(keyHash, 'hex'));
         if (!isPaired) {
-            const pending = db.getSetting('tvbox_pairing');
-            if (!pending || pending.deviceId !== id || now - (pending.lastSeen || 0) > 10 * 60 * 1000) {
-                db.setSetting('tvbox_pairing', { deviceId: id, keyHash, model: status.model, ip: status.ip,
-                    versionName: status.versionName, firstSeen: (pending && pending.deviceId === id && pending.firstSeen) || now, lastSeen: now });
+            const code = String(b.pairCode || '');
+            for (const [k, v] of tvboxPending) if (now - v.lastSeen > 15 * 60 * 1000) tvboxPending.delete(k);
+            if (/^[0-9]{6}$/.test(code) && (tvboxPending.has(id) || tvboxPending.size < 20)) {
+                const prev = tvboxPending.get(id);
+                tvboxPending.set(id, { deviceId: id, keyHash, code, model: status.model, ip: status.ip,
+                    versionName: status.versionName, firstSeen: prev && prev.keyHash === keyHash ? prev.firstSeen : now, lastSeen: now });
             }
             return res.json({ success: true, paired: false });
         }
@@ -1299,6 +1327,7 @@ app.post('/api/tv-box/sync', (req, res) => {
 // Public, minimal data for the TV welcome screen (no secrets: no WLAN, no codes, no invoices).
 // Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
 app.get('/api/welcome', (req, res) => {
+    if (!tvboxViewAllowed(req)) return res.status(403).json({ success: false, error: 'Nur für die TV-Box' });
     try {
         const s = db.getAllSettings();
         const today = berlinToday();
@@ -2245,7 +2274,7 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 const SECRET_MASK = '••••••••';
 const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
 const SERVER_ONLY_SETTINGS = ['push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state',
-    'tvbox_paired', 'tvbox_pairing', 'tvbox_config', 'tvbox_command'];
+    'tvbox_paired', 'tvbox_config', 'tvbox_command'];
 
 function secretPath(settings, [key, field]) {
     const holder = field ? settings[key] : settings;
@@ -2433,12 +2462,11 @@ app.get('/api/settings/tvbox', apiLimiter, async (req, res) => {
 
 function tvboxRemoteState() {
     const paired = db.getSetting('tvbox_paired');
-    const pending = db.getSetting('tvbox_pairing');
     const strip = o => o ? { deviceId: o.deviceId, model: o.model, ip: o.ip, versionName: o.versionName,
         firstSeen: o.firstSeen, lastSeen: o.lastSeen, pairedAt: o.pairedAt } : null;
     return {
         paired: strip(paired),
-        pending: pending && (!paired || pending.deviceId !== paired.deviceId) ? strip(pending) : null,
+        pending: [...tvboxPending.values()].filter(p => !paired || p.deviceId !== paired.deviceId).map(strip),
         live: tvboxLive && paired && tvboxLive.deviceId === paired.deviceId ? tvboxLive : null,
         config: (({ adminPin, ...rest }) => ({ ...rest, adminPin: adminPin ? true : '' }))(tvboxConfig()), // PIN stays on the server
         command: db.getSetting('tvbox_command') || null,
@@ -2447,12 +2475,15 @@ function tvboxRemoteState() {
 }
 
 app.post('/api/settings/tvbox/pair', apiLimiter, (req, res) => {
-    const pending = db.getSetting('tvbox_pairing');
-    if (!pending || pending.deviceId !== String((req.body || {}).deviceId || '')) {
-        return res.status(400).json({ error: 'Keine wartende Box mit dieser Kennung. Bitte neu laden.' });
+    // The 6-digit code is shown on the TV; only whoever sees the TV can pair it
+    const code = String((req.body || {}).code || '').replace(/\s+/g, '');
+    const pending = /^[0-9]{6}$/.test(code) ? [...tvboxPending.values()].find(p => p.code === code) : null;
+    if (!pending) {
+        return res.status(400).json({ error: 'Kein Fernseher zeigt diesen Code. Bitte den Code vom Bildschirm der Box abtippen.' });
     }
-    db.setSetting('tvbox_paired', { ...pending, pairedAt: Date.now() });
-    db.setSetting('tvbox_pairing', null);
+    const { code: _c, ...rest } = pending;
+    db.setSetting('tvbox_paired', { ...rest, pairedAt: Date.now() });
+    tvboxPending.delete(pending.deviceId);
     tvboxLive = null;
     res.json({ success: true, ...tvboxRemoteState() });
 });

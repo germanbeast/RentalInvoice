@@ -5248,12 +5248,11 @@
         const p = d.paired, live = d.live, cfg = d.config || {};
         $('#tvbox-paired').textContent = p ? `${p.model || 'TV-Box'}${p.ip ? ' · ' + p.ip : ''}, gekoppelt am ${fmtT(p.pairedAt)}` : 'noch keine';
         const show = (el, on) => { el.style.display = on ? '' : 'none'; };
-        show($('#tvbox-pending'), !!d.pending);
-        if (d.pending) $('#tvbox-pending-text').textContent = `${d.pending.model || 'TV-Box'}${d.pending.ip ? ' · ' + d.pending.ip : ''} (App ${d.pending.versionName || '?'}), zuletzt ${ago(d.pending.lastSeen)}`;
-        const pairBtn = $('#btn-tvbox-pair');
-        show(pairBtn, !!d.pending);
-        pairBtn.dataset.deviceId = d.pending ? d.pending.deviceId : '';
-        pairBtn.textContent = p ? 'Stattdessen diese Box koppeln' : 'Diese Box koppeln';
+        const pend = d.pending || [];
+        show($('#tvbox-pending'), pend.length > 0);
+        $('#tvbox-pending-text').textContent = pend.map(x => `${x.model || 'TV-Box'}${x.ip ? ' · ' + x.ip : ''} (App ${x.versionName || '?'}), zuletzt ${ago(x.lastSeen)}`).join('; ');
+        $('#btn-tvbox-pair').textContent = p ? 'Andere Box koppeln (ersetzt die jetzige)' : 'Box koppeln';
+        $('#tvbox-pair-label').textContent = p ? 'Neue Box? Kopplungs-Code vom Fernseher' : 'Kopplungs-Code vom Fernseher';
         show($('#btn-tvbox-unpair'), !!p);
         show($('#tvbox-remote'), !!p);
         if (!p) return;
@@ -5287,12 +5286,16 @@
         if (!d || !d.success) showToast((d && d.error) || 'Hat nicht geklappt', 'error');
         return d && d.success ? d : null;
     }
-    if ($('#btn-tvbox-pair')) $('#btn-tvbox-pair').addEventListener('click', async (e) => {
-        if (await tvboxPost('/api/settings/tvbox/pair', { deviceId: e.currentTarget.dataset.deviceId })) {
-            showToast('Box gekoppelt', 'success');
+    if ($('#btn-tvbox-pair')) $('#btn-tvbox-pair').addEventListener('click', async () => {
+        const code = $('#tvbox-pair-code').value.replace(/\D/g, '');
+        if (code.length !== 6) { showToast('Bitte den 6-stelligen Code vom Fernseher eingeben', 'error'); return; }
+        if (await tvboxPost('/api/settings/tvbox/pair', { code })) {
+            $('#tvbox-pair-code').value = '';
+            showToast('Box gekoppelt, sie zeigt gleich den Welcome-Screen', 'success');
             loadTvbox();
         }
     });
+    if ($('#btn-tvbox-preview')) $('#btn-tvbox-preview').addEventListener('click', () => window.open('/welcome.html', '_blank', 'noopener'));
     if ($('#btn-tvbox-unpair')) $('#btn-tvbox-unpair').addEventListener('click', async () => {
         if (!confirm('Kopplung aufheben? Die Box behält ihre Einstellungen, bekommt aber keine neuen mehr.')) return;
         if (await tvboxPost('/api/settings/tvbox/unpair')) loadTvbox();
