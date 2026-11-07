@@ -41,6 +41,8 @@ public class MainActivity extends Activity {
     private static final long BACK_HOLD_MS = 10 * 1000;
     /** Extra beim Start nach Aus/Ein: Welcome-Seite neu laden. */
     static final String EXTRA_RESET = "reset_home";
+    /** Welcome-Screen ist gerade sichtbar (für die Inaktivitäts-Prüfung im WatchService). */
+    static volatile boolean inFront = false;
     private static final long RETRY_MS = 20000;
     /** Apps, die die Knöpfe auf dem Welcome-Screen starten dürfen (auch im Kiosk-Modus). */
     private static final String[] ALLOWED_APPS = {
@@ -391,7 +393,7 @@ public class MainActivity extends Activity {
     private void startLockTaskIfOwner() {
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) return;
-        if (prefs.getBoolean("kiosk_paused", false)) return; // per PIN ausgesetzt (bis zum Neustart)
+        if (RemoteControl.kioskOff(prefs)) return; // per PIN (bis zum Neustart) oder im Admin ausgeschaltet
         try {
             ComponentName admin = new ComponentName(this, AdminReceiver.class);
             java.util.LinkedHashSet<String> allowed = new java.util.LinkedHashSet<>();
@@ -413,6 +415,25 @@ public class MainActivity extends Activity {
             startLockTask();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void releaseLockOnly() {
+        try {
+            stopLockTask();
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Kiosk aus (Admin): Sperre lösen und Home-Taste wieder normal, Geräte-Eigentümer bleibt. */
+    private void releaseKiosk() {
+        releaseLockOnly();
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
+            try {
+                dpm.clearPackagePersistentPreferredActivities(new ComponentName(this, AdminReceiver.class), getPackageName());
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -453,6 +474,7 @@ public class MainActivity extends Activity {
     // dispatchKeyEvent, weil die WebView OK sonst selbst verbraucht.
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        WatchService.markActive();
         int code = event.getKeyCode();
         // Zurück-Taste 10 Sekunden halten → PIN-Abfrage für die Einstellungen (Ausstieg für den Gastgeber).
         // Per Zeitgeber statt Tasten-Wiederholung, weil manche Fernbedienungen Zurück nicht wiederholen.
@@ -489,11 +511,34 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        inFront = false;
+        WatchService.markActive(); // ab Verlassen des Welcome-Screens zählt die Ruhezeit
+        super.onPause();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        inFront = true;
+        WatchService.markActive();
         enableKioskMode();
-        if (!getIntent().getBooleanExtra("exit_kiosk", false)) {
+        if (RemoteControl.kioskOff(prefs)) {
+            releaseKiosk(); // im Admin ausgeschaltet: Sperre lösen, Home-Zuordnung aufheben
+        } else if (!getIntent().getBooleanExtra("exit_kiosk", false)) {
             startLockTaskIfOwner();
+        }
+        // Fernbefehl aus dem Admin: Android-Einstellungen öffnen
+        if (getIntent().getBooleanExtra(RemoteControl.EXTRA_OPEN_SETTINGS, false)) {
+            getIntent().removeExtra(RemoteControl.EXTRA_OPEN_SETTINGS);
+            releaseLockOnly();
+            try {
+                Intent si = new Intent(android.provider.Settings.ACTION_SETTINGS);
+                si.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(si);
+            } catch (Exception ignored) {
+            }
+            return;
         }
         // Reload page when returning from settings
         loadWelcomePage();

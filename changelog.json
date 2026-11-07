@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.42.0",
+    "currentVersion": "1.43.0",
     "releases": [
+        {
+            "version": "1.43.0",
+            "date": "2026-11-07",
+            "title": "TV-Box aus dem Admin fernsteuern",
+            "features": [
+                "TV-Box im Admin koppeln und dann von dort steuern: Kiosk-Modus an/aus, Ruhezeit, Admin-PIN",
+                "Befehle an die Box: Welcome-Screen zeigen, neu laden, Update suchen, Android-Einstellungen öffnen, Neustart",
+                "Live-Status der Box: online, Kiosk aktiv, was gerade läuft, letzter Tastendruck",
+                "Wird 4 Stunden lang keine Taste auf der Fernbedienung gedrückt, kehrt die Box von Waipu & Co. automatisch zum Welcome-Screen zurück"
+            ]
+        },
         {
             "version": "1.42.0",
             "date": "2026-11-06",

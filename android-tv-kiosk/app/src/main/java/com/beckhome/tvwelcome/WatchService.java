@@ -28,6 +28,10 @@ public class WatchService extends Service {
     private static final String CHANNEL = "watch";
     private static final long POLL_MS = 3000;
     private static final long UPDATE_EVERY_MS = 3 * 60 * 60 * 1000L;
+    /** Fernsteuerung: alle 60 Sekunden beim Server nach Einstellungen und Befehlen fragen. */
+    private static final long SYNC_MS = 60 * 1000L;
+    private static final long IDLE_CHECK_MS = 60 * 1000L;
+    private static volatile long lastActive = System.currentTimeMillis();
     private static final String HDMI_PLUG = "android.media.action.HDMI_AUDIO_PLUG";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -68,6 +72,14 @@ public class WatchService extends Service {
         }
     };
 
+    private final Runnable sync = new Runnable() {
+        @Override
+        public void run() {
+            RemoteControl.syncAsync(WatchService.this, isDisplayOn());
+            handler.postDelayed(this, SYNC_MS);
+        }
+    };
+
     private final Runnable poll = new Runnable() {
         @Override
         public void run() {
@@ -76,6 +88,31 @@ public class WatchService extends Service {
             else if (!lastOn && on) turnedOn();
             lastOn = on;
             handler.postDelayed(this, POLL_MS);
+        }
+    };
+
+    /** Tastendruck oder Wechsel weg vom Welcome-Screen: Ruhezeit beginnt neu. */
+    static long lastActive() {
+        return lastActive;
+    }
+
+    static void markActive() {
+        lastActive = System.currentTimeMillis();
+    }
+
+    private final Runnable idleCheck = new Runnable() {
+        @Override
+        public void run() {
+            // Läuft eine andere App (z.B. Waipu) und seit 4 Stunden wurde keine Taste gedrückt,
+            // zurück zum Welcome-Screen. Ohne Tasten-Wächter (Bedienungshilfe nicht aktiv) zählt die
+            // Zeit ab dem Verlassen des Welcome-Screens.
+            long idleMs = RemoteControl.idleHomeMs(WatchService.this);
+            if (idleMs > 0 && !MainActivity.inFront && isDisplayOn() && !RemoteControl.kioskOff(WatchService.this)
+                    && System.currentTimeMillis() - lastActive >= idleMs) {
+                markActive();
+                showWelcome();
+            }
+            handler.postDelayed(this, IDLE_CHECK_MS);
         }
     };
 
@@ -92,6 +129,7 @@ public class WatchService extends Service {
     public void onCreate() {
         super.onCreate();
         goForeground();
+        ensureKeyWatch();
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_SCREEN_OFF);
         f.addAction(Intent.ACTION_SCREEN_ON);
@@ -106,6 +144,8 @@ public class WatchService extends Service {
         }
         lastOn = isDisplayOn();
         handler.postDelayed(poll, POLL_MS);
+        handler.postDelayed(idleCheck, IDLE_CHECK_MS);
+        handler.postDelayed(sync, 5000);
         handler.postDelayed(updateCheck, 60 * 1000); // kurz nach dem Start, dann alle 3 Stunden
     }
 
@@ -118,6 +158,8 @@ public class WatchService extends Service {
     public void onDestroy() {
         handler.removeCallbacks(poll);
         handler.removeCallbacks(updateCheck);
+        handler.removeCallbacks(idleCheck);
+        handler.removeCallbacks(sync);
         try {
             unregisterReceiver(receiver);
         } catch (Exception ignored) {
@@ -131,6 +173,7 @@ public class WatchService extends Service {
     }
 
     private void turnedOff() {
+        if (RemoteControl.kioskOff(this)) return; // Kiosk aus: nichts erzwingen
         wasOff = true;
         showWelcome(); // schon im Dunkeln nach vorne holen, beim Einschalten ist er sofort da
     }
@@ -140,16 +183,42 @@ public class WatchService extends Service {
             wasOff = false;
             showWelcome();
             SelfUpdater.checkAsync(this);
+            RemoteControl.syncAsync(this, true);
         }
     }
 
-    private void showWelcome() {
+    void showWelcome() {
         try {
             Intent i = new Intent(this, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
                     | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             i.putExtra(MainActivity.EXTRA_RESET, true);
             startActivity(i);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * Schaltet die Ruhe-Erkennung (Bedienungshilfe) wieder ein, falls Android sie z.B. nach einem
+     * Absturz abgeschaltet hat. Geht nur, wenn die .bat WRITE_SECURE_SETTINGS erteilt hat.
+     */
+    private void ensureKeyWatch() {
+        try {
+            if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+            android.content.ContentResolver cr = getContentResolver();
+            String me = getPackageName() + "/" + KeyWatchService.class.getName();
+            String meShort = getPackageName() + "/.KeyWatchService";
+            String list = android.provider.Settings.Secure.getString(cr,
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (list == null) list = "";
+            if (!list.contains(me) && !list.contains(meShort)) {
+                list = list.isEmpty() ? meShort : list + ":" + meShort;
+                android.provider.Settings.Secure.putString(cr,
+                        android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, list);
+            }
+            android.provider.Settings.Secure.putInt(cr,
+                    android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 1);
         } catch (Exception ignored) {
         }
     }

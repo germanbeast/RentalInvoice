@@ -5,6 +5,12 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.0] - 2026-11-07
+
+### Neu
+- TV-Box-Fernsteuerung: Die Box (TV-App 1.7) meldet sich jede Minute bei `POST /api/tv-box/sync` mit eigener Zufalls-Kennung und Schlüssel. Nach dem Koppeln unter Einstellungen → TV-Box bekommt sie Kiosk an/aus, Ruhezeit und Admin-PIN (`PUT /api/settings/tvbox/config`) sowie Befehle (`POST /api/settings/tvbox/command`: Welcome-Screen, neu laden, Update suchen, Android-Einstellungen, Neustart als Geräte-Eigentümer). Der Admin zeigt den Live-Status. Ungekoppelte Boxen bekommen nichts außer „nicht gekoppelt“; die PIN verlässt den Server nur zur gekoppelten Box
+- TV-App 1.7: Nach 4 Stunden ohne Tastendruck kehrt die Box aus jeder App (z.B. Waipu) zum Welcome-Screen zurück. Eine Bedienungshilfe (`KeyWatchService`) merkt sich nur den Zeitpunkt des letzten Tastendrucks; `TV-Box-einrichten.bat` schaltet sie ein und erteilt `WRITE_SECURE_SETTINGS`, damit die App sie selbst wieder aktiviert. Ohne Bedienungshilfe zählen die 4 Stunden ab dem Verlassen des Welcome-Screens
+
 ## [1.42.0] - 2026-11-06
 
 ### Neu
