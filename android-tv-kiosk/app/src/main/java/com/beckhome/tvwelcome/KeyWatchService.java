@@ -11,6 +11,21 @@ import android.view.accessibility.AccessibilityEvent;
  */
 public class KeyWatchService extends AccessibilityService {
 
+    /** Läuft gerade (für die Statusanzeige im Admin). */
+    static volatile boolean connected = false;
+
+    @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        connected = true;
+    }
+
+    @Override
+    public void onDestroy() {
+        connected = false;
+        super.onDestroy();
+    }
+
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
         WatchService.markActive();

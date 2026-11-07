@@ -5232,7 +5232,89 @@
         else if (newer) hint.textContent = 'Eine neue Version ist da. Nach der Freigabe installiert die Box sie beim nächsten Nachfragen.';
         else if (d.device && d.approved && d.device.versionCode < d.approved.versionCode) hint.textContent = 'Freigegeben, die Box hat das Update aber noch nicht installiert.';
         else hint.textContent = 'Alles aktuell.';
+        renderTvboxRemote(d);
     }
+
+    const TVBOX_CMD_LABELS = {
+        show_welcome: 'Welcome-Screen zeigen', reload: 'Seite neu laden', update_check: 'Nach Update suchen',
+        open_settings: 'Android-Einstellungen öffnen', reboot: 'Box neu starten'
+    };
+    function renderTvboxRemote(d) {
+        const fmtT = t => t ? new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        const ago = t => {
+            const m = Math.round((Date.now() - t) / 60000);
+            return m < 1 ? 'gerade eben' : m < 60 ? `vor ${m} Min.` : m < 48 * 60 ? `vor ${Math.round(m / 60)} Std.` : fmtT(t);
+        };
+        const p = d.paired, live = d.live, cfg = d.config || {};
+        $('#tvbox-paired').textContent = p ? `${p.model || 'TV-Box'}${p.ip ? ' · ' + p.ip : ''}, gekoppelt am ${fmtT(p.pairedAt)}` : 'noch keine';
+        const show = (el, on) => { el.style.display = on ? '' : 'none'; };
+        show($('#tvbox-pending'), !!d.pending);
+        if (d.pending) $('#tvbox-pending-text').textContent = `${d.pending.model || 'TV-Box'}${d.pending.ip ? ' · ' + d.pending.ip : ''} (App ${d.pending.versionName || '?'}), zuletzt ${ago(d.pending.lastSeen)}`;
+        const pairBtn = $('#btn-tvbox-pair');
+        show(pairBtn, !!d.pending);
+        pairBtn.dataset.deviceId = d.pending ? d.pending.deviceId : '';
+        pairBtn.textContent = p ? 'Stattdessen diese Box koppeln' : 'Diese Box koppeln';
+        show($('#btn-tvbox-unpair'), !!p);
+        show($('#tvbox-remote'), !!p);
+        if (!p) return;
+
+        const online = live && Date.now() - live.lastSeen < 3 * 60 * 1000;
+        $('#tvbox-live-online').textContent = !live ? 'noch keine Meldung seit dem Server-Start'
+            : online ? `online (${ago(live.lastSeen)})` : `offline, zuletzt ${ago(live.lastSeen)}`;
+        $('#tvbox-live-kiosk').textContent = !live ? '–' : live.kioskActive ? 'aktiv (gesperrt)'
+            : live.deviceOwner ? 'aus' : 'aus (App ist kein Geräte-Eigentümer, .bat erneut ausführen)';
+        $('#tvbox-live-screen').textContent = !live ? '–' : !live.screenOn ? 'Fernseher aus / Standby'
+            : live.onWelcome ? 'Welcome-Screen' : 'eine andere App (z.B. Waipu)';
+        $('#tvbox-live-idle').textContent = !live ? '–' : (live.idleMinutes < 1 ? 'gerade eben' : live.idleMinutes < 120 ? `vor ${live.idleMinutes} Min.` : `vor ${Math.round(live.idleMinutes / 60)} Std.`)
+            + (live.keyWatch ? '' : ' (Ruhe-Erkennung nicht aktiv, .bat erneut ausführen)');
+        $('#tvbox-live-device').textContent = !live ? '–' : `${live.model || '?'}, Android ${live.android || '?'}, App ${live.versionName || '?'}${live.ip ? ', IP ' + live.ip : ''}`;
+
+        const form = $('#tvbox-cfg-kiosk');
+        if (document.activeElement !== form) form.value = cfg.kiosk === false ? '0' : '1';
+        const idle = $('#tvbox-cfg-idle');
+        if (document.activeElement !== idle) idle.value = cfg.idleHours != null ? cfg.idleHours : 4;
+        const applied = live && cfg.version && live.configVersion >= cfg.version;
+        $('#tvbox-cfg-state').textContent = (cfg.adminPin ? 'Eine PIN ist hinterlegt. ' : 'Noch keine PIN über den Admin gesetzt (es gilt die PIN aus der Einrichtung). ')
+            + (!cfg.version ? '' : applied ? 'Die Box hat die Einstellungen übernommen.' : 'Die Box hat die letzten Einstellungen noch nicht abgeholt.');
+
+        const c = d.command;
+        $('#tvbox-cmd-state').textContent = !c ? '' : `Zuletzt: „${TVBOX_CMD_LABELS[c.type] || c.type}“ am ${fmtT(c.createdAt)}, `
+            + (live && live.ackSeq >= c.seq ? 'ausgeführt.' : 'wartet auf die Box.');
+    }
+
+    async function tvboxPost(url, body, method = 'POST') {
+        const d = await apiJson(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).catch(() => null);
+        if (!d || !d.success) showToast((d && d.error) || 'Hat nicht geklappt', 'error');
+        return d && d.success ? d : null;
+    }
+    if ($('#btn-tvbox-pair')) $('#btn-tvbox-pair').addEventListener('click', async (e) => {
+        if (await tvboxPost('/api/settings/tvbox/pair', { deviceId: e.currentTarget.dataset.deviceId })) {
+            showToast('Box gekoppelt', 'success');
+            loadTvbox();
+        }
+    });
+    if ($('#btn-tvbox-unpair')) $('#btn-tvbox-unpair').addEventListener('click', async () => {
+        if (!confirm('Kopplung aufheben? Die Box behält ihre Einstellungen, bekommt aber keine neuen mehr.')) return;
+        if (await tvboxPost('/api/settings/tvbox/unpair')) loadTvbox();
+    });
+    if ($('#btn-tvbox-cfg-save')) $('#btn-tvbox-cfg-save').addEventListener('click', async () => {
+        const body = { kiosk: $('#tvbox-cfg-kiosk').value === '1', idleHours: Number($('#tvbox-cfg-idle').value) };
+        const pin = $('#tvbox-cfg-pin').value.trim();
+        if (pin) body.adminPin = pin;
+        if (await tvboxPost('/api/settings/tvbox/config', body, 'PUT')) {
+            $('#tvbox-cfg-pin').value = '';
+            showToast('Gespeichert, die Box übernimmt es in etwa einer Minute', 'success');
+            loadTvbox();
+        }
+    });
+    document.querySelectorAll('[data-tvbox-cmd]').forEach(b => b.addEventListener('click', async () => {
+        const type = b.dataset.tvboxCmd;
+        if (type === 'reboot' && !confirm('Die TV-Box jetzt neu starten?')) return;
+        if (await tvboxPost('/api/settings/tvbox/command', { type })) {
+            showToast(`„${TVBOX_CMD_LABELS[type]}“ gesendet, die Box führt es in etwa einer Minute aus`, 'success');
+            loadTvbox();
+        }
+    }));
     if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
     if ($('#btn-tvbox-approve')) $('#btn-tvbox-approve').addEventListener('click', async () => {
         const btn = $('#btn-tvbox-approve');

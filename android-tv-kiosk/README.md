@@ -10,6 +10,7 @@ Diese APK zeigt einen Welcome Screen für Gäste auf Google TV / Android TV.
 ✅ **Vollbild** - Optimiert für TV-Displays
 ✅ **App-Launch** - Buttons starten Waipu TV, Netflix, etc.
 ✅ **Ruhe-Rückkehr** - Nach 4 Stunden ohne Tastendruck zurück zum Welcome-Screen (auch aus Waipu)
+✅ **Fernsteuerung** - Im Admin (Einstellungen → TV-Box) koppeln, dann Kiosk an/aus, Ruhezeit, PIN und Befehle (Neustart, neu laden …)
 
 ## Installation
 

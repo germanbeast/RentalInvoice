@@ -28,8 +28,8 @@ public class WatchService extends Service {
     private static final String CHANNEL = "watch";
     private static final long POLL_MS = 3000;
     private static final long UPDATE_EVERY_MS = 3 * 60 * 60 * 1000L;
-    /** Nach so langer Ruhe (keine Taste auf der Fernbedienung) geht es zurück zum Welcome-Screen. */
-    static final long IDLE_HOME_MS = 4 * 60 * 60 * 1000L;
+    /** Fernsteuerung: alle 60 Sekunden beim Server nach Einstellungen und Befehlen fragen. */
+    private static final long SYNC_MS = 60 * 1000L;
     private static final long IDLE_CHECK_MS = 60 * 1000L;
     private static volatile long lastActive = System.currentTimeMillis();
     private static final String HDMI_PLUG = "android.media.action.HDMI_AUDIO_PLUG";
@@ -72,6 +72,14 @@ public class WatchService extends Service {
         }
     };
 
+    private final Runnable sync = new Runnable() {
+        @Override
+        public void run() {
+            RemoteControl.syncAsync(WatchService.this, isDisplayOn());
+            handler.postDelayed(this, SYNC_MS);
+        }
+    };
+
     private final Runnable poll = new Runnable() {
         @Override
         public void run() {
@@ -84,6 +92,10 @@ public class WatchService extends Service {
     };
 
     /** Tastendruck oder Wechsel weg vom Welcome-Screen: Ruhezeit beginnt neu. */
+    static long lastActive() {
+        return lastActive;
+    }
+
     static void markActive() {
         lastActive = System.currentTimeMillis();
     }
@@ -94,8 +106,9 @@ public class WatchService extends Service {
             // Läuft eine andere App (z.B. Waipu) und seit 4 Stunden wurde keine Taste gedrückt,
             // zurück zum Welcome-Screen. Ohne Tasten-Wächter (Bedienungshilfe nicht aktiv) zählt die
             // Zeit ab dem Verlassen des Welcome-Screens.
-            if (!MainActivity.inFront && isDisplayOn()
-                    && System.currentTimeMillis() - lastActive >= IDLE_HOME_MS) {
+            long idleMs = RemoteControl.idleHomeMs(WatchService.this);
+            if (idleMs > 0 && !MainActivity.inFront && isDisplayOn() && !RemoteControl.kioskOff(WatchService.this)
+                    && System.currentTimeMillis() - lastActive >= idleMs) {
                 markActive();
                 showWelcome();
             }
@@ -132,6 +145,7 @@ public class WatchService extends Service {
         lastOn = isDisplayOn();
         handler.postDelayed(poll, POLL_MS);
         handler.postDelayed(idleCheck, IDLE_CHECK_MS);
+        handler.postDelayed(sync, 5000);
         handler.postDelayed(updateCheck, 60 * 1000); // kurz nach dem Start, dann alle 3 Stunden
     }
 
@@ -145,6 +159,7 @@ public class WatchService extends Service {
         handler.removeCallbacks(poll);
         handler.removeCallbacks(updateCheck);
         handler.removeCallbacks(idleCheck);
+        handler.removeCallbacks(sync);
         try {
             unregisterReceiver(receiver);
         } catch (Exception ignored) {
@@ -158,6 +173,7 @@ public class WatchService extends Service {
     }
 
     private void turnedOff() {
+        if (RemoteControl.kioskOff(this)) return; // Kiosk aus: nichts erzwingen
         wasOff = true;
         showWelcome(); // schon im Dunkeln nach vorne holen, beim Einschalten ist er sofort da
     }
@@ -167,10 +183,11 @@ public class WatchService extends Service {
             wasOff = false;
             showWelcome();
             SelfUpdater.checkAsync(this);
+            RemoteControl.syncAsync(this, true);
         }
     }
 
-    private void showWelcome() {
+    void showWelcome() {
         try {
             Intent i = new Intent(this, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP

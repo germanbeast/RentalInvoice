@@ -393,7 +393,7 @@ public class MainActivity extends Activity {
     private void startLockTaskIfOwner() {
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) return;
-        if (prefs.getBoolean("kiosk_paused", false)) return; // per PIN ausgesetzt (bis zum Neustart)
+        if (RemoteControl.kioskOff(prefs)) return; // per PIN (bis zum Neustart) oder im Admin ausgeschaltet
         try {
             ComponentName admin = new ComponentName(this, AdminReceiver.class);
             java.util.LinkedHashSet<String> allowed = new java.util.LinkedHashSet<>();
@@ -415,6 +415,25 @@ public class MainActivity extends Activity {
             startLockTask();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void releaseLockOnly() {
+        try {
+            stopLockTask();
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Kiosk aus (Admin): Sperre lösen und Home-Taste wieder normal, Geräte-Eigentümer bleibt. */
+    private void releaseKiosk() {
+        releaseLockOnly();
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
+            try {
+                dpm.clearPackagePersistentPreferredActivities(new ComponentName(this, AdminReceiver.class), getPackageName());
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -504,8 +523,22 @@ public class MainActivity extends Activity {
         inFront = true;
         WatchService.markActive();
         enableKioskMode();
-        if (!getIntent().getBooleanExtra("exit_kiosk", false)) {
+        if (RemoteControl.kioskOff(prefs)) {
+            releaseKiosk(); // im Admin ausgeschaltet: Sperre lösen, Home-Zuordnung aufheben
+        } else if (!getIntent().getBooleanExtra("exit_kiosk", false)) {
             startLockTaskIfOwner();
+        }
+        // Fernbefehl aus dem Admin: Android-Einstellungen öffnen
+        if (getIntent().getBooleanExtra(RemoteControl.EXTRA_OPEN_SETTINGS, false)) {
+            getIntent().removeExtra(RemoteControl.EXTRA_OPEN_SETTINGS);
+            releaseLockOnly();
+            try {
+                Intent si = new Intent(android.provider.Settings.ACTION_SETTINGS);
+                si.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(si);
+            } catch (Exception ignored) {
+            }
+            return;
         }
         // Reload page when returning from settings
         loadWelcomePage();

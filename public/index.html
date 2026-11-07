@@ -2472,6 +2472,61 @@
                                         <button type="button" id="btn-tvbox-refresh" class="btn btn-ghost">Neu laden</button>
                                     </div>
                                 </div>
+
+                                <h3 style="margin-top: 2rem;">Fernsteuerung</h3>
+                                <p class="text-muted">Die Box meldet sich jede Minute. Einstellungen und Befehle von hier übernimmt sie innerhalb von etwa einer Minute. Dafür muss die Box einmal gekoppelt werden.</p>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <div class="info-row"><span>Gekoppelte Box:</span> <strong id="tvbox-paired">–</strong></div>
+                                    <div id="tvbox-pending" class="info-row" style="display:none"><span>Wartet auf Kopplung:</span> <strong id="tvbox-pending-text">–</strong></div>
+                                    <div class="btn-group" style="margin-top: 1rem;">
+                                        <button type="button" id="btn-tvbox-pair" class="btn btn-primary" style="display:none">Diese Box koppeln</button>
+                                        <button type="button" id="btn-tvbox-unpair" class="btn btn-ghost btn-danger btn-sm" style="display:none">Kopplung aufheben</button>
+                                    </div>
+                                </div>
+
+                                <div id="tvbox-remote" style="display:none">
+                                    <div class="card" style="margin-top: 1rem;">
+                                        <h4 style="margin-top:0">Status</h4>
+                                        <div class="info-row"><span>Verbindung:</span> <strong id="tvbox-live-online">–</strong></div>
+                                        <div class="info-row"><span>Kiosk-Modus:</span> <strong id="tvbox-live-kiosk">–</strong></div>
+                                        <div class="info-row"><span>Gerade sichtbar:</span> <strong id="tvbox-live-screen">–</strong></div>
+                                        <div class="info-row"><span>Letzter Tastendruck:</span> <strong id="tvbox-live-idle">–</strong></div>
+                                        <div class="info-row"><span>Gerät:</span> <strong id="tvbox-live-device">–</strong></div>
+                                    </div>
+
+                                    <div class="card" style="margin-top: 1rem;">
+                                        <h4 style="margin-top:0">Einstellungen</h4>
+                                        <div class="form-group">
+                                            <label for="tvbox-cfg-kiosk">Kiosk-Modus</label>
+                                            <select id="tvbox-cfg-kiosk">
+                                                <option value="1">An: Gäste bleiben im Welcome-Screen</option>
+                                                <option value="0">Aus: Box frei bedienbar (z.B. für Wartung)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="tvbox-cfg-idle">Zurück zum Welcome-Screen nach … Stunden ohne Tastendruck (0 = nie)</label>
+                                            <input type="number" id="tvbox-cfg-idle" min="0" max="48" step="0.5">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="tvbox-cfg-pin">Neue Admin-PIN der Box (leer lassen = unverändert)</label>
+                                            <input type="password" id="tvbox-cfg-pin" inputmode="numeric" autocomplete="new-password" placeholder="4 bis 10 Ziffern">
+                                        </div>
+                                        <p class="text-muted" id="tvbox-cfg-state" style="font-size:.85rem"></p>
+                                        <button type="button" id="btn-tvbox-cfg-save" class="btn btn-primary">Auf die Box schicken</button>
+                                    </div>
+
+                                    <div class="card" style="margin-top: 1rem;">
+                                        <h4 style="margin-top:0">Befehle</h4>
+                                        <div class="btn-group" style="flex-wrap: wrap;">
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="show_welcome">Welcome-Screen zeigen</button>
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="reload">Seite neu laden</button>
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="update_check">Jetzt nach Update suchen</button>
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="open_settings">Android-Einstellungen öffnen</button>
+                                            <button type="button" class="btn btn-ghost btn-danger" data-tvbox-cmd="reboot">Box neu starten</button>
+                                        </div>
+                                        <p class="text-muted" id="tvbox-cmd-state" style="font-size:.85rem; margin-top:.75rem"></p>
+                                    </div>
+                                </div>
                             </section>
 
                             <section id="settings-system" class="settings-page">
