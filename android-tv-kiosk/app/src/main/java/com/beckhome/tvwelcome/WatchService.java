@@ -28,6 +28,10 @@ public class WatchService extends Service {
     private static final String CHANNEL = "watch";
     private static final long POLL_MS = 3000;
     private static final long UPDATE_EVERY_MS = 3 * 60 * 60 * 1000L;
+    /** Nach so langer Ruhe (keine Taste auf der Fernbedienung) geht es zurück zum Welcome-Screen. */
+    static final long IDLE_HOME_MS = 4 * 60 * 60 * 1000L;
+    private static final long IDLE_CHECK_MS = 60 * 1000L;
+    private static volatile long lastActive = System.currentTimeMillis();
     private static final String HDMI_PLUG = "android.media.action.HDMI_AUDIO_PLUG";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -79,6 +83,26 @@ public class WatchService extends Service {
         }
     };
 
+    /** Tastendruck oder Wechsel weg vom Welcome-Screen: Ruhezeit beginnt neu. */
+    static void markActive() {
+        lastActive = System.currentTimeMillis();
+    }
+
+    private final Runnable idleCheck = new Runnable() {
+        @Override
+        public void run() {
+            // Läuft eine andere App (z.B. Waipu) und seit 4 Stunden wurde keine Taste gedrückt,
+            // zurück zum Welcome-Screen. Ohne Tasten-Wächter (Bedienungshilfe nicht aktiv) zählt die
+            // Zeit ab dem Verlassen des Welcome-Screens.
+            if (!MainActivity.inFront && isDisplayOn()
+                    && System.currentTimeMillis() - lastActive >= IDLE_HOME_MS) {
+                markActive();
+                showWelcome();
+            }
+            handler.postDelayed(this, IDLE_CHECK_MS);
+        }
+    };
+
     static void start(Context context) {
         try {
             Intent i = new Intent(context, WatchService.class);
@@ -92,6 +116,7 @@ public class WatchService extends Service {
     public void onCreate() {
         super.onCreate();
         goForeground();
+        ensureKeyWatch();
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_SCREEN_OFF);
         f.addAction(Intent.ACTION_SCREEN_ON);
@@ -106,6 +131,7 @@ public class WatchService extends Service {
         }
         lastOn = isDisplayOn();
         handler.postDelayed(poll, POLL_MS);
+        handler.postDelayed(idleCheck, IDLE_CHECK_MS);
         handler.postDelayed(updateCheck, 60 * 1000); // kurz nach dem Start, dann alle 3 Stunden
     }
 
@@ -118,6 +144,7 @@ public class WatchService extends Service {
     public void onDestroy() {
         handler.removeCallbacks(poll);
         handler.removeCallbacks(updateCheck);
+        handler.removeCallbacks(idleCheck);
         try {
             unregisterReceiver(receiver);
         } catch (Exception ignored) {
@@ -150,6 +177,31 @@ public class WatchService extends Service {
                     | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             i.putExtra(MainActivity.EXTRA_RESET, true);
             startActivity(i);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * Schaltet die Ruhe-Erkennung (Bedienungshilfe) wieder ein, falls Android sie z.B. nach einem
+     * Absturz abgeschaltet hat. Geht nur, wenn die .bat WRITE_SECURE_SETTINGS erteilt hat.
+     */
+    private void ensureKeyWatch() {
+        try {
+            if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+            android.content.ContentResolver cr = getContentResolver();
+            String me = getPackageName() + "/" + KeyWatchService.class.getName();
+            String meShort = getPackageName() + "/.KeyWatchService";
+            String list = android.provider.Settings.Secure.getString(cr,
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (list == null) list = "";
+            if (!list.contains(me) && !list.contains(meShort)) {
+                list = list.isEmpty() ? meShort : list + ":" + meShort;
+                android.provider.Settings.Secure.putString(cr,
+                        android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, list);
+            }
+            android.provider.Settings.Secure.putInt(cr,
+                    android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 1);
         } catch (Exception ignored) {
         }
     }

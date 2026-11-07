@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.42.1] - 2026-11-07
+
+### Neu
+- TV-App 1.7: Nach 4 Stunden ohne Tastendruck kehrt die Box aus jeder App (z.B. Waipu) zum Welcome-Screen zurück. Eine Bedienungshilfe (`KeyWatchService`) merkt sich nur den Zeitpunkt des letzten Tastendrucks; `TV-Box-einrichten.bat` schaltet sie ein und erteilt `WRITE_SECURE_SETTINGS`, damit die App sie selbst wieder aktiviert. Ohne Bedienungshilfe zählen die 4 Stunden ab dem Verlassen des Welcome-Screens
+
 ## [1.42.0] - 2026-11-06
 
 ### Neu

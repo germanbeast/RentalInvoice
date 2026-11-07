@@ -41,6 +41,8 @@ public class MainActivity extends Activity {
     private static final long BACK_HOLD_MS = 10 * 1000;
     /** Extra beim Start nach Aus/Ein: Welcome-Seite neu laden. */
     static final String EXTRA_RESET = "reset_home";
+    /** Welcome-Screen ist gerade sichtbar (für die Inaktivitäts-Prüfung im WatchService). */
+    static volatile boolean inFront = false;
     private static final long RETRY_MS = 20000;
     /** Apps, die die Knöpfe auf dem Welcome-Screen starten dürfen (auch im Kiosk-Modus). */
     private static final String[] ALLOWED_APPS = {
@@ -453,6 +455,7 @@ public class MainActivity extends Activity {
     // dispatchKeyEvent, weil die WebView OK sonst selbst verbraucht.
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        WatchService.markActive();
         int code = event.getKeyCode();
         // Zurück-Taste 10 Sekunden halten → PIN-Abfrage für die Einstellungen (Ausstieg für den Gastgeber).
         // Per Zeitgeber statt Tasten-Wiederholung, weil manche Fernbedienungen Zurück nicht wiederholen.
@@ -489,8 +492,17 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        inFront = false;
+        WatchService.markActive(); // ab Verlassen des Welcome-Screens zählt die Ruhezeit
+        super.onPause();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        inFront = true;
+        WatchService.markActive();
         enableKioskMode();
         if (!getIntent().getBooleanExtra("exit_kiosk", false)) {
             startLockTaskIfOwner();

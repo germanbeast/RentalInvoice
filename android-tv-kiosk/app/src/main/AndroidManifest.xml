@@ -20,6 +20,10 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Wird von der .bat per "pm grant" erteilt: Ruhe-Erkennung nach Updates selbst wieder einschalten -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Streaming-Apps, die der Welcome-Screen starten darf (Android 11+ braucht das) -->
     <queries>
@@ -102,6 +106,20 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Kiosk: Welcome-Screen nach dem Einschalten des Fernsehers anzeigen" />
+        </service>
+
+        <!-- Ruhe-Erkennung: merkt sich nur den letzten Tastendruck (4 Stunden Ruhe → Welcome-Screen) -->
+        <service
+            android:name=".KeyWatchService"
+            android:exported="true"
+            android:label="@string/key_watch_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/key_watch" />
         </service>
 
         <!-- Ergebnis der Selbst-Installation (Update) -->
