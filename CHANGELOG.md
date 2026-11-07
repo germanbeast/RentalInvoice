@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## TV-App 1.9.1 - 2026-11-07
+
+### Neu
+- Test-Update für die Selbst-Aktualisierung: Nach einem Update zeigt die Box kurz „App aktualisiert auf Version …“ an
+
 ## [1.44.1] - 2026-11-07
 
 ### Verbessert
