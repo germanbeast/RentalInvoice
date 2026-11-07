@@ -10,6 +10,9 @@ public class BootReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         // Nach einem Selbst-Update: Wächter und Welcome-Screen wieder starten
         if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+            // Beim nächsten Anzeigen kurz „App aktualisiert“ einblenden
+            context.getSharedPreferences("WelcomeSettings", Context.MODE_PRIVATE)
+                    .edit().putBoolean("just_updated", true).apply();
             WatchService.start(context);
             Intent i = new Intent(context, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

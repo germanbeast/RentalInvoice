@@ -751,6 +751,15 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         inFront = true;
+        if (prefs.getBoolean("just_updated", false)) {
+            prefs.edit().putBoolean("just_updated", false).apply();
+            String v = "";
+            try {
+                v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception ignored) {
+            }
+            android.widget.Toast.makeText(this, "App aktualisiert auf Version " + v, android.widget.Toast.LENGTH_LONG).show();
+        }
         WatchService.markActive();
         enableKioskMode();
         if (RemoteControl.kioskOff(prefs)) {
