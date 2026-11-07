@@ -570,7 +570,8 @@ public class MainActivity extends Activity {
             cm.flush();
         } catch (Exception ignored) {
         }
-        String guestName = prefs.getString("guest_name", "Willkommen");
+        // Gastname kommt vom Server (aktuelle Buchung). Nur ein per adb fest gesetzter Name überschreibt ihn.
+        String guestName = prefs.getString("guest_name", "");
 
         // Get guest name from intent (if provided)
         String intentGuestName = getIntent().getStringExtra("guest_name");

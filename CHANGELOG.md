@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## TV-App 1.9.2 - 2026-11-07
+
+### Behoben
+- Die TV-Box zeigte immer „Willkommen“ statt des Gastnamens: Die App hängte `?welcome=Willkommen` an die Welcome-Seite, und dieser Wert hatte Vorrang vor dem Namen aus der aktuellen Buchung. Jetzt kommt der Name vom Server, nur ein per adb gesetzter `guest_name` überschreibt ihn
+
 ## TV-App 1.9.1 - 2026-11-07
 
 ### Neu
