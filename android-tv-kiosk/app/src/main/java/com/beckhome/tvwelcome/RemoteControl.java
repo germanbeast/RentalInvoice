@@ -159,6 +159,8 @@ final class RemoteControl {
         boolean paired = res.optBoolean("paired", false);
         setState(ctx, p, paired, false);
         if (!paired) return;
+        JSONObject welcome = res.optJSONObject("welcome");
+        if (welcome != null) p.edit().putString("welcome_json", welcome.toString()).apply(); // für den Offline-Welcome-Screen
 
         JSONObject cfg = res.optJSONObject("config");
         if (cfg != null) applyConfig(ctx, p, cfg);

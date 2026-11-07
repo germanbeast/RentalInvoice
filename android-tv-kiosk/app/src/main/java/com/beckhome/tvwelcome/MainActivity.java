@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
     private final Runnable retryRunnable = new Runnable() {
         @Override
         public void run() {
-            loadWelcomePage();
+            retryWhenServerBack();
         }
     };
     private SharedPreferences prefs;
@@ -143,11 +143,24 @@ public class MainActivity extends Activity {
                 // Server kennt die Box nicht (mehr): gleich nachfragen, dann zeigt sie den Kopplungs-Code
                 if (request.isForMainFrame() && response.getStatusCode() == 403) {
                     RemoteControl.syncAsync(MainActivity.this, true);
+                    pageFailed = true;
+                    showOfflineAndRetry("HTTP 403"); // gleich danach zeigt die Box ggf. den Kopplungs-Code
+                }
+                // Server/Tunnel gestört (z.B. 502 von Cloudflare): Offline-Welcome statt Fehlerseite
+                if (request.isForMainFrame() && response.getStatusCode() >= 500) {
+                    pageFailed = true;
+                    showOfflineAndRetry("HTTP " + response.getStatusCode());
                 }
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                if (url != null && !url.startsWith("data:") && !url.startsWith("about:")) pageFailed = false;
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
+                if (url != null && url.contains("/welcome.html") && !pageFailed) welcomeLoaded = true;
                 retryHandler.removeCallbacks(idleReturn);
                 if (!isOnWelcomePage()) retryHandler.postDelayed(idleReturn, IDLE_RETURN_MS);
             }
@@ -156,6 +169,7 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request.isForMainFrame()) {
+                    pageFailed = true;
                     showOfflineAndRetry(error.getDescription() + " (" + error.getErrorCode() + ")");
                 }
             }
@@ -164,6 +178,7 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                    pageFailed = true;
                     showOfflineAndRetry(description + " (" + errorCode + ")");
                 }
             }
@@ -172,6 +187,7 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                 handler.cancel();
+                pageFailed = true;
                 showOfflineAndRetry("Zertifikat ungültig (" + error.getPrimaryError()
                         + "), Datum/Uhrzeit der Box prüfen");
             }
@@ -317,17 +333,109 @@ public class MainActivity extends Activity {
         if (changed) editor.apply();
     }
 
+    /** Echte Welcome-Seite ist geladen (für „offline: einfach stehen lassen“). */
+    private boolean welcomeLoaded = false;
+    private boolean pageFailed = false;
+    private volatile boolean checkingServer = false;
+
+    private boolean isOnRealWelcome() {
+        String u = webView == null ? null : webView.getUrl();
+        return welcomeLoaded && u != null && u.contains("/welcome.html");
+    }
+
+    /**
+     * Internet/Server weg: keine Fehlermeldung, sondern ein Welcome-Screen aus der App mit den zuletzt
+     * bekannten Daten (Name, Zeiten, Kontakt), Uhr und dem Fernseh-Knopf. Im Hintergrund wird alle
+     * 20 Sekunden geprüft, ob der Server wieder da ist, dann lädt die echte Seite.
+     */
     private void showOfflineAndRetry(String detail) {
+        android.util.Log.w("Welcome", "offline: " + detail);
         retryHandler.removeCallbacks(retryRunnable);
-        String html = "<html><head><meta charset='utf-8'>" + SCREEN_CSS + "</head><body>"
-                + "<div><div style='font-size:42px'>Willkommen in der Ferienwohnung Beckhome</div>"
-                + "<div style='font-size:22px;opacity:.7;margin-top:24px'>Verbindung zum Internet wird hergestellt …</div>"
-                + "<div style='font-size:16px;opacity:.45;margin-top:32px'>" + android.text.TextUtils.htmlEncode(
-                        prefs.getString("server_url", DEFAULT_SERVER_URL) + ": " + detail) + "</div>"
-                + networkButtons()
-                + "</div><script>var b=document.getElementById('b1');if(b)b.focus();</script></body></html>";
-        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        welcomeLoaded = false;
+        webView.loadDataWithBaseURL(null, offlineWelcomeHtml(), "text/html", "UTF-8", null);
         retryHandler.postDelayed(retryRunnable, RETRY_MS);
+    }
+
+    private String offlineWelcomeHtml() {
+        String name = "", title = "", phone = "", cin = "", cout = "";
+        try {
+            org.json.JSONObject w = new org.json.JSONObject(prefs.getString("welcome_json", "{}"));
+            title = w.optString("title", "");
+            phone = w.optString("phone", "");
+            cin = w.optString("checkinTime", "");
+            cout = w.optString("checkoutTime", "");
+            org.json.JSONObject g = w.optJSONObject("guest");
+            String today = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(new java.util.Date());
+            if (g != null && today.compareTo(g.optString("checkout", "")) <= 0) name = g.optString("name", "");
+        } catch (Exception ignored) {
+        }
+        StringBuilder facts = new StringBuilder();
+        if (!phone.isEmpty()) facts.append("<div class='f'><span>Kontakt</span><b>").append(h(phone)).append("</b></div>");
+        if (!cin.isEmpty()) facts.append("<div class='f'><span>Check-in</span><b>").append(h(cin)).append("</b></div>");
+        if (!cout.isEmpty()) facts.append("<div class='f'><span>Check-out</span><b>").append(h(cout)).append("</b></div>");
+        return "<html><head><meta charset='utf-8'><style>"
+                + "body{margin:0;height:100vh;overflow:hidden;color:#f5f0e8;font-family:sans-serif;"
+                + "background:radial-gradient(110% 90% at 15% 0%,#4a3d31 0%,#1f1c18 62%)}"
+                + ".w{box-sizing:border-box;height:100vh;padding:5vh 5vw;display:flex;flex-direction:column}"
+                + ".top{display:flex;justify-content:space-between;align-items:flex-start}"
+                + ".brand{font:italic 2.3rem/1 Georgia,serif;color:rgba(245,240,232,.72)}"
+                + ".time{font:4.4rem/1 Georgia,serif;text-align:right}.date{color:rgba(245,240,232,.52);font-size:1.2rem;margin-top:.4rem}"
+                + ".main{flex:1;display:flex;flex-direction:column;justify-content:center}"
+                + ".eye{letter-spacing:.18em;text-transform:uppercase;color:#c27a4f;font-size:1rem;margin-bottom:1rem}"
+                + "h1{font:6.2rem/.98 Georgia,serif;margin:0 0 1.2rem}.msg{font-size:1.6rem;color:rgba(245,240,232,.72);margin:0}"
+                + ".facts{display:flex;gap:3.5rem;margin-top:2.5rem}.f span{display:block;color:rgba(245,240,232,.52);font-size:.9rem;"
+                + "letter-spacing:.12em;text-transform:uppercase;margin-bottom:.4rem}.f b{font-weight:400;font-size:1.6rem}"
+                + ".apps{display:flex;gap:1.2rem;align-items:center;border-top:1px solid rgba(245,240,232,.14);padding-top:1.6rem}"
+                + ".apps div{color:rgba(245,240,232,.52);font-size:1rem;letter-spacing:.12em;text-transform:uppercase;margin-right:1rem}"
+                + "a{display:inline-block;padding:1rem 2.2rem;border:1px solid rgba(245,240,232,.3);border-radius:4px;color:#f5f0e8;"
+                + "text-decoration:none;font-size:1.35rem;background:#2b2621}a:focus{outline:none;background:#f5f0e8;color:#1f1c18}"
+                + "</style></head><body><div class='w'>"
+                + "<div class='top'><div class='brand'>" + h(title.isEmpty() ? "Ferienwohnung Beckhome" : title) + "</div>"
+                + "<div><div class='time' id='t'></div><div class='date' id='d'></div></div></div>"
+                + "<div class='main'><div class='eye'>Willkommen</div><h1>" + h(name.isEmpty() ? "Liebe Gäste" : name) + "</h1>"
+                + "<p class='msg'>Wir wünschen Ihnen einen angenehmen Aufenthalt!</p>"
+                + (facts.length() > 0 ? "<div class='facts'>" + facts + "</div>" : "") + "</div>"
+                + "<div class='apps'><div>Für Ihren Aufenthalt</div>"
+                + "<a id='tv' href='intent://de.exaring.waiputv#Intent;scheme=app;package=de.exaring.waiputv;end'>Fernsehen schauen</a></div>"
+                + "</div><script>"
+                + "function u(){var n=new Date();document.getElementById('t').textContent=n.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});"
+                + "document.getElementById('d').textContent=n.toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});}"
+                + "u();setInterval(u,15000);setTimeout(function(){document.getElementById('tv').focus();},200);"
+                + "</script></body></html>";
+    }
+
+    private static String h(String v) {
+        return android.text.TextUtils.htmlEncode(v);
+    }
+
+    /** Server wieder erreichbar? Erst dann die echte Seite laden (kein Flackern beim Warten). */
+    private void retryWhenServerBack() {
+        if (checkingServer) return;
+        checkingServer = true;
+        final String url = serverUrl() + "/api/health";
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                boolean ok = false;
+                try {
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                    c.setConnectTimeout(8000);
+                    c.setReadTimeout(8000);
+                    ok = c.getResponseCode() == 200;
+                    c.disconnect();
+                } catch (Exception ignored) {
+                }
+                final boolean back = ok;
+                checkingServer = false;
+                retryHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (back) loadWelcomePage();
+                        else retryHandler.postDelayed(retryRunnable, RETRY_MS);
+                    }
+                });
+            }
+        }, "server-check").start();
     }
 
     private void handleSettingsTap() {
@@ -447,6 +555,11 @@ public class MainActivity extends Activity {
             return;
         }
         lastPairingHtml = null;
+        if (!networkConnected()) {
+            // Kein Netz: die geladene Seite einfach stehen lassen, sonst Offline-Welcome
+            if (!isOnRealWelcome()) showOfflineAndRetry("kein Netzwerk");
+            return;
+        }
         String serverUrl = serverUrl();
         // Ausweis der gekoppelten Box: nur damit liefert der Server welcome.html und /api/welcome
         try {
