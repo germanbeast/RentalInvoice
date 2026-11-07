@@ -1316,6 +1316,7 @@ app.post('/api/tv-box/sync', (req, res) => {
             success: true,
             paired: true,
             config: { version: cfg.version || 0, kiosk: cfg.kiosk !== false, idleHours: cfg.idleHours, adminPin: cfg.adminPin || '' },
+            welcome: (() => { try { return welcomeData(); } catch (e) { return null; } })(), // offline copy on the box
             command: cmd && cmd.seq > status.ackSeq && now - cmd.createdAt < 24 * 60 * 60 * 1000 ? { seq: cmd.seq, type: cmd.type } : null
         });
     } catch (e) {
@@ -1326,28 +1327,32 @@ app.post('/api/tv-box/sync', (req, res) => {
 
 // Public, minimal data for the TV welcome screen (no secrets: no WLAN, no codes, no invoices).
 // Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
+function welcomeData() {
+    const s = db.getAllSettings();
+    const today = berlinToday();
+    const mode = ['first', 'full', 'none'].includes(s.welcome_name_mode) ? s.welcome_name_mode : 'first';
+    const current = loadBookingRows()
+        .filter(r => r.checkin <= today && r.checkout >= today && r.state !== 'past')
+        .sort((a, b) => (a.checkout === today) - (b.checkout === today) || a.checkin.localeCompare(b.checkin))[0];
+    let name = '';
+    if (current && current.name && mode !== 'none') {
+        const parts = current.name.trim().split(/\s+/);
+        name = mode === 'full' ? current.name : parts[0];
+    }
+    return {
+        success: true, today,
+        guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
+        phone: (s.vermieter && s.vermieter.telefon) || '',
+        checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
+        title: (s.site && s.site.title) || ''
+    };
+}
+
 app.get('/api/welcome', (req, res) => {
     if (!tvboxViewAllowed(req)) return res.status(403).json({ success: false, error: 'Nur für die TV-Box' });
     try {
-        const s = db.getAllSettings();
-        const today = berlinToday();
-        const mode = ['first', 'full', 'none'].includes(s.welcome_name_mode) ? s.welcome_name_mode : 'first';
-        const current = loadBookingRows()
-            .filter(r => r.checkin <= today && r.checkout >= today && r.state !== 'past')
-            .sort((a, b) => (a.checkout === today) - (b.checkout === today) || a.checkin.localeCompare(b.checkin))[0];
-        let name = '';
-        if (current && current.name && mode !== 'none') {
-            const parts = current.name.trim().split(/\s+/);
-            name = mode === 'full' ? current.name : parts[0];
-        }
         res.set('Cache-Control', 'no-store');
-        res.json({
-            success: true, today,
-            guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
-            phone: (s.vermieter && s.vermieter.telefon) || '',
-            checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
-            title: (s.site && s.site.title) || ''
-        });
+        res.json(welcomeData());
     } catch (e) {
         res.status(500).json({ success: false });
     }

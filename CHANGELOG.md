@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.1] - 2026-11-07
+
+### Verbessert
+- TV-App 1.9: Bei Internet- oder Server-Ausfall keine Fehlerseite mehr. Eine geladene Welcome-Seite bleibt stehen; sonst zeigt die App einen Offline-Welcome-Screen im selben Look (zuletzt bekannter Gastname, Kontakt, Check-in/-out aus `POST /api/tv-box/sync` → `welcome`, Uhr, Knopf „Fernsehen schauen“). Im Hintergrund prüft sie alle 20 s `/api/health` und lädt die echte Seite erst, wenn der Server wieder antwortet. Auch 5xx (z.B. Cloudflare 502) und „Vor-Ort-Informationen“ ohne Netz landen dort
+
 ## [1.44.0] - 2026-11-07
 
 ### Sicherheit

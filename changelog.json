@@ -1,6 +1,14 @@
 {
-    "currentVersion": "1.44.0",
+    "currentVersion": "1.44.1",
     "releases": [
+        {
+            "version": "1.44.1",
+            "date": "2026-11-07",
+            "title": "TV-Box bleibt bei Internet-Ausfall bedienbar",
+            "features": [
+                "Fällt das Internet aus, bleibt der Welcome-Screen stehen bzw. die Box zeigt ihn aus dem Speicher: mit Name, Zeiten, Uhr und dem Knopf „Fernsehen schauen“, ohne Fehlermeldung"
+            ]
+        },
         {
             "version": "1.44.0",
             "date": "2026-11-07",
