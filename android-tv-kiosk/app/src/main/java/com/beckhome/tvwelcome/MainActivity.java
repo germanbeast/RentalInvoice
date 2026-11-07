@@ -129,7 +129,21 @@ public class MainActivity extends Activity {
                     launchApp(url);
                     return true;
                 }
+                // Knöpfe auf dem Kopplungs- und Offline-Bildschirm
+                if (url.startsWith("beckhome://")) {
+                    handleLocalButton(url.substring("beckhome://".length()));
+                    return true;
+                }
                 return false;
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                                            android.webkit.WebResourceResponse response) {
+                // Server kennt die Box nicht (mehr): gleich nachfragen, dann zeigt sie den Kopplungs-Code
+                if (request.isForMainFrame() && response.getStatusCode() == 403) {
+                    RemoteControl.syncAsync(MainActivity.this, true);
+                }
             }
 
             @Override
@@ -305,13 +319,13 @@ public class MainActivity extends Activity {
 
     private void showOfflineAndRetry(String detail) {
         retryHandler.removeCallbacks(retryRunnable);
-        String html = "<html><body style='margin:0;background:#1f1c18;color:#f5f0e8;font-family:sans-serif;"
-                + "display:flex;align-items:center;justify-content:center;height:100vh;text-align:center'>"
+        String html = "<html><head><meta charset='utf-8'>" + SCREEN_CSS + "</head><body>"
                 + "<div><div style='font-size:42px'>Willkommen in der Ferienwohnung Beckhome</div>"
                 + "<div style='font-size:22px;opacity:.7;margin-top:24px'>Verbindung zum Internet wird hergestellt …</div>"
                 + "<div style='font-size:16px;opacity:.45;margin-top:32px'>" + android.text.TextUtils.htmlEncode(
                         prefs.getString("server_url", DEFAULT_SERVER_URL) + ": " + detail) + "</div>"
-                + "</div></body></html>";
+                + networkButtons()
+                + "</div><script>var b=document.getElementById('b1');if(b)b.focus();</script></body></html>";
         webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
         retryHandler.postDelayed(retryRunnable, RETRY_MS);
     }
@@ -335,11 +349,114 @@ public class MainActivity extends Activity {
         startActivity(intent);
     }
 
+    private String lastPairingHtml = null;
+    private final Runnable pairingPoll = new Runnable() {
+        @Override
+        public void run() {
+            RemoteControl.syncAsync(MainActivity.this, true);
+            if (!RemoteControl.mayShowWelcome(prefs)) {
+                showPairingScreen(); // Code / Verbindungsstatus aktualisieren
+            }
+        }
+    };
+
+    /** Netzwerk-Knöpfe: ohne Kopplung frei (Ersteinrichtung), danach nur mit PIN. */
+    private void handleLocalButton(String what) {
+        if ("pin".equals(what) || RemoteControl.isPaired(prefs)) {
+            openSettings(); // PIN-Abfrage, dort gibt es WLAN und Android-Einstellungen
+            return;
+        }
+        String action = "wifi".equals(what) ? android.provider.Settings.ACTION_WIFI_SETTINGS
+                : android.provider.Settings.ACTION_SETTINGS;
+        releaseLockOnly();
+        try {
+            Intent i = new Intent(action);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception e) {
+            try {
+                Intent i = new Intent(android.provider.Settings.ACTION_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private boolean networkConnected() {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            android.net.NetworkInfo ni = cm != null ? cm.getActiveNetworkInfo() : null;
+            return ni != null && ni.isConnected();
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    private static final String SCREEN_CSS = "<style>body{margin:0;background:#1f1c18;color:#f5f0e8;font-family:sans-serif;"
+            + "display:flex;align-items:center;justify-content:center;height:100vh;text-align:center}"
+            + "a{display:inline-block;margin:10px;padding:16px 30px;border:2px solid rgba(245,240,232,.4);border-radius:6px;"
+            + "color:#f5f0e8;text-decoration:none;font-size:22px}a:focus{background:#f5f0e8;color:#1f1c18;outline:none}"
+            + ".s{font-size:20px;opacity:.7;margin-top:18px}.m{font-size:15px;opacity:.45;margin-top:26px}</style>";
+
+    private String networkButtons() {
+        if (RemoteControl.isPaired(prefs)) {
+            return "<div style='margin-top:34px'><a id='b1' href='beckhome://pin'>Netzwerk einrichten (PIN)</a></div>";
+        }
+        return "<div style='margin-top:34px'><a id='b1' href='beckhome://wifi'>WLAN einrichten</a>"
+                + "<a href='beckhome://settings'>Netzwerk / LAN-Einstellungen</a></div>";
+    }
+
+    /** Erster Start oder Kopplung aufgehoben: Code zeigen, den der Gastgeber im Admin eingibt. */
+    private void showPairingScreen() {
+        retryHandler.removeCallbacks(retryRunnable);
+        retryHandler.removeCallbacks(pairingPoll);
+        String code = RemoteControl.pairCode(prefs);
+        String status;
+        if (!networkConnected()) {
+            status = "Keine Netzwerkverbindung. Bitte WLAN einrichten oder ein LAN-Kabel einstecken.";
+        } else if (RemoteControl.lastError != null) {
+            status = "Server nicht erreichbar: " + RemoteControl.lastError;
+        } else {
+            status = "Verbunden. Wartet auf die Eingabe des Codes im Admin …";
+        }
+        String html = "<html><head><meta charset='utf-8'>" + SCREEN_CSS + "</head><body><div>"
+                + "<div style='font-size:34px'>TV-Box koppeln</div>"
+                + "<div class='s'>Im Admin unter Einstellungen → TV-Box diesen Code eingeben:</div>"
+                + "<div style='font-size:96px;letter-spacing:14px;margin-top:22px;font-weight:bold'>"
+                + code.substring(0, 3) + " " + code.substring(3) + "</div>"
+                + "<div class='s'>" + android.text.TextUtils.htmlEncode(status) + "</div>"
+                + networkButtons()
+                + "<div class='m'>" + android.text.TextUtils.htmlEncode(serverUrl()) + "</div>"
+                + "</div><script>var b=document.getElementById('b1');if(b)b.focus();</script></body></html>";
+        if (!html.equals(lastPairingHtml)) { // nur bei Änderung neu zeichnen (Fokus bleibt stehen)
+            lastPairingHtml = html;
+            webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        }
+        retryHandler.postDelayed(pairingPoll, 8000);
+    }
+
     private void loadWelcomePage() {
         // Get settings from SharedPreferences
         retryHandler.removeCallbacks(retryRunnable);
         retryHandler.removeCallbacks(idleReturn);
+        retryHandler.removeCallbacks(pairingPoll);
+        if (!RemoteControl.mayShowWelcome(prefs)) {
+            RemoteControl.syncAsync(this, true);
+            showPairingScreen();
+            return;
+        }
+        lastPairingHtml = null;
         String serverUrl = serverUrl();
+        // Ausweis der gekoppelten Box: nur damit liefert der Server welcome.html und /api/welcome
+        try {
+            android.webkit.CookieManager cm = android.webkit.CookieManager.getInstance();
+            cm.setAcceptCookie(true);
+            cm.setCookie(serverUrl, "tvbox_auth=" + RemoteControl.authToken(prefs)
+                    + "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=31536000");
+            cm.flush();
+        } catch (Exception ignored) {
+        }
         String guestName = prefs.getString("guest_name", "Willkommen");
 
         // Get guest name from intent (if provided)

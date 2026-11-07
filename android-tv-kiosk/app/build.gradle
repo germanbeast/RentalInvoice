@@ -10,8 +10,8 @@ android {
         applicationId "com.beckhome.tvwelcome"
         minSdk 21
         targetSdk 34
-        versionCode 9
-        versionName "1.7"
+        versionCode 10
+        versionName "1.8"
     }
 
     // Fester Signierschlüssel aus GitHub-Secrets (TV_KEYSTORE_B64/TV_KEYSTORE_PASSWORD, siehe Workflow).
