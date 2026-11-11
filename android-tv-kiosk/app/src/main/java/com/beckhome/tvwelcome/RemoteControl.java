@@ -141,6 +141,8 @@ final class RemoteControl {
         body.put("ackSeq", p.getLong("remote_ack", 0));
         body.put("configVersion", p.getInt("remote_config_version", 0));
         body.put("pairCode", pairCode(p));
+        body.put("printers", Printer.foundJson());
+        body.put("printError", Printer.lastError);
 
         String text;
         try {
@@ -164,6 +166,11 @@ final class RemoteControl {
 
         JSONObject cfg = res.optJSONObject("config");
         if (cfg != null) applyConfig(ctx, p, cfg);
+
+        // Neue Buchungen drucken (im Hintergrund, der Fernseher zeigt davon nichts)
+        Printer.discoverIfDue(ctx);
+        JSONObject print = res.optJSONObject("print");
+        if (print != null) Printer.runAsync(print, server(p), authToken(p));
 
         JSONObject cmd = res.optJSONObject("command");
         if (cmd != null) {

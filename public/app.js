@@ -2180,6 +2180,7 @@
                 ${bk.state !== 'past' && bk.guestCode ? '<button type="button" class="pill" data-pop="guestlink">Gastlink kopieren</button>' : ''}
                 <button type="button" class="pill" data-pop="chat">Nachricht</button>
                 ${bk.name && canDo('vouchers', 'edit') ? '<button type="button" class="pill" data-pop="voucher">Gutschein schenken</button>' : ''}
+                ${canDo('bookings', 'edit') ? '<button type="button" class="pill" data-pop="print">Ausdrucken</button>' : ''}
                 ${bk.manualEntry ? '<button type="button" class="pill pill-danger" data-pop="delete">Löschen</button>' : ''}
             </div>`;
         tlPop.dataset.bid = bk.id;
@@ -2248,6 +2249,12 @@
             if (act === 'chat') { hideTlPop(); return chatWithBooking(bk); }
             if (act === 'meldeschein') { hideTlPop(); return window.open(`/api/meldescheine/${bk.meldescheinId}/druck`, '_blank', 'noopener'); }
             if (act === 'doorcode') { hideTlPop(); return openDoorCode(bk); }
+            if (act === 'print') {
+                const d = await apiJson(`/api/bookings/${bk.id}/print`, { method: 'POST' }).catch(() => null);
+                if (d && d.success) showToast('Druckauftrag angelegt, die TV-Box druckt in etwa einer Minute', 'success');
+                else showToast((d && d.error) || 'Drucken hat nicht geklappt', 'error');
+                return;
+            }
             if (act === 'voucher') { hideTlPop(); return openVoucherModal(null, { guestId: bk.guestId, guestName: bk.name }); }
             if (act === 'delete') {
                 if (!confirm(`Buchung von ${bk.name || 'diesem Gast'} (${fmtDEfull(bk.checkin)} – ${fmtDEfull(bk.checkout)}) löschen?${bk.hasCode ? ' Der Türcode wird ebenfalls gelöscht.' : ''}`)) return;
@@ -4063,6 +4070,7 @@
                 if (targetId === 'settings-push') loadPushSettings();
                 if (targetId === 'settings-users') loadUsers();
                 if (targetId === 'settings-tvbox') loadTvbox();
+                if (targetId === 'settings-printer') loadPrinter();
 
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {
@@ -5319,6 +5327,74 @@
         }
     }));
     if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
+
+    // Drucker: new bookings are printed by the TV box in the apartment's network (print-jobs.js)
+    const PRINT_STATUS = { pending: 'wartet auf die Box', sent: 'wird gedruckt …', printed: 'gedruckt ✓', failed: 'fehlgeschlagen' };
+    async function loadPrinter() {
+        const d = await apiJson('/api/settings/printer').catch(() => null);
+        if (!d || !d.success) { $('#printer-box-state').textContent = 'Konnte die Einstellungen nicht laden.'; return; }
+        const c = d.config || {};
+        $('#printer-enabled').checked = !!c.enabled;
+        $('#printer-host').value = c.host || '';
+        $('#printer-mode').value = c.mode || 'auto';
+        $('#printer-port').value = c.port || '';
+        $('#printer-path').value = c.path || '';
+        $('#printer-copies').value = c.copies || 1;
+        $('#printer-manual').checked = c.manual !== false;
+
+        const box = d.box;
+        const online = box && Date.now() - box.lastSeen < 3 * 60 * 1000;
+        $('#printer-box-state').textContent = !box ? 'Die TV-Box hat sich seit dem Server-Start noch nicht gemeldet (oder ist nicht gekoppelt, siehe TV-Box).'
+            : (online ? 'TV-Box ist online.' : 'TV-Box ist gerade offline, Aufträge warten, bis sie wieder da ist.')
+              + (box.error ? ` Letzter Druckfehler: ${box.error}` : '');
+        const found = $('#printer-found');
+        const printers = (box && box.printers) || [];
+        found.style.display = printers.length ? '' : 'none';
+        found.innerHTML = printers.length ? '<span>Im WLAN gefunden:</span> ' + printers.map((p, i) =>
+            `<button type="button" class="btn btn-ghost btn-sm" data-printer-pick="${i}">${escapeHtml(p.name || p.host)} · ${escapeHtml(p.host)}</button>`).join(' ') : '';
+        found.querySelectorAll('[data-printer-pick]').forEach(b => b.addEventListener('click', () => {
+            const p = printers[Number(b.dataset.printerPick)];
+            $('#printer-host').value = p.host;
+            $('#printer-port').value = p.port || 631;
+            if (p.path) $('#printer-path').value = p.path;
+            $('#printer-mode').value = 'auto';
+            showToast('Übernommen, bitte noch speichern', 'success');
+        }));
+
+        const jobs = d.jobs || [];
+        const fmtT = t => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+        $('#printer-jobs').innerHTML = !jobs.length ? 'Noch nichts gedruckt.' : jobs.map(j => `
+            <div class="info-row" style="align-items:center">
+                <span>${escapeHtml(j.title || 'Druck')} <small class="text-muted">(${fmtT(j.created_at)})</small></span>
+                <strong>${PRINT_STATUS[j.status] || escapeHtml(j.status)}${j.error && j.status !== 'printed' ? ` <small class="text-muted">${escapeHtml(j.error)}</small>` : ''}
+                ${j.status === 'failed' || j.status === 'printed' ? ` <button type="button" class="btn btn-ghost btn-sm" data-printer-retry="${j.id}">${j.status === 'failed' ? 'Erneut versuchen' : 'Nochmal drucken'}</button>` : ''}</strong>
+            </div>`).join('');
+        $('#printer-jobs').querySelectorAll('[data-printer-retry]').forEach(b => b.addEventListener('click', async () => {
+            const r = await apiJson(`/api/settings/printer/jobs/${b.dataset.printerRetry}/retry`, { method: 'POST' }).catch(() => null);
+            if (r && r.success) { showToast('Wird erneut gedruckt', 'success'); loadPrinter(); }
+            else showToast('Hat nicht geklappt', 'error');
+        }));
+    }
+    async function savePrinter() {
+        const body = {
+            enabled: $('#printer-enabled').checked, host: $('#printer-host').value.trim(), mode: $('#printer-mode').value,
+            port: $('#printer-port').value, path: $('#printer-path').value.trim(), copies: $('#printer-copies').value,
+            manual: $('#printer-manual').checked
+        };
+        const d = await tvboxPost('/api/settings/printer', body, 'PUT');
+        if (d) showToast('Drucker gespeichert', 'success');
+        return !!d;
+    }
+    if ($('#btn-printer-save')) $('#btn-printer-save').addEventListener('click', async () => { if (await savePrinter()) loadPrinter(); });
+    if ($('#btn-printer-test')) $('#btn-printer-test').addEventListener('click', async () => {
+        if (!(await savePrinter())) return;
+        if (await tvboxPost('/api/settings/printer/test')) {
+            showToast('Testseite geschickt, die TV-Box druckt sie in etwa einer Minute', 'success');
+            loadPrinter();
+            setTimeout(loadPrinter, 75000);
+        }
+    });
+    if ($('#btn-printer-preview')) $('#btn-printer-preview').addEventListener('click', () => window.open('/api/settings/printer/preview', '_blank', 'noopener'));
     if ($('#btn-tvbox-approve')) $('#btn-tvbox-approve').addEventListener('click', async () => {
         const btn = $('#btn-tvbox-approve');
         btn.disabled = true;

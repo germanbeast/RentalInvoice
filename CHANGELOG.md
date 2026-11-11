@@ -5,6 +5,15 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.0] / TV-App 1.10 - 2026-11-11
+
+### Neu
+- Neue Buchungen automatisch ausdrucken (`print-jobs.js`): Jede neue Buchung aus dem Kalender-Abgleich, jede bestätigte Webseiten-Anfrage und (abschaltbar) jede im Admin eingetragene Buchung legt einen Druckauftrag an (Tabelle `print_jobs`)
+- Die gekoppelte TV-Box bekommt offene Aufträge in der Antwort von `/api/tv-box/sync` (`print`), lädt das Buchungsblatt als PDF von `/api/tv-box/print/:id/pdf` (nur mit Box-Schlüssel) und druckt es per IPP 1.1 (Port 631, `application/pdf`) oder direkt an Port 9100; Modus „Automatisch“ weicht auf 9100 aus, wenn IPP nicht erreichbar ist. Ergebnis an `/api/tv-box/print/:id/result`, unbeantwortete Aufträge werden nach 10 Minuten erneut ausgegeben (max. 4 Versuche)
+- TV-App 1.10 sucht alle 30 Minuten per mDNS nach IPP-Druckern und meldet sie, im Admin lassen sie sich mit einem Klick übernehmen
+- Einstellungen → Drucker mit Testseite, Muster-Blatt (PDF) und Auftragsliste; „Ausdrucken“ im Buchungs-Popup (`POST /api/bookings/:id/print`)
+- Telegram/WhatsApp-Hinweis bei endgültig fehlgeschlagenem Druck oder wenn ein Auftrag 2 Stunden offen bleibt
+
 ## TV-App 1.9.2 - 2026-11-07
 
 ### Behoben

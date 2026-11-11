@@ -706,6 +706,7 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
                 : undefined;
             const sent = await sendToAllRecipients(msg, { tgKeyboard, type: 'new_booking' });
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
+            printJobs.queueBooking(result.id, 'portal');
             await sendGuestMessageToTelegram(result.id);
         }
     }
@@ -1288,6 +1289,12 @@ app.post('/api/tv-box/sync', (req, res) => {
             idleMinutes: Math.max(0, parseInt(b.idleMinutes, 10) || 0),
             ackSeq: parseInt(b.ackSeq, 10) || 0,
             configVersion: parseInt(b.configVersion, 10) || 0,
+            // network printers the box found in the WLAN (IPP/AirPrint via mDNS), for Settings → Drucker
+            printers: (Array.isArray(b.printers) ? b.printers : []).slice(0, 10).map(x => ({
+                name: clip(x && x.name, 80), host: clip(x && x.host, 64),
+                port: parseInt(x && x.port, 10) || 631, path: clip(x && x.path, 100)
+            })).filter(x => x.host),
+            printError: clip(b.printError, 200),
             lastSeen: now
         };
         res.set('Cache-Control', 'no-store');
@@ -1317,12 +1324,30 @@ app.post('/api/tv-box/sync', (req, res) => {
             paired: true,
             config: { version: cfg.version || 0, kiosk: cfg.kiosk !== false, idleHours: cfg.idleHours, adminPin: cfg.adminPin || '' },
             welcome: (() => { try { return welcomeData(); } catch (e) { return null; } })(), // offline copy on the box
-            command: cmd && cmd.seq > status.ackSeq && now - cmd.createdAt < 24 * 60 * 60 * 1000 ? { seq: cmd.seq, type: cmd.type } : null
+            command: cmd && cmd.seq > status.ackSeq && now - cmd.createdAt < 24 * 60 * 60 * 1000 ? { seq: cmd.seq, type: cmd.type } : null,
+            print: (() => { try { return printJobs.forBox(); } catch (e) { console.error('Druckaufträge:', e.message); return null; } })()
         });
     } catch (e) {
         console.error('TV-Box sync:', e.message);
         res.status(500).json({ success: false });
     }
+});
+
+// Automatic printing of new bookings: the paired box fetches the sheet as PDF and prints it in the
+// apartment's network (see print-jobs.js). Public paths, checked with the box's own key.
+const printJobs = require('./print-jobs')({
+    db, puppeteer,
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg);
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    },
+    isPlaceholderName: (n) => require('./bot-logic').isPlaceholderGuestName(n),
+    nightsBetween: (a, b) => nightsBetween(a, b),
+    formatDateDE: (d) => formatDateDE(d)
+});
+printJobs.registerBoxRoutes(app, { authorized: tvboxDeviceAuthorized, limiter: apiLimiter });
+cron.schedule('*/15 * * * *', () => {
+    printJobs.checkStale().catch(e => console.error('Druck-Prüfung:', e.message));
 });
 
 // Public, minimal data for the TV welcome screen (no secrets: no WLAN, no codes, no invoices).
@@ -1395,6 +1420,7 @@ const guestPortal = require('./guest-portal')({
     arrivalFor: (booking, pin) => arrivalGuide ? arrivalGuide.guestView(booking, pin) : null,
     createNukiPin: (arrival, departure, name) => createNukiPin(arrival, departure, name),
     deleteNukiPin: (authId) => deleteNukiPin(authId),
+    onNewBooking: (bookingId) => printJobs.queueBooking(bookingId, 'direct'),
     berlinToday: () => berlinToday(),
     addDays: (ymd, n) => addDays(ymd, n),
     nightsBetween: (a, b) => nightsBetween(a, b),
@@ -1930,6 +1956,9 @@ meldeschein.registerAdminRoutes(app, apiLimiter);
 vouchers.registerAdminRoutes(app, apiLimiter, { getSite: () => guestPortal.getSite(), permissions });
 localLive.registerAdminRoutes(app, apiLimiter);
 arrivalGuide.registerAdminRoutes(app, apiLimiter);
+printJobs.registerAdminRoutes(app, apiLimiter, {
+    boxPrinters: () => (tvboxLive ? { printers: tvboxLive.printers || [], error: tvboxLive.printError || '', lastSeen: tvboxLive.lastSeen } : null)
+});
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {
@@ -2033,6 +2062,7 @@ app.post('/api/bookings', apiLimiter, async (req, res) => {
                 if (n && n.success) { db.updateBookingNukiData(bookingId, n.pin, n.authId); pin = n.pin; }
             } catch (e) { pinError = e.message; }
         }
+        printJobs.queueBooking(bookingId, 'manual');
         res.json({ success: true, bookingId, pin, pinError, voucher: voucher ? { code: voucher.voucher.code, label: voucher.label, discount: voucher.discount } : null });
     } catch (e) {
         console.error('Manual booking Error:', e.message);

@@ -64,7 +64,7 @@ const RATING_PLATFORMS = { booking: { name: 'Booking.com', max: 10 }, airbnb: { 
 const MAX_REVIEWS = 40;
 const MAX_TIPS = 24;
 
-function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, chatButton, arrivalFor, createNukiPin, deleteNukiPin, berlinToday, addDays, nightsBetween, formatDateDE }) {
+function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, chatButton, arrivalFor, createNukiPin, deleteNukiPin, onNewBooking, berlinToday, addDays, nightsBetween, formatDateDE }) {
     if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
     const sql = () => db.getDb();
@@ -955,6 +955,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
                     const n = await createNukiPin(r.checkin, r.checkout, r.name);
                     if (n && n.success) { db.updateBookingNukiData(bookingId, n.pin, n.authId); pin = n.pin; }
                 } catch (e) { console.warn('⚠️ Direktbuchung: Türcode nicht angelegt:', e.message); }
+                if (onNewBooking) onNewBooking(bookingId);
 
                 const site = getSite();
                 const bank = site.show_bank && price ? bankText() : '';

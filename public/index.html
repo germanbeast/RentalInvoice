@@ -1759,6 +1759,7 @@
                             <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
                             <a href="#" class="nav-item" data-target="settings-users">Benutzer &amp; Rechte</a>
                             <a href="#" class="nav-item" data-target="settings-tvbox">TV-Box (Welcome-Screen)</a>
+                            <a href="#" class="nav-item" data-target="settings-printer">Drucker</a>
                             <a href="#" class="nav-item" data-target="settings-system">System & Update</a>
                         </nav>
                     </aside>
@@ -2531,6 +2532,66 @@
                                         </div>
                                         <p class="text-muted" id="tvbox-cmd-state" style="font-size:.85rem; margin-top:.75rem"></p>
                                     </div>
+                                </div>
+                            </section>
+
+                            <section id="settings-printer" class="settings-page">
+                                <h2>Drucker</h2>
+                                <p class="text-muted">Bei jeder neuen Buchung kommt automatisch ein Buchungsblatt aus deinem Drucker (Gast, Zeitraum, Personen, Kontakt, Preis, Türcode). Der Server kann den Drucker in der Wohnung nicht direkt erreichen, deshalb druckt die gekoppelte TV-Box im Hintergrund: Sie holt neue Aufträge jede Minute ab und schickt sie übers WLAN an den Drucker. Der Fernseher zeigt davon nichts. Ist die Box aus, wird gedruckt, sobald sie wieder läuft.</p>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="printer-enabled"> Neue Buchungen automatisch ausdrucken
+                                        </label>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="printer-host">IP-Adresse des Druckers</label>
+                                            <input type="text" id="printer-host" placeholder="z.B. 192.168.178.40" autocomplete="off">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="printer-mode">Verbindung</label>
+                                            <select id="printer-mode">
+                                                <option value="auto">Automatisch (IPP, sonst Port 9100)</option>
+                                                <option value="ipp">Nur IPP / AirPrint (Port 631)</option>
+                                                <option value="raw">Nur direkt (Port 9100)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="printer-found" class="info-row" style="display:none; flex-wrap:wrap; gap:.5rem"></div>
+                                    <details style="margin: .5rem 0 1rem">
+                                        <summary class="text-muted" style="cursor:pointer">Erweitert</summary>
+                                        <div class="form-row" style="margin-top:.75rem">
+                                            <div class="form-group">
+                                                <label for="printer-port">Port</label>
+                                                <input type="number" id="printer-port" min="1" max="65535" placeholder="631">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="printer-path">IPP-Pfad</label>
+                                                <input type="text" id="printer-path" placeholder="ipp/print">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="printer-copies">Anzahl Blätter</label>
+                                                <input type="number" id="printer-copies" min="1" max="5" placeholder="1">
+                                            </div>
+                                        </div>
+                                    </details>
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="printer-manual"> Auch Buchungen drucken, die ich selbst im Admin eintrage
+                                        </label>
+                                    </div>
+                                    <p class="text-muted" id="printer-box-state" style="font-size:.85rem"></p>
+                                    <div class="btn-group" style="flex-wrap: wrap;">
+                                        <button type="button" id="btn-printer-save" class="btn btn-primary">Speichern</button>
+                                        <button type="button" id="btn-printer-test" class="btn btn-outline">Testseite drucken</button>
+                                        <button type="button" id="btn-printer-preview" class="btn btn-ghost">Muster-Blatt ansehen</button>
+                                    </div>
+                                    <p class="text-muted" style="font-size:.85rem; margin-top:.75rem">Die IP findest du am Drucker-Display (bei Utax/Kyocera meist unter „Status“ oder „Systemmenü → Netzwerk“) oder in der FRITZ!Box unter Heimnetz → Netzwerk. Tipp: In der FRITZ!Box „Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“ anhaken.</p>
+                                </div>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h4 style="margin-top:0">Letzte Druckaufträge</h4>
+                                    <div id="printer-jobs" class="text-muted">–</div>
                                 </div>
                             </section>
 

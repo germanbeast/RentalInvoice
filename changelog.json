@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.44.1",
+    "currentVersion": "1.45.0",
     "releases": [
+        {
+            "version": "1.45.0",
+            "date": "2026-11-11",
+            "title": "Neue Buchungen automatisch ausdrucken",
+            "features": [
+                "Bei jeder neuen Buchung (Booking.com, Airbnb, Webseite, auf Wunsch auch selbst eingetragene) kommt automatisch ein Buchungsblatt aus dem Drucker: Gast, Zeitraum, Nächte, Personen, Telefon, E-Mail, Preis, Türcode, Nachricht",
+                "Gedruckt wird von der TV-Box im Hintergrund (TV-App 1.10): Sie holt neue Aufträge jede Minute ab und schickt sie per IPP/AirPrint oder Port 9100 an den Drucker im WLAN, der Fernseher zeigt davon nichts",
+                "Einstellungen → Drucker: Ein/Aus, Drucker-IP (die Box findet Drucker im WLAN selbst), Testseite, Muster-Blatt, letzte Druckaufträge mit „Erneut versuchen“",
+                "„Ausdrucken“ im Buchungs-Popup im Kalender",
+                "Telegram-Hinweis, wenn ein Druck fehlschlägt oder die Box ihn 2 Stunden lang nicht erledigt hat"
+            ]
+        },
         {
             "version": "1.44.1",
             "date": "2026-11-07",
