@@ -1,6 +1,23 @@
 {
-    "currentVersion": "1.45.0",
+    "currentVersion": "1.46.0",
     "releases": [
+        {
+            "version": "1.46.0",
+            "date": "2026-11-17",
+            "title": "Gäste-WLAN: eigenes Passwort pro Buchung oder eigener Router mit Anmeldeseite",
+            "features": [
+                "Neuer Bereich Webseite → WLAN mit drei Varianten: festes Passwort, eigenes Passwort pro Buchung über die FRITZ!Box, oder eigener Router (Cudy WR3000 mit OpenWrt) mit Anmeldeseite",
+                "Anmeldeseite im Stil der Gäste-Webseite: Gäste geben einen 6-stelligen Zugangscode ein und werden mit Namen begrüßt; der Code gilt vom Anreisetag bis zum Check-out (plus Nachlauf)",
+                "Geräte, die im Aufenthalt schon online waren, kommen ohne Code wieder rein; wer auf „Meine Buchung“ angemeldet ist, verbindet mit einem Tipp",
+                "Höchstzahl Geräte pro Buchung, Gastgeber-Code für eigene Geräte, Liste der angemeldeten Geräte, Telegram-Meldung, wenn der Router sich nicht mehr meldet",
+                "Router-Einrichtung mit einem einzigen Befehl samt Schritt-für-Schritt-Anleitung im Admin",
+                "Zugangsdaten mit QR-Code auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher",
+                "Begrüßungsseite nach dem WLAN-Login: Check-out-Zeit, Hausregeln, Wetter, geöffnete Ausflugsziele und Veranstaltungen, WhatsApp- und Telefon-Knopf",
+                "WLAN-Statistik im Admin: Geräte gerade online, Datenvolumen heute, im aktuellen Aufenthalt und in 30 Tagen, Balken der letzten 14 Tage, Volumen pro Gerät",
+                "Gäste-WLAN geht bei Leerstand automatisch aus und am Anreisetag um 0 Uhr wieder an; „24 Std. einschalten“ für eigene Geräte, „24 Std. ausschalten“ und „Automatik“"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.45.0",
             "date": "2026-11-11",
