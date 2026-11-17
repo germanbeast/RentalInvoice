@@ -11,7 +11,7 @@
                 "Passt eine Postleitzahl nicht zum Land (z. B. „3118 A.Hlinka“ bei Slowakei), wird sie als Hausnummer erkannt: „A.Hlinka 3118/37, Slowakei“",
                 "Zeilen wie „Zeitraum:“, „Betrag:“ oder andere unbekannte Beschriftungen werden übersprungen",
                 "Eine Anschrift aus Straße und Land ohne Ort wird ebenfalls übernommen; bereits falsch gespeicherte Adressen werden beim nächsten Rechnung-Erstellen bereinigt",
-                "Screenshot aus der Booking.com-App (auch im Dunkelmodus): Symbole vor Namen, E-Mail und Land werden nicht mehr als Buchstaben mitgelesen; „A.Hlinka 3118,, ČADCA, 02201“ wird zu „A.Hlinka 3118 / 022 01 Čadca / Slowakei“"
+                "Screenshot aus der Booking.com-App (auch im Dunkelmodus): Symbole vor Namen, E-Mail und Land werden nicht mehr als Buchstaben mitgelesen; „A.Hlinka 3118,, ČADCA, 02201“ wird zu „A.Hlinka 3118 / 022 01 Cadca / Slowakei“ (Hatschek-Buchstaben erkennt die Texterkennung nicht immer)"
             ]
         },
         {
