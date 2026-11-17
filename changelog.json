@@ -1,6 +1,23 @@
 {
-    "currentVersion": "1.48.1",
+    "currentVersion": "1.49.0",
     "releases": [
+        {
+            "version": "1.49.0",
+            "date": "2026-11-17",
+            "title": "Anschrift mit OpenStreetMap abgleichen, Booking.com-Zusatzangaben aussortieren",
+            "features": [
+                "Jede Anschrift aus Telegram (Text oder Screenshot) wird mit OpenStreetMap abgeglichen: fehlende PLZ oder fehlender Ort werden ergänzt, die Schreibweise des Orts korrigiert (z. B. „Čadca“ statt „CADCA“)",
+                "Widerspricht die Karte (andere PLZ, anderer Straßenname), ändert der Bot nichts von selbst, sondern zeigt „Laut Karte eher …“ mit Knopf „Werte von der Karte übernehmen“; „Ohne Kartenabgleich“ stellt alles wie erkannt wieder her",
+                "Gibt es eine Straße in mehreren Orten und fehlt der Ort, sagt der Bot das statt zu raten; ist der Kartendienst nicht erreichbar, geht alles ohne Abgleich weiter"
+            ],
+            "fixes": [
+                "„Erwachsener 1“, „Bevorzugte Sprache Englisch“ und „Land/Region“ landen nicht mehr in der Adresse, auch wenn alles in einer Zeile steht",
+                "Passt eine Postleitzahl nicht zum Land (z. B. „3118 A.Hlinka“ bei Slowakei), wird sie als Hausnummer erkannt: „A.Hlinka 3118/37, Slowakei“",
+                "Zeilen wie „Zeitraum:“, „Betrag:“ oder andere unbekannte Beschriftungen werden übersprungen",
+                "Eine Anschrift aus Straße und Land ohne Ort wird ebenfalls übernommen; bereits falsch gespeicherte Adressen werden beim nächsten Rechnung-Erstellen bereinigt",
+                "Screenshot aus der Booking.com-App (auch im Dunkelmodus): Symbole vor Namen, E-Mail und Land werden nicht mehr als Buchstaben mitgelesen; „A.Hlinka 3118,, ČADCA, 02201“ wird zu „A.Hlinka 3118 / 022 01 Cadca / Slowakei“ (Hatschek-Buchstaben erkennt die Texterkennung nicht immer)"
+            ]
+        },
         {
             "version": "1.48.1",
             "date": "2026-11-17",

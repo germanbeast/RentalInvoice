@@ -4,6 +4,7 @@ const permissions = require('./permissions');
 const LANG_LABEL = { de: '🇩🇪 Deutsch', en: '🇬🇧 Englisch', nl: '🇳🇱 Niederländisch', pl: '🇵🇱 Polnisch' };
 const addressParser = require('./address-parser');
 const ocr = require('./screenshot-ocr');
+const geoCheck = require('./geo-check');
 const os = require('os');
 const path = require('path');
 
@@ -22,7 +23,7 @@ function callbackRight(data) {
     if (data === 'codes') return 'codes';
     if (data === 'sync' || data.startsWith('ovl:')) return 'sync';
     if (data === 'names' || data.startsWith('nm:')) return 'namen';
-    if (data === 'adr' || data.startsWith('adr:') || data.startsWith('ab:') || ['aok', 'aname', 'aback'].includes(data)) return 'adresse';
+    if (data === 'adr' || data.startsWith('adr:') || data.startsWith('ab:') || ['aok', 'aname', 'aback'].includes(data) || data.startsWith('ageo:')) return 'adresse';
     if (data === 'lock:status') return 'lockstatus';
     if (data.startsWith('lock:')) return 'lock';
     if (data === 'gm' || data.startsWith('gm:')) return 'nachricht';
@@ -705,12 +706,84 @@ async function handleAddressText(bot, chatId, session, body, fromScreenshot) {
             keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
     }
     if (!fromScreenshot) session.photoMsgId = null;
+    session.original = { ...p };
+    session.geo = null;
+    session.geoOff = false;
+    await runGeoCheck(bot, chatId, session, p);
     session.parsed = p;
     session.raw = body;
     session.page = 0;
     session.replaceName = false;
     if (session.bookingId) return showAddressConfirm(bot, chatId, session);
     return showAddressBookings(bot, chatId, session);
+}
+
+/** Looks the address up on OpenStreetMap and fills/corrects what is safe (see geo-check.js). Never blocks saving. */
+async function runGeoCheck(bot, chatId, session, p) {
+    if (!p.street && !p.city && !p.zip) return;
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    try {
+        const r = await Promise.race([geoCheck.check(p), new Promise(res => setTimeout(() => res('timeout'), 15000))]);
+        if (r === 'timeout' || !r) { session.geo = r === 'timeout' ? { error: true } : null; return; }
+        session.geo = r;
+        if (r.changes && Object.keys(r.changes).length) {
+            Object.assign(p, r.changes);
+            p.address = addressParser.formatAddress(p);
+        }
+    } catch (e) {
+        console.warn('[TG] Kartenabgleich nicht möglich:', e.message);
+        session.geo = { error: true };
+    }
+}
+
+function geoText(session) {
+    const g = session.geo;
+    if (session.geoOff) return '🗺 <i>Ohne Kartenabgleich (so wie erkannt).</i>\n';
+    if (!g) return '';
+    if (g.error) return '🗺 <i>Kartenabgleich gerade nicht möglich.</i>\n';
+    if (g.ambiguous) return '🗺 Diese Straße gibt es in mehreren Orten. Bitte PLZ oder Ort mitschicken.\n';
+    if (!g.found) return '🗺 Auf der Karte (OpenStreetMap) nicht gefunden, bitte kurz prüfen.\n';
+    let t = g.fills.length ? `🗺 Mit OpenStreetMap abgeglichen, von der Karte übernommen: ${esc(g.fills.join(', '))}.\n` : '🗺 Auf der Karte (OpenStreetMap) gefunden ✓\n';
+    if (g.suggest) {
+        const parts = [];
+        if (g.suggest.street) parts.push(`Straße „${esc(g.suggest.street)}“`);
+        if (g.suggest.zip) parts.push(`PLZ ${esc(g.suggest.zip)}`);
+        if (g.suggest.city) parts.push(`Ort „${esc(g.suggest.city)}“`);
+        t += `⚠️ Laut Karte eher: ${parts.join(', ')}.\n`;
+    }
+    return t;
+}
+
+function geoButtons(session) {
+    const g = session.geo;
+    const rows = [];
+    if (!g || g.error || session.geoOff) {
+        if (session.geoOff) rows.push([btn('🗺 Kartenabgleich wieder an', 'ageo:on')]);
+        return rows;
+    }
+    if (g.suggest) rows.push([btn('🗺 Werte von der Karte übernehmen', 'ageo:map')]);
+    if (g.changes && Object.keys(g.changes).length) rows.push([btn('↩️ Ohne Kartenabgleich', 'ageo:off')]);
+    return rows;
+}
+
+/** Buttons under the summary: map values, original values, or back to the map result. */
+async function applyGeoChoice(bot, chatId, session, choice) {
+    const p = session.parsed;
+    const g = session.geo || {};
+    if (choice === 'off') {
+        session.parsed = { ...session.original, name: p.name };
+        session.geoOff = true;
+    } else if (choice === 'on') {
+        session.parsed = { ...session.original, name: p.name, ...(g.changes || {}) };
+        session.geoOff = false;
+    } else if (choice === 'map' && g.suggest) {
+        Object.assign(p, g.suggest, g.changes || {});
+        g.changes = { ...(g.changes || {}), ...g.suggest };
+        g.fills = [...new Set([...(g.fills || []), ...Object.keys(g.suggest).map(k => ({ street: 'Straße', zip: 'PLZ', city: 'Ort' }[k]))])];
+        g.suggest = null;
+    }
+    session.parsed.address = addressParser.formatAddress(session.parsed);
+    return session.step === 'confirm' ? showAddressConfirm(bot, chatId, session) : showAddressBookings(bot, chatId, session);
 }
 
 async function showAddressBookings(bot, chatId, session) {
@@ -720,7 +793,7 @@ async function showAddressBookings(bot, chatId, session) {
     let list = [];
     try { list = addressCandidates(p.name); } catch (e) { console.error('[TG] Buchungen für Anschrift:', e.message); }
     const shown = list.slice(session.page * ADDRESS_PAGE, (session.page + 1) * ADDRESS_PAGE);
-    let text = '📇 <b>Anschrift erkannt</b>\n\n' + addressFieldsText(p) + '\n';
+    let text = '📇 <b>Anschrift erkannt</b>\n\n' + addressFieldsText(p) + geoText(session) + '\n';
     if (!list.length) {
         text += '⚠️ Es gibt keine aktuelle oder kürzliche Buchung, zu der ich das speichern kann.';
         return send(bot, chatId, text, keyboard([[btn('🏠 Hauptmenü', 'menu')]]), session);
@@ -732,6 +805,7 @@ async function showAddressBookings(bot, chatId, session) {
     if (session.page > 0) nav.push(btn('⬅️ Vorherige', 'ab:prev'));
     if (list.length > (session.page + 1) * ADDRESS_PAGE) nav.push(btn('Weitere ➡️', 'ab:next'));
     if (nav.length) rows.push(nav);
+    rows.push(...geoButtons(session));
     rows.push([btn('🧾 Stattdessen Rechnung erstellen', 'ab:inv')]);
     rows.push([btn('❌ Abbrechen', 'cancel')]);
     return send(bot, chatId, text, keyboard(rows), session);
@@ -752,7 +826,7 @@ async function showAddressConfirm(bot, chatId, session) {
     const differs = current && p.name && nameScore(current, p.name) < 2;
 
     let text = `📇 <b>Anschrift speichern</b>\n\n📅 Buchung <b>${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}</b>\n\n`;
-    text += addressFieldsText(p);
+    text += addressFieldsText(p) + geoText(session);
     text += '\n<b>So steht es dann beim Gast:</b>\n';
     const name = (!current || (differs && session.replaceName)) ? p.name : current;
     text += `<code>${esc([name || '❓', p.address].filter(Boolean).join('\n'))}</code>\n`;
@@ -772,6 +846,7 @@ async function showAddressConfirm(bot, chatId, session) {
 
     const rows = [];
     if (current || p.name) rows.push([btn('✅ Speichern', 'aok')]);
+    rows.push(...geoButtons(session));
     if (differs) rows.push([btn(session.replaceName ? `↩️ Name „${short(current, 18)}“ behalten` : `👤 Name „${short(p.name, 18)}“ übernehmen`, 'aname')]);
     rows.push(session.fixedBooking ? [btn('❌ Abbrechen', 'cancel')] : [btn('⬅️ Andere Buchung', 'aback'), btn('❌ Abbrechen', 'cancel')]);
     return send(bot, chatId, text, keyboard(rows), session);
@@ -917,7 +992,7 @@ function tidyAddress(text, { strict = false } = {}) {
     const typed = String(text || '').split('\n').map(l => l.trim()).filter(Boolean).join('\n');
     if (!typed) return '';
     const p = addressParser.parseAddress(typed);
-    if (p.street && (p.zip || p.city)) return p.address;
+    if (p.street && (p.zip || p.city || p.country)) return p.address;
     if (strict) return '';
     return typed.split('\n').length <= 4 ? typed : '';
 }
@@ -1219,7 +1294,7 @@ async function startFlow(bot, chatId, flowName, initialText, prefill) {
         const flatIdx = m ? initialText.replace(/\n/g, ' ').indexOf(m) : -1;
         const work = flatIdx >= 0 ? initialText.slice(0, flatIdx) + '\n' + initialText.slice(flatIdx + m.length) : initialText;
         const addr = addressParser.parseAddress(work);
-        data.gAdresse = addr.street && (addr.zip || addr.city) ? addr.address : tidyAddress(data.gAdresse, { strict: data.gAdresse.split('\n').length > 4 });
+        data.gAdresse = addr.street && (addr.zip || addr.city || addr.country) ? addr.address : tidyAddress(data.gAdresse, { strict: data.gAdresse.split('\n').length > 4 });
         if (!data.gEmail && addr.email) data.gEmail = addr.email;
     }
     if (prefill) Object.assign(data, prefill);
@@ -1549,7 +1624,7 @@ async function processCallback(bot, q) {
     const active = session && session !== 'expired' ? session : null;
 
     // Alte Buttons, die nicht mehr zu einer Session passen
-    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit', 'aok', 'aname', 'aback'].includes(data) || data.startsWith('ef:') || data.startsWith('ab:');
+    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit', 'aok', 'aname', 'aback'].includes(data) || data.startsWith('ef:') || data.startsWith('ab:') || data.startsWith('ageo:');
     if (needsSession && !active) {
         await answer(session === 'expired' ? '⏱ Abgelaufen' : 'Vorgang nicht mehr aktiv');
         // Buttons der alten Nachricht entfernen
@@ -1644,6 +1719,9 @@ async function processCallback(bot, q) {
                 active.replaceName = false;
                 return showAddressConfirm(bot, chatId, active);
             }
+            case data.startsWith('ageo:'):
+                if (active.flow !== 'address' || !active.parsed) return;
+                return applyGeoChoice(bot, chatId, active, data.slice(5));
             case data === 'aname':
                 if (active.flow !== 'address' || active.step !== 'confirm') return;
                 active.replaceName = !active.replaceName;
