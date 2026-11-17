@@ -723,8 +723,9 @@ async function runGeoCheck(bot, chatId, session, p) {
     if (!p.street && !p.city && !p.zip) return;
     bot.sendChatAction(chatId, 'typing').catch(() => { });
     try {
-        const r = await Promise.race([geoCheck.check(p), new Promise(res => setTimeout(() => res('timeout'), 15000))]);
-        if (r === 'timeout' || !r) { session.geo = r === 'timeout' ? { error: true } : null; return; }
+        const r = await Promise.race([geoCheck.check(p), new Promise(res => setTimeout(() => res('timeout'), 25000))]);
+        if (r === 'timeout' || !r) { session.geo = r === 'timeout' ? { error: true, reason: 'Kartendienst antwortet nicht rechtzeitig' } : null; return; }
+        if (r.error) { console.warn('[TG] Kartenabgleich nicht möglich:', r.reason); session.geo = r; return; }
         session.geo = r;
         if (r.changes && Object.keys(r.changes).length) {
             Object.assign(p, r.changes);
@@ -732,7 +733,7 @@ async function runGeoCheck(bot, chatId, session, p) {
         }
     } catch (e) {
         console.warn('[TG] Kartenabgleich nicht möglich:', e.message);
-        session.geo = { error: true };
+        session.geo = { error: true, reason: geoCheck.reasonOf(e) };
     }
 }
 
@@ -740,7 +741,7 @@ function geoText(session) {
     const g = session.geo;
     if (session.geoOff) return '🗺 <i>Ohne Kartenabgleich (so wie erkannt).</i>\n';
     if (!g) return '';
-    if (g.error) return '🗺 <i>Kartenabgleich gerade nicht möglich.</i>\n';
+    if (g.error) return `🗺 <i>Kartenabgleich gerade nicht möglich${g.reason ? ` (${esc(g.reason)})` : ''}. Die Anschrift bleibt so wie erkannt.</i>\n`;
     if (g.ambiguous) return '🗺 Diese Straße gibt es in mehreren Orten. Bitte PLZ oder Ort mitschicken.\n';
     if (!g.found) return '🗺 Auf der Karte (OpenStreetMap) nicht gefunden, bitte kurz prüfen.\n';
     let t = g.fills.length ? `🗺 Mit OpenStreetMap abgeglichen, von der Karte übernommen: ${esc(g.fills.join(', '))}.\n` : '🗺 Auf der Karte (OpenStreetMap) gefunden ✓\n';
