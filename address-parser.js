@@ -534,4 +534,17 @@ function looksLikeAddress(text) {
     return Boolean((r.street && (r.zip || r.city)) || (r.zip && r.city && (r.name || r.street)));
 }
 
-module.exports = { parseAddress, looksLikeAddress, formatAddress, tidyCase, normalizePhone, _internal: { parseStreet, parseZipCity, countryFromText } };
+/** Stored guest address ("Straße Nr.\nPLZ Ort\nLand") split into form fields (Meldeschein, invoice). */
+function splitAddress(address) {
+    const out = { street: '', zip: '', city: '', country: '', countryCode: '' };
+    if (!String(address || '').trim()) return out;
+    const r = parseAddress(address);
+    out.street = streetLine(r);
+    out.zip = r.zip || '';
+    out.city = r.city || '';
+    out.country = r.country || '';
+    out.countryCode = r.countryCode || '';
+    return out;
+}
+
+module.exports = { parseAddress, looksLikeAddress, formatAddress, splitAddress, tidyCase, normalizePhone, _internal: { parseStreet, parseZipCity, countryFromText } };

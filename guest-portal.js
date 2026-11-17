@@ -13,6 +13,8 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const vouchers = require('./vouchers');
+const guestLang = require('./guest-lang');
+const { splitAddress } = require('./address-parser');
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
 const SITE_DIR = path.join(__dirname, 'guest-site');
@@ -221,7 +223,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             pin: showPin ? b.nuki_pin : null,
             pinLater: !showPin && Number(site.pin_days) > 0 && !!b.nuki_pin && state === 'upcoming' ? Number(site.pin_days) : null,
             contact: site.show_contact ? contactInfo(settings) : null,
-            chat: state !== 'past' ? chatFor(b) : null
+            chat: state !== 'past' ? chatFor(b) : null,
+            lang: guestLang.forBooking(b).lang || null
         };
         if (state !== 'past') {
             v.wifi = wifiFor ? wifiFor(b) : (site.wifi_name ? { name: site.wifi_name, password: site.wifi_password || '' } : null);
@@ -235,7 +238,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         if (plan) {
             v.invoiceOffer = {
                 positions: plan.positions, total: plan.total, mwstRate: plan.mwstRate, paid: plan.payment.zBezahlt,
-                name: hasName ? guest.name : '', email: (guest && guest.email) || ''
+                name: hasName ? guest.name : '', email: (guest && guest.email) || '',
+                address: guest && guest.address ? (a => ({ ...a, country: a.country || (a.zip ? 'Deutschland' : '') }))(splitAddress(guest.address)) : null
             };
         }
         if (request) {
@@ -319,7 +323,8 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             details: { name: r.name, email: r.email, phone: r.phone || '' },
             contact: site.show_contact ? contactInfo(settings) : null,
             chat: chatFor({ guest_code: r.code, checkin: r.checkin, checkout: r.checkout }),
-            createdAt: r.created_at
+            createdAt: r.created_at,
+            lang: guestLang.langOfPhone(r.phone) || guestLang.langOfEmail(r.email) || null
         };
     }
 
@@ -610,6 +615,14 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
         const st = currentStatus(req.session && req.session.guest, req);
         if (!st) return res.json({ success: false, loggedIn: false });
         res.json({ success: true, status: st });
+    });
+
+    // Language the guest picked on "Meine Buchung": also used for the TV and the messages (the host's choice wins)
+    router.post('/api/me/lang', (req, res) => {
+        const b = guestBooking(req.session && req.session.guest);
+        const lang = String((req.body && req.body.lang) || '');
+        if (!b) return res.json({ success: false });
+        res.json({ success: guestLang.setPick(b.id, lang) });
     });
 
     const invoiceLimiter = rateLimit({

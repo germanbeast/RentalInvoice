@@ -14,7 +14,7 @@
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_COMPANIONS = 12;
-const GERMAN = /^(deutsch(land)?|germany|german|de|d|brd)$/i;
+const GERMAN = /^(deutsch(land)?|germany|german|de|d|brd|duitsland|duits|niemcy|niemiecka|niemieckie)$/i;
 
 function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, guestBooking, berlinToday, nightsBetween, formatDateDE }) {
     const sql = () => db.getDb();
@@ -80,7 +80,12 @@ function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, 
             const g = db.getGuestById(b.guest_id);
             if (g && !botLogic.isPlaceholderGuestName(g.name)) {
                 const parts = g.name.trim().split(/\s+/);
-                prefill = { lastName: parts.length > 1 ? parts.pop() : '', firstName: parts.join(' ') };
+                // Address and country from the guest data (e.g. pasted in Telegram)
+                const a = require('./address-parser').splitAddress(g.address);
+                // "Jan de Vries" -> first name Jan, last name de Vries
+                let cut = parts.length > 1 ? parts.length - 1 : parts.length;
+                while (cut > 1 && /^(de|der|den|van|von|vom|zu|zur|ter|ten|te|het|da|di|del|della|du|le|la|al|el|mc|o')$/i.test(parts[cut - 1])) cut--;
+                prefill = { lastName: parts.slice(cut).join(' '), firstName: parts.slice(0, cut).join(' '), street: a.street, zip: a.zip, city: a.city, country: a.country || (a.zip ? 'Deutschland' : '') };
             }
         }
         const req2 = sql().prepare('SELECT adults, children FROM booking_requests WHERE booking_id = ?').get(b.id);

@@ -1106,7 +1106,7 @@ function createGuestChat({ imap, mailParser, express, rateLimit, db, botLogic, g
         });
         app.get('/api/chat/template/:bookingId', apiLimiter, (req, res) => {
             try {
-                const r = guestMessage.compose(parseInt(req.params.bookingId, 10), req.query.lang === 'en' ? 'en' : 'de');
+                const r = guestMessage.compose(parseInt(req.params.bookingId, 10), ['de', 'en', 'nl', 'pl'].includes(req.query.lang) ? req.query.lang : undefined);
                 if (!r) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
                 res.json({ success: true, text: r.text, warnings: r.warnings || [] });
             } catch (e) {

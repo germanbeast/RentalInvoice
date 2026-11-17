@@ -1,6 +1,7 @@
 const db = require('./db');
 const botLogic = require('./bot-logic');
 const permissions = require('./permissions');
+const LANG_LABEL = { de: '🇩🇪 Deutsch', en: '🇬🇧 Englisch', nl: '🇳🇱 Niederländisch', pl: '🇵🇱 Polnisch' };
 const addressParser = require('./address-parser');
 const ocr = require('./screenshot-ocr');
 const os = require('os');
@@ -523,15 +524,16 @@ async function showGuestMessageList(bot, chatId) {
     return send(bot, chatId, '<b>✉️ Gästenachricht</b>\nFür welche Buchung?', keyboard(kb));
 }
 
-async function showGuestMessage(bot, chatId, bookingId, lang = 'de') {
+async function showGuestMessage(bot, chatId, bookingId, langWanted) {
     const api = guestMessageApi();
     if (!api) return send(bot, chatId, '❌ Die Gästenachricht ist nicht verfügbar.', menuOnlyKeyboard());
-    const m = api.compose(bookingId, lang);
+    const m = api.compose(bookingId, langWanted);
     if (!m) return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard());
+    const lang = m.lang || 'de';
 
     const b = m.booking;
     const who = m.name ? esc(short(m.name, 30)) : 'Gast';
-    let text = `✉️ <b>Gästenachricht${lang === 'en' ? ' (English)' : ''}: ${who}</b> · ${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)}\n` +
+    let text = `✉️ <b>Gästenachricht${lang !== 'de' ? ` (${LANG_LABEL[lang]})` : ''}: ${who}</b> · ${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)}\n` +
         'Tippe auf den Text, um ihn zu kopieren, und füge ihn bei Booking.com oder Airbnb ein.\n';
     if (m.link) text += `<i>Der Link gilt bis ${fmtDate(m.linkUntil)}.</i>\n`;
     m.warnings.forEach(w => { text += `⚠️ ${esc(w)}\n`; });
@@ -540,7 +542,7 @@ async function showGuestMessage(bot, chatId, bookingId, lang = 'de') {
     const rows = [];
     const first = [];
     if (m.link) first.push({ text: '📋 Nur Link kopieren', copy_text: { text: m.link } });
-    first.push(lang === 'en' ? btn('🇩🇪 Deutsch', `gm:${b.id}`) : btn('🇬🇧 English', `gm:en:${b.id}`));
+    first.push(lang !== 'de' ? btn('🇩🇪 Deutsch', `gm:de:${b.id}`) : btn('🇬🇧 English', `gm:en:${b.id}`));
     rows.push(first);
     if (m.link) rows.push([btn('🔁 Neuer Link', `gl:new?:${b.id}`), btn('🔒 Link sperren', `gl:off:${b.id}`)]);
     if (!m.name) rows.push([btn('👤 Namen eintragen', `nm:${b.id}`)]);
@@ -1594,8 +1596,8 @@ async function processCallback(bot, q) {
                 return runLockAction(bot, chatId, data === 'lock:auf!' ? 'unlock' : 'unlatch', who);
             case data === 'gm':
                 return showGuestMessageList(bot, chatId);
-            case data.startsWith('gm:en:'):
-                return showGuestMessage(bot, chatId, parseInt(data.slice(6), 10), 'en');
+            case /^gm:(de|en|nl|pl):/.test(data):
+                return showGuestMessage(bot, chatId, parseInt(data.slice(6), 10), data.slice(3, 5));
             case data.startsWith('gm:'):
                 return showGuestMessage(bot, chatId, parseInt(data.slice(3), 10));
             case data.startsWith('gl:new?:'):

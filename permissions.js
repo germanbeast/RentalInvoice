@@ -188,7 +188,7 @@ function createGuard(db) {
 function redactBooking(row, perms) {
     const r = { ...row };
     if (!can(perms, 'door')) { r.pin = null; }
-    if (!can(perms, 'bookings')) { r.guestEmail = null; r.guestId = null; }
+    if (!can(perms, 'bookings')) { r.guestEmail = null; r.guestId = null; r.guestPhone = null; r.guestAddress = null; }
     if (!can(perms, 'messages') && !can(perms, 'bookings')) r.guestCode = null;
     if (!can(perms, 'meldescheine')) r.meldescheinId = null;
     return r;

@@ -2169,6 +2169,10 @@
                 <dt>Türcode</dt><dd>${bk.hasCode ? (bk.pin ? `<code>${escapeHtml(bk.pin)}</code>` : 'angelegt') + (bk.arrivedAt ? ' · genutzt' : '') : 'kein Code'}</dd>
                 ${bk.guestCode ? `<dt>Gastcode</dt><dd><code>${escapeHtml(bk.guestCode)}</code></dd>` : ''}
                 ${bk.guestEmail ? `<dt>E-Mail</dt><dd>${escapeHtml(bk.guestEmail)}</dd>` : ''}
+                ${bk.guestPhone ? `<dt>Telefon</dt><dd>${escapeHtml(bk.guestPhone)}</dd>` : ''}
+                ${bk.guestAddress ? `<dt>Anschrift</dt><dd>${escapeHtml(bk.guestAddress).replace(/\n/g, ', ')}</dd>` : ''}
+                ${bk.state !== 'past' && canDo('bookings', 'edit') ? `<dt>Sprache</dt><dd><select class="pop-lang" data-pop-lang aria-label="Sprache der Gäste-App, des Fernsehers und der Gästenachrichten">
+                    <option value="">Automatisch</option>${Object.entries(GUEST_LANGS).map(([k, v]) => `<option value="${k}"${bk.lang === k ? ' selected' : ''}>${v}</option>`).join('')}</select></dd>` : ''}
                 <dt>Meldeschein</dt><dd>${bk.meldescheinId ? 'ausgefüllt ✓' : bk.state === 'past' ? '–' : 'fehlt noch'}</dd>
                 ${bk.voucherCode ? `<dt>Gutschein</dt><dd><code>${escapeHtml(bk.voucherCode)}</code> eingelöst</dd>` : ''}
             </dl>
@@ -2186,7 +2190,23 @@
         tlPop.dataset.bid = bk.id;
         delete tlPop.dataset.rid;
         placePop(anchor);
+        const langSel = tlPop.querySelector('[data-pop-lang]');
+        if (langSel) {
+            // What "Automatisch" means for this guest right now
+            apiJson(`/api/bookings/${bk.id}/lang`).then(d => {
+                if (!d || !d.success || !langSel.isConnected) return;
+                const auto = d.pick || d.auto;
+                langSel.options[0].textContent = auto ? `Automatisch · ${GUEST_LANGS[auto]}` : 'Automatisch · Browser';
+                langSel.title = auto ? (d.pick ? 'Vom Gast auf „Meine Buchung“ gewählt' : `Erkannt aus ${d.from}`) : 'Keine Angaben zum Gast: Meine Buchung nimmt die Sprache des Browsers, Fernseher und Nachrichten Deutsch';
+            }).catch(() => { });
+            langSel.addEventListener('change', async () => {
+                const d = await apiJson(`/api/bookings/${bk.id}/lang`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: langSel.value }) }).catch(() => null);
+                if (d && d.success) { bk.lang = langSel.value; showToast(langSel.value ? `Sprache: ${GUEST_LANGS[langSel.value]}` : 'Sprache wieder automatisch', 'success'); }
+                else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
+            });
+        }
     }
+    const GUEST_LANGS = { de: 'Deutsch', en: 'Englisch', nl: 'Niederländisch', pl: 'Polnisch' };
 
     function showRequestPop(rq, anchor) {
         tlPop.innerHTML = `

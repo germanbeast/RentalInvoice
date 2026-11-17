@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.47.0",
+    "currentVersion": "1.48.0",
     "releases": [
+        {
+            "version": "1.48.0",
+            "date": "2026-11-17",
+            "title": "Gäste-App auf Englisch, Niederländisch und Polnisch",
+            "features": [
+                "Meine Buchung (mit Meldeschein, Ankunft, A–Z, Umgebung, Rechnung), die WLAN-Anmeldeseite, Notfall-Öffnen und der Fernseher gibt es jetzt auf Deutsch, Englisch, Niederländisch und Polnisch",
+                "Die Sprache wird automatisch gewählt: aus Meldeschein, Anschrift (auch der per Telegram eingefügten), Telefonvorwahl oder E-Mail des Gastes, sonst aus der Sprache des Browsers. Gäste können oben oder im Menü umschalten",
+                "Im Kalender-Popup einer Buchung lässt sich die Sprache festlegen (Automatisch, Deutsch, Englisch, Niederländisch, Polnisch); dort stehen jetzt auch Telefon und Anschrift des Gastes",
+                "Gästenachricht und Anreise-Nachricht kommen automatisch in der Sprache des Gastes, jetzt auch auf Niederländisch und Polnisch",
+                "Meldeschein und Rechnung auf Meine Buchung sind mit der gespeicherten Anschrift des Gastes vorausgefüllt"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.47.0",
             "date": "2026-11-17",
