@@ -1373,7 +1373,8 @@ function welcomeData() {
         checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
         title: (s.site && s.site.title) || '',
         wifi: current ? guestWifi.tvView() : null,
-        lang: current ? guestLang.langOrDe(current) : 'de'
+        lang: current ? guestLang.langOrDe(current) : 'de',
+        video: siteVideo.publicInfo('tv')
     };
 }
 
@@ -1426,8 +1427,15 @@ const guestWifi = require('./wifi')({
     addDays: (ymd, n) => addDays(ymd, n),
     formatDateDE: (d) => formatDateDE(d)
 });
+// Background video of the apartment (muted loop, slightly blurred) for the guest pages and the TV, see site-video.js.
+// Served before the guest-domain rewrite, so the TV box gets it on the guest host too.
+const siteVideo = require('./site-video')({ db, express });
+app.get('/hintergrund-video/:file', siteVideo.serveFile);
+app.get('/bg-video.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'bg-video.js')); });
+
 // Public guest website (description, availability, booking requests, guest login + status)
 const guestPortal = require('./guest-portal')({
+    videoFor: (where) => siteVideo.publicInfo(where),
     express, rateLimit, db, nodemailer, multer,
     botLogic: require('./bot-logic'),
     notify: async (msg, type) => {
@@ -1981,6 +1989,7 @@ function loadBookingRows() {
 
 // Guest website admin: settings, photos, booking requests
 guestPortal.registerAdminRoutes(app, apiLimiter);
+siteVideo.registerAdminRoutes(app, apiLimiter);
 guestChat.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
 meldeschein.registerAdminRoutes(app, apiLimiter);

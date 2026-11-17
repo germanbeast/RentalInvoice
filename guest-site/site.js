@@ -60,6 +60,8 @@
         photos = d.photos;
         const thumb = (p, i) => `<button type="button" data-idx="${i}" aria-label="Foto ${i + 1} vergrößern"><img src="${esc(p)}" alt="" loading="lazy"></button>`;
         if (photos.length) $('#hero-media').innerHTML = `<img src="${esc(photos[0])}" alt="">`;
+        // Hintergrund-Video der Wohnung über dem Titelbild (bg-video.js)
+        if (d.video && d.video.site && window.bgVideo) window.bgVideo($('#hero-media'), d.video.site, { poster: !photos.length });
         // Spread: the next three photos (or the cover again when there is only one); the rest go into the strip
         const spread = photos.length > 1 ? photos.slice(1, 4).map((p, i) => thumb(p, i + 1)) : photos.map(thumb);
         $('#gallery').innerHTML = spread.join('');

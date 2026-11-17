@@ -5,6 +5,15 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.0] - 2026-11-17
+
+### Neu
+- `site-video.js`: Hintergrund-Video der Wohnung. Upload in 8-MB-Stücken (`/api/site/video/start|chunk|finish`, bis 2 GB, Cloudflare-Limit 100 MB pro Anfrage), ffmpeg erzeugt Master (1280 px, ohne Ton, max. 60 s), unscharfe Fassung (960 px, `gblur` eingerechnet) und Standbild; neue Unschärfe wird aus dem Master gerechnet. Ohne ffmpeg: MP4/WebM bis 60 MB unverändert, Unschärfe per CSS. Einstellungen in `site_video` (Startseite, Meine Buchung, TV, Handys)
+- Öffentlich unter `/hintergrund-video/<datei>` (vor der Gäste-Domain-Umleitung, Range-Anfragen, nur aktuelle Dateien), Skript `guest-site/bg-video.js` (auch `/bg-video.js` für den TV): lädt erst bei Sichtbarkeit, pausiert außerhalb des Bildschirms, kein Video bei reduzierter Bewegung/Datensparmodus/2G/3G
+- `/gast/api/info` liefert `video.site`/`video.account`, `/api/welcome` liefert `video`; TV-Welcome mit abgedunkeltem Video-Hintergrund
+- TV-App 1.11: `setMediaPlaybackRequiresUserGesture(false)`
+- `setup.sh` installiert ffmpeg, `update.sh` weist darauf hin, wenn es fehlt
+
 ## [1.49.0] - 2026-11-17
 
 ### Neu
