@@ -1,6 +1,21 @@
 {
-    "currentVersion": "1.46.0",
+    "currentVersion": "1.47.0",
     "releases": [
+        {
+            "version": "1.47.0",
+            "date": "2026-11-17",
+            "title": "Anschrift einfach in Telegram einfügen",
+            "features": [
+                "Anschrift unformatiert in Telegram schicken (z. B. aus Booking.com kopiert): Der Bot erkennt Name, Firma, Straße, Hausnummer, Zusatz, PLZ, Ort, Land, Telefon und E-Mail",
+                "Das Land wird auch erkannt, wenn es nicht dasteht: aus dem PLZ-Format (z. B. 1015 CJ, 00-590, SW1A 2AA), bekannten Orten (Wien, Zürich, Brüssel …) und der Telefonvorwahl",
+                "Danach nur noch die Buchung antippen (passender Name mit ⭐ oben) und bestätigen; gespeichert wird sauber formatiert beim Gast, die nächste Rechnung übernimmt die Anschrift",
+                "Hat die Buchung noch keinen Namen, bekommt sie ihn gleich mit (auch der Türcode wird umbenannt); ein abweichender Name wird nur auf Wunsch übernommen",
+                "Neu: /adresse und Knopf „📇 Anschrift einfügen“ im Hauptmenü und nach „Namen eintragen“",
+                "Im Rechnungsdialog wird eine eingefügte Adresse ebenfalls sauber formatiert",
+                "Auch ein Screenshot geht (z. B. aus der Booking.com-App): Der Text wird direkt auf deinem Server gelesen, nichts geht an fremde Dienste; das Bild wird nicht gespeichert und nach dem Speichern auch aus dem Telegram-Chat gelöscht"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.46.0",
             "date": "2026-11-17",
