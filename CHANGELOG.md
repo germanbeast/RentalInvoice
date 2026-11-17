@@ -5,6 +5,12 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.1] - 2026-11-17
+
+### Behoben
+- Rechnungsdialog (Telegram): Die Adresse wird aus dem ganzen eingefügten Text mit `address-parser` bestimmt (Datum vorher entfernt); nicht zuordenbare Zeilen (Wohnungsname, Erwachsene, Sprache) fallen weg. Längerer Text ohne erkennbare Anschrift wird nicht mehr übernommen, der Bot fragt nach. Gespeicherte Gast-Adressen werden beim Vorbefüllen bereinigt.
+- `address-parser`: Beschriftungen „Land/Region“, „Erwachsener“, „Bevorzugte Sprache“, „Unterkunft“ u. a.; ein Satz nach dem Namen wird nicht mehr als Firma gelesen; SK/CZ-PLZ mit Leerzeichen
+
 ## [1.48.0] - 2026-11-17
 
 ### Neu
