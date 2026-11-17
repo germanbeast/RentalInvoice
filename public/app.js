@@ -2561,6 +2561,7 @@
         if (tab === 'meldescheine') loadMeldescheine();
         if (tab === 'live') loadLive();
         if (tab === 'arrival') loadArrival();
+        if (tab === 'wifi') loadWifi();
     }
     $$('#website-tabs button').forEach(b => b.addEventListener('click', () => setSiteTab(b.dataset.tab)));
 
@@ -3160,6 +3161,208 @@
             fillArrival(d);
             showToast('Ankunft gespeichert', 'success');
         } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
+    });
+
+    // ---- WLAN für Gäste (Webseite → WLAN) -----------------------------------
+    let wifiState = null;
+    const wifiMode = () => (Array.from($$('input[name="wifi-mode"]')).find(r => r.checked) || {}).value || 'static';
+    const fmtDT = iso => iso ? new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+    function wifiIndexOptions(wlans, selected) {
+        const sel = $('#wifi-index');
+        const opts = ['<option value="0">Automatisch (Gastzugang)</option>'];
+        (wlans || []).forEach(w => opts.push(`<option value="${w.index}">${w.index}: ${escapeHtml(w.ssid || '(ohne Namen)')}${w.enabled ? '' : ' (aus)'}</option>`));
+        if (selected && !(wlans || []).some(w => w.index === selected)) opts.push(`<option value="${selected}">WLAN ${selected}</option>`);
+        sel.innerHTML = opts.join('');
+        sel.value = String(selected || 0);
+    }
+
+    function wifiToggleFritz() {
+        const mode = wifiMode();
+        $('#wifi-fritz-card').hidden = mode !== 'fritzbox';
+        $('#wifi-portal-card').hidden = mode !== 'portal';
+        $('#wifi-list-card').hidden = mode === 'static';
+        const portal = mode === 'portal';
+        $('#wifi-list-title').textContent = portal ? 'Zugangscodes der nächsten Buchungen' : 'Passwörter der nächsten Buchungen';
+        $('#wifi-list-hint').textContent = portal
+            ? 'Jede Buchung hat einen 6-stelligen Zugangscode. Der Gast sieht ihn ab dem Anreisetag auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher. Er gilt vom Anreisetag bis zum Check-out (plus Nachlauf). „Neu“ macht den alten Code ungültig.'
+            : 'Jede Buchung bekommt automatisch ein leicht tippbares Passwort. Der Gast sieht es ab dem Anreisetag. „Neu“ erzeugt ein anderes Passwort, ist der Gast gerade da, wird die FRITZ!Box sofort umgestellt.';
+    }
+
+    function fillWifiPortal(d) {
+        const p = d.config.portal || {};
+        $('#wifi-portal-ssid').value = p.ssid || '';
+        $('#wifi-portal-wpa').value = p.wpa || '';
+        $('#wifi-portal-devices').value = p.max_devices || 5;
+        $('#wifi-portal-grace').value = p.grace_min != null ? p.grace_min : 60;
+        $('#wifi-portal-alert').checked = p.alert !== false;
+        $('#wifi-portal-owner').textContent = p.owner_code || '– (erst speichern)';
+        const ps = d.portal;
+        const st = $('#wifi-portal-status');
+        const cmd = $('#wifi-portal-cmd');
+        if (!ps) {
+            st.innerHTML = '<span class="wifi-dot"></span>Noch nicht gespeichert: Modus wählen und unten „Speichern“ drücken, dann erscheint der Einrichtungs-Befehl.';
+            cmd.textContent = 'Erscheint nach dem Speichern.'; cmd.classList.add('empty');
+            $('#wifi-portal-devices-list').innerHTML = '';
+            return;
+        }
+        const r = ps.router || {};
+        if (ps.publicUrlProblem) st.innerHTML = `<span class="wifi-dot bad"></span>${escapeHtml(ps.publicUrlProblem)}`;
+        else if (r.online) st.innerHTML = `<span class="wifi-dot ok"></span><b>Router verbunden</b>${r.version ? ` (openNDS ${escapeHtml(r.version)})` : ''}. <small>Zuletzt gemeldet ${fmtDT(r.lastSeen)}.</small>`;
+        else if (r.lastSeen) st.innerHTML = `<span class="wifi-dot bad"></span><b>Router meldet sich nicht</b> seit ${fmtDT(r.lastSeen)}. Strom und Kabel zur FRITZ!Box prüfen; neue Gäste kommen sonst nicht ins WLAN.`;
+        else st.innerHTML = '<span class="wifi-dot warn"></span>Der Router hat sich noch nie gemeldet. Sobald er eingerichtet ist (Anleitung unten), steht hier „Router verbunden“.';
+        if (ps.command) { cmd.textContent = ps.command; cmd.classList.remove('empty'); }
+        else { cmd.textContent = ps.publicUrlProblem || 'Erscheint nach dem Speichern.'; cmd.classList.add('empty'); }
+        $('#wifi-portal-copy').disabled = !ps.command;
+        const list = ps.devices || [];
+        $('#wifi-portal-devices-list').innerHTML = list.length ? list.map(x => `<div class="arr-row" data-dev="${x.id}">
+            <div class="arr-who"><strong>${escapeHtml(x.ua)} · ${escapeHtml(x.who)}</strong>
+                <span class="arr-state">seit ${fmtDT(x.since)} · online bis ${fmtDT(x.until)} · ${escapeHtml(x.mac)}</span></div>
+            <div class="arr-actions"><button type="button" class="btn-mini" data-wifi="forget">Vergessen</button></div>
+        </div>`).join('') : '<div class="text-muted" style="font-size:.85rem">Gerade ist kein Gerät angemeldet.</div>';
+    }
+
+    function fillWifi(d) {
+        wifiState = d;
+        const c = d.config;
+        $$('input[name="wifi-mode"]').forEach(r => { r.checked = r.value === c.mode; });
+        $('#wifi-show-arrival').checked = c.show_arrival !== false;
+        $('#wifi-show-tv').checked = c.show_tv !== false;
+        $('#wifi-static-hint').innerHTML = d.site.wifi_name
+            ? `Festes WLAN: <b>${escapeHtml(d.site.wifi_name)}</b>${d.site.has_password ? ' mit Passwort' : ' ohne Passwort'} (Inhalte → Gästemappe). Bei „pro Buchung“ ist es die Rückfalllösung, solange die FRITZ!Box nicht eingerichtet ist.`
+            : 'Noch kein festes WLAN eingetragen (Inhalte → Gästemappe).';
+        $('#wifi-url').value = c.fritz.url || '';
+        $('#wifi-user').value = c.fritz.user || '';
+        $('#wifi-pass').value = c.fritz.password || '';
+        $('#wifi-insecure').checked = !!c.fritz.insecure;
+        if (!$('#wifi-index').options.length || $('#wifi-index').options.length === 1) wifiIndexOptions([], c.fritz.index);
+        else $('#wifi-index').value = String(c.fritz.index || 0);
+        $('#wifi-switch-time').value = c.switch_time || '';
+        $('#wifi-switch-hint').textContent = `(leer = Check-out-Zeit${d.site.checkout_time ? `, ${d.site.checkout_time} Uhr` : ''})`;
+        $('#wifi-vacant-off').checked = !!c.vacant_disable;
+        $('#wifi-notify').checked = c.notify !== false;
+        const st = d.state;
+        let html;
+        if (!d.ready) html = '<span class="wifi-dot"></span>Noch nicht eingerichtet: Adresse, Benutzer und Kennwort eintragen, testen, speichern.';
+        else if (st.error) html = `<span class="wifi-dot bad"></span><b>Umstellen klappt gerade nicht:</b> ${escapeHtml(st.error)} <small>(${fmtDT(st.errorAt)}, neuer Versuch alle 5 Minuten)</small>`;
+        else if (st.inSync) html = `<span class="wifi-dot ok"></span><b>${escapeHtml(st.ssid || 'Gast-WLAN')}</b> ist ${st.now && st.now.vacant ? (st.enabled === false ? 'ausgeschaltet (niemand da)' : 'auf ein Zufallspasswort gestellt (niemand da)') : `eingestellt für ${escapeHtml(st.now ? st.now.name : '')}`}. <small>Zuletzt geprüft ${fmtDT(st.lastCheck)}.</small>`;
+        else html = '<span class="wifi-dot warn"></span>Wird gleich umgestellt …';
+        $('#wifi-status').innerHTML = html;
+        $('#wifi-status').hidden = false;
+        renderWifiUpcoming(d.upcoming);
+        fillWifiPortal(d);
+        wifiToggleFritz();
+    }
+
+    function renderWifiUpcoming(list) {
+        const box = $('#wifi-upcoming');
+        if (!list || !list.length) { box.innerHTML = '<div class="text-muted" style="font-size:.85rem">Keine Buchungen in den nächsten 60 Tagen.</div>'; return; }
+        box.innerHTML = list.map(b => `<div class="arr-row" data-id="${b.id}">
+            <div class="arr-who"><strong>${escapeHtml(b.name || 'Gast')} · ${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)}</strong>
+                <span class="arr-state ${b.active ? 'ok' : ''}">${escapeHtml(b.source || '')}${b.source ? ' · ' : ''}${b.active ? (wifiState && wifiState.config.mode === 'portal' ? 'Code gilt gerade' : 'hat gerade das WLAN') : `ab ${fmtDEfull(b.checkin)}`}</span></div>
+            <div class="arr-actions"><code class="wifi-pw">${escapeHtml(b.password)}</code><button type="button" class="btn-mini" data-wifi="renew">Neu</button>${wifiState && wifiState.config.mode === 'portal' ? '' : `<a class="btn-mini" href="/api/site/wifi/qr?booking=${b.id}" target="_blank" rel="noopener">QR-Code</a>`}</div>
+        </div>`).join('');
+    }
+
+    async function loadWifi() {
+        try {
+            const d = await apiJson('/api/site/wifi');
+            if (d.success) fillWifi(d);
+        } catch (e) { showToast('WLAN konnte nicht geladen werden', 'error'); }
+    }
+
+    function wifiCollect() {
+        return {
+            mode: wifiMode(), show_arrival: $('#wifi-show-arrival').checked, show_tv: $('#wifi-show-tv').checked,
+            switch_time: $('#wifi-switch-time').value, vacant_disable: $('#wifi-vacant-off').checked, notify: $('#wifi-notify').checked,
+            fritz: { url: $('#wifi-url').value, user: $('#wifi-user').value, password: $('#wifi-pass').value, insecure: $('#wifi-insecure').checked, index: Number($('#wifi-index').value) || 0 },
+            portal: {
+                ssid: $('#wifi-portal-ssid').value, wpa: $('#wifi-portal-wpa').value, alert: $('#wifi-portal-alert').checked,
+                max_devices: Number($('#wifi-portal-devices').value) || 5, grace_min: Number($('#wifi-portal-grace').value)
+            }
+        };
+    }
+
+    $$('input[name="wifi-mode"]').forEach(r => r.addEventListener('change', wifiToggleFritz));
+
+    $('#wifi-test').addEventListener('click', async () => {
+        const btn = $('#wifi-test');
+        const out = $('#wifi-test-result');
+        btn.disabled = true;
+        out.textContent = 'Verbinde mit der FRITZ!Box …';
+        try {
+            const d = await apiJson('/api/site/wifi/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fritz: wifiCollect().fritz }) });
+            if (!d.success) { out.innerHTML = `<span class="wifi-dot bad"></span>${escapeHtml(d.error || 'Test fehlgeschlagen')}`; return; }
+            const cur = Number($('#wifi-index').value) || 0;
+            wifiIndexOptions(d.wlans, cur);
+            const guest = d.wlans.find(w => w.index === d.guestIndex);
+            out.innerHTML = `<span class="wifi-dot ok"></span>Verbunden. Gefunden: ${d.wlans.map(w => `${escapeHtml(w.ssid || '?')}${w.enabled ? '' : ' (aus)'}`).join(', ')}. Als Gast-WLAN wird <b>${escapeHtml(guest ? guest.ssid : '?')}</b> genommen${d.wlans.length < 3 ? ' (bitte prüfen, ob das wirklich der Gastzugang ist)' : ''}. Jetzt speichern.`;
+        } catch (e) {
+            out.textContent = 'Test fehlgeschlagen';
+        } finally { btn.disabled = false; }
+    });
+
+    $('#wifi-apply').addEventListener('click', async () => {
+        try {
+            const d = await apiJson('/api/site/wifi/apply', { method: 'POST' });
+            if (d.config) fillWifi(d);
+            showToast(d.success ? (d.changed ? 'FRITZ!Box umgestellt' : 'FRITZ!Box war schon richtig eingestellt') : (d.error || 'Umstellen fehlgeschlagen'), d.success ? 'success' : 'error');
+        } catch (e) { showToast('Umstellen fehlgeschlagen', 'error'); }
+    });
+
+    $('#wifi-upcoming').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-wifi="renew"]');
+        if (!btn) return;
+        const id = btn.closest('.arr-row').dataset.id;
+        const portal = wifiState && wifiState.config.mode === 'portal';
+        if (portal && !confirm('Neuen Zugangscode erzeugen? Der alte gilt dann nicht mehr (schon angemeldete Geräte bleiben online).')) return;
+        btn.disabled = true;
+        try {
+            const d = await apiJson(portal ? `/api/site/wifi/code/${id}` : `/api/site/wifi/renew/${id}`, { method: 'POST' });
+            if (d.config) fillWifi(d);
+            showToast(d.success ? (portal ? `Neuer Code: ${d.code}` : (d.applied ? 'Neues Passwort, FRITZ!Box umgestellt' : 'Neues Passwort erzeugt')) : (d.error || 'Fehlgeschlagen'), d.success ? 'success' : 'error');
+        } catch (err) { showToast('Fehlgeschlagen', 'error'); } finally { btn.disabled = false; }
+    });
+
+    $('#wifi-portal-copy').addEventListener('click', async () => {
+        const text = $('#wifi-portal-cmd').textContent;
+        try { await navigator.clipboard.writeText(text); showToast('Befehl kopiert', 'success'); }
+        catch (e) {
+            const r = document.createRange(); r.selectNodeContents($('#wifi-portal-cmd'));
+            const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+            showToast('Markiert, jetzt mit Strg+C kopieren', 'info');
+        }
+    });
+    async function wifiPortalRenew(what, question) {
+        if (!confirm(question)) return;
+        try {
+            const d = await apiJson('/api/site/wifi/portal/renew', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ what }) });
+            if (d.config) fillWifi(d);
+            showToast(d.success ? (what === 'key' ? 'Neuer Schlüssel. Jetzt den Befehl auf dem Router noch einmal ausführen.' : 'Neuer Gastgeber-Code') : (d.error || 'Fehlgeschlagen'), d.success ? 'success' : 'error');
+        } catch (e) { showToast('Fehlgeschlagen', 'error'); }
+    }
+    $('#wifi-portal-owner-new').addEventListener('click', () => wifiPortalRenew('owner', 'Neuen Gastgeber-Code erzeugen? Der alte gilt dann nicht mehr.'));
+    $('#wifi-portal-key-new').addEventListener('click', () => wifiPortalRenew('key', 'Neuen Schlüssel erzeugen? Bis du den neuen Befehl auf dem Router ausgeführt hast, kommt niemand neu ins WLAN.'));
+    $('#wifi-portal-devices-list').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-wifi="forget"]');
+        if (!btn) return;
+        const id = btn.closest('.arr-row').dataset.dev;
+        try {
+            const d = await apiJson(`/api/site/wifi/portal/device/${id}`, { method: 'DELETE' });
+            if (d.config) fillWifi(d);
+            showToast('Gerät vergessen: zählt nicht mehr zum Limit und muss den Code beim nächsten Mal neu eingeben', 'success');
+        } catch (err) { showToast('Fehlgeschlagen', 'error'); }
+    });
+
+    $('#wifi-save').addEventListener('click', async () => {
+        const btn = $('#wifi-save');
+        btn.disabled = true;
+        try {
+            const d = await apiJson('/api/site/wifi', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wifi: wifiCollect() }) });
+            if (!d.success) return showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+            fillWifi(d);
+            showToast(d.state && d.state.error && d.ready ? 'Gespeichert, aber die FRITZ!Box ist nicht erreichbar' : 'WLAN gespeichert', d.state && d.state.error && d.ready ? 'error' : 'success');
+        } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); } finally { btn.disabled = false; }
     });
 
     async function loadSiteRequests() {

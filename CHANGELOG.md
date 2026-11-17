@@ -5,6 +5,15 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.0] - 2026-11-17
+
+### Neu
+- WLAN für Gäste (enthält PR #45): `wifi.js` mit den Modi „Festes Passwort“, „FRITZ!Box“ (eigenes Passwort pro Buchung über TR-064, `fritzbox.js`) und neu „Anmeldeseite“ (`wifi-portal.js`)
+- Anmeldeseite für einen eigenen Router mit OpenWrt + openNDS (Forward Authentication, `fas_secure_enabled 4`): `/wlan` (Gast-Host) zeigt `guest-site/wlan.html`, Login mit 6-stelligem Code pro Buchung (`bookings.wifi_code`), Gastgeber-Code, Wiedererkennung per MAC (`wifi_portal_devices`), Login über die „Meine Buchung“-Sitzung
+- Der authmon-Daemon des Routers holt die Freischaltungen über `/wlan?auth_get=…` ab (HMAC `authmac` von openNDS 11 wird geprüft, ohne authmac nur mit dem zufälligen Gateway-Namen)
+- `/wlan/setup.sh?k=…`: Einrichtungs-Skript für OpenWrt (opkg und apk): openNDS, dnsmasq-full, eigenes Gäste-Netz `br-gaeste` mit Firewall (kein Zugriff aufs Heimnetz), WLAN, openNDS-Konfiguration mit Walled Garden
+- Admin Webseite → WLAN: Router-Status, Einrichtungs-Befehl, Anleitung, Zugangscodes, angemeldete Geräte; Telegram, wenn der Router 15 Minuten schweigt
+
 ## [1.45.0] / TV-App 1.10 - 2026-11-11
 
 ### Neu
