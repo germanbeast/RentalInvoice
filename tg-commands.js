@@ -359,7 +359,7 @@ async function startInvoiceFromBooking(bot, chatId, bookingId) {
         return send(bot, chatId, '⚠️ Bitte zuerst den Gastnamen eintragen.', keyboard([[btn('👤 Namen eintragen', `nm:${bookingId}`), btn('🏠 Hauptmenü', 'menu')]]));
     }
     const prefill = { gName: b.guest_name, arrival: b.checkin, departure: b.checkout };
-    if (b.guest_address) prefill.gAdresse = b.guest_address;
+    if (b.guest_address) { const clean = tidyAddress(b.guest_address); if (clean) prefill.gAdresse = clean; }
     if (b.guest_email) prefill.gEmail = b.guest_email;
     return startFlow(bot, chatId, 'invoice', '', prefill);
 }
@@ -908,12 +908,18 @@ async function processPhoto(bot, msg) {
     return handleAddressText(bot, chatId, session, caption + text, true);
 }
 
-/** Invoice dialog: a pasted address comes out as a clean block; when parts cannot be placed it stays as typed. */
-function tidyAddress(text) {
+/**
+ * Invoice dialog: only the real address goes into the invoice, never the rest of a pasted text
+ * (Booking.com copies carry the listing title, adults, language …). Recognized street + town -> clean block.
+ * Otherwise a short typed address stays as typed; a longer text that is no address returns '' so the bot asks.
+ */
+function tidyAddress(text, { strict = false } = {}) {
     const typed = String(text || '').split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+    if (!typed) return '';
     const p = addressParser.parseAddress(typed);
-    if (!p.street || !(p.zip || p.city) || p.unknown.length || p.name) return typed;
-    return p.address;
+    if (p.street && (p.zip || p.city)) return p.address;
+    if (strict) return '';
+    return typed.split('\n').length <= 4 ? typed : '';
 }
 
 // ---------------------------------------------------------------------------
@@ -1116,7 +1122,9 @@ function applyInput(session, step, textRaw) {
             if (text.length < 5 || text.length > 300) {
                 return { ok: false, error: '⚠️ Die Adresse wirkt zu kurz. Bitte Straße, PLZ und Ort angeben.' };
             }
-            d.gAdresse = tidyAddress(text);
+            const clean = tidyAddress(text);
+            if (!clean) return { ok: false, error: '⚠️ Darin habe ich keine Anschrift gefunden. Bitte Straße mit Hausnummer, PLZ und Ort schicken.' };
+            d.gAdresse = clean;
             const parsed = addressParser.parseAddress(text);
             if (parsed.email && d.gEmail === undefined) d.gEmail = parsed.email;
             return { ok: true };
@@ -1205,7 +1213,15 @@ async function startFlow(bot, chatId, flowName, initialText, prefill) {
         departure: parsed.departure || ''
     };
     if (flowName === 'invoice' && parsed.gEmail) data.gEmail = parsed.gEmail;
-    if (flowName === 'invoice' && data.gAdresse) data.gAdresse = tidyAddress(data.gAdresse);
+    if (flowName === 'invoice' && initialText) {
+        // Address from the whole text (labels like "Adresse" / "Land/Region" are understood), dates are already out
+        const m = botLogic.parseDates(initialText.replace(/\n/g, ' ')).matched;
+        const flatIdx = m ? initialText.replace(/\n/g, ' ').indexOf(m) : -1;
+        const work = flatIdx >= 0 ? initialText.slice(0, flatIdx) + '\n' + initialText.slice(flatIdx + m.length) : initialText;
+        const addr = addressParser.parseAddress(work);
+        data.gAdresse = addr.street && (addr.zip || addr.city) ? addr.address : tidyAddress(data.gAdresse, { strict: data.gAdresse.split('\n').length > 4 });
+        if (!data.gEmail && addr.email) data.gEmail = addr.email;
+    }
     if (prefill) Object.assign(data, prefill);
 
     const session = { flow: flowName, step: null, data, updatedAt: Date.now(), lastMsgId: null, sequential: false, editing: false, busy: false };

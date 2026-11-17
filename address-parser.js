@@ -105,12 +105,12 @@ const LABELS = [
     ['zipCity', /^(plz \/ ort|plz\/ort|plz und ort|plz, ort|plz ort|zip \/ city|postal code \/ city|postcode \/ city)$/],
     ['city', /^(ort|stadt|wohnort|city|town|city \/ town|plaats|woonplaats|ville|miasto|miejscowość|gemeinde)$/],
     ['state', /^(bundesland|state|province|provinz|region|county|kanton)$/],
-    ['country', /^(land|country|staat|country\/region|country \/ region|wohnland|country of residence|pays|kraj)$/],
+    ['country', /^(land|country|staat|country\/region|country \/ region|land\/region|land \/ region|herkunftsland|wohnland|country of residence|pays|kraj)$/],
     ['phone', /^(telefon|telefonnummer|tel|telephone|phone|phone number|mobil|mobile|mobilnummer|mobile phone|handy|handynummer|cell|cellphone|telefoonnummer|telefoon|mobiel|telefon komórkowy|téléphone|whatsapp)$/],
     ['email', /^(e-mail|email|e-mail-adresse|email address|e-mail address|mail|e-mailadres)$/]
 ];
 // Beschriftungen, deren Wert keine Anschrift ist (z. B. aus dem Booking.com-Extranet mitkopiert): Zeile weg
-const IGNORE_LABEL = /^(buchungsnummer|booking number|reservation number|reservierungsnummer|bestätigungsnummer|confirmation( code| number)?|buchungscode|pin( code)?|anreise|abreise|check-?in|check-?out|ankunft|arrival|departure|aufenthalt|dauer|nächte|naechte|nights|preis|gesamtpreis|price|total|total price|betrag|provision|commission|zahlung|payment|personen|gäste|gaeste|guests|erwachsene|adults|kinder|children|zimmer|room|unit|wohneinheit|sprache|language|nationalität|nationality|staatsangehörigkeit|geburtsdatum|date of birth|ankunftszeit|arrival time|voraussichtliche ankunft|nachricht|message|anmerkung|anmerkungen|notiz|notes|remarks|bemerkung|bemerkungen|wünsche|special requests|status|quelle|source|kanal|channel|gebucht am|booked on|buchungsdatum|booking date|genius)$/;
+const IGNORE_LABEL = /^(erwachsener?|erwachsene|adult|kind|kinder|child|babys?|haustiere?|pets?|bevorzugte sprache|preferred language|sprachen?|unterkunft|property|objekt|zimmertyp|room type|wohnungstyp|unit type|ankunftszeit|estimated arrival time|geschätzte ankunftszeit|reiseanlass|reason for travel|purpose of trip|geschäftsreise|business trip|stornierungsbedingungen|cancellation policy|bezahlung|payment method|zahlungsart|kreditkarte|credit card|genius-level|buchung über|booked via|buchungsdetails|reservation details|reservierungsdetails|gastdaten|guest details|kontaktdaten|contact details|buchungsnummer|booking number|reservation number|reservierungsnummer|bestätigungsnummer|confirmation( code| number)?|buchungscode|pin( code)?|anreise|abreise|check-?in|check-?out|ankunft|arrival|departure|aufenthalt|dauer|nächte|naechte|nights|preis|gesamtpreis|price|total|total price|betrag|provision|commission|zahlung|payment|personen|gäste|gaeste|guests|erwachsene|adults|kinder|children|zimmer|room|unit|wohneinheit|sprache|language|nationalität|nationality|staatsangehörigkeit|geburtsdatum|date of birth|ankunftszeit|arrival time|voraussichtliche ankunft|nachricht|message|anmerkung|anmerkungen|notiz|notes|remarks|bemerkung|bemerkungen|wünsche|special requests|status|quelle|source|kanal|channel|gebucht am|booked on|buchungsdatum|booking date|genius)$/;
 
 const SALUTATION = /^(herr|frau|hr\.?|fr\.?|mr\.?|mrs\.?|ms\.?|miss|mx\.?|monsieur|madame|mme\.?|m\.|mevrouw|mevr\.?|meneer|dhr\.?|de heer|pan|pani|signor|signora|sig\.?|sig\.ra|señor|señora|sr\.?|sra\.?|herrn)\s+/i;
 const COMPANY = /\b(gmbh|ag|ug|kg|ohg|gbr|e\.\s?k\.?|e\.\s?v\.?|mbh|se|ltd\.?|limited|llc|inc\.?|corp\.?|b\.\s?v\.?|bv|n\.\s?v\.?|nv|s\.a\.?|sarl|s\.a\.r\.l\.?|s\.r\.l\.?|srl|spa|s\.p\.a\.?|sp\.? z o\.?o\.?|s\.r\.o\.?|a\/s|aps|oy|ab|plc|co\.? kg|holding|group|gruppe|firma|stiftung|verein|praxis|kanzlei|hotel|consulting|services|solutions|software|systems|bank|versicherung|universität|university|institut|institute|agentur|agency|werk|werke|handel|bau)\b/i;
@@ -459,7 +459,7 @@ function parseAddress(text) {
         if (kinds[i]) return;
         const beforeAddress = (streetIdx < 0 || i < streetIdx) && (zipIdx < 0 || i < zipIdx);
         if (beforeAddress && !r.name && looksLikeName(t) && !COMPANY.test(t)) { r.name = cleanName(t); kinds[i] = 'name'; return; }
-        if (beforeAddress && !r.company && (COMPANY.test(t) || (r.name && kinds[i - 1] === 'name' && !/\d/.test(t) && /[A-Za-zÀ-ÿ]{3}/.test(t)))) { r.company = t; kinds[i] = 'company'; return; }
+        if (beforeAddress && !r.company && COMPANY.test(t) && t.split(' ').length <= 6 && !/[.!?]$/.test(t)) { r.company = t; kinds[i] = 'company'; return; }
         if (!r.name && looksLikeName(t) && !COMPANY.test(t) && streetIdx < 0 && zipIdx < 0) { r.name = cleanName(t); kinds[i] = 'name'; return; }
         // Between street and town: address addition ("Hinterhaus", "Apt 4")
         if (streetIdx >= 0 && i > streetIdx && (zipIdx < 0 || i < zipIdx)) { extras.push(t); kinds[i] = 'extra'; return; }
@@ -497,6 +497,7 @@ function parseAddress(text) {
         if (c) { r.country = c.name; r.countryCode = c.code; }
     }
 
+    if ((r.countryCode === 'SK' || r.countryCode === 'CZ') && /^\d{5}$/.test(r.zip)) r.zip = `${r.zip.slice(0, 3)} ${r.zip.slice(3)}`;
     r.address = formatAddress(r);
     r.found = ['name', 'street', 'zip', 'city', 'phone', 'email', 'company'].filter(k => r[k]).length;
     delete r._numberFirst;

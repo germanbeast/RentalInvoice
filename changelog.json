@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.48.0",
+    "currentVersion": "1.48.1",
     "releases": [
+        {
+            "version": "1.48.1",
+            "date": "2026-11-17",
+            "title": "Rechnung: nur die echte Anschrift übernehmen",
+            "features": [],
+            "fixes": [
+                "Wird ein ganzer Booking.com-Text in den Rechnungsdialog kopiert, landet nur noch die Anschrift auf der Rechnung, nicht mehr Wohnungsname, Erwachsene, Sprache usw.",
+                "„Land/Region“, „Erwachsener“, „Bevorzugte Sprache“ und weitere Booking.com-Beschriftungen werden erkannt bzw. ausgeblendet",
+                "Eine bereits gespeicherte, unordentliche Gast-Adresse wird beim Erstellen der Rechnung bereinigt",
+                "Slowakische und tschechische Postleitzahlen werden als „034 01“ geschrieben"
+            ]
+        },
         {
             "version": "1.48.0",
             "date": "2026-11-17",
