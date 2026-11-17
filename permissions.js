@@ -197,7 +197,7 @@ function redactBooking(row, perms) {
 // Telegram/WhatsApp bot commands -> required right
 const BOT_COMMANDS = {
     status: ['calendar', 'view'], anreisen: ['calendar', 'view'], sync: ['calendar', 'edit'],
-    namen: ['bookings', 'edit'],
+    namen: ['bookings', 'edit'], adresse: ['bookings', 'edit'],
     offen: ['invoices', 'view'], rechnung: ['invoices', 'edit'],
     codes: ['door', 'view'], pin: ['door', 'edit'], lock: ['door', 'edit'], lockstatus: ['door', 'view'],
     nachricht: ['messages', 'view'], guestlink: ['messages', 'edit'],

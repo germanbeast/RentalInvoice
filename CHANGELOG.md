@@ -5,6 +5,14 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.0] - 2026-11-17
+
+### Neu
+- `address-parser.js`: erkennt in unformatiertem Text Name, Firma, Straße/Hausnummer, Zusatz, PLZ, Ort, Bundesstaat, Land, Telefon, E-Mail; mit/ohne Beschriftungen (DE/EN/NL/PL), eine Zeile mit Kommas oder ganz ohne Trenner, Formate DE/AT/CH/NL/BE/PL/CZ/GB/US/FR u. a.
+- Land aus Text, PLZ-Präfix (D-, CH-), PLZ-Format, bekannten Städten oder Telefonvorwahl; Ausgabe im App-Format (Straße Nr. / PLZ Ort / Land außer Deutschland)
+- Telegram: eingefügte Anschrift ohne Datum startet „Anschrift einfügen“ (mit Datum bleibt es der Rechnungsdialog), `/adresse`, Menü-Knopf; Buchungsauswahl mit Namensabgleich, Zusammenfassung, Speichern in `guests.address/phone/email`, bei Platzhalter-Gast über `applyGuestName`
+- Recht `adresse` = Buchungen & Gäste bearbeiten
+
 ## [1.46.0] - 2026-11-17
 
 ### Neu
