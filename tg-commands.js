@@ -1,8 +1,11 @@
 const db = require('./db');
 const botLogic = require('./bot-logic');
 const permissions = require('./permissions');
-const guestData = require('./guest-data');
-const guestLang = require('./guest-lang');
+const LANG_LABEL = { de: '🇩🇪 Deutsch', en: '🇬🇧 Englisch', nl: '🇳🇱 Niederländisch', pl: '🇵🇱 Polnisch' };
+const addressParser = require('./address-parser');
+const ocr = require('./screenshot-ocr');
+const os = require('os');
+const path = require('path');
 
 /** Rights of a Telegram chat: a linked user account gets its own rights; an ID that was only approved
  *  under Einstellungen → Telegram (no user linked) keeps full access as before. */
@@ -12,13 +15,14 @@ function botPerms(chatId) {
 }
 const DENIED = '⛔ <b>Keine Berechtigung</b>\nDein Benutzer darf das nicht. Rechte vergibt der Inhaber in der Benutzerverwaltung.';
 const CMD_RIGHT = { status: 'offen', offen: 'offen', sync: 'sync', namen: 'namen', codes: 'codes', 'türcodes': 'codes', tuercodes: 'codes',
-    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin', gast: 'namen', gastdaten: 'namen', adresse: 'namen', anschrift: 'namen' };
+    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin', adresse: 'adresse', anschrift: 'adresse' };
 function callbackRight(data) {
     if (data === 'open') return 'offen';
     if (data === 'arrivals') return 'anreisen';
     if (data === 'codes') return 'codes';
     if (data === 'sync' || data.startsWith('ovl:')) return 'sync';
-    if (data === 'names' || data.startsWith('nm:') || data.startsWith('gd:')) return 'namen';
+    if (data === 'names' || data.startsWith('nm:')) return 'namen';
+    if (data === 'adr' || data.startsWith('adr:') || data.startsWith('ab:') || ['aok', 'aname', 'aback'].includes(data)) return 'adresse';
     if (data === 'lock:status') return 'lockstatus';
     if (data.startsWith('lock:')) return 'lock';
     if (data === 'gm' || data.startsWith('gm:')) return 'nachricht';
@@ -103,7 +107,7 @@ function mainMenuKeyboard() {
         [btn('🔐 Türcodes', 'codes'), btn('📅 Anreisen', 'arrivals')],
         [btn('✉️ Gästenachricht', 'gm'), btn('📋 Offene Rechnungen', 'open')],
         [btn('🔄 Kalender abfragen', 'sync'), btn('🚪 Schloss', 'lock:status')],
-        [btn('❓ Hilfe', 'help')]
+        [btn('📇 Anschrift einfügen', 'adr'), btn('❓ Hilfe', 'help')]
     ]);
 }
 
@@ -180,7 +184,7 @@ async function showHelp(bot, chatId) {
         '• <code>/status</code> – offene Rechnungen\n' +
         '• <code>/codes</code> – Türcodes live aus Nuki anzeigen\n' +
         '• <code>/namen</code> – Gastnamen zu Buchungen nachtragen\n' +
-        '• <code>/gast</code> – Gastdaten (Anschrift, Telefon, E-Mail) zu einer Buchung speichern\n' +
+        '• <code>/adresse</code> – Anschrift eines Gastes einfügen (Format egal)\n' +
         '• <code>/sync</code> – Booking.com &amp; Airbnb jetzt abfragen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
         '• <code>/nachricht</code> – fertige Nachricht für den Gast (zum Kopieren)\n' +
@@ -193,10 +197,9 @@ async function showHelp(bot, chatId) {
         'Du kannst gleich alles in eine Nachricht schreiben, z.B.\n' +
         '<code>Rechnung Max Mustermann\nMusterstr. 1\n12345 Musterstadt\n15.03. - 20.03.2026</code>\n' +
         'Der Bot übernimmt, was er erkennt, und fragt nur nach dem Rest.\n\n' +
-        '<b>Gastdaten einfach einfügen</b>\n' +
-        'Kopier Name, Anschrift, Telefon und E-Mail des Gastes egal wie formatiert in den Chat, z.B.\n' +
-        '<code>Jan de Vries, Kerkstraat 12, 1012 AB Amsterdam, +31 6 12345678</code>\n' +
-        'Der Bot ordnet sie der passenden Buchung zu und füllt damit Rechnung, Meldeschein und die Sprache der Gäste-App aus.\n\n' +
+        '<b>Anschrift einfach reinkopieren</b>\n' +
+        'Eine Anschrift ohne Datum (z. B. aus Booking.com kopiert) erkennt der Bot von selbst: Name, Straße, PLZ, Ort, Land, Telefon, E-Mail. ' +
+        'Du wählst nur noch die Buchung und bestätigst. Das klappt auch mit einem 📷 Screenshot, der nach dem Speichern aus dem Chat gelöscht wird.\n\n' +
         '<b>Jederzeit möglich</b>\n' +
         '• ⬅️ <b>Zurück</b> (oder „zurück“) – einen Schritt zurück\n' +
         '• ❌ <b>Abbrechen</b> (oder „abbrechen“) – Vorgang beenden\n' +
@@ -321,7 +324,7 @@ async function executeGuestName(bot, chatId, session) {
                 : `⚠️ Der Türcode konnte in Nuki nicht umbenannt werden: ${esc(short(r.nukiError, 120))}\n(Der Code selbst funktioniert weiterhin.)\n`;
         }
         const left = (() => { try { return bookingsNeedingName().length; } catch (e) { return 0; } })();
-        const rows = [[btn('🧾 Rechnung erstellen', `inv:${session.bookingId}`)]];
+        const rows = [[btn('🧾 Rechnung erstellen', `inv:${session.bookingId}`), btn('📇 Anschrift', `adr:${session.bookingId}`)]];
         if (left > 0) rows.push([btn(`👤 Weitere Namen offen (${left})`, 'names')]);
         rows.push([btn('🔐 Türcodes', 'codes'), btn('🏠 Hauptmenü', 'menu')]);
         await send(bot, chatId, text, keyboard(rows));
@@ -348,143 +351,6 @@ async function showNamesOpen(bot, chatId) {
     kb.push([btn('🏠 Hauptmenü', 'menu')]);
     const more = rows.length > shown.length ? `\n… und ${rows.length - shown.length} weitere` : '';
     return send(bot, chatId, `<b>👤 Buchungen ohne Gastnamen (${rows.length})</b>\nWähle eine Buchung:${more}`, keyboard(kb));
-}
-
-// ---------------------------------------------------------------------------
-// Gastdaten aus unformatiertem Text (Anschrift, Telefon, E-Mail) zu einer Buchung speichern
-// ---------------------------------------------------------------------------
-const GD_TTL_MS = 30 * 60 * 1000;
-const guestDataDrafts = new Map(); // chatId -> { p, text, bookingId, at }
-const LANG_LABEL = { de: '🇩🇪 Deutsch', en: '🇬🇧 Englisch', nl: '🇳🇱 Niederländisch', pl: '🇵🇱 Polnisch' };
-
-function guestDataCandidates() {
-    return db.getDb().prepare(`
-        SELECT b.id, b.summary, b.checkin, b.checkout, b.source, b.uid, g.name AS guest_name
-        FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
-        WHERE b.checkout >= date('now', '-14 days') AND b.checkin IS NOT NULL
-        ORDER BY b.checkin ASC LIMIT 40
-    `).all();
-}
-
-/** Booking the text belongs to: same dates, else the same name, else the only booking without a name. */
-function matchBooking(p, rows) {
-    if (p.arrival && p.departure) {
-        const hit = rows.find(r => r.checkin === p.arrival && r.checkout === p.departure) || rows.find(r => r.checkin === p.arrival);
-        if (hit) return hit;
-    }
-    const n = String(p.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    if (n) {
-        const parts = n.split(' ');
-        const hit = rows.find(r => {
-            const g = String(r.guest_name || '').toLowerCase();
-            return g && !botLogic.isPlaceholderGuestName(r.guest_name) && (g === n || parts.every(w => w.length > 1 && g.includes(w)));
-        });
-        if (hit) return hit;
-    }
-    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
-    const open = rows.filter(r => r.checkout >= today && botLogic.isPlaceholderGuestName(r.guest_name || guessNameFromSummary(r.summary)));
-    return open.length === 1 ? open[0] : null;
-}
-
-const bookingLabel = r => {
-    const real = r.guest_name || guessNameFromSummary(r.summary);
-    const name = botLogic.isPlaceholderGuestName(real) ? 'Name fehlt' : short(real, 20);
-    return `${fmtDate(r.checkin).slice(0, 6)}–${fmtDate(r.checkout).slice(0, 6)} · ${name}`;
-};
-
-async function startGuestData(bot, chatId, text) {
-    const active = sessions.get(chatId);
-    if (active) await cancelSession(bot, chatId, active, true);
-    const p = guestData.parseGuestText(text);
-    if (!guestData.hasGuestData(p) && !p.name) {
-        return send(bot, chatId, '🤔 Darin habe ich keine Anschrift, Telefonnummer oder E-Mail gefunden.', menuOnlyKeyboard());
-    }
-    let rows = [];
-    try { rows = guestDataCandidates(); } catch (e) { console.error('[TG] Gastdaten Buchungen:', e.message); }
-    const hit = matchBooking(p, rows);
-    guestDataDrafts.set(chatId, { p, text, bookingId: hit ? hit.id : null, at: Date.now() });
-    return hit ? showGuestDataConfirm(bot, chatId) : showGuestDataPick(bot, chatId);
-}
-
-function guestDataDraft(chatId) {
-    const d = guestDataDrafts.get(chatId);
-    if (!d || Date.now() - d.at > GD_TTL_MS) { guestDataDrafts.delete(chatId); return null; }
-    return d;
-}
-
-async function showGuestDataPick(bot, chatId, intro) {
-    const d = guestDataDraft(chatId);
-    if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
-    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
-    let rows = [];
-    try { rows = guestDataCandidates().filter(r => r.checkout >= today).slice(0, 8); } catch (e) { rows = []; }
-    if (!rows.length) return send(bot, chatId, '📅 Keine aktuellen oder kommenden Buchungen, zu denen ich die Gastdaten speichern kann.', keyboard([[btn('🧾 Rechnung daraus erstellen', 'gd:inv'), btn('🏠 Hauptmenü', 'menu')]]));
-    const kb = rows.map(r => [btn(`📅 ${bookingLabel(r)}`, `gd:b:${r.id}`)]);
-    kb.push([btn('🧾 Stattdessen Rechnung', 'gd:inv'), btn('❌ Abbrechen', 'gd:x')]);
-    return send(bot, chatId, `${intro ? intro + '\n\n' : ''}${guestDataSummary(d.p)}\n\n<b>Zu welcher Buchung gehört der Gast?</b>`, keyboard(kb));
-}
-
-function guestDataSummary(p, booking) {
-    const lines = ['👤 <b>Gastdaten erkannt</b>'];
-    lines.push(`Name: ${p.name ? `<b>${esc(p.name)}</b>` : '<i>nicht erkannt</i>'}`);
-    const addr = guestData.addressText(p);
-    if (addr) lines.push(`Anschrift: ${esc(addr).replace(/\n/g, ', ')}`);
-    if (p.phone) lines.push(`Telefon: ${esc(p.phone)}`);
-    if (p.email) lines.push(`E-Mail: ${esc(p.email)}`);
-    if (p.rest && p.rest.length) lines.push(`<i>Nicht zugeordnet: ${esc(short(p.rest.join(', '), 80))}</i>`);
-    if (booking) {
-        const lang = guestLang.langOfCountry(p.country) || guestLang.langOfPhone(p.phone) || guestLang.langOfEmail(p.email);
-        lines.push('', `📅 Buchung: <b>${esc(bookingLabel(booking))}</b>${booking.source ? ` (${esc(booking.source)})` : ''}`);
-        if (lang) lines.push(`🌐 Gäste-App &amp; TV: ${LANG_LABEL[lang]}`);
-    }
-    return lines.join('\n');
-}
-
-async function showGuestDataConfirm(bot, chatId) {
-    const d = guestDataDraft(chatId);
-    if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
-    const b = getBookingRow(d.bookingId);
-    if (!b) return showGuestDataPick(bot, chatId);
-    const has = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name);
-    let note = '';
-    if (!d.p.name && !has) note = '\n\n⚠️ Ohne Namen kann ich nichts speichern. Schick die Daten bitte mit dem Namen des Gastes.';
-    else if (d.p.name && has && b.guest_name.trim().toLowerCase() !== d.p.name.trim().toLowerCase()) note = `\n\n✏️ Bisheriger Name „${esc(b.guest_name)}“ wird ersetzt.`;
-    const rows = [];
-    if (d.p.name || has) rows.push([btn('✅ Speichern', 'gd:ok')]);
-    rows.push([btn('📅 Andere Buchung', 'gd:pick'), btn('🧾 Stattdessen Rechnung', 'gd:inv')]);
-    rows.push([btn('❌ Abbrechen', 'gd:x')]);
-    return send(bot, chatId, guestDataSummary(d.p, { ...b, source: b.source || (/^airbnb/i.test(b.summary || '') ? 'Airbnb' : String(b.uid || '').startsWith('manual') ? 'Direkt' : 'Booking.com') }) + note, keyboard(rows));
-}
-
-async function saveGuestData(bot, chatId) {
-    const d = guestDataDraft(chatId);
-    if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
-    const b = getBookingRow(d.bookingId);
-    if (!b) return showGuestDataPick(bot, chatId, '⚠️ Diese Buchung gibt es nicht mehr.');
-    const p = d.p;
-    let r = null;
-    const current = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
-    if (p.name && p.name.trim().toLowerCase() !== current.trim().toLowerCase()) r = await botLogic.applyGuestName(b.id, p.name);
-    else if (!current) return send(bot, chatId, '⚠️ Ohne Namen kann ich nichts speichern.', menuOnlyKeyboard());
-    const fresh = db.getDb().prepare('SELECT guest_id FROM bookings WHERE id = ?').get(b.id);
-    const g = fresh && fresh.guest_id ? db.getGuestById(fresh.guest_id) : null;
-    if (!g) return send(bot, chatId, '❌ Gast konnte nicht gespeichert werden.', menuOnlyKeyboard());
-    const addr = guestData.addressText(p);
-    db.updateGuest(g.id, { ...g, address: addr || g.address, phone: p.phone || g.phone, email: p.email || g.email });
-    guestDataDrafts.delete(chatId);
-
-    const lang = guestLang.forBooking({ id: b.id });
-    let text = `✅ <b>Gastdaten gespeichert:</b> ${esc(p.name || current)}\n📅 ${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}\n`;
-    if (addr) text += `🏠 ${esc(addr).replace(/\n/g, ', ')}\n`;
-    if (p.phone) text += `📞 ${esc(p.phone)}\n`;
-    if (p.email) text += `✉️ ${esc(p.email)}\n`;
-    if (lang.lang) text += `🌐 ${LANG_LABEL[lang.lang]}${lang.set ? ' (im Admin festgelegt)' : ''}\n`;
-    if (r && r.booking && r.booking.nuki_auth_id) text += r.nukiRenamed ? '🔑 Türcode im Nuki-Schloss umbenannt.\n' : `⚠️ Türcode nicht umbenannt: ${esc(short(r.nukiError || '', 100))}\n`;
-    text += '\nRechnung und Meldeschein sind damit schon ausgefüllt.';
-    return send(bot, chatId, text, keyboard([
-        [btn('🧾 Rechnung erstellen', `inv:${b.id}`), btn('✉️ Gästenachricht', `gm:${b.id}`)],
-        [btn('🏠 Hauptmenü', 'menu')]
-    ]));
 }
 
 async function startInvoiceFromBooking(bot, chatId, bookingId) {
@@ -710,6 +576,347 @@ async function blockGuestLink(bot, chatId, bookingId) {
 }
 
 // ---------------------------------------------------------------------------
+// Anschrift einfügen: unformatierten Text erkennen und beim Gast einer Buchung speichern
+// ---------------------------------------------------------------------------
+const ADDRESS_PAGE = 6;
+
+function berlinToday() {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+}
+
+function addDays(ymd, n) {
+    const d = new Date(`${ymd}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+}
+
+/** Lower-case words of a name without accents, for comparing "Müller" with "MUELLER" or "Muller". */
+function nameWords(name) {
+    return String(name || '').toLowerCase()
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .split(/[^a-z]+/).filter(w => w.length >= 2 && !['von', 'van', 'der', 'den', 'de', 'zu', 'familie', 'family', 'herr', 'frau'].includes(w));
+}
+
+/** 2 = same name, 1 = same last name (or one word in common), 0 = no match */
+function nameScore(a, b) {
+    const x = nameWords(a), y = nameWords(b);
+    if (!x.length || !y.length) return 0;
+    if (x.join(' ') === y.join(' ')) return 2;
+    if (x[x.length - 1] === y[y.length - 1]) return 1;
+    return x.some(w => w.length >= 4 && y.includes(w)) ? 1 : 0;
+}
+
+/**
+ * Bookings to choose from: the last 60 days up to everything ahead. Order: name matches,
+ * then the current stay, then the next arrivals, then the most recent past stays.
+ */
+function addressCandidates(parsedName) {
+    const today = berlinToday();
+    const rows = db.getDb().prepare(`
+        SELECT b.id, b.summary, b.checkin, b.checkout, b.guest_id, g.name AS guest_name, g.address AS guest_address
+        FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE b.checkout >= ?
+        ORDER BY b.checkin ASC
+    `).all(addDays(today, -60));
+    const rank = r => {
+        const real = r.guest_name && !botLogic.isPlaceholderGuestName(r.guest_name) ? r.guest_name : '';
+        const score = parsedName && real ? nameScore(parsedName, real) : 0;
+        const current = r.checkin <= today && r.checkout >= today;
+        const upcoming = r.checkin > today;
+        return { r, score, group: score ? 0 : current ? 1 : upcoming ? 2 : 3 };
+    };
+    return rows.map(rank).sort((a, b) => {
+        if (a.group !== b.group) return a.group - b.group;
+        if (a.score !== b.score) return b.score - a.score;
+        if (a.group === 3) return b.r.checkout.localeCompare(a.r.checkout); // past: newest first
+        return a.r.checkin.localeCompare(b.r.checkin);
+    }).map(x => ({ ...x.r, match: x.score }));
+}
+
+function bookingLabel(b) {
+    const name = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '❓ ohne Namen';
+    return `${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)} · ${name}`;
+}
+
+function addressFieldsText(p) {
+    const line = (icon, label, value) => value ? `${icon} <b>${label}:</b> ${esc(value)}\n` : '';
+    let t = '';
+    t += line('👤', 'Name', p.name);
+    t += line('🏢', 'Firma', p.company);
+    t += line('🏠', 'Straße', p.street);
+    t += line('🔢', 'Hausnummer', p.houseNumber);
+    t += line('➕', 'Zusatz', p.extra);
+    t += line('📮', 'PLZ', p.zip);
+    t += line('🏙', 'Ort', p.city);
+    if (p.state) t += line('🗺', 'Bundesstaat', p.state);
+    t += line('🌍', 'Land', p.country);
+    t += line('📞', 'Telefon', p.phone);
+    t += line('✉️', 'E-Mail', p.email);
+    if (p.unknown && p.unknown.length) t += `❔ <b>Nicht zugeordnet:</b> ${esc(p.unknown.join(' · '))}\n`;
+    return t || '—\n';
+}
+
+/** True when a message without command should go to "Anschrift einfügen" instead of the invoice dialog. */
+function isAddressText(body) {
+    if (/^\/?(rechnung|pin)\b/i.test(body)) return false;
+    const dates = botLogic.parseDates(body.replace(/\n/g, ' '));
+    if (dates.matched) return false;
+    if (addressParser.looksLikeAddress(body)) return true;
+    // Contact data only (Booking.com shows no street): name + phone or e-mail in several lines
+    const p = addressParser.parseAddress(body);
+    return body.includes('\n') && Boolean(p.name && (p.phone || p.email) && !p.unknown.length);
+}
+
+async function startAddressFlow(bot, chatId, bookingId, silent) {
+    const old = sessions.get(chatId);
+    if (old && old.lastMsgId) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: old.lastMsgId }).catch(() => { });
+    const session = { flow: 'address', step: 'await', bookingId: bookingId || null, fixedBooking: !!bookingId, parsed: null, raw: '', page: 0, replaceName: false, data: {}, updatedAt: Date.now(), lastMsgId: null, busy: false };
+    sessions.set(chatId, session);
+    if (silent) return session;
+    let intro = '';
+    if (bookingId) {
+        const b = getBookingRow(bookingId);
+        if (!b) { sessions.delete(chatId); return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard()); }
+        intro = `Buchung: <b>${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}</b>${b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? ` · ${esc(b.guest_name)}` : ''}\n\n`;
+    }
+    return send(bot, chatId,
+        '📇 <b>Anschrift einfügen</b>\n\n' + intro +
+        'Schick mir die Anschrift einfach so, wie du sie hast, z. B. aus Booking.com kopiert. Format egal, eine oder mehrere Zeilen:\n' +
+        '<code>Max Mustermann\nMusterstr. 12a\n12345 Musterstadt\n+49 170 1234567\nmax@example.de</code>\n\n' +
+        'Oder schick einfach einen 📷 <b>Screenshot</b> (z. B. aus der Booking.com-App). Er wird nach dem Speichern wieder gelöscht.\n\n' +
+        'Ich erkenne Name, Straße, Hausnummer, PLZ, Ort, Land, Telefon und E-Mail.',
+        keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
+}
+
+/** Parses the text, then asks for the booking (or goes straight to the summary when it is known). */
+async function handleAddressText(bot, chatId, session, body, fromScreenshot) {
+    touch(session);
+    const p = addressParser.parseAddress(body);
+    if (fromScreenshot) {
+        preferKnownGuestName(p, body);
+        p.unknown = []; // headings and buttons of the app, not worth showing
+    }
+    if (!p.street && !p.zip && !p.city && !p.phone && !p.email) {
+        return send(bot, chatId,
+            fromScreenshot
+                ? '🤔 Auf dem Screenshot habe ich keine Anschrift gefunden.\nAm besten so zuschneiden, dass Name und Adresse gut lesbar sind, oder die Anschrift als Text schicken.'
+                : '🤔 Darin habe ich keine Anschrift gefunden.\nBitte mindestens Straße oder PLZ und Ort mitschicken, gern mehrzeilig.',
+            keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
+    }
+    if (!fromScreenshot) session.photoMsgId = null;
+    session.parsed = p;
+    session.raw = body;
+    session.page = 0;
+    session.replaceName = false;
+    if (session.bookingId) return showAddressConfirm(bot, chatId, session);
+    return showAddressBookings(bot, chatId, session);
+}
+
+async function showAddressBookings(bot, chatId, session) {
+    session.step = 'pick';
+    touch(session);
+    const p = session.parsed;
+    let list = [];
+    try { list = addressCandidates(p.name); } catch (e) { console.error('[TG] Buchungen für Anschrift:', e.message); }
+    const shown = list.slice(session.page * ADDRESS_PAGE, (session.page + 1) * ADDRESS_PAGE);
+    let text = '📇 <b>Anschrift erkannt</b>\n\n' + addressFieldsText(p) + '\n';
+    if (!list.length) {
+        text += '⚠️ Es gibt keine aktuelle oder kürzliche Buchung, zu der ich das speichern kann.';
+        return send(bot, chatId, text, keyboard([[btn('🏠 Hauptmenü', 'menu')]]), session);
+    }
+    text += '<b>Zu welcher Buchung gehört das?</b>';
+    if (session.page === 0 && list[0].match) text += '\n⭐ = Name passt';
+    const rows = shown.map(b => [btn(`${b.match ? '⭐ ' : ''}${short(bookingLabel(b), 40)}`, `ab:${b.id}`)]);
+    const nav = [];
+    if (session.page > 0) nav.push(btn('⬅️ Vorherige', 'ab:prev'));
+    if (list.length > (session.page + 1) * ADDRESS_PAGE) nav.push(btn('Weitere ➡️', 'ab:next'));
+    if (nav.length) rows.push(nav);
+    rows.push([btn('🧾 Stattdessen Rechnung erstellen', 'ab:inv')]);
+    rows.push([btn('❌ Abbrechen', 'cancel')]);
+    return send(bot, chatId, text, keyboard(rows), session);
+}
+
+async function showAddressConfirm(bot, chatId, session) {
+    session.step = 'confirm';
+    touch(session);
+    const b = getBookingRow(session.bookingId);
+    if (!b) {
+        session.bookingId = null;
+        session.fixedBooking = false;
+        return showAddressBookings(bot, chatId, session);
+    }
+    const p = session.parsed;
+    const current = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
+    const guest = b.guest_id ? db.getGuestById(b.guest_id) : null;
+    const differs = current && p.name && nameScore(current, p.name) < 2;
+
+    let text = `📇 <b>Anschrift speichern</b>\n\n📅 Buchung <b>${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}</b>\n\n`;
+    text += addressFieldsText(p);
+    text += '\n<b>So steht es dann beim Gast:</b>\n';
+    const name = (!current || (differs && session.replaceName)) ? p.name : current;
+    text += `<code>${esc([name || '❓', p.address].filter(Boolean).join('\n'))}</code>\n`;
+    if (p.phone) text += `📞 ${esc(p.phone)}\n`;
+    if (p.email) text += `✉️ ${esc(p.email)}\n`;
+
+    const notes = [];
+    if (!current && !p.name) notes.push('⚠️ <b>Kein Name erkannt</b> und die Buchung hat noch keinen. Bitte die Anschrift mit dem Namen in der ersten Zeile erneut schicken.');
+    if (differs) notes.push(session.replaceName
+        ? `👤 Der Gastname wird von „${esc(current)}“ auf „${esc(p.name)}“ geändert (auch im Türcode).`
+        : `👤 In der Buchung steht „${esc(current)}“. Der Name bleibt so, außer du tippst auf „Name übernehmen“.`);
+    if (guest && guest.address && p.address && guest.address.trim() !== p.address.trim()) {
+        notes.push(`ℹ️ Bisherige Adresse wird ersetzt: ${esc(guest.address.replace(/\n/g, ', '))}`);
+    }
+    if (!current && p.name) notes.push(`👤 Die Buchung bekommt den Namen „${esc(p.name)}“ (auch im Türcode).`);
+    if (notes.length) text += '\n' + notes.join('\n');
+
+    const rows = [];
+    if (current || p.name) rows.push([btn('✅ Speichern', 'aok')]);
+    if (differs) rows.push([btn(session.replaceName ? `↩️ Name „${short(current, 18)}“ behalten` : `👤 Name „${short(p.name, 18)}“ übernehmen`, 'aname')]);
+    rows.push(session.fixedBooking ? [btn('❌ Abbrechen', 'cancel')] : [btn('⬅️ Andere Buchung', 'aback'), btn('❌ Abbrechen', 'cancel')]);
+    return send(bot, chatId, text, keyboard(rows), session);
+}
+
+async function executeAddress(bot, chatId, session, q) {
+    if (session.busy) return;
+    session.busy = true;
+    touch(session);
+    try {
+        const p = session.parsed;
+        const b = getBookingRow(session.bookingId);
+        if (!b) throw new Error('Die Buchung existiert nicht mehr.');
+        const current = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
+        const differs = current && p.name && nameScore(current, p.name) < 2;
+        let guestId = b.guest_id;
+        let nukiNote = '';
+        if (!current || (differs && session.replaceName)) {
+            if (!p.name) throw new Error('Kein Name erkannt.');
+            await setProgress(bot, q, session, chatId, '⏳ <b>Wird gespeichert …</b>');
+            const r = await botLogic.applyGuestName(b.id, p.name);
+            guestId = r.guestId;
+            if (r.booking.nuki_auth_id && !r.nukiRenamed) nukiNote = `\n⚠️ Der Türcode konnte in Nuki nicht umbenannt werden: ${esc(short(r.nukiError || '', 100))}`;
+        }
+        const g = db.getGuestById(guestId);
+        if (!g) throw new Error('Gast nicht gefunden.');
+        db.updateGuest(g.id, {
+            ...g,
+            address: p.address || g.address,
+            phone: p.phone || g.phone,
+            email: p.email || g.email
+        });
+        sessions.delete(chatId);
+        if (q && q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+        console.log(`📇 Anschrift für Gast ${g.id} (Buchung ${b.id}) per Telegram gespeichert`);
+        let photoNote = '';
+        if (session.photoMsgId) {
+            const ok = await bot.deleteMessage(chatId, session.photoMsgId).then(() => true).catch(() => false);
+            photoNote = ok ? '\n🗑 Der Screenshot wurde aus dem Chat gelöscht.' : '\nℹ️ Den Screenshot konnte ich nicht löschen (nach 48 Std. geht das nicht mehr), bitte selbst entfernen.';
+        }
+        const saved = db.getGuestById(g.id);
+        const text = `✅ <b>Gespeichert bei ${esc(saved.name)}</b>\n📅 ${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}\n\n` +
+            `<code>${esc([saved.name, saved.address].filter(Boolean).join('\n'))}</code>` +
+            (saved.phone ? `\n📞 ${esc(saved.phone)}` : '') + (saved.email ? `\n✉️ ${esc(saved.email)}` : '') + nukiNote + photoNote +
+            '\n\nDie Anschrift steht jetzt in der Gästeliste und wird bei der nächsten Rechnung automatisch eingesetzt.';
+        return send(bot, chatId, text, keyboard([[btn('🧾 Rechnung erstellen', `inv:${b.id}`)], [btn('📇 Weitere Anschrift', 'adr'), btn('🏠 Hauptmenü', 'menu')]]));
+    } catch (e) {
+        console.error('[TG] Anschrift speichern:', e);
+        session.busy = false;
+        return send(bot, chatId, `❌ <b>Fehler:</b> ${esc(e.message)}`, keyboard([[btn('🔁 Erneut versuchen', 'aok')], [btn('❌ Abbrechen', 'cancel')]]), session);
+    }
+}
+
+/** Text while the address dialog is open: a new address replaces the old one, anything else shows the step again. */
+async function handleAddressInput(bot, chatId, session, body) {
+    if (session.step === 'await') return handleAddressText(bot, chatId, session, body);
+    const p = addressParser.parseAddress(body);
+    if (p.street || p.zip || p.phone || p.email) return handleAddressText(bot, chatId, session, body);
+    return session.step === 'confirm' ? showAddressConfirm(bot, chatId, session) : showAddressBookings(bot, chatId, session);
+}
+
+async function addressBack(bot, chatId, session) {
+    if (session.step === 'confirm' && !session.fixedBooking) {
+        session.bookingId = null;
+        return showAddressBookings(bot, chatId, session);
+    }
+    return cancelSession(bot, chatId, session, false);
+}
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function isImageDocument(msg) {
+    return Boolean(msg.document && /^image\/(png|jpe?g|webp|bmp|tiff?)$/i.test(msg.document.mime_type || ''));
+}
+
+/** Screenshots: the guest name of a booking that shows up in the text beats a guessed name (OCR adds noise lines). */
+function preferKnownGuestName(p, text) {
+    try {
+        const names = [...new Set(addressCandidates(null).map(b => b.guest_name).filter(n => n && !botLogic.isPlaceholderGuestName(n)))];
+        const lines = String(text).split('\n');
+        const hit = names.find(n => lines.some(l => nameScore(l, n) === 2));
+        if (hit && nameScore(p.name, hit) < 2) p.name = hit;
+    } catch (e) { /* best-effort */ }
+}
+
+/**
+ * Photo or image file sent to the bot: read the text on it (on this server, see screenshot-ocr.js) and continue
+ * like a pasted address. The image is only kept in a temp file during recognition; after saving, the photo message
+ * is deleted from the chat as well.
+ */
+async function processPhoto(bot, msg) {
+    const chatId = msg.chat.id;
+    if (!db.isTelegramIdAuthorized(chatId)) {
+        return send(bot, chatId, '⛔ <b>Zugriff verweigert</b>\n\nBitte sende <code>/register</code>, um eine Zugangsanfrage zu stellen.');
+    }
+    if (!permissions.canBot(botPerms(chatId), 'adresse')) return send(bot, chatId, DENIED);
+    const file = msg.photo ? msg.photo[msg.photo.length - 1] : msg.document;
+    if (!file || (file.file_size && file.file_size > MAX_IMAGE_BYTES)) {
+        return send(bot, chatId, '⚠️ Das Bild ist zu groß (max. 10 MB). Bitte als normales Foto schicken.');
+    }
+    console.log(`[TG] Bild von [${chatId}] zur Texterkennung`);
+
+    let session = getActiveSession(chatId);
+    if (!session || session === 'expired' || session.flow !== 'address') {
+        if (session && session !== 'expired') await cancelSession(bot, chatId, session, true);
+        session = await startAddressFlow(bot, chatId, null, true);
+    } else if (session.busy) {
+        return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
+    } else if (session.step !== 'await' && !session.fixedBooking) {
+        session.bookingId = null;
+    }
+    session.busy = true;
+    const waitMsg = await send(bot, chatId, '🔍 <b>Ich lese den Screenshot …</b>\nDas dauert ein paar Sekunden.');
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-ocr-'));
+    let text = '';
+    try {
+        const filePath = await bot.downloadFile(file.file_id, tmpDir);
+        const r = await ocr.recognize(filePath);
+        text = r.text;
+    } catch (e) {
+        console.error('[TG] Texterkennung fehlgeschlagen:', e.message);
+        session.busy = false;
+        return send(bot, chatId, `❌ <b>Der Screenshot konnte nicht gelesen werden.</b>\n${esc(short(e.message, 160))}\n\nDu kannst die Anschrift auch als Text schicken.`, keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
+    } finally {
+        // The image is not kept on the server
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+        if (waitMsg) bot.deleteMessage(chatId, waitMsg.message_id).catch(() => { });
+    }
+    session.busy = false;
+    session.photoMsgId = msg.message_id;
+    const caption = msg.caption ? `${msg.caption.trim()}\n` : '';
+    return handleAddressText(bot, chatId, session, caption + text, true);
+}
+
+/** Invoice dialog: a pasted address comes out as a clean block; when parts cannot be placed it stays as typed. */
+function tidyAddress(text) {
+    const typed = String(text || '').split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+    const p = addressParser.parseAddress(typed);
+    if (!p.street || !(p.zip || p.city) || p.unknown.length || p.name) return typed;
+    return p.address;
+}
+
+// ---------------------------------------------------------------------------
 // Slot-Filling-Engine
 // ---------------------------------------------------------------------------
 function isFilled(step, data) {
@@ -909,7 +1116,9 @@ function applyInput(session, step, textRaw) {
             if (text.length < 5 || text.length > 300) {
                 return { ok: false, error: '⚠️ Die Adresse wirkt zu kurz. Bitte Straße, PLZ und Ort angeben.' };
             }
-            d.gAdresse = text.split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+            d.gAdresse = tidyAddress(text);
+            const parsed = addressParser.parseAddress(text);
+            if (parsed.email && d.gEmail === undefined) d.gEmail = parsed.email;
             return { ok: true };
         }
         case 'email': {
@@ -996,6 +1205,7 @@ async function startFlow(bot, chatId, flowName, initialText, prefill) {
         departure: parsed.departure || ''
     };
     if (flowName === 'invoice' && parsed.gEmail) data.gEmail = parsed.gEmail;
+    if (flowName === 'invoice' && data.gAdresse) data.gAdresse = tidyAddress(data.gAdresse);
     if (prefill) Object.assign(data, prefill);
 
     const session = { flow: flowName, step: null, data, updatedAt: Date.now(), lastMsgId: null, sequential: false, editing: false, busy: false };
@@ -1105,7 +1315,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck|gastdaten|gast|adresse|anschrift)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|adresse|anschrift|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -1119,6 +1329,7 @@ function detectCommand(body) {
 // ---------------------------------------------------------------------------
 async function processMessage(bot, msg) {
     const chatId = msg.chat.id;
+    if (!msg.text && (msg.photo || isImageDocument(msg))) return processPhoto(bot, msg);
     const body = msg.text ? msg.text.trim() : '';
     if (!body) return;
 
@@ -1160,7 +1371,7 @@ async function processMessage(bot, msg) {
     // --- Globale Navigation (in jedem Schritt) ---
     if (active) {
         if (CANCEL_WORDS.has(lower)) return cancelSession(bot, chatId, active, false);
-        if (BACK_WORDS.has(lower)) return goBack(bot, chatId, active);
+        if (BACK_WORDS.has(lower)) return active.flow === 'address' ? addressBack(bot, chatId, active) : goBack(bot, chatId, active);
         if (MENU_WORDS.has(lower)) return cancelSession(bot, chatId, active, false);
     } else if (BACK_WORDS.has(lower) || CANCEL_WORDS.has(lower) || MENU_WORDS.has(lower)) {
         return showMenu(bot, chatId);
@@ -1228,18 +1439,22 @@ async function processMessage(bot, msg) {
                 return startFlow(bot, chatId, 'invoice', cmd.rest);
             case 'pin':
                 return startFlow(bot, chatId, 'pin', cmd.rest);
-            case 'gast':
-            case 'gastdaten':
             case 'adresse':
-            case 'anschrift':
-                if (!cmd.rest) return send(bot, chatId, '👤 <b>Gastdaten eintragen</b>\nSchick mir Name, Anschrift, Telefon und/oder E-Mail des Gastes in einer Nachricht, ganz egal wie formatiert, z.B. einfach aus Booking.com kopiert.', menuOnlyKeyboard());
-                return startGuestData(bot, chatId, cmd.rest);
+            case 'anschrift': {
+                if (active) await cancelSession(bot, chatId, active, true);
+                if (!cmd.rest) return startAddressFlow(bot, chatId, null);
+                await startAddressFlow(bot, chatId, null, true);
+                return handleAddressText(bot, chatId, sessions.get(chatId), cmd.rest);
+            }
             default:
                 break;
         }
     }
 
     // --- Antwort in laufendem Dialog ---
+    if (active && !active.busy && active.flow === 'address') {
+        return handleAddressInput(bot, chatId, active, body);
+    }
     if (active && !active.busy) {
         return handleStepInput(bot, chatId, active, body);
     }
@@ -1247,9 +1462,11 @@ async function processMessage(bot, msg) {
         return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
     }
 
-    // --- Freitext mit Anschrift, Telefon oder E-Mail: Gastdaten zu einer Buchung speichern ---
-    if (allowed('namen') && guestData.hasGuestData(guestData.parseGuestText(body))) {
-        return startGuestData(bot, chatId, body);
+    // --- Freitext ohne Befehl: eingefügte Anschrift (ohne Datum) -> beim Gast speichern ---
+    if (isAddressText(body)) {
+        if (!allowed('adresse')) return send(bot, chatId, DENIED);
+        await startAddressFlow(bot, chatId, null, true);
+        return handleAddressText(bot, chatId, sessions.get(chatId), body);
     }
 
     // --- Freitext ohne Befehl: Buchungstext erkennen (mehrzeilig oder mit Datum) ---
@@ -1316,7 +1533,7 @@ async function processCallback(bot, q) {
     const active = session && session !== 'expired' ? session : null;
 
     // Alte Buttons, die nicht mehr zu einer Session passen
-    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit'].includes(data) || data.startsWith('ef:');
+    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit', 'aok', 'aname', 'aback'].includes(data) || data.startsWith('ef:') || data.startsWith('ab:');
     if (needsSession && !active) {
         await answer(session === 'expired' ? '⏱ Abgelaufen' : 'Vorgang nicht mehr aktiv');
         // Buttons der alten Nachricht entfernen
@@ -1392,6 +1609,35 @@ async function processCallback(bot, q) {
                 return blockGuestLink(bot, chatId, parseInt(data.slice(7), 10));
             case data.startsWith('nm:'):
                 return startNameFlow(bot, chatId, parseInt(data.slice(3), 10));
+            case data === 'adr':
+                return startAddressFlow(bot, chatId, null);
+            case data.startsWith('adr:'):
+                return startAddressFlow(bot, chatId, parseInt(data.slice(4), 10));
+            case data.startsWith('ab:'): {
+                if (active.flow !== 'address' || !active.parsed) return;
+                const arg = data.slice(3);
+                if (arg === 'next') { active.page++; return showAddressBookings(bot, chatId, active); }
+                if (arg === 'prev') { active.page = Math.max(0, active.page - 1); return showAddressBookings(bot, chatId, active); }
+                if (arg === 'inv') {
+                    if (!permissions.canBot(botPerms(chatId), 'rechnung')) return send(bot, chatId, DENIED);
+                    const raw = active.raw;
+                    await cancelSession(bot, chatId, active, true);
+                    return startFlow(bot, chatId, 'invoice', raw);
+                }
+                active.bookingId = parseInt(arg, 10);
+                active.replaceName = false;
+                return showAddressConfirm(bot, chatId, active);
+            }
+            case data === 'aname':
+                if (active.flow !== 'address' || active.step !== 'confirm') return;
+                active.replaceName = !active.replaceName;
+                return showAddressConfirm(bot, chatId, active);
+            case data === 'aback':
+                if (active.flow !== 'address') return;
+                return addressBack(bot, chatId, active);
+            case data === 'aok':
+                if (active.flow !== 'address' || active.step !== 'confirm') return;
+                return executeAddress(bot, chatId, active, q);
             case data.startsWith('ovl:'): {
                 const n = hooks.ackOverlap ? hooks.ackOverlap(data.slice(4)) : 0;
                 if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
@@ -1399,34 +1645,6 @@ async function processCallback(bot, q) {
             }
             case data.startsWith('inv:'):
                 return startInvoiceFromBooking(bot, chatId, parseInt(data.slice(4), 10));
-            case data === 'gd:ok':
-                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
-                return saveGuestData(bot, chatId);
-            case data === 'gd:pick':
-                return showGuestDataPick(bot, chatId);
-            case data.startsWith('gd:b:'): {
-                const d = guestDataDraft(chatId);
-                if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
-                d.bookingId = parseInt(data.slice(5), 10);
-                return showGuestDataConfirm(bot, chatId);
-            }
-            case data === 'gd:inv': {
-                const d = guestDataDraft(chatId);
-                guestDataDrafts.delete(chatId);
-                if (!permissions.canBot(botPerms(chatId), 'rechnung')) return send(bot, chatId, DENIED);
-                if (!d) return startFlow(bot, chatId, 'invoice', '');
-                const prefill = {};
-                if (d.p.name) prefill.gName = d.p.name;
-                const addr = guestData.addressText(d.p);
-                if (addr) prefill.gAdresse = addr;
-                if (d.p.email) prefill.gEmail = d.p.email;
-                if (d.p.arrival && d.p.departure) { prefill.arrival = d.p.arrival; prefill.departure = d.p.departure; }
-                return startFlow(bot, chatId, 'invoice', '', prefill);
-            }
-            case data === 'gd:x':
-                guestDataDrafts.delete(chatId);
-                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
-                return showMenu(bot, chatId, '❌ Gastdaten verworfen.');
             case data === 'new:invoice':
                 return startFlow(bot, chatId, 'invoice', '');
             case data === 'new:pin':
@@ -1435,7 +1653,7 @@ async function processCallback(bot, q) {
             case data === 'cancel':
                 return cancelSession(bot, chatId, active, false);
             case data === 'back':
-                return goBack(bot, chatId, active);
+                return active.flow === 'address' ? addressBack(bot, chatId, active) : goBack(bot, chatId, active);
 
             case data === 'keep': {
                 if (!isFilled(active.step, active.data)) return;
@@ -1493,7 +1711,7 @@ async function setup(bot, options = {}) {
             { command: 'rechnung', description: 'Neue Rechnung erstellen' },
             { command: 'pin', description: 'Nur Tür-Code erstellen' },
             { command: 'namen', description: 'Gastnamen nachtragen' },
-            { command: 'gast', description: 'Gastdaten (Anschrift, Telefon) einfügen' },
+            { command: 'adresse', description: 'Anschrift eines Gastes einfügen' },
             { command: 'sync', description: 'Kalender jetzt abfragen' },
             { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },
@@ -1517,5 +1735,5 @@ module.exports = {
     setup,
     showGuestMessage,
     // für Tests
-    _internal: { sessions, detectCommand, applyInput, FLOWS }
+    _internal: { sessions, detectCommand, applyInput, FLOWS, isAddressText, addressCandidates, nameScore }
 };

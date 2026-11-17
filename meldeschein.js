@@ -81,7 +81,7 @@ function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, 
             if (g && !botLogic.isPlaceholderGuestName(g.name)) {
                 const parts = g.name.trim().split(/\s+/);
                 // Address and country from the guest data (e.g. pasted in Telegram)
-                const a = require('./guest-data').splitAddress(g.address);
+                const a = require('./address-parser').splitAddress(g.address);
                 // "Jan de Vries" -> first name Jan, last name de Vries
                 let cut = parts.length > 1 ? parts.length - 1 : parts.length;
                 while (cut > 1 && /^(de|der|den|van|von|vom|zu|zur|ter|ten|te|het|da|di|del|della|du|le|la|al|el|mc|o')$/i.test(parts[cut - 1])) cut--;

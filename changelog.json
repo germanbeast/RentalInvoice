@@ -1,18 +1,33 @@
 {
-    "currentVersion": "1.47.0",
+    "currentVersion": "1.48.0",
     "releases": [
+        {
+            "version": "1.48.0",
+            "date": "2026-11-17",
+            "title": "Gäste-App auf Englisch, Niederländisch und Polnisch",
+            "features": [
+                "Meine Buchung (mit Meldeschein, Ankunft, A–Z, Umgebung, Rechnung), die WLAN-Anmeldeseite, Notfall-Öffnen und der Fernseher gibt es jetzt auf Deutsch, Englisch, Niederländisch und Polnisch",
+                "Die Sprache wird automatisch gewählt: aus Meldeschein, Anschrift (auch der per Telegram eingefügten), Telefonvorwahl oder E-Mail des Gastes, sonst aus der Sprache des Browsers. Gäste können oben oder im Menü umschalten",
+                "Im Kalender-Popup einer Buchung lässt sich die Sprache festlegen (Automatisch, Deutsch, Englisch, Niederländisch, Polnisch); dort stehen jetzt auch Telefon und Anschrift des Gastes",
+                "Gästenachricht und Anreise-Nachricht kommen automatisch in der Sprache des Gastes, jetzt auch auf Niederländisch und Polnisch",
+                "Meldeschein und Rechnung auf Meine Buchung sind mit der gespeicherten Anschrift des Gastes vorausgefüllt"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.47.0",
             "date": "2026-11-17",
-            "title": "Gäste-App auf Englisch, Niederländisch und Polnisch + Gastdaten per Telegram einfügen",
+            "title": "Anschrift einfach in Telegram einfügen",
             "features": [
-                "Meine Buchung (mit Meldeschein, Ankunft, A–Z, Umgebung, Rechnung), die WLAN-Anmeldeseite, Notfall-Öffnen und der Fernseher gibt es jetzt auf Deutsch, Englisch, Niederländisch und Polnisch",
-                "Die Sprache wird automatisch gewählt: aus Meldeschein, Anschrift, Telefonvorwahl oder E-Mail des Gastes, sonst aus der Sprache des Browsers. Gäste können oben oder im Menü umschalten",
-                "Im Kalender-Popup einer Buchung lässt sich die Sprache festlegen (Automatisch, Deutsch, Englisch, Niederländisch, Polnisch)",
-                "Gästenachricht und Anreise-Nachricht kommen automatisch in der Sprache des Gastes, jetzt auch auf Niederländisch und Polnisch",
-                "Telegram: Name, Anschrift, Telefon und E-Mail des Gastes einfach unformatiert in den Chat kopieren (oder /gast). Der Bot erkennt alles, ordnet es der Buchung zu und speichert es sauber beim Gast",
-                "Mit den gespeicherten Gastdaten sind Rechnung und Meldeschein schon vorausgefüllt; im Admin geht dasselbe über „Gastdaten einfügen“ im Buchungs-Popup"
-            ]
+                "Anschrift unformatiert in Telegram schicken (z. B. aus Booking.com kopiert): Der Bot erkennt Name, Firma, Straße, Hausnummer, Zusatz, PLZ, Ort, Land, Telefon und E-Mail",
+                "Das Land wird auch erkannt, wenn es nicht dasteht: aus dem PLZ-Format (z. B. 1015 CJ, 00-590, SW1A 2AA), bekannten Orten (Wien, Zürich, Brüssel …) und der Telefonvorwahl",
+                "Danach nur noch die Buchung antippen (passender Name mit ⭐ oben) und bestätigen; gespeichert wird sauber formatiert beim Gast, die nächste Rechnung übernimmt die Anschrift",
+                "Hat die Buchung noch keinen Namen, bekommt sie ihn gleich mit (auch der Türcode wird umbenannt); ein abweichender Name wird nur auf Wunsch übernommen",
+                "Neu: /adresse und Knopf „📇 Anschrift einfügen“ im Hauptmenü und nach „Namen eintragen“",
+                "Im Rechnungsdialog wird eine eingefügte Adresse ebenfalls sauber formatiert",
+                "Auch ein Screenshot geht (z. B. aus der Booking.com-App): Der Text wird direkt auf deinem Server gelesen, nichts geht an fremde Dienste; das Bild wird nicht gespeichert und nach dem Speichern auch aus dem Telegram-Chat gelöscht"
+            ],
+            "fixes": []
         },
         {
             "version": "1.46.0",

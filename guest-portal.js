@@ -14,7 +14,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const vouchers = require('./vouchers');
 const guestLang = require('./guest-lang');
-const guestData = require('./guest-data');
+const { splitAddress } = require('./address-parser');
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
 const SITE_DIR = path.join(__dirname, 'guest-site');
@@ -239,7 +239,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             v.invoiceOffer = {
                 positions: plan.positions, total: plan.total, mwstRate: plan.mwstRate, paid: plan.payment.zBezahlt,
                 name: hasName ? guest.name : '', email: (guest && guest.email) || '',
-                address: guest && guest.address ? (a => ({ ...a, country: a.country || (a.zip ? 'Deutschland' : '') }))(guestData.splitAddress(guest.address)) : null
+                address: guest && guest.address ? (a => ({ ...a, country: a.country || (a.zip ? 'Deutschland' : '') }))(splitAddress(guest.address)) : null
             };
         }
         if (request) {

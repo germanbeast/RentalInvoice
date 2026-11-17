@@ -2178,7 +2178,6 @@
             </dl>
             <div class="pop-actions">
                 <button type="button" class="pill" data-pop="name">${bk.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
-                ${canDo('bookings', 'edit') ? '<button type="button" class="pill" data-pop="guestdata">Gastdaten einfügen</button>' : ''}
                 <button type="button" class="pill" data-pop="invoice">Rechnung erstellen</button>
                 ${bk.meldescheinId ? '<button type="button" class="pill" data-pop="meldeschein">Meldeschein</button>' : ''}
                 ${bk.state !== 'past' ? `<button type="button" class="pill" data-pop="doorcode">${bk.hasCode ? 'Türcode bearbeiten' : 'Türcode anlegen'}</button>` : ''}
@@ -2282,39 +2281,6 @@
                 const d = await apiJson(`/api/bookings/${bk.id}`, { method: 'DELETE' }).catch(() => null);
                 if (d && d.success) { showToast('Buchung gelöscht', 'success'); hideTlPop(); loadCalendarHome(); }
                 else showToast((d && d.error) || 'Löschen fehlgeschlagen', 'error');
-                return;
-            }
-            if (act === 'guestdata') {
-                const acts = tlPop.querySelector('.pop-actions');
-                acts.outerHTML = `<form class="pop-guestdata" data-gd>
-                    <label>Gastdaten, egal wie formatiert (z. B. aus Booking.com kopiert)
-                    <textarea rows="5" maxlength="2000" placeholder="Jan de Vries&#10;Kerkstraat 12&#10;1012 AB Amsterdam&#10;+31 6 12345678"></textarea></label>
-                    <div class="pop-gd-preview" aria-live="polite"></div>
-                    <div class="pop-actions"><button type="submit" class="pill pill-primary">Übernehmen</button><button type="button" class="pill" data-pop="close">Abbrechen</button></div></form>`;
-                const f = tlPop.querySelector('[data-gd]');
-                const ta = f.querySelector('textarea');
-                const prev = f.querySelector('.pop-gd-preview');
-                ta.focus();
-                let t = null;
-                ta.addEventListener('input', () => {
-                    clearTimeout(t);
-                    t = setTimeout(async () => {
-                        if (!ta.value.trim()) { prev.textContent = ''; return; }
-                        const d = await apiJson(`/api/bookings/${bk.id}/guest-data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: ta.value, preview: true }) }).catch(() => null);
-                        if (!d || !d.success) return;
-                        const p = d.parsed;
-                        prev.innerHTML = [['Name', p.name], ['Anschrift', d.address.replace(/\n/g, ', ')], ['Telefon', p.phone], ['E-Mail', p.email]]
-                            .map(([k, v]) => `<span><b>${k}:</b> ${v ? escapeHtml(v) : '<em>–</em>'}</span>`).join('');
-                    }, 300);
-                });
-                f.addEventListener('submit', async ev => {
-                    ev.preventDefault();
-                    const d = await apiJson(`/api/bookings/${bk.id}/guest-data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: ta.value }) }).catch(() => null);
-                    if (d && d.success) { showToast('Gastdaten gespeichert' + (d.nukiRenamed ? ' – Türcode umbenannt' : ''), 'success'); hideTlPop(); loadCalendarHome(); }
-                    else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
-                });
-                const pr = tlPop.getBoundingClientRect();
-                if (pr.bottom > window.innerHeight - 8) tlPop.style.top = `${Math.max(8, window.innerHeight - pr.height - 8)}px`;
                 return;
             }
             if (act === 'name') {

@@ -60,7 +60,14 @@ function langOfEmail(email) {
 }
 
 /** Country from the last line of an address ("Hauptstr. 1\n1012 AB Amsterdam\nNiederlande"). */
+const CC_LANG = { DE: 'de', AT: 'de', CH: 'de', LI: 'de', NL: 'nl', BE: 'nl', PL: 'pl' };
+
 function langOfAddress(address) {
+    // Parsed like the Telegram address paste (also knows zip formats and towns); Germany is only the parser's default
+    try {
+        const cc = require('./address-parser').splitAddress(address).countryCode;
+        if (cc && cc !== 'DE') return CC_LANG[cc] || 'en';
+    } catch (e) { /* fall back to the simple check below */ }
     const lines = String(address || '').split(/\n|,/).map(l => l.trim()).filter(Boolean);
     if (lines.length < 2) return null;
     const last = lines[lines.length - 1];

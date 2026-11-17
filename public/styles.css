@@ -3627,7 +3627,3 @@ a.pill { text-decoration: none; }
 
 /* Buchung: Sprache der Gäste-App + Gastdaten einfügen */
 .pop-lang { font: inherit; font-size: .84rem; padding: .2rem .4rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card, #fff); color: var(--ink); max-width: 100%; }
-.pop-guestdata label { display: block; font-size: .8rem; color: var(--muted); }
-.pop-guestdata textarea { display: block; width: 100%; margin: .35rem 0 .5rem; font: inherit; font-size: .85rem; padding: .5rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card, #fff); color: var(--ink); resize: vertical; }
-.pop-gd-preview { display: grid; gap: .15rem; font-size: .8rem; margin-bottom: .6rem; }
-.pop-gd-preview:empty { display: none; }
