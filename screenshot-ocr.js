@@ -42,6 +42,8 @@ function prepareLangDir() {
 function cleanOcrText(text) {
     return String(text || '').replace(/\r/g, '').split('\n')
         .map(l => l.replace(/[|_~«»©®™•●◦▪►▶◀←→↑↓<>‹›]/g, ' ').replace(/^[\s—–\-=:;.,'"`]+/, '').replace(/\s+/g, ' ').trim())
+        // Icons read as letters: "X Gast kontaktieren", "XI jsebas@…", "ET Slowakei", "… SEBASTIAN X"
+        .map(l => l.replace(/^[A-Z]{1,2}[I|l1]?\s+(?=[A-Za-zÀ-ÿ])/, '').replace(/(\S{3,})\s+[A-Z]{1,2}$/, '$1'))
         .filter(l => l.length >= 2)
         .filter(l => /[A-Za-zÀ-ÿ0-9]/.test(l))
         // Status bar: "17:34 5G 84%"

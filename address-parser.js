@@ -110,7 +110,7 @@ const LABELS = [
     ['email', /^(e-mail|email|e-mail-adresse|email address|e-mail address|mail|e-mailadres)$/]
 ];
 // Beschriftungen, deren Wert keine Anschrift ist (z. B. aus dem Booking.com-Extranet mitkopiert): Zeile weg
-const IGNORE_LABEL = /^(zeitraum|bezahlt via|bezahlt|betrag|summe|rechnungsnummer|rechnungsdatum|leistungszeitraum|erwachsener?|erwachsene|adult|kind|kinder|child|babys?|haustiere?|pets?|bevorzugte sprache|preferred language|sprachen?|unterkunft|property|objekt|zimmertyp|room type|wohnungstyp|unit type|ankunftszeit|estimated arrival time|geschätzte ankunftszeit|reiseanlass|reason for travel|purpose of trip|geschäftsreise|business trip|stornierungsbedingungen|cancellation policy|bezahlung|payment method|zahlungsart|kreditkarte|credit card|genius-level|buchung über|booked via|buchungsdetails|reservation details|reservierungsdetails|gastdaten|guest details|kontaktdaten|contact details|buchungsnummer|booking number|reservation number|reservierungsnummer|bestätigungsnummer|confirmation( code| number)?|buchungscode|pin( code)?|anreise|abreise|check-?in|check-?out|ankunft|arrival|departure|aufenthalt|dauer|nächte|naechte|nights|preis|gesamtpreis|price|total|total price|betrag|provision|commission|zahlung|payment|personen|gäste|gaeste|guests|erwachsene|adults|kinder|children|zimmer|room|unit|wohneinheit|sprache|language|nationalität|nationality|staatsangehörigkeit|geburtsdatum|date of birth|ankunftszeit|arrival time|voraussichtliche ankunft|nachricht|message|anmerkung|anmerkungen|notiz|notes|remarks|bemerkung|bemerkungen|wünsche|special requests|status|quelle|source|kanal|channel|gebucht am|booked on|buchungsdatum|booking date|genius)$/;
+const IGNORE_LABEL = /^(gesamtzahl der gäste|anzahl gäste|number of guests|total guests|zeitraum|bezahlt via|bezahlt|betrag|summe|rechnungsnummer|rechnungsdatum|leistungszeitraum|erwachsener?|erwachsene|adult|kind|kinder|child|babys?|haustiere?|pets?|bevorzugte sprache|preferred language|sprachen?|unterkunft|property|objekt|zimmertyp|room type|wohnungstyp|unit type|ankunftszeit|estimated arrival time|geschätzte ankunftszeit|reiseanlass|reason for travel|purpose of trip|geschäftsreise|business trip|stornierungsbedingungen|cancellation policy|bezahlung|payment method|zahlungsart|kreditkarte|credit card|genius-level|buchung über|booked via|buchungsdetails|reservation details|reservierungsdetails|gastdaten|guest details|kontaktdaten|contact details|buchungsnummer|booking number|reservation number|reservierungsnummer|bestätigungsnummer|confirmation( code| number)?|buchungscode|pin( code)?|anreise|abreise|check-?in|check-?out|ankunft|arrival|departure|aufenthalt|dauer|nächte|naechte|nights|preis|gesamtpreis|price|total|total price|betrag|provision|commission|zahlung|payment|personen|gäste|gaeste|guests|erwachsene|adults|kinder|children|zimmer|room|unit|wohneinheit|sprache|language|nationalität|nationality|staatsangehörigkeit|geburtsdatum|date of birth|ankunftszeit|arrival time|voraussichtliche ankunft|nachricht|message|anmerkung|anmerkungen|notiz|notes|remarks|bemerkung|bemerkungen|wünsche|special requests|status|quelle|source|kanal|channel|gebucht am|booked on|buchungsdatum|booking date|genius)$/;
 
 const SALUTATION = /^(herr|frau|hr\.?|fr\.?|mr\.?|mrs\.?|ms\.?|miss|mx\.?|monsieur|madame|mme\.?|m\.|mevrouw|mevr\.?|meneer|dhr\.?|de heer|pan|pani|signor|signora|sig\.?|sig\.ra|señor|señora|sr\.?|sra\.?|herrn)\s+/i;
 const COMPANY = /\b(gmbh|ag|ug|kg|ohg|gbr|e\.\s?k\.?|e\.\s?v\.?|mbh|se|ltd\.?|limited|llc|inc\.?|corp\.?|b\.\s?v\.?|bv|n\.\s?v\.?|nv|s\.a\.?|sarl|s\.a\.r\.l\.?|s\.r\.l\.?|srl|spa|s\.p\.a\.?|sp\.? z o\.?o\.?|s\.r\.o\.?|a\/s|aps|oy|ab|plc|co\.? kg|holding|group|gruppe|firma|stiftung|verein|praxis|kanzlei|hotel|consulting|services|solutions|software|systems|bank|versicherung|universität|university|institut|institute|agentur|agency|werk|werke|handel|bau)\b/i;
@@ -341,7 +341,8 @@ function parseAddress(text) {
             }
             case 'state': r.state = r.state || value; break;
             case 'country': {
-                const c = countryFromText(value);
+                // "ET Slowakei": a flag icon read as letters in front of the name
+                const c = countryFromText(value) || countryFromText(value.replace(/^\S{1,3}\s+/, ''));
                 r.country = c ? c.name : tidyCase(value); r.countryCode = c ? c.code : '';
                 break;
             }
@@ -454,6 +455,10 @@ function parseAddress(text) {
         }
         if (!r.zip) {
             const zc = parseZipCity(t);
+            // "A.Hlinka 3118" with a Slovak address: street + house number, the postcode follows elsewhere
+            if (zc && r.countryCode && !zc.hint && !ZIP_FORMAT_OK(r.countryCode, zc.zip) && !r.street && /^\D+\s+\d+$/.test(t)) {
+                r.street = tidyCase(zc.city); r.houseNumber = zc.zip; kinds[i] = 'street'; return;
+            }
             if (zc) {
                 // City followed by a country in the same token ("12345 Berlin Germany")
                 let city = zc.city;

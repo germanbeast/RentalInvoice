@@ -9,6 +9,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Behoben
 - `address-parser`: Anzahl-Angaben („Erwachsener 1“, „2 Adults“) fallen weg; Beschriftungen ohne Doppelpunkt mitten im Text („Bevorzugte Sprache“, „Land/Region“) samt Wert; „37 Slowakei“ → Land + Restnummer; PLZ passt nicht zum Land → Hausnummer + Straße (`ZIP_FORMATS`); unbekannte „Beschriftung: Wert“-Zeilen werden ignoriert
+- Screenshots: Icons als Buchstaben („X“, „XI“, Flagge „ET“) werden entfernt; Länderwert mit Icon-Präfix wird erkannt; „Straße 3118“ mit PLZ, die nicht zum Land passt, wird als Straße + Hausnummer gelesen, die echte PLZ folgt separat; Beschriftung „Gesamtzahl der Gäste“
 - Straße + Land ohne Ort gilt als Anschrift (`looksLikeAddress`, Rechnungsdialog, Bereinigung gespeicherter Adressen)
 
 ## [1.48.1] - 2026-11-17
