@@ -2,6 +2,9 @@ const db = require('./db');
 const botLogic = require('./bot-logic');
 const permissions = require('./permissions');
 const addressParser = require('./address-parser');
+const ocr = require('./screenshot-ocr');
+const os = require('os');
+const path = require('path');
 
 /** Rights of a Telegram chat: a linked user account gets its own rights; an ID that was only approved
  *  under Einstellungen → Telegram (no user linked) keeps full access as before. */
@@ -195,7 +198,7 @@ async function showHelp(bot, chatId) {
         'Der Bot übernimmt, was er erkennt, und fragt nur nach dem Rest.\n\n' +
         '<b>Anschrift einfach reinkopieren</b>\n' +
         'Eine Anschrift ohne Datum (z. B. aus Booking.com kopiert) erkennt der Bot von selbst: Name, Straße, PLZ, Ort, Land, Telefon, E-Mail. ' +
-        'Du wählst nur noch die Buchung und bestätigst.\n\n' +
+        'Du wählst nur noch die Buchung und bestätigst. Das klappt auch mit einem 📷 Screenshot, der nach dem Speichern aus dem Chat gelöscht wird.\n\n' +
         '<b>Jederzeit möglich</b>\n' +
         '• ⬅️ <b>Zurück</b> (oder „zurück“) – einen Schritt zurück\n' +
         '• ❌ <b>Abbrechen</b> (oder „abbrechen“) – Vorgang beenden\n' +
@@ -679,19 +682,27 @@ async function startAddressFlow(bot, chatId, bookingId, silent) {
         '📇 <b>Anschrift einfügen</b>\n\n' + intro +
         'Schick mir die Anschrift einfach so, wie du sie hast, z. B. aus Booking.com kopiert. Format egal, eine oder mehrere Zeilen:\n' +
         '<code>Max Mustermann\nMusterstr. 12a\n12345 Musterstadt\n+49 170 1234567\nmax@example.de</code>\n\n' +
+        'Oder schick einfach einen 📷 <b>Screenshot</b> (z. B. aus der Booking.com-App). Er wird nach dem Speichern wieder gelöscht.\n\n' +
         'Ich erkenne Name, Straße, Hausnummer, PLZ, Ort, Land, Telefon und E-Mail.',
         keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
 }
 
 /** Parses the text, then asks for the booking (or goes straight to the summary when it is known). */
-async function handleAddressText(bot, chatId, session, body) {
+async function handleAddressText(bot, chatId, session, body, fromScreenshot) {
     touch(session);
     const p = addressParser.parseAddress(body);
+    if (fromScreenshot) {
+        preferKnownGuestName(p, body);
+        p.unknown = []; // headings and buttons of the app, not worth showing
+    }
     if (!p.street && !p.zip && !p.city && !p.phone && !p.email) {
         return send(bot, chatId,
-            '🤔 Darin habe ich keine Anschrift gefunden.\nBitte mindestens Straße oder PLZ und Ort mitschicken, gern mehrzeilig.',
+            fromScreenshot
+                ? '🤔 Auf dem Screenshot habe ich keine Anschrift gefunden.\nAm besten so zuschneiden, dass Name und Adresse gut lesbar sind, oder die Anschrift als Text schicken.'
+                : '🤔 Darin habe ich keine Anschrift gefunden.\nBitte mindestens Straße oder PLZ und Ort mitschicken, gern mehrzeilig.',
             keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
     }
+    if (!fromScreenshot) session.photoMsgId = null;
     session.parsed = p;
     session.raw = body;
     session.page = 0;
@@ -794,10 +805,15 @@ async function executeAddress(bot, chatId, session, q) {
         sessions.delete(chatId);
         if (q && q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
         console.log(`📇 Anschrift für Gast ${g.id} (Buchung ${b.id}) per Telegram gespeichert`);
+        let photoNote = '';
+        if (session.photoMsgId) {
+            const ok = await bot.deleteMessage(chatId, session.photoMsgId).then(() => true).catch(() => false);
+            photoNote = ok ? '\n🗑 Der Screenshot wurde aus dem Chat gelöscht.' : '\nℹ️ Den Screenshot konnte ich nicht löschen (nach 48 Std. geht das nicht mehr), bitte selbst entfernen.';
+        }
         const saved = db.getGuestById(g.id);
         const text = `✅ <b>Gespeichert bei ${esc(saved.name)}</b>\n📅 ${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}\n\n` +
             `<code>${esc([saved.name, saved.address].filter(Boolean).join('\n'))}</code>` +
-            (saved.phone ? `\n📞 ${esc(saved.phone)}` : '') + (saved.email ? `\n✉️ ${esc(saved.email)}` : '') + nukiNote +
+            (saved.phone ? `\n📞 ${esc(saved.phone)}` : '') + (saved.email ? `\n✉️ ${esc(saved.email)}` : '') + nukiNote + photoNote +
             '\n\nDie Anschrift steht jetzt in der Gästeliste und wird bei der nächsten Rechnung automatisch eingesetzt.';
         return send(bot, chatId, text, keyboard([[btn('🧾 Rechnung erstellen', `inv:${b.id}`)], [btn('📇 Weitere Anschrift', 'adr'), btn('🏠 Hauptmenü', 'menu')]]));
     } catch (e) {
@@ -821,6 +837,73 @@ async function addressBack(bot, chatId, session) {
         return showAddressBookings(bot, chatId, session);
     }
     return cancelSession(bot, chatId, session, false);
+}
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function isImageDocument(msg) {
+    return Boolean(msg.document && /^image\/(png|jpe?g|webp|bmp|tiff?)$/i.test(msg.document.mime_type || ''));
+}
+
+/** Screenshots: the guest name of a booking that shows up in the text beats a guessed name (OCR adds noise lines). */
+function preferKnownGuestName(p, text) {
+    try {
+        const names = [...new Set(addressCandidates(null).map(b => b.guest_name).filter(n => n && !botLogic.isPlaceholderGuestName(n)))];
+        const lines = String(text).split('\n');
+        const hit = names.find(n => lines.some(l => nameScore(l, n) === 2));
+        if (hit && nameScore(p.name, hit) < 2) p.name = hit;
+    } catch (e) { /* best-effort */ }
+}
+
+/**
+ * Photo or image file sent to the bot: read the text on it (on this server, see screenshot-ocr.js) and continue
+ * like a pasted address. The image is only kept in a temp file during recognition; after saving, the photo message
+ * is deleted from the chat as well.
+ */
+async function processPhoto(bot, msg) {
+    const chatId = msg.chat.id;
+    if (!db.isTelegramIdAuthorized(chatId)) {
+        return send(bot, chatId, '⛔ <b>Zugriff verweigert</b>\n\nBitte sende <code>/register</code>, um eine Zugangsanfrage zu stellen.');
+    }
+    if (!permissions.canBot(botPerms(chatId), 'adresse')) return send(bot, chatId, DENIED);
+    const file = msg.photo ? msg.photo[msg.photo.length - 1] : msg.document;
+    if (!file || (file.file_size && file.file_size > MAX_IMAGE_BYTES)) {
+        return send(bot, chatId, '⚠️ Das Bild ist zu groß (max. 10 MB). Bitte als normales Foto schicken.');
+    }
+    console.log(`[TG] Bild von [${chatId}] zur Texterkennung`);
+
+    let session = getActiveSession(chatId);
+    if (!session || session === 'expired' || session.flow !== 'address') {
+        if (session && session !== 'expired') await cancelSession(bot, chatId, session, true);
+        session = await startAddressFlow(bot, chatId, null, true);
+    } else if (session.busy) {
+        return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
+    } else if (session.step !== 'await' && !session.fixedBooking) {
+        session.bookingId = null;
+    }
+    session.busy = true;
+    const waitMsg = await send(bot, chatId, '🔍 <b>Ich lese den Screenshot …</b>\nDas dauert ein paar Sekunden.');
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-ocr-'));
+    let text = '';
+    try {
+        const filePath = await bot.downloadFile(file.file_id, tmpDir);
+        const r = await ocr.recognize(filePath);
+        text = r.text;
+    } catch (e) {
+        console.error('[TG] Texterkennung fehlgeschlagen:', e.message);
+        session.busy = false;
+        return send(bot, chatId, `❌ <b>Der Screenshot konnte nicht gelesen werden.</b>\n${esc(short(e.message, 160))}\n\nDu kannst die Anschrift auch als Text schicken.`, keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
+    } finally {
+        // The image is not kept on the server
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+        if (waitMsg) bot.deleteMessage(chatId, waitMsg.message_id).catch(() => { });
+    }
+    session.busy = false;
+    session.photoMsgId = msg.message_id;
+    const caption = msg.caption ? `${msg.caption.trim()}\n` : '';
+    return handleAddressText(bot, chatId, session, caption + text, true);
 }
 
 /** Invoice dialog: a pasted address comes out as a clean block; when parts cannot be placed it stays as typed. */
@@ -1244,6 +1327,7 @@ function detectCommand(body) {
 // ---------------------------------------------------------------------------
 async function processMessage(bot, msg) {
     const chatId = msg.chat.id;
+    if (!msg.text && (msg.photo || isImageDocument(msg))) return processPhoto(bot, msg);
     const body = msg.text ? msg.text.trim() : '';
     if (!body) return;
 

@@ -459,7 +459,7 @@ function parseAddress(text) {
         if (kinds[i]) return;
         const beforeAddress = (streetIdx < 0 || i < streetIdx) && (zipIdx < 0 || i < zipIdx);
         if (beforeAddress && !r.name && looksLikeName(t) && !COMPANY.test(t)) { r.name = cleanName(t); kinds[i] = 'name'; return; }
-        if (beforeAddress && !r.company && (COMPANY.test(t) || (r.name && i <= 2))) { r.company = t; kinds[i] = 'company'; return; }
+        if (beforeAddress && !r.company && (COMPANY.test(t) || (r.name && kinds[i - 1] === 'name' && !/\d/.test(t) && /[A-Za-zÀ-ÿ]{3}/.test(t)))) { r.company = t; kinds[i] = 'company'; return; }
         if (!r.name && looksLikeName(t) && !COMPANY.test(t) && streetIdx < 0 && zipIdx < 0) { r.name = cleanName(t); kinds[i] = 'name'; return; }
         // Between street and town: address addition ("Hinterhaus", "Apt 4")
         if (streetIdx >= 0 && i > streetIdx && (zipIdx < 0 || i < zipIdx)) { extras.push(t); kinds[i] = 'extra'; return; }

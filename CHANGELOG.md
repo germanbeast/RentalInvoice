@@ -12,6 +12,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Land aus Text, PLZ-Präfix (D-, CH-), PLZ-Format, bekannten Städten oder Telefonvorwahl; Ausgabe im App-Format (Straße Nr. / PLZ Ort / Land außer Deutschland)
 - Telegram: eingefügte Anschrift ohne Datum startet „Anschrift einfügen“ (mit Datum bleibt es der Rechnungsdialog), `/adresse`, Menü-Knopf; Buchungsauswahl mit Namensabgleich, Zusammenfassung, Speichern in `guests.address/phone/email`, bei Platzhalter-Gast über `applyGuestName`
 - Recht `adresse` = Buchungen & Gäste bearbeiten
+- Screenshots: Foto oder Bilddatei an den Bot → Texterkennung mit `tesseract.js` auf dem Server (`screenshot-ocr.js`, Sprachdaten Deutsch/Englisch als npm-Pakete `@tesseract.js-data/deu|eng`, entpackt nach `.ocr-data/`), Statusleiste/App-Knöpfe werden herausgefiltert, bekannte Gastnamen haben Vorrang; Bild nur als temporäre Datei, nach dem Speichern wird die Foto-Nachricht per `deleteMessage` aus dem Chat entfernt
 
 ## [1.46.0] - 2026-11-17
 

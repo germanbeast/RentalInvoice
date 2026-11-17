@@ -12,6 +12,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@tesseract.js-data/deu": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
@@ -31,6 +33,7 @@
     "nodemailer": "^10.3.1",
     "puppeteer": "^24.37.3",
     "qrcode": "^1.5.4",
+    "tesseract.js": "^7.0.0",
     "web-push": "^3.6.7",
     "whatsapp-web.js": "^1.34.6"
   }
