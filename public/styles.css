@@ -3624,3 +3624,10 @@ a.pill { text-decoration: none; }
 .wifi-bars > div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; min-width: 0; }
 .wifi-bars i { display: block; width: 100%; max-width: 22px; background: var(--accent, #8a6d3b); border-radius: 2px 2px 0 0; }
 .wifi-bars small { font-size: .62rem; color: var(--text-secondary); }
+
+/* Buchung: Sprache der Gäste-App + Gastdaten einfügen */
+.pop-lang { font: inherit; font-size: .84rem; padding: .2rem .4rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card, #fff); color: var(--ink); max-width: 100%; }
+.pop-guestdata label { display: block; font-size: .8rem; color: var(--muted); }
+.pop-guestdata textarea { display: block; width: 100%; margin: .35rem 0 .5rem; font: inherit; font-size: .85rem; padding: .5rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card, #fff); color: var(--ink); resize: vertical; }
+.pop-gd-preview { display: grid; gap: .15rem; font-size: .8rem; margin-bottom: .6rem; }
+.pop-gd-preview:empty { display: none; }

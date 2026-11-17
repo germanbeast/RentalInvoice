@@ -26,6 +26,8 @@ const db = require('./db');
 const vouchers = require('./vouchers');
 const waCommands = require('./wa-commands');
 const tgCommands = require('./tg-commands');
+const guestLang = require('./guest-lang');
+const guestData = require('./guest-data');
 const TelegramBot = require('node-telegram-bot-api');
 const packageJson = require('./package.json');
 const { renderEstateReportHtml } = require('./estate-report-template');
@@ -1371,7 +1373,8 @@ function welcomeData() {
         phone: (s.vermieter && s.vermieter.telefon) || '',
         checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
         title: (s.site && s.site.title) || '',
-        wifi: current ? guestWifi.tvView() : null
+        wifi: current ? guestWifi.tvView() : null,
+        lang: current ? guestLang.langOrDe(current) : 'de'
     };
 }
 
@@ -1392,6 +1395,7 @@ const liveLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: t
 app.get('/api/live', liveLimiter, localLive.publicHandler);
 app.get('/gast/api/live', liveLimiter, localLive.publicHandler);
 app.get('/live-icons.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'live-icons.js')); });
+app.get('/guest-i18n.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'i18n.js')); });
 
 // Web app (PWA) files: browsers and the OS fetch them without the session cookie
 app.get('/sw.js', (req, res) => {
@@ -1942,9 +1946,11 @@ function nightsBetween(a, b) {
 
 function loadBookingRows() {
     guestPortal.ensureGuestCodes();
+    guestLang.migrate();
     const rows = db.getDb().prepare(`
         SELECT b.id, b.uid, b.summary, b.checkin, b.checkout, b.source, b.nuki_pin, b.nuki_auth_id, b.guest_code,
-               b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email,
+               b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email, g.phone AS guest_phone, g.address AS guest_address,
+               b.guest_lang, b.guest_lang_pick,
                (SELECT id FROM guest_registrations r WHERE r.booking_id = b.id) AS meldeschein_id,
                (SELECT code FROM vouchers v WHERE v.booking_id = b.id AND v.status = 'redeemed' ORDER BY v.id LIMIT 1) AS voucher_code
         FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
@@ -1967,7 +1973,9 @@ function loadBookingRows() {
             hasCode: !!(r.nuki_auth_id || r.nuki_pin), pin: r.nuki_pin || null,
             arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state,
             guestCode: r.guest_code || null, meldescheinId: r.meldeschein_id || null, voucherCode: r.voucher_code || null,
-            manualEntry: String(r.uid).startsWith('direct-manual-')
+            manualEntry: String(r.uid).startsWith('direct-manual-'),
+            guestPhone: r.guest_phone || null, guestAddress: r.guest_address || null,
+            lang: r.guest_lang || '', langPick: r.guest_lang_pick || ''
         };
     });
 }
@@ -2156,6 +2164,45 @@ app.put('/api/bookings/:id/guest', apiLimiter, async (req, res) => {
         res.json({ success: true, name: r.name, nukiRenamed: r.nukiRenamed, nukiError: r.nukiError });
     } catch (e) {
         console.error('Booking guest name Error:', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Language of the guest pages, TV and guest messages: '' = automatic (guest's choice or guessed from the guest data)
+app.get('/api/bookings/:id/lang', apiLimiter, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const b = db.getDb().prepare('SELECT id FROM bookings WHERE id = ?').get(id);
+    if (!b) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+    res.json({ success: true, ...guestLang.forBooking(b) });
+});
+app.put('/api/bookings/:id/lang', apiLimiter, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const lang = String((req.body && req.body.lang) || '');
+    if (lang && !guestLang.LANGS.includes(lang)) return res.status(400).json({ success: false, error: 'Unbekannte Sprache' });
+    if (!guestLang.setHost(id, lang)) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+    res.json({ success: true, ...guestLang.forBooking({ id }) });
+});
+
+// Guest data from unformatted text (like in Telegram): name, address, phone, e-mail
+app.post('/api/bookings/:id/guest-data', apiLimiter, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const b = db.getDb().prepare('SELECT b.*, g.name AS guest_name FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id WHERE b.id = ?').get(id);
+        if (!b) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+        const p = guestData.parseGuestText(String((req.body && req.body.text) || '').slice(0, 2000));
+        if (req.body && req.body.preview) return res.json({ success: true, parsed: p, address: guestData.addressText(p) });
+        const current = b.guest_name && !botLogicShared.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
+        if (!p.name && !current) return res.status(400).json({ success: false, error: 'Kein Name erkannt. Bitte den Namen des Gastes mit einfügen.' });
+        if (!guestData.hasGuestData(p) && !p.name) return res.status(400).json({ success: false, error: 'Keine Anschrift, Telefonnummer oder E-Mail erkannt.' });
+        let nukiRenamed = false;
+        if (p.name && p.name.toLowerCase() !== current.toLowerCase()) nukiRenamed = (await botLogicShared.applyGuestName(id, p.name)).nukiRenamed;
+        const fresh = db.getDb().prepare('SELECT guest_id FROM bookings WHERE id = ?').get(id);
+        const g = db.getGuestById(fresh.guest_id);
+        const address = guestData.addressText(p);
+        db.updateGuest(g.id, { ...g, address: address || g.address, phone: p.phone || g.phone, email: p.email || g.email });
+        res.json({ success: true, parsed: p, address, nukiRenamed, lang: guestLang.forBooking({ id }) });
+    } catch (e) {
+        console.error('Booking guest data Error:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });

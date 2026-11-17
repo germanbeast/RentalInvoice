@@ -72,6 +72,7 @@
         .wl-rules .prose { margin-top: .7rem; font-size: .95rem; }
         .wl-preview { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--ink); color: var(--paper); text-align: center; font-size: .82rem; padding: .55rem 1rem; letter-spacing: .02em; }
         .masthead .brand { pointer-events: none; }
+        .masthead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
     </style>
 </head>
 <body>
@@ -81,12 +82,13 @@
 
     <main class="wl" aria-live="polite">
         <p class="wl-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16.1a5 5 0 0 1 7 0"/><path d="M12 19.6h.01"/></svg><span id="kicker">Gäste-WLAN</span></p>
-        <div id="box"><div class="wl-wait"><div class="wl-spin" aria-hidden="true"></div><p>Einen Moment …</p></div></div>
+        <div id="box"><div class="wl-wait"><div class="wl-spin" aria-hidden="true"></div><p data-t>Einen Moment …</p></div></div>
         <div class="wl-contact" id="contact" hidden></div>
     </main>
     <div class="wl-preview" id="preview" hidden>Vorschau der WLAN-Anmeldeseite · jeder 6-stellige Code wird angenommen</div>
 
     <script src="live-icons.js"></script>
+    <script src="i18n.js"></script>
     <script src="wlan.js"></script>
 </body>
 </html>

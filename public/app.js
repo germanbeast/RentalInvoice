@@ -2169,11 +2169,16 @@
                 <dt>Türcode</dt><dd>${bk.hasCode ? (bk.pin ? `<code>${escapeHtml(bk.pin)}</code>` : 'angelegt') + (bk.arrivedAt ? ' · genutzt' : '') : 'kein Code'}</dd>
                 ${bk.guestCode ? `<dt>Gastcode</dt><dd><code>${escapeHtml(bk.guestCode)}</code></dd>` : ''}
                 ${bk.guestEmail ? `<dt>E-Mail</dt><dd>${escapeHtml(bk.guestEmail)}</dd>` : ''}
+                ${bk.guestPhone ? `<dt>Telefon</dt><dd>${escapeHtml(bk.guestPhone)}</dd>` : ''}
+                ${bk.guestAddress ? `<dt>Anschrift</dt><dd>${escapeHtml(bk.guestAddress).replace(/\n/g, ', ')}</dd>` : ''}
+                ${bk.state !== 'past' && canDo('bookings', 'edit') ? `<dt>Sprache</dt><dd><select class="pop-lang" data-pop-lang aria-label="Sprache der Gäste-App, des Fernsehers und der Gästenachrichten">
+                    <option value="">Automatisch</option>${Object.entries(GUEST_LANGS).map(([k, v]) => `<option value="${k}"${bk.lang === k ? ' selected' : ''}>${v}</option>`).join('')}</select></dd>` : ''}
                 <dt>Meldeschein</dt><dd>${bk.meldescheinId ? 'ausgefüllt ✓' : bk.state === 'past' ? '–' : 'fehlt noch'}</dd>
                 ${bk.voucherCode ? `<dt>Gutschein</dt><dd><code>${escapeHtml(bk.voucherCode)}</code> eingelöst</dd>` : ''}
             </dl>
             <div class="pop-actions">
                 <button type="button" class="pill" data-pop="name">${bk.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
+                ${canDo('bookings', 'edit') ? '<button type="button" class="pill" data-pop="guestdata">Gastdaten einfügen</button>' : ''}
                 <button type="button" class="pill" data-pop="invoice">Rechnung erstellen</button>
                 ${bk.meldescheinId ? '<button type="button" class="pill" data-pop="meldeschein">Meldeschein</button>' : ''}
                 ${bk.state !== 'past' ? `<button type="button" class="pill" data-pop="doorcode">${bk.hasCode ? 'Türcode bearbeiten' : 'Türcode anlegen'}</button>` : ''}
@@ -2186,7 +2191,23 @@
         tlPop.dataset.bid = bk.id;
         delete tlPop.dataset.rid;
         placePop(anchor);
+        const langSel = tlPop.querySelector('[data-pop-lang]');
+        if (langSel) {
+            // What "Automatisch" means for this guest right now
+            apiJson(`/api/bookings/${bk.id}/lang`).then(d => {
+                if (!d || !d.success || !langSel.isConnected) return;
+                const auto = d.pick || d.auto;
+                langSel.options[0].textContent = auto ? `Automatisch · ${GUEST_LANGS[auto]}` : 'Automatisch · Browser';
+                langSel.title = auto ? (d.pick ? 'Vom Gast auf „Meine Buchung“ gewählt' : `Erkannt aus ${d.from}`) : 'Keine Angaben zum Gast: Meine Buchung nimmt die Sprache des Browsers, Fernseher und Nachrichten Deutsch';
+            }).catch(() => { });
+            langSel.addEventListener('change', async () => {
+                const d = await apiJson(`/api/bookings/${bk.id}/lang`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: langSel.value }) }).catch(() => null);
+                if (d && d.success) { bk.lang = langSel.value; showToast(langSel.value ? `Sprache: ${GUEST_LANGS[langSel.value]}` : 'Sprache wieder automatisch', 'success'); }
+                else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
+            });
+        }
     }
+    const GUEST_LANGS = { de: 'Deutsch', en: 'Englisch', nl: 'Niederländisch', pl: 'Polnisch' };
 
     function showRequestPop(rq, anchor) {
         tlPop.innerHTML = `
@@ -2261,6 +2282,39 @@
                 const d = await apiJson(`/api/bookings/${bk.id}`, { method: 'DELETE' }).catch(() => null);
                 if (d && d.success) { showToast('Buchung gelöscht', 'success'); hideTlPop(); loadCalendarHome(); }
                 else showToast((d && d.error) || 'Löschen fehlgeschlagen', 'error');
+                return;
+            }
+            if (act === 'guestdata') {
+                const acts = tlPop.querySelector('.pop-actions');
+                acts.outerHTML = `<form class="pop-guestdata" data-gd>
+                    <label>Gastdaten, egal wie formatiert (z. B. aus Booking.com kopiert)
+                    <textarea rows="5" maxlength="2000" placeholder="Jan de Vries&#10;Kerkstraat 12&#10;1012 AB Amsterdam&#10;+31 6 12345678"></textarea></label>
+                    <div class="pop-gd-preview" aria-live="polite"></div>
+                    <div class="pop-actions"><button type="submit" class="pill pill-primary">Übernehmen</button><button type="button" class="pill" data-pop="close">Abbrechen</button></div></form>`;
+                const f = tlPop.querySelector('[data-gd]');
+                const ta = f.querySelector('textarea');
+                const prev = f.querySelector('.pop-gd-preview');
+                ta.focus();
+                let t = null;
+                ta.addEventListener('input', () => {
+                    clearTimeout(t);
+                    t = setTimeout(async () => {
+                        if (!ta.value.trim()) { prev.textContent = ''; return; }
+                        const d = await apiJson(`/api/bookings/${bk.id}/guest-data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: ta.value, preview: true }) }).catch(() => null);
+                        if (!d || !d.success) return;
+                        const p = d.parsed;
+                        prev.innerHTML = [['Name', p.name], ['Anschrift', d.address.replace(/\n/g, ', ')], ['Telefon', p.phone], ['E-Mail', p.email]]
+                            .map(([k, v]) => `<span><b>${k}:</b> ${v ? escapeHtml(v) : '<em>–</em>'}</span>`).join('');
+                    }, 300);
+                });
+                f.addEventListener('submit', async ev => {
+                    ev.preventDefault();
+                    const d = await apiJson(`/api/bookings/${bk.id}/guest-data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: ta.value }) }).catch(() => null);
+                    if (d && d.success) { showToast('Gastdaten gespeichert' + (d.nukiRenamed ? ' – Türcode umbenannt' : ''), 'success'); hideTlPop(); loadCalendarHome(); }
+                    else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
+                });
+                const pr = tlPop.getBoundingClientRect();
+                if (pr.bottom > window.innerHeight - 8) tlPop.style.top = `${Math.max(8, window.innerHeight - pr.height - 8)}px`;
                 return;
             }
             if (act === 'name') {

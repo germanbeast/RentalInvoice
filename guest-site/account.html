@@ -17,10 +17,10 @@
     <header class="masthead solid login-only">
         <a href="./" class="brand" id="brand">Ferienwohnung Beckhome</a>
         <nav class="mast-nav" aria-label="Hauptnavigation">
-            <a href="./#wohnung">Die Wohnung</a>
-            <a href="./#buchen">Verfügbarkeit</a>
-            <a href="./" class="mast-cta" id="mast-home">Zur Startseite</a>
-            <button type="button" class="mast-cta mast-logout" id="mast-logout" hidden>Abmelden</button>
+            <a href="./#wohnung" data-t>Die Wohnung</a>
+            <a href="./#buchen" data-t>Verfügbarkeit</a>
+            <a href="./" class="mast-cta" id="mast-home" data-t>Zur Startseite</a>
+            <button type="button" class="mast-cta mast-logout" id="mast-logout" hidden data-t>Abmelden</button>
         </nav>
     </header>
 
@@ -29,19 +29,19 @@
 
         <div class="account-panel">
             <div id="login-box" hidden>
-                <h1>Meine Buchung</h1>
-                <p class="guest-lead">Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer E-Mail oder in der Nachricht über Booking.com bzw. Airbnb. Airbnb-Gäste können auch ihren Airbnb-Bestätigungscode (HM…) verwenden.</p>
+                <h1 data-t>Meine Buchung</h1>
+                <p class="guest-lead" data-t>Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer E-Mail oder in der Nachricht über Booking.com bzw. Airbnb. Airbnb-Gäste können auch ihren Airbnb-Bestätigungscode (HM…) verwenden.</p>
                 <form class="login" id="login-form" novalidate>
-                    <label>Buchungscode
+                    <label><span data-t>Buchungscode</span>
                         <input type="text" name="code" placeholder="BH-XXXXXX" autocomplete="off" autocapitalize="characters" maxlength="20" required autofocus>
                     </label>
-                    <label>Anreisedatum
+                    <label><span data-t>Anreisedatum</span>
                         <input type="date" name="arrival" required>
                     </label>
                     <div class="form-error" id="login-error" role="alert" hidden></div>
-                    <button type="submit" class="btn btn-dark btn-block">Anmelden</button>
+                    <button type="submit" class="btn btn-dark btn-block" data-t>Anmelden</button>
                 </form>
-                <p class="account-help">Noch nicht gebucht? <a href="./#buchen">Verfügbarkeit ansehen</a></p>
+                <p class="account-help"><span data-t>Noch nicht gebucht?</span> <a href="./#buchen" data-t>Verfügbarkeit ansehen</a></p>
             </div>
 
         </div>
@@ -54,9 +54,9 @@
                 <p id="footer-contact"></p>
             </div>
             <nav aria-label="Rechtliches">
-                <a href="./">Startseite</a>
-                <a href="#impressum">Impressum</a>
-                <a href="#datenschutz">Datenschutz</a>
+                <a href="./" data-t>Startseite</a>
+                <a href="#impressum" data-t>Impressum</a>
+                <a href="#datenschutz" data-t>Datenschutz</a>
             </nav>
         </div>
     </footer>
@@ -67,12 +67,12 @@
             <div class="gapp-hero-media" id="app-hero-media" aria-hidden="true"></div>
             <div class="gapp-bar">
                 <a href="./" class="gapp-brand" id="app-brand">Ferienwohnung Beckhome</a>
-                <button type="button" class="gapp-menu-btn" id="app-menu-btn" aria-label="Menü" aria-haspopup="dialog">
+                <button type="button" class="gapp-menu-btn" id="app-menu-btn" aria-label="Menü" data-t-attr="aria-label" aria-haspopup="dialog">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
                 </button>
             </div>
             <div class="gapp-hero-text">
-                <p class="gapp-kicker">Meine Buchung</p>
+                <p class="gapp-kicker" data-t>Meine Buchung</p>
                 <h1 id="app-hello">Willkommen</h1>
                 <p id="app-state"></p>
             </div>
@@ -81,15 +81,15 @@
         <nav class="gapp-tabs" id="app-tabs" role="tablist" aria-label="Bereiche">
             <button type="button" role="tab" data-tab="guests" id="tab-guests">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.2 3.2 0 0 1 0 6.4M18 13.8c2.1.7 3.5 2.9 3.5 5.2"/></svg>
-                <span>Gäste</span><i class="gapp-dot" id="tab-guests-dot" hidden></i>
+                <span data-t>Gäste</span><i class="gapp-dot" id="tab-guests-dot" hidden></i>
             </button>
             <button type="button" role="tab" data-tab="stay" id="tab-stay">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="m9 14 2 2 4-4"/></svg>
-                <span>Aufenthalt</span>
+                <span data-t>Aufenthalt</span>
             </button>
             <button type="button" role="tab" data-tab="arrival" id="tab-arrival">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>
-                <span>Ankunft</span>
+                <span data-t>Ankunft</span>
             </button>
             <button type="button" role="tab" data-tab="az" id="tab-az">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3.5 5v13.5c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5z"/><path d="M12 6.5V20"/></svg>
@@ -97,7 +97,7 @@
             </button>
             <button type="button" role="tab" data-tab="area" id="tab-area">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>
-                <span>Umgebung</span>
+                <span data-t>Umgebung</span>
             </button>
         </nav>
 
@@ -111,25 +111,26 @@
     </div>
 
     <dialog class="sheet gapp-sheet" id="app-menu" aria-label="Menü">
-        <button type="button" class="icon-btn sheet-close" data-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button type="button" class="icon-btn sheet-close" data-close aria-label="Schließen" data-t-attr="aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         <h2 id="app-menu-title">Menü</h2>
         <nav class="gapp-menu" id="app-menu-links">
-            <a href="./">Zur Startseite</a>
-            <a href="./#wohnung">Die Wohnung</a>
+            <a href="./" data-t>Zur Startseite</a>
+            <a href="./#wohnung" data-t>Die Wohnung</a>
             <span id="app-menu-contact"></span>
-            <a href="#impressum">Impressum</a>
-            <a href="#datenschutz">Datenschutz</a>
-            <button type="button" id="app-logout">Abmelden</button>
+            <a href="#impressum" data-t>Impressum</a>
+            <a href="#datenschutz" data-t>Datenschutz</a>
+            <button type="button" id="app-logout" data-t>Abmelden</button>
         </nav>
     </dialog>
 
     <dialog class="sheet" id="legal-overlay" aria-labelledby="legal-title">
-        <button type="button" class="icon-btn sheet-close" id="legal-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button type="button" class="icon-btn sheet-close" id="legal-close" aria-label="Schließen" data-t-attr="aria-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         <h2 id="legal-title"></h2>
         <div class="prose" id="legal-body"></div>
     </dialog>
 
     <script src="live-icons.js"></script>
+    <script src="i18n.js"></script>
     <script src="account.js"></script>
 </body>
 </html>

@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.0] - 2026-11-17
+
+### Neu
+- Gäste-Seiten mehrsprachig (Deutsch, Englisch, Niederländisch, Polnisch): `guest-site/i18n.js` mit Wörterbuch (deutscher Text als Schlüssel), `T()` für eigene und `TX()` für Server-Texte (Fehler, Wetter, Öffnungszeiten); Sprachumschalter auf Meine Buchung (Login, Kopfleiste, Menü), WLAN-Anmeldeseite und Notfall-Öffnen; TV-Welcome lädt `/guest-i18n.js`
+- `guest-lang.js`: Sprache pro Buchung, Reihenfolge Admin (`bookings.guest_lang`) > Wahl des Gastes (`bookings.guest_lang_pick`, `POST /gast/api/me/lang`) > erkannt aus Meldeschein, Land der Anschrift, Telefonvorwahl, E-Mail-Domain; ohne Hinweis Browser-Sprache (Gästeseiten) bzw. Deutsch (TV, Nachrichten)
+- Admin: Sprache im Buchungs-Popup (`GET/PUT /api/bookings/:id/lang`), Telefon und Anschrift im Popup, „Gastdaten einfügen“ (`POST /api/bookings/:id/guest-data`, mit Vorschau)
+- Gästenachricht (`guest-message.js`) und Anreise-Nachricht (`arrival-guide.js`) auch auf Niederländisch und Polnisch, Standard ist die Sprache des Gastes
+- `guest-data.js`: liest Name, Straße, PLZ/Ort, Land, Telefon, E-Mail und Zeitraum aus unformatiertem Text (Zeilen, Kommas oder eine Zeile; DE/NL/PL/UK-Postleitzahlen, Booking.com-Extranet mit Beschriftungszeilen)
+- Telegram: Freitext mit Anschrift/Telefon/E-Mail oder `/gast …` → Zuordnung zur Buchung (Zeitraum, Name oder einzige Buchung ohne Namen, sonst Auswahl) → Bestätigen → Gast mit Name (Türcode wird umbenannt), Anschrift, Telefon, E-Mail gespeichert; „Stattdessen Rechnung“ startet den Rechnungs-Dialog vorausgefüllt
+- Meldeschein und Rechnungsformular auf Meine Buchung sind mit der gespeicherten Anschrift vorausgefüllt; Länder werden in der Sprache des Gastes angezeigt, gespeichert bleibt der deutsche Name
+
 ## [1.46.0] - 2026-11-17
 
 ### Neu

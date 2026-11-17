@@ -18,6 +18,7 @@
  */
 
 const crypto = require('crypto');
+const guestLang = require('./guest-lang');
 const path = require('path');
 
 const SITE_DIR = path.join(__dirname, 'guest-site');
@@ -401,7 +402,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         const rhid = enqueue(f.fas, minutes, `booking=${b.id}`);
         rememberDevice({ bookingId: b.id, kind: 'guest', mac: f.mac, fas: f.fas, ua, until: acc.until });
         db.logNotification('guest_wifi', `WLAN-Anmeldung (${how}) für ${guestName(b) || 'Gast'} ${formatDateDE(b.checkin)} – ${formatDateDE(b.checkout)}`, 'sent');
-        return { success: true, wait: rhid, name: firstName(guestName(b)), until: new Date(acc.until).toISOString(), checkout: b.checkout, welcome: welcomeFor(b) };
+        return { success: true, wait: rhid, name: firstName(guestName(b)), until: new Date(acc.until).toISOString(), checkout: b.checkout, welcome: welcomeFor(b), lang: guestLang.forBooking(b).lang };
     }
 
     /** What the page shows after the login: check-out, house rules, contact (the live tips come from api/live). */
@@ -487,7 +488,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
                 if (r.success) return res.json({ ...base, auto: true, ...r });
             }
             const sb = active() ? sessionBooking(req) : null;
-            res.json({ ...base, session: sb ? { name: firstName(guestName(sb)) || 'Gast' } : null });
+            res.json({ ...base, session: sb ? { name: firstName(guestName(sb)) || 'Gast', lang: guestLang.forBooking(sb).lang } : null });
         });
 
         router.post('/api/wlan/login', pageLimiter, (req, res) => {

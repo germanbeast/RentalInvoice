@@ -1,6 +1,8 @@
 const db = require('./db');
 const botLogic = require('./bot-logic');
 const permissions = require('./permissions');
+const guestData = require('./guest-data');
+const guestLang = require('./guest-lang');
 
 /** Rights of a Telegram chat: a linked user account gets its own rights; an ID that was only approved
  *  under Einstellungen → Telegram (no user linked) keeps full access as before. */
@@ -10,13 +12,13 @@ function botPerms(chatId) {
 }
 const DENIED = '⛔ <b>Keine Berechtigung</b>\nDein Benutzer darf das nicht. Rechte vergibt der Inhaber in der Benutzerverwaltung.';
 const CMD_RIGHT = { status: 'offen', offen: 'offen', sync: 'sync', namen: 'namen', codes: 'codes', 'türcodes': 'codes', tuercodes: 'codes',
-    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin' };
+    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin', gast: 'namen', gastdaten: 'namen', adresse: 'namen', anschrift: 'namen' };
 function callbackRight(data) {
     if (data === 'open') return 'offen';
     if (data === 'arrivals') return 'anreisen';
     if (data === 'codes') return 'codes';
     if (data === 'sync' || data.startsWith('ovl:')) return 'sync';
-    if (data === 'names' || data.startsWith('nm:')) return 'namen';
+    if (data === 'names' || data.startsWith('nm:') || data.startsWith('gd:')) return 'namen';
     if (data === 'lock:status') return 'lockstatus';
     if (data.startsWith('lock:')) return 'lock';
     if (data === 'gm' || data.startsWith('gm:')) return 'nachricht';
@@ -178,6 +180,7 @@ async function showHelp(bot, chatId) {
         '• <code>/status</code> – offene Rechnungen\n' +
         '• <code>/codes</code> – Türcodes live aus Nuki anzeigen\n' +
         '• <code>/namen</code> – Gastnamen zu Buchungen nachtragen\n' +
+        '• <code>/gast</code> – Gastdaten (Anschrift, Telefon, E-Mail) zu einer Buchung speichern\n' +
         '• <code>/sync</code> – Booking.com &amp; Airbnb jetzt abfragen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
         '• <code>/nachricht</code> – fertige Nachricht für den Gast (zum Kopieren)\n' +
@@ -190,6 +193,10 @@ async function showHelp(bot, chatId) {
         'Du kannst gleich alles in eine Nachricht schreiben, z.B.\n' +
         '<code>Rechnung Max Mustermann\nMusterstr. 1\n12345 Musterstadt\n15.03. - 20.03.2026</code>\n' +
         'Der Bot übernimmt, was er erkennt, und fragt nur nach dem Rest.\n\n' +
+        '<b>Gastdaten einfach einfügen</b>\n' +
+        'Kopier Name, Anschrift, Telefon und E-Mail des Gastes egal wie formatiert in den Chat, z.B.\n' +
+        '<code>Jan de Vries, Kerkstraat 12, 1012 AB Amsterdam, +31 6 12345678</code>\n' +
+        'Der Bot ordnet sie der passenden Buchung zu und füllt damit Rechnung, Meldeschein und die Sprache der Gäste-App aus.\n\n' +
         '<b>Jederzeit möglich</b>\n' +
         '• ⬅️ <b>Zurück</b> (oder „zurück“) – einen Schritt zurück\n' +
         '• ❌ <b>Abbrechen</b> (oder „abbrechen“) – Vorgang beenden\n' +
@@ -341,6 +348,143 @@ async function showNamesOpen(bot, chatId) {
     kb.push([btn('🏠 Hauptmenü', 'menu')]);
     const more = rows.length > shown.length ? `\n… und ${rows.length - shown.length} weitere` : '';
     return send(bot, chatId, `<b>👤 Buchungen ohne Gastnamen (${rows.length})</b>\nWähle eine Buchung:${more}`, keyboard(kb));
+}
+
+// ---------------------------------------------------------------------------
+// Gastdaten aus unformatiertem Text (Anschrift, Telefon, E-Mail) zu einer Buchung speichern
+// ---------------------------------------------------------------------------
+const GD_TTL_MS = 30 * 60 * 1000;
+const guestDataDrafts = new Map(); // chatId -> { p, text, bookingId, at }
+const LANG_LABEL = { de: '🇩🇪 Deutsch', en: '🇬🇧 Englisch', nl: '🇳🇱 Niederländisch', pl: '🇵🇱 Polnisch' };
+
+function guestDataCandidates() {
+    return db.getDb().prepare(`
+        SELECT b.id, b.summary, b.checkin, b.checkout, b.source, b.uid, g.name AS guest_name
+        FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE b.checkout >= date('now', '-14 days') AND b.checkin IS NOT NULL
+        ORDER BY b.checkin ASC LIMIT 40
+    `).all();
+}
+
+/** Booking the text belongs to: same dates, else the same name, else the only booking without a name. */
+function matchBooking(p, rows) {
+    if (p.arrival && p.departure) {
+        const hit = rows.find(r => r.checkin === p.arrival && r.checkout === p.departure) || rows.find(r => r.checkin === p.arrival);
+        if (hit) return hit;
+    }
+    const n = String(p.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    if (n) {
+        const parts = n.split(' ');
+        const hit = rows.find(r => {
+            const g = String(r.guest_name || '').toLowerCase();
+            return g && !botLogic.isPlaceholderGuestName(r.guest_name) && (g === n || parts.every(w => w.length > 1 && g.includes(w)));
+        });
+        if (hit) return hit;
+    }
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+    const open = rows.filter(r => r.checkout >= today && botLogic.isPlaceholderGuestName(r.guest_name || guessNameFromSummary(r.summary)));
+    return open.length === 1 ? open[0] : null;
+}
+
+const bookingLabel = r => {
+    const real = r.guest_name || guessNameFromSummary(r.summary);
+    const name = botLogic.isPlaceholderGuestName(real) ? 'Name fehlt' : short(real, 20);
+    return `${fmtDate(r.checkin).slice(0, 6)}–${fmtDate(r.checkout).slice(0, 6)} · ${name}`;
+};
+
+async function startGuestData(bot, chatId, text) {
+    const active = sessions.get(chatId);
+    if (active) await cancelSession(bot, chatId, active, true);
+    const p = guestData.parseGuestText(text);
+    if (!guestData.hasGuestData(p) && !p.name) {
+        return send(bot, chatId, '🤔 Darin habe ich keine Anschrift, Telefonnummer oder E-Mail gefunden.', menuOnlyKeyboard());
+    }
+    let rows = [];
+    try { rows = guestDataCandidates(); } catch (e) { console.error('[TG] Gastdaten Buchungen:', e.message); }
+    const hit = matchBooking(p, rows);
+    guestDataDrafts.set(chatId, { p, text, bookingId: hit ? hit.id : null, at: Date.now() });
+    return hit ? showGuestDataConfirm(bot, chatId) : showGuestDataPick(bot, chatId);
+}
+
+function guestDataDraft(chatId) {
+    const d = guestDataDrafts.get(chatId);
+    if (!d || Date.now() - d.at > GD_TTL_MS) { guestDataDrafts.delete(chatId); return null; }
+    return d;
+}
+
+async function showGuestDataPick(bot, chatId, intro) {
+    const d = guestDataDraft(chatId);
+    if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+    let rows = [];
+    try { rows = guestDataCandidates().filter(r => r.checkout >= today).slice(0, 8); } catch (e) { rows = []; }
+    if (!rows.length) return send(bot, chatId, '📅 Keine aktuellen oder kommenden Buchungen, zu denen ich die Gastdaten speichern kann.', keyboard([[btn('🧾 Rechnung daraus erstellen', 'gd:inv'), btn('🏠 Hauptmenü', 'menu')]]));
+    const kb = rows.map(r => [btn(`📅 ${bookingLabel(r)}`, `gd:b:${r.id}`)]);
+    kb.push([btn('🧾 Stattdessen Rechnung', 'gd:inv'), btn('❌ Abbrechen', 'gd:x')]);
+    return send(bot, chatId, `${intro ? intro + '\n\n' : ''}${guestDataSummary(d.p)}\n\n<b>Zu welcher Buchung gehört der Gast?</b>`, keyboard(kb));
+}
+
+function guestDataSummary(p, booking) {
+    const lines = ['👤 <b>Gastdaten erkannt</b>'];
+    lines.push(`Name: ${p.name ? `<b>${esc(p.name)}</b>` : '<i>nicht erkannt</i>'}`);
+    const addr = guestData.addressText(p);
+    if (addr) lines.push(`Anschrift: ${esc(addr).replace(/\n/g, ', ')}`);
+    if (p.phone) lines.push(`Telefon: ${esc(p.phone)}`);
+    if (p.email) lines.push(`E-Mail: ${esc(p.email)}`);
+    if (p.rest && p.rest.length) lines.push(`<i>Nicht zugeordnet: ${esc(short(p.rest.join(', '), 80))}</i>`);
+    if (booking) {
+        const lang = guestLang.langOfCountry(p.country) || guestLang.langOfPhone(p.phone) || guestLang.langOfEmail(p.email);
+        lines.push('', `📅 Buchung: <b>${esc(bookingLabel(booking))}</b>${booking.source ? ` (${esc(booking.source)})` : ''}`);
+        if (lang) lines.push(`🌐 Gäste-App &amp; TV: ${LANG_LABEL[lang]}`);
+    }
+    return lines.join('\n');
+}
+
+async function showGuestDataConfirm(bot, chatId) {
+    const d = guestDataDraft(chatId);
+    if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
+    const b = getBookingRow(d.bookingId);
+    if (!b) return showGuestDataPick(bot, chatId);
+    const has = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name);
+    let note = '';
+    if (!d.p.name && !has) note = '\n\n⚠️ Ohne Namen kann ich nichts speichern. Schick die Daten bitte mit dem Namen des Gastes.';
+    else if (d.p.name && has && b.guest_name.trim().toLowerCase() !== d.p.name.trim().toLowerCase()) note = `\n\n✏️ Bisheriger Name „${esc(b.guest_name)}“ wird ersetzt.`;
+    const rows = [];
+    if (d.p.name || has) rows.push([btn('✅ Speichern', 'gd:ok')]);
+    rows.push([btn('📅 Andere Buchung', 'gd:pick'), btn('🧾 Stattdessen Rechnung', 'gd:inv')]);
+    rows.push([btn('❌ Abbrechen', 'gd:x')]);
+    return send(bot, chatId, guestDataSummary(d.p, { ...b, source: b.source || (/^airbnb/i.test(b.summary || '') ? 'Airbnb' : String(b.uid || '').startsWith('manual') ? 'Direkt' : 'Booking.com') }) + note, keyboard(rows));
+}
+
+async function saveGuestData(bot, chatId) {
+    const d = guestDataDraft(chatId);
+    if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
+    const b = getBookingRow(d.bookingId);
+    if (!b) return showGuestDataPick(bot, chatId, '⚠️ Diese Buchung gibt es nicht mehr.');
+    const p = d.p;
+    let r = null;
+    const current = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
+    if (p.name && p.name.trim().toLowerCase() !== current.trim().toLowerCase()) r = await botLogic.applyGuestName(b.id, p.name);
+    else if (!current) return send(bot, chatId, '⚠️ Ohne Namen kann ich nichts speichern.', menuOnlyKeyboard());
+    const fresh = db.getDb().prepare('SELECT guest_id FROM bookings WHERE id = ?').get(b.id);
+    const g = fresh && fresh.guest_id ? db.getGuestById(fresh.guest_id) : null;
+    if (!g) return send(bot, chatId, '❌ Gast konnte nicht gespeichert werden.', menuOnlyKeyboard());
+    const addr = guestData.addressText(p);
+    db.updateGuest(g.id, { ...g, address: addr || g.address, phone: p.phone || g.phone, email: p.email || g.email });
+    guestDataDrafts.delete(chatId);
+
+    const lang = guestLang.forBooking({ id: b.id });
+    let text = `✅ <b>Gastdaten gespeichert:</b> ${esc(p.name || current)}\n📅 ${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}\n`;
+    if (addr) text += `🏠 ${esc(addr).replace(/\n/g, ', ')}\n`;
+    if (p.phone) text += `📞 ${esc(p.phone)}\n`;
+    if (p.email) text += `✉️ ${esc(p.email)}\n`;
+    if (lang.lang) text += `🌐 ${LANG_LABEL[lang.lang]}${lang.set ? ' (im Admin festgelegt)' : ''}\n`;
+    if (r && r.booking && r.booking.nuki_auth_id) text += r.nukiRenamed ? '🔑 Türcode im Nuki-Schloss umbenannt.\n' : `⚠️ Türcode nicht umbenannt: ${esc(short(r.nukiError || '', 100))}\n`;
+    text += '\nRechnung und Meldeschein sind damit schon ausgefüllt.';
+    return send(bot, chatId, text, keyboard([
+        [btn('🧾 Rechnung erstellen', `inv:${b.id}`), btn('✉️ Gästenachricht', `gm:${b.id}`)],
+        [btn('🏠 Hauptmenü', 'menu')]
+    ]));
 }
 
 async function startInvoiceFromBooking(bot, chatId, bookingId) {
@@ -514,15 +658,16 @@ async function showGuestMessageList(bot, chatId) {
     return send(bot, chatId, '<b>✉️ Gästenachricht</b>\nFür welche Buchung?', keyboard(kb));
 }
 
-async function showGuestMessage(bot, chatId, bookingId, lang = 'de') {
+async function showGuestMessage(bot, chatId, bookingId, langWanted) {
     const api = guestMessageApi();
     if (!api) return send(bot, chatId, '❌ Die Gästenachricht ist nicht verfügbar.', menuOnlyKeyboard());
-    const m = api.compose(bookingId, lang);
+    const m = api.compose(bookingId, langWanted);
     if (!m) return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard());
+    const lang = m.lang || 'de';
 
     const b = m.booking;
     const who = m.name ? esc(short(m.name, 30)) : 'Gast';
-    let text = `✉️ <b>Gästenachricht${lang === 'en' ? ' (English)' : ''}: ${who}</b> · ${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)}\n` +
+    let text = `✉️ <b>Gästenachricht${lang !== 'de' ? ` (${LANG_LABEL[lang]})` : ''}: ${who}</b> · ${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)}\n` +
         'Tippe auf den Text, um ihn zu kopieren, und füge ihn bei Booking.com oder Airbnb ein.\n';
     if (m.link) text += `<i>Der Link gilt bis ${fmtDate(m.linkUntil)}.</i>\n`;
     m.warnings.forEach(w => { text += `⚠️ ${esc(w)}\n`; });
@@ -531,7 +676,7 @@ async function showGuestMessage(bot, chatId, bookingId, lang = 'de') {
     const rows = [];
     const first = [];
     if (m.link) first.push({ text: '📋 Nur Link kopieren', copy_text: { text: m.link } });
-    first.push(lang === 'en' ? btn('🇩🇪 Deutsch', `gm:${b.id}`) : btn('🇬🇧 English', `gm:en:${b.id}`));
+    first.push(lang !== 'de' ? btn('🇩🇪 Deutsch', `gm:de:${b.id}`) : btn('🇬🇧 English', `gm:en:${b.id}`));
     rows.push(first);
     if (m.link) rows.push([btn('🔁 Neuer Link', `gl:new?:${b.id}`), btn('🔒 Link sperren', `gl:off:${b.id}`)]);
     if (!m.name) rows.push([btn('👤 Namen eintragen', `nm:${b.id}`)]);
@@ -960,7 +1105,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck|gastdaten|gast|adresse|anschrift)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -1083,6 +1228,12 @@ async function processMessage(bot, msg) {
                 return startFlow(bot, chatId, 'invoice', cmd.rest);
             case 'pin':
                 return startFlow(bot, chatId, 'pin', cmd.rest);
+            case 'gast':
+            case 'gastdaten':
+            case 'adresse':
+            case 'anschrift':
+                if (!cmd.rest) return send(bot, chatId, '👤 <b>Gastdaten eintragen</b>\nSchick mir Name, Anschrift, Telefon und/oder E-Mail des Gastes in einer Nachricht, ganz egal wie formatiert, z.B. einfach aus Booking.com kopiert.', menuOnlyKeyboard());
+                return startGuestData(bot, chatId, cmd.rest);
             default:
                 break;
         }
@@ -1094,6 +1245,11 @@ async function processMessage(bot, msg) {
     }
     if (active && active.busy) {
         return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
+    }
+
+    // --- Freitext mit Anschrift, Telefon oder E-Mail: Gastdaten zu einer Buchung speichern ---
+    if (allowed('namen') && guestData.hasGuestData(guestData.parseGuestText(body))) {
+        return startGuestData(bot, chatId, body);
     }
 
     // --- Freitext ohne Befehl: Buchungstext erkennen (mehrzeilig oder mit Datum) ---
@@ -1223,8 +1379,8 @@ async function processCallback(bot, q) {
                 return runLockAction(bot, chatId, data === 'lock:auf!' ? 'unlock' : 'unlatch', who);
             case data === 'gm':
                 return showGuestMessageList(bot, chatId);
-            case data.startsWith('gm:en:'):
-                return showGuestMessage(bot, chatId, parseInt(data.slice(6), 10), 'en');
+            case /^gm:(de|en|nl|pl):/.test(data):
+                return showGuestMessage(bot, chatId, parseInt(data.slice(6), 10), data.slice(3, 5));
             case data.startsWith('gm:'):
                 return showGuestMessage(bot, chatId, parseInt(data.slice(3), 10));
             case data.startsWith('gl:new?:'):
@@ -1243,6 +1399,34 @@ async function processCallback(bot, q) {
             }
             case data.startsWith('inv:'):
                 return startInvoiceFromBooking(bot, chatId, parseInt(data.slice(4), 10));
+            case data === 'gd:ok':
+                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+                return saveGuestData(bot, chatId);
+            case data === 'gd:pick':
+                return showGuestDataPick(bot, chatId);
+            case data.startsWith('gd:b:'): {
+                const d = guestDataDraft(chatId);
+                if (!d) return send(bot, chatId, '⏱ Die Gastdaten sind abgelaufen. Bitte noch einmal schicken.', menuOnlyKeyboard());
+                d.bookingId = parseInt(data.slice(5), 10);
+                return showGuestDataConfirm(bot, chatId);
+            }
+            case data === 'gd:inv': {
+                const d = guestDataDraft(chatId);
+                guestDataDrafts.delete(chatId);
+                if (!permissions.canBot(botPerms(chatId), 'rechnung')) return send(bot, chatId, DENIED);
+                if (!d) return startFlow(bot, chatId, 'invoice', '');
+                const prefill = {};
+                if (d.p.name) prefill.gName = d.p.name;
+                const addr = guestData.addressText(d.p);
+                if (addr) prefill.gAdresse = addr;
+                if (d.p.email) prefill.gEmail = d.p.email;
+                if (d.p.arrival && d.p.departure) { prefill.arrival = d.p.arrival; prefill.departure = d.p.departure; }
+                return startFlow(bot, chatId, 'invoice', '', prefill);
+            }
+            case data === 'gd:x':
+                guestDataDrafts.delete(chatId);
+                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+                return showMenu(bot, chatId, '❌ Gastdaten verworfen.');
             case data === 'new:invoice':
                 return startFlow(bot, chatId, 'invoice', '');
             case data === 'new:pin':
@@ -1309,6 +1493,7 @@ async function setup(bot, options = {}) {
             { command: 'rechnung', description: 'Neue Rechnung erstellen' },
             { command: 'pin', description: 'Nur Tür-Code erstellen' },
             { command: 'namen', description: 'Gastnamen nachtragen' },
+            { command: 'gast', description: 'Gastdaten (Anschrift, Telefon) einfügen' },
             { command: 'sync', description: 'Kalender jetzt abfragen' },
             { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },

@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const guestLang = require('./guest-lang');
 
 const PHOTO_DIR = path.join(__dirname, 'uploads', 'site');
 const PHOTO_RE = /^arr-\d+-[a-f0-9]{8}\.(jpe?g|png|webp)$/;
@@ -159,6 +160,36 @@ function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite,
             emergency: 'If the keypad does not respond, you can open the door here:',
             contact: p => (p ? `If you have any questions, just message us here or call ${p}.` : 'If you have any questions, just message us here.'),
             bye: 'Safe travels!'
+        },
+        nl: {
+            hello: n => (n ? `Hallo ${n},` : 'Hallo,'),
+            intro: t => `vandaag is je aankomstdag, we kijken ernaar uit je te verwelkomen! 🚗 Hier staat alles voor een ontspannen aankomst.${t ? ` Inchecken kan vanaf ${t} uur.` : ''}`,
+            address: 'Adres', route: 'Route', parking: 'Parkeren', door: 'Voordeur',
+            pin: p => `🔑 Je deurcode: ${p}`,
+            wifi: (n, p) => `📶 Wifi: ${n}${p ? `\nWachtwoord: ${p}` : ''}`,
+            wifiOwn: (t, l) => `Het wachtwoord geldt alleen tijdens je verblijf${t ? `, vanaf ${t} uur` : ''}.${l ? ' Via de link hieronder vind je ook een QR-code om te scannen.' : ''}`,
+            wifiCode: c => `Toegangscode: ${c} (na het verbinden opent de inlogpagina, vul hem daar in)`,
+            nopin: '(je deurcode)',
+            steps: 'Zo open je de deur:',
+            photos: '📸 Alle stappen met foto’s:',
+            emergency: 'Reageert het toetsenbord niet, dan kun je de deur hier openen:',
+            contact: p => (p ? `Bij vragen kun je ons altijd hier bereiken of bellen op ${p}.` : 'Bij vragen kun je ons altijd hier bereiken.'),
+            bye: 'Goede reis!'
+        },
+        pl: {
+            hello: n => (n ? `Dzień dobry ${n},` : 'Dzień dobry,'),
+            intro: t => `dziś dzień Twojego przyjazdu, cieszymy się, że przyjeżdżasz! 🚗 Oto wszystko, czego potrzebujesz na spokojny przyjazd.${t ? ` Zameldowanie od godz. ${t}.` : ''}`,
+            address: 'Adres', route: 'Trasa', parking: 'Parking', door: 'Drzwi wejściowe',
+            pin: p => `🔑 Twój kod do drzwi: ${p}`,
+            wifi: (n, p) => `📶 Wi-Fi: ${n}${p ? `\nHasło: ${p}` : ''}`,
+            wifiOwn: (t, l) => `Hasło działa tylko w czasie pobytu${t ? `, od godz. ${t}` : ''}.${l ? ' Pod linkiem poniżej znajdziesz też kod QR do zeskanowania.' : ''}`,
+            wifiCode: c => `Kod dostępu: ${c} (po połączeniu otworzy się strona logowania, wpisz go tam)`,
+            nopin: '(Twój kod do drzwi)',
+            steps: 'Jak otworzyć drzwi:',
+            photos: '📸 Wszystkie kroki ze zdjęciami:',
+            emergency: 'Jeśli klawiatura nie reaguje, drzwi możesz otworzyć tutaj:',
+            contact: p => (p ? `W razie pytań napisz do nas tutaj lub zadzwoń: ${p}.` : 'W razie pytań napisz do nas tutaj.'),
+            bye: 'Szerokiej drogi!'
         }
     };
 
@@ -169,15 +200,9 @@ function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite,
         return n.split(/\s+/)[0];
     }
 
-    /** English when the Meldeschein says the guest is not German (the texts the host types stay as they are). */
+    /** Language of the guest (Admin, guest's choice, Meldeschein, address, phone); the texts the host types stay as they are. */
     function langFor(b) {
-        try {
-            const r = sql().prepare('SELECT data FROM guest_registrations WHERE booking_id = ?').get(b.id);
-            const d = r && JSON.parse(r.data || '{}');
-            const nat = String((d && d.nationality) || '').trim();
-            if (nat && !/^(deutsch(land)?|germany|german|de|d|brd|österreich|oesterreich|austria|österreichisch|schweiz|switzerland|schweizerisch)$/i.test(nat)) return 'en';
-        } catch (e) { /* no Meldeschein table yet */ }
-        return 'de';
+        return guestLang.langOrDe(b);
     }
 
     /** { text, warnings, lang } for a booking, null if it does not exist. */
@@ -231,13 +256,17 @@ function createArrivalGuide({ express, rateLimit, db, multer, botLogic, getSite,
         const sign = host.name || site.title;
         if (sign) lines.push(sign);
         // SMS: short and without emoji (one emoji makes every part 70 instead of 160 characters)
-        const P = lang === 'en'
-            ? { hi: n => `Hi ${n || 'there'}, today is your arrival day!`, addr: 'Address', code: 'Door code', link: 'Directions, parking and how to open the door, with photos', ask: 'Questions' }
-            : { hi: n => `Hallo ${n || ''}, heute ist dein Anreisetag!`.replace('Hallo ,', 'Hallo,'), addr: 'Adresse', code: 'Türcode', link: 'Anfahrt, Parken und wie du die Haustür öffnest, mit Fotos', ask: 'Fragen' };
+        const PS = {
+            en: { hi: n => `Hi ${n || 'there'}, today is your arrival day!`, addr: 'Address', code: 'Door code', link: 'Directions, parking and how to open the door, with photos', ask: 'Questions', wifi: 'Wi-Fi' },
+            nl: { hi: n => `Hallo ${n || ''}, vandaag is je aankomstdag!`.replace('Hallo ,', 'Hallo,'), addr: 'Adres', code: 'Deurcode', link: 'Route, parkeren en hoe je de voordeur opent, met foto’s', ask: 'Vragen', wifi: 'Wifi' },
+            pl: { hi: n => `Dzień dobry ${n || ''}, dziś dzień przyjazdu!`.replace('dobry ,', 'dobry,'), addr: 'Adres', code: 'Kod do drzwi', link: 'Dojazd, parking i jak otworzyć drzwi, ze zdjęciami', ask: 'Pytania', wifi: 'Wi-Fi' },
+            de: { hi: n => `Hallo ${n || ''}, heute ist dein Anreisetag!`.replace('Hallo ,', 'Hallo,'), addr: 'Adresse', code: 'Türcode', link: 'Anfahrt, Parken und wie du die Haustür öffnest, mit Fotos', ask: 'Fragen', wifi: 'WLAN' }
+        };
+        const P = PS[lang] || PS.de;
         const sms = [P.hi(firstName(name))];
         if (site.address) sms.push(`${P.addr}: ${site.address}.`);
         if (b.nuki_pin) sms.push(`${P.code}: ${b.nuki_pin}.`);
-        if (wifi && wifi.name) sms.push(`${lang === 'en' ? 'Wi-Fi' : 'WLAN'}: ${wifi.name}${wifi.password ? ` / ${wifi.password}` : ''}${wifi.code ? `, Code ${wifi.code}` : ''}`);
+        if (wifi && wifi.name) sms.push(`${P.wifi}: ${wifi.name}${wifi.password ? ` / ${wifi.password}` : ''}${wifi.code ? `, Code ${wifi.code}` : ''}`);
         if (link) sms.push(`${P.link}: ${link}`);
         else {
             if (parking) sms.push(`${L.parking}: ${parking}`);
