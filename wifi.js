@@ -32,6 +32,7 @@ const DEFAULTS = {
         max_devices: 5,          // devices per booking (counted by MAC address)
         grace_min: 60,           // stays online this long after the check-out time
         alert: true,             // Telegram when the router stops asking the server
+        vacant_off: true,        // guest WLAN off while nobody stays (on from the arrival day 00:00 until check-out + grace)
         faskey: '',              // shared key with openNDS (generated, server only)
         setup_token: '',         // protects the setup script download (generated)
         gateway: '',             // gatewayname on the router, random so authmon's gateway hash cannot be guessed
@@ -76,7 +77,7 @@ function qrSvg(qrcode, text) {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}" shape-rendering="crispEdges"><rect width="${s}" height="${s}" style="fill:#fff;stroke:none"/><path style="fill:#000;stroke:none" d="${d}"/></svg>`;
 }
 
-function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, telegram, berlinToday, addDays, formatDateDE }) {
+function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, chatButton, telegram, berlinToday, addDays, formatDateDE }) {
     const sql = () => db.getDb();
     const cols = sql().prepare('PRAGMA table_info(bookings)').all().map(c => c.name);
     if (!cols.includes('wifi_password')) sql().exec('ALTER TABLE bookings ADD COLUMN wifi_password TEXT');
@@ -141,7 +142,8 @@ function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, telegr
                     wpa: wpa.length >= 8 ? wpa : '',
                     max_devices: Math.min(20, Math.max(1, parseInt(p.max_devices, 10) || cur.portal.max_devices)),
                     grace_min: Math.min(600, Math.max(0, parseInt(p.grace_min, 10) >= 0 ? parseInt(p.grace_min, 10) : cur.portal.grace_min)),
-                    alert: p.alert !== false
+                    alert: p.alert !== false,
+                    vacant_off: p.vacant_off == null ? cur.portal.vacant_off : !!p.vacant_off
                 };
             })()
         };
@@ -315,7 +317,7 @@ function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, telegr
     const label = d => d.booking ? `${guestName(d.booking) || 'Gast'} (${formatDateDE(d.booking.checkin)} – ${formatDateDE(d.booking.checkout)})` : 'Leerstand';
 
     const wifiPortal = createWifiPortal({
-        db, getConfig, getSite, guestBooking: sess => (guestBooking ? guestBooking(sess) : null), guestName,
+        db, getConfig, getSite, guestBooking: sess => (guestBooking ? guestBooking(sess) : null), guestName, chatButton,
         telegram, berlinToday, formatDateDE
     });
 
@@ -495,6 +497,12 @@ function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, telegr
             if (what === 'owner') ensurePortalSecrets(['owner_code']);
             else if (what === 'key') ensurePortalSecrets(['faskey', 'setup_token', 'gateway']);
             else return res.status(400).json({ success: false, error: 'Unbekannt' });
+            res.json({ success: true, ...adminState() });
+        });
+        app.post('/api/site/wifi/portal/power', apiLimiter, (req, res) => {
+            const mode = String((req.body && req.body.mode) || '');
+            if (!['auto', 'on24', 'off24'].includes(mode)) return res.status(400).json({ success: false, error: 'Unbekannt' });
+            wifiPortal.setPowerOverride(mode);
             res.json({ success: true, ...adminState() });
         });
         app.delete('/api/site/wifi/portal/device/:id', apiLimiter, (req, res) => {

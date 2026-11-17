@@ -3196,6 +3196,7 @@
         $('#wifi-portal-devices').value = p.max_devices || 5;
         $('#wifi-portal-grace').value = p.grace_min != null ? p.grace_min : 60;
         $('#wifi-portal-alert').checked = p.alert !== false;
+        $('#wifi-portal-vacant').checked = !!p.vacant_off;
         $('#wifi-portal-owner').textContent = p.owner_code || '– (erst speichern)';
         const ps = d.portal;
         const st = $('#wifi-portal-status');
@@ -3204,6 +3205,7 @@
             st.innerHTML = '<span class="wifi-dot"></span>Noch nicht gespeichert: Modus wählen und unten „Speichern“ drücken, dann erscheint der Einrichtungs-Befehl.';
             cmd.textContent = 'Erscheint nach dem Speichern.'; cmd.classList.add('empty');
             $('#wifi-portal-devices-list').innerHTML = '';
+            $('#wifi-portal-power').innerHTML = ''; $('#wifi-portal-stats').innerHTML = '';
             return;
         }
         const r = ps.router || {};
@@ -3214,12 +3216,44 @@
         if (ps.command) { cmd.textContent = ps.command; cmd.classList.remove('empty'); }
         else { cmd.textContent = ps.publicUrlProblem || 'Erscheint nach dem Speichern.'; cmd.classList.add('empty'); }
         $('#wifi-portal-copy').disabled = !ps.command;
+        fillWifiPower(ps.power, ps.stats);
+        fillWifiStats(ps.stats);
         const list = ps.devices || [];
         $('#wifi-portal-devices-list').innerHTML = list.length ? list.map(x => `<div class="arr-row" data-dev="${x.id}">
             <div class="arr-who"><strong>${escapeHtml(x.ua)} · ${escapeHtml(x.who)}</strong>
-                <span class="arr-state">seit ${fmtDT(x.since)} · online bis ${fmtDT(x.until)} · ${escapeHtml(x.mac)}</span></div>
+                <span class="arr-state">seit ${fmtDT(x.since)} · online bis ${fmtDT(x.until)}${x.volume ? ` · ${escapeHtml(x.volume)}` : ''} · ${escapeHtml(x.mac)}</span></div>
             <div class="arr-actions"><button type="button" class="btn-mini" data-wifi="forget">Vergessen</button></div>
         </div>`).join('') : '<div class="text-muted" style="font-size:.85rem">Gerade ist kein Gerät angemeldet.</div>';
+    }
+
+    function fillWifiPower(pw, stats) {
+        const el = $('#wifi-portal-power');
+        if (!pw) { el.innerHTML = ''; return; }
+        let txt;
+        if (pw.reason === 'manual') txt = pw.on ? `<b>Von Hand eingeschaltet</b> bis ${fmtDT(pw.until)}, danach wieder Automatik.` : `<b>Von Hand ausgeschaltet</b> bis ${fmtDT(pw.until)}, danach wieder Automatik.`;
+        else if (pw.reason === 'always') txt = '<b>Immer an.</b> Den Haken oben setzen, damit das WLAN bei Leerstand ausgeht.';
+        else if (pw.reason === 'guest') txt = `<b>An</b>, weil ${escapeHtml(pw.name || 'ein Gast')} da ist (bis ${fmtDT(pw.until)}).`;
+        else txt = `<b>Aus</b>, gerade ist niemand da.${pw.next ? ` Geht am ${fmtDT(pw.next)} wieder an.` : ' Keine Buchung in Sicht.'} Für eigene Geräte „24 Std. einschalten“.`;
+        let router = '';
+        if (stats && stats.fresh && stats.wifiOn != null && stats.wifiOn !== pw.on) router = ' <small>Der Router stellt in den nächsten 2 Minuten um.</small>';
+        else if (stats && stats.fresh && stats.wifiOn != null) router = ` <small>Router meldet: WLAN ${stats.wifiOn ? 'an' : 'aus'}.</small>`;
+        el.innerHTML = `<span class="wifi-dot ${pw.on ? 'ok' : ''}"></span>${txt}${router}`;
+        $('#wifi-portal-power-auto').disabled = pw.reason !== 'manual';
+    }
+
+    function fillWifiStats(s) {
+        const el = $('#wifi-portal-stats');
+        if (!s || !s.reported) { el.innerHTML = '<div class="text-muted" style="font-size:.85rem">Noch keine Daten. Der Router meldet sich nach der Einrichtung alle 2 Minuten.</div>'; return; }
+        const max = Math.max(1, ...s.chart.map(c => c.kb));
+        const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+        el.innerHTML = `<div class="wifi-stats">
+                <div><span>Gerade online</span><strong>${s.fresh ? s.onlineCount : '–'}</strong></div>
+                <div><span>Heute</span><strong>${escapeHtml(s.today)}</strong></div>
+                <div><span>${s.stay ? escapeHtml(s.stay.name) : 'Aktueller Aufenthalt'}</span><strong>${s.stay ? escapeHtml(s.stay.volume) : '–'}</strong>${s.stay ? `<small>${s.stay.devices} Gerät${s.stay.devices === 1 ? '' : 'e'}</small>` : ''}</div>
+                <div><span>30 Tage</span><strong>${escapeHtml(s.days30)}</strong></div>
+            </div>
+            <div class="wifi-bars" role="img" aria-label="Datenvolumen der letzten 14 Tage">${s.chart.map(c => `<div title="${fmtDEfull(c.day)}: ${escapeHtml(c.label)}"><i style="height:${c.kb ? Math.max(3, Math.round(c.kb / max * 100)) : 0}%"></i><small>${wd[new Date(c.day + 'T12:00:00Z').getUTCDay()]}</small></div>`).join('')}</div>
+            ${s.fresh ? (s.online.length ? `<div class="arr-upcoming" style="margin-top:.6rem">${s.online.map(o => `<div class="arr-row"><div class="arr-who"><strong>${escapeHtml(o.kind)} · ${escapeHtml(o.who)}</strong><span class="arr-state">diese Sitzung ${escapeHtml(o.session)} · ${escapeHtml(o.mac)}</span></div></div>`).join('')}</div>` : '') : `<div class="text-muted" style="font-size:.82rem;margin-top:.5rem">Letzte Meldung vom Router: ${fmtDT(s.reported)}.</div>`}`;
     }
 
     function fillWifi(d) {
@@ -3277,7 +3311,7 @@
             switch_time: $('#wifi-switch-time').value, vacant_disable: $('#wifi-vacant-off').checked, notify: $('#wifi-notify').checked,
             fritz: { url: $('#wifi-url').value, user: $('#wifi-user').value, password: $('#wifi-pass').value, insecure: $('#wifi-insecure').checked, index: Number($('#wifi-index').value) || 0 },
             portal: {
-                ssid: $('#wifi-portal-ssid').value, wpa: $('#wifi-portal-wpa').value, alert: $('#wifi-portal-alert').checked,
+                ssid: $('#wifi-portal-ssid').value, wpa: $('#wifi-portal-wpa').value, alert: $('#wifi-portal-alert').checked, vacant_off: $('#wifi-portal-vacant').checked,
                 max_devices: Number($('#wifi-portal-devices').value) || 5, grace_min: Number($('#wifi-portal-grace').value)
             }
         };
@@ -3343,6 +3377,16 @@
     }
     $('#wifi-portal-owner-new').addEventListener('click', () => wifiPortalRenew('owner', 'Neuen Gastgeber-Code erzeugen? Der alte gilt dann nicht mehr.'));
     $('#wifi-portal-key-new').addEventListener('click', () => wifiPortalRenew('key', 'Neuen Schlüssel erzeugen? Bis du den neuen Befehl auf dem Router ausgeführt hast, kommt niemand neu ins WLAN.'));
+    $('#wifi-portal-card').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-power]');
+        if (!btn) return;
+        btn.disabled = true;
+        try {
+            const d = await apiJson('/api/site/wifi/portal/power', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: btn.dataset.power }) });
+            if (d.success) { showToast({ on24: 'WLAN 24 Stunden an', off24: 'WLAN 24 Stunden aus', auto: 'Wieder Automatik' }[btn.dataset.power], 'success'); await loadWifi(); }
+            else showToast(d.error || 'Fehlgeschlagen', 'error');
+        } finally { btn.disabled = false; }
+    });
     $('#wifi-portal-devices-list').addEventListener('click', async e => {
         const btn = e.target.closest('[data-wifi="forget"]');
         if (!btn) return;

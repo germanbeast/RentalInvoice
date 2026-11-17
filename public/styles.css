@@ -3615,3 +3615,12 @@ a.pill { text-decoration: none; }
 .wifi-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .wifi-cmd { font: .8rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; overflow-wrap: anywhere; user-select: all; }
 .wifi-cmd.empty { font-family: inherit; color: var(--text-secondary); user-select: auto; }
+.wifi-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.wifi-stats > div { background: var(--card); padding: 10px 12px; min-width: 0; }
+.wifi-stats span { display: block; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wifi-stats strong { display: block; font-size: 1.25rem; font-weight: 600; margin-top: 2px; }
+.wifi-stats small { color: var(--text-secondary); font-size: .78rem; }
+.wifi-bars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; align-items: end; height: 96px; margin-top: .8rem; }
+.wifi-bars > div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; min-width: 0; }
+.wifi-bars i { display: block; width: 100%; max-width: 22px; background: var(--accent, #8a6d3b); border-radius: 2px 2px 0 0; }
+.wifi-bars small { font-size: .62rem; color: var(--text-secondary); }

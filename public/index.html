@@ -780,7 +780,8 @@
                             <div class="form-group"><label for="wifi-portal-devices">Geräte pro Buchung</label><input type="number" id="wifi-portal-devices" min="1" max="20"></div>
                             <div class="form-group"><label for="wifi-portal-grace">Online nach dem Check-out noch <small>(Minuten)</small></label><input type="number" id="wifi-portal-grace" min="0" max="600" step="15"></div>
                         </div>
-                        <label style="display:flex;gap:.5rem;align-items:center;font-size:.88rem;margin-bottom:.8rem"><input type="checkbox" id="wifi-portal-alert"> Per Telegram melden, wenn sich der Router 15 Minuten nicht meldet</label>
+                        <label style="display:flex;gap:.5rem;align-items:center;font-size:.88rem;margin-bottom:.4rem"><input type="checkbox" id="wifi-portal-alert"> Per Telegram melden, wenn sich der Router 15 Minuten nicht meldet</label>
+                        <label style="display:flex;gap:.5rem;align-items:center;font-size:.88rem;margin-bottom:.8rem"><input type="checkbox" id="wifi-portal-vacant"> Gäste-WLAN bei Leerstand ausschalten <small class="text-muted">(an ab 0 Uhr am Anreisetag bis nach dem Check-out)</small></label>
                         <div class="wifi-portal-grid">
                             <div>
                                 <div class="wifi-label">Gastgeber-Code <small>(eigene Geräte, je eine Woche)</small></div>
@@ -801,7 +802,7 @@
                                 <li><b>Passwort setzen:</b> Wieder <code>http://192.168.1.1</code>, System → Administration → Router-Passwort vergeben und gut aufheben.</li>
                                 <li><b>An die FRITZ!Box:</b> Netzwerkkabel vom blauen <b>WAN</b>-Anschluss des Routers zu einem LAN-Anschluss der FRITZ!Box. Laptop bleibt am gelben Anschluss.</li>
                                 <li><b>Befehl ausführen:</b> Am Laptop die Eingabeaufforderung öffnen (Windows-Taste, „cmd“), <code>ssh root@192.168.1.1</code> eingeben, „yes“ und das Router-Passwort. Dann den Befehl unten kopieren, mit Rechtsklick einfügen, Enter. Nach 2–3 Minuten steht da <b>FERTIG</b>.</li>
-                                <li><b>Testen:</b> Mit dem Handy ins WLAN, die Anmeldeseite öffnet sich, den Gastgeber-Code eingeben. Hier oben steht dann „Router verbunden“.</li>
+                                <li><b>Testen:</b> Mit dem Handy ins WLAN, die Anmeldeseite öffnet sich, den Gastgeber-Code eingeben. Hier oben steht dann „Router verbunden“. Ist gerade kein Gast da und „bei Leerstand ausschalten“ angehakt, vorher unten „24 Std. einschalten“ drücken, sonst geht das WLAN nach 2 Minuten aus.</li>
                                 <li><b>Aufräumen:</b> Das alte Gast-WLAN der FRITZ!Box ausschalten (WLAN → Gastzugang), damit Gäste nur noch das neue sehen. TV-Box, Drucker und Nuki-Bridge bleiben an der FRITZ!Box.</li>
                             </ol>
                         </details>
@@ -811,6 +812,15 @@
                             <button type="button" class="btn-mini" id="wifi-portal-copy">Befehl kopieren</button>
                             <button type="button" class="btn-mini" id="wifi-portal-key-new" title="Neuer Schlüssel zwischen Router und Server; danach den Befehl auf dem Router noch einmal ausführen">Neuer Schlüssel</button>
                         </div>
+                        <div class="today-title" style="margin-top:1.2rem;font-size:.95rem">WLAN an/aus</div>
+                        <div id="wifi-portal-power" class="wifi-status"></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 0">
+                            <button type="button" class="btn-mini" data-power="on24">24 Std. einschalten</button>
+                            <button type="button" class="btn-mini" data-power="off24">24 Std. ausschalten</button>
+                            <button type="button" class="btn-mini" data-power="auto" id="wifi-portal-power-auto">Automatik</button>
+                        </div>
+                        <div class="today-title" style="margin-top:1.2rem;font-size:.95rem">Statistik</div>
+                        <div id="wifi-portal-stats"></div>
                         <div class="today-title" style="margin-top:1.2rem;font-size:.95rem">Angemeldete Geräte</div>
                         <div id="wifi-portal-devices-list" class="arr-upcoming"></div>
                     </div>

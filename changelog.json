@@ -11,7 +11,10 @@
                 "Geräte, die im Aufenthalt schon online waren, kommen ohne Code wieder rein; wer auf „Meine Buchung“ angemeldet ist, verbindet mit einem Tipp",
                 "Höchstzahl Geräte pro Buchung, Gastgeber-Code für eigene Geräte, Liste der angemeldeten Geräte, Telegram-Meldung, wenn der Router sich nicht mehr meldet",
                 "Router-Einrichtung mit einem einzigen Befehl samt Schritt-für-Schritt-Anleitung im Admin",
-                "Zugangsdaten mit QR-Code auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher"
+                "Zugangsdaten mit QR-Code auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher",
+                "Begrüßungsseite nach dem WLAN-Login: Check-out-Zeit, Hausregeln, Wetter, geöffnete Ausflugsziele und Veranstaltungen, WhatsApp- und Telefon-Knopf",
+                "WLAN-Statistik im Admin: Geräte gerade online, Datenvolumen heute, im aktuellen Aufenthalt und in 30 Tagen, Balken der letzten 14 Tage, Volumen pro Gerät",
+                "Gäste-WLAN geht bei Leerstand automatisch aus und am Anreisetag um 0 Uhr wieder an; „24 Std. einschalten“ für eigene Geräte, „24 Std. ausschalten“ und „Automatik“"
             ],
             "fixes": []
         },

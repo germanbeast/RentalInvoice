@@ -1417,6 +1417,7 @@ const guestWifi = require('./wifi')({
     botLogic: require('./bot-logic'),
     getSite: () => guestPortalRef.getSite(),
     guestBooking: (sess) => guestPortalRef.guestBooking(sess),
+    chatButton: (booking) => guestChat ? guestChat.guestButton(booking) : null,
     telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
     berlinToday: () => berlinToday(),
     addDays: (ymd, n) => addDays(ymd, n),

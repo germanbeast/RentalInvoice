@@ -69,7 +69,7 @@ function berlinEpoch(ymd, hhmm) {
     return guess - (asBerlin - guess);
 }
 
-function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, guestName, ensureCode, telegram, berlinToday, formatDateDE }) {
+function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, chatButton, telegram, berlinToday, formatDateDE }) {
     const sql = () => db.getDb();
     sql().exec(`
         CREATE TABLE IF NOT EXISTS wifi_portal_devices (
@@ -86,7 +86,25 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
         );
         CREATE INDEX IF NOT EXISTS idx_wifi_portal_devices_booking ON wifi_portal_devices(booking_id);
         CREATE INDEX IF NOT EXISTS idx_wifi_portal_devices_mac ON wifi_portal_devices(mac);
+        -- last counters the router reported per device (openNDS counts per session, in KB)
+        CREATE TABLE IF NOT EXISTS wifi_portal_clients (
+            mac TEXT PRIMARY KEY,
+            last_down INTEGER NOT NULL DEFAULT 0,
+            last_up INTEGER NOT NULL DEFAULT 0,
+            last_seen TEXT
+        );
+        -- data volume per day (KB), from the router's reports every 2 minutes
+        CREATE TABLE IF NOT EXISTS wifi_portal_usage (
+            day TEXT PRIMARY KEY,
+            down_kb INTEGER NOT NULL DEFAULT 0,
+            up_kb INTEGER NOT NULL DEFAULT 0
+        );
     `);
+    {
+        const dc = sql().prepare('PRAGMA table_info(wifi_portal_devices)').all().map(c => c.name);
+        if (!dc.includes('down_kb')) sql().exec('ALTER TABLE wifi_portal_devices ADD COLUMN down_kb INTEGER NOT NULL DEFAULT 0');
+        if (!dc.includes('up_kb')) sql().exec('ALTER TABLE wifi_portal_devices ADD COLUMN up_kb INTEGER NOT NULL DEFAULT 0');
+    }
 
     // gatewayhash -> Map(rhid -> { line, at, deviceId })
     const queues = new Map();
@@ -216,6 +234,10 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
         let decoded = '';
         try { decoded = Buffer.from(payload, 'base64').toString('utf8'); } catch (e) { decoded = ''; }
 
+        if (action === 'custom' && /^stats1\b/.test(decoded)) {
+            processStats(decoded);
+            return res.send(`ack wifi=${powerState().on ? 'on' : 'off'}`);
+        }
         if (action === 'deauthed' || action === 'custom') return res.send('ack');
         if (action === 'clear') { queues.delete(gw); return res.send(''); }
         cleanup();
@@ -227,6 +249,107 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
         const list = [...q.values()].map(e => encodeURIComponent(e.line));
         if (action === 'list') for (const r of [...q.keys()]) ack(r);
         res.send(['*', ...list].join(' '));
+    }
+
+    // -----------------------------------------------------------------------
+    // Statistics from the router: "stats1 wifi=1 up=12345 clients=mac,downKB,upKB;mac,…;" every 2 minutes
+    // -----------------------------------------------------------------------
+    let liveStats = null; // { at, wifiOn, uptime, clients: [{ mac, down, up }] }
+
+    function processStats(text) {
+        const field = k => { const m = new RegExp(`\\b${k}=(\\S*)`).exec(text); return m ? m[1] : ''; };
+        const clients = field('clients').split(';').map(x => x.split(',')).filter(x => x.length === 3)
+            .map(([mac, down, up]) => ({ mac: normMac(mac), down: Math.max(0, parseInt(down, 10) || 0), up: Math.max(0, parseInt(up, 10) || 0) }))
+            .filter(c => c.mac.length === 17).slice(0, 200);
+        const now = new Date();
+        const nowIso = now.toISOString();
+        const day = berlinToday();
+        let addDown = 0, addUp = 0;
+        const tx = sql().transaction(() => {
+            for (const c of clients) {
+                const prev = sql().prepare('SELECT * FROM wifi_portal_clients WHERE mac = ?').get(c.mac);
+                // counters restart with each session (and router restart): a smaller value is a new count
+                const dDown = prev && c.down >= prev.last_down ? c.down - prev.last_down : c.down;
+                const dUp = prev && c.up >= prev.last_up ? c.up - prev.last_up : c.up;
+                sql().prepare(`INSERT INTO wifi_portal_clients (mac, last_down, last_up, last_seen) VALUES (?, ?, ?, ?)
+                    ON CONFLICT(mac) DO UPDATE SET last_down = excluded.last_down, last_up = excluded.last_up, last_seen = excluded.last_seen`).run(c.mac, c.down, c.up, nowIso);
+                if (!dDown && !dUp) continue;
+                addDown += dDown; addUp += dUp;
+                const dev = sql().prepare('SELECT id FROM wifi_portal_devices WHERE mac = ? ORDER BY last_at DESC LIMIT 1').get(c.mac);
+                if (dev) sql().prepare('UPDATE wifi_portal_devices SET down_kb = down_kb + ?, up_kb = up_kb + ? WHERE id = ?').run(dDown, dUp, dev.id);
+            }
+            if (addDown || addUp) {
+                sql().prepare(`INSERT INTO wifi_portal_usage (day, down_kb, up_kb) VALUES (?, ?, ?)
+                    ON CONFLICT(day) DO UPDATE SET down_kb = down_kb + excluded.down_kb, up_kb = up_kb + excluded.up_kb`).run(day, addDown, addUp);
+            }
+        });
+        tx();
+        liveStats = { at: now.getTime(), wifiOn: field('wifi') !== '0', uptime: parseInt(field('up'), 10) || 0, clients };
+        const st = db.getSetting('guest_wifi_state') || {};
+        const prevStats = st.portal_stats || {};
+        if (!prevStats.at || now.getTime() - prevStats.at > 10 * 60 * 1000 || prevStats.wifiOn !== liveStats.wifiOn) {
+            db.setSetting('guest_wifi_state', { ...st, portal_stats: { at: liveStats.at, wifiOn: liveStats.wifiOn } });
+        }
+    }
+
+    const fmtKb = kb => kb >= 1024 * 1024 ? `${(kb / 1024 / 1024).toFixed(1).replace('.', ',')} GB` : kb >= 1024 ? `${Math.round(kb / 1024)} MB` : `${kb} KB`;
+
+    function adminStats() {
+        const st = db.getSetting('guest_wifi_state') || {};
+        const s = liveStats || (st.portal_stats ? { ...st.portal_stats, clients: [] } : null);
+        const fresh = !!(s && Date.now() - s.at < 6 * 60 * 1000);
+        const today = berlinToday();
+        const days = sql().prepare(`SELECT day, down_kb, up_kb FROM wifi_portal_usage WHERE day >= date(?, '-29 days') ORDER BY day`).all(today);
+        const sum = rows => rows.reduce((a, r) => a + r.down_kb + r.up_kb, 0);
+        const todayRow = days.find(d => d.day === today);
+        const online = fresh && liveStats ? liveStats.clients.map(c => {
+            const dev = sql().prepare('SELECT * FROM wifi_portal_devices WHERE mac = ? ORDER BY last_at DESC LIMIT 1').get(c.mac);
+            const b = dev && dev.booking_id ? sql().prepare('SELECT * FROM bookings WHERE id = ?').get(dev.booking_id) : null;
+            return { mac: c.mac, kind: dev ? deviceLabel(dev.user_agent) : 'Gerät', who: dev ? (dev.kind === 'owner' ? 'Gastgeber' : (guestName(b) || 'Gast')) : '?', session: fmtKb(c.down + c.up) };
+        }) : [];
+        // current stay: sum of its devices
+        const cur = sql().prepare('SELECT * FROM bookings WHERE checkin <= ? AND checkout >= ? ORDER BY (checkout = ?) ASC, checkin ASC LIMIT 1').get(today, today, today);
+        const stay = cur ? sql().prepare(`SELECT COALESCE(SUM(down_kb + up_kb), 0) AS kb, COUNT(*) AS n FROM wifi_portal_devices WHERE booking_id = ?`).get(cur.id) : null;
+        const chart = [];
+        for (let i = 13; i >= 0; i--) {
+            const d = new Date(Date.parse(today + 'T12:00:00Z') - i * 864e5).toISOString().slice(0, 10);
+            const r = days.find(x => x.day === d);
+            chart.push({ day: d, kb: r ? r.down_kb + r.up_kb : 0 });
+        }
+        return {
+            reported: s ? new Date(s.at).toISOString() : null, fresh, wifiOn: s ? s.wifiOn : null,
+            onlineCount: online.length, online,
+            today: fmtKb(todayRow ? todayRow.down_kb + todayRow.up_kb : 0),
+            days30: fmtKb(sum(days)),
+            stay: cur && stay ? { name: guestName(cur) || 'Gast', volume: fmtKb(stay.kb), devices: stay.n } : null,
+            chart: chart.map(c => ({ ...c, label: fmtKb(c.kb) }))
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // WLAN on/off: off while nobody stays (optional), the router asks every 2 minutes
+    // -----------------------------------------------------------------------
+    function powerState(now = Date.now()) {
+        const c = cfg();
+        const ov = (db.getSetting('guest_wifi_state') || {}).portal_power;
+        if (ov && ov.until && Date.parse(ov.until) > now) return { on: ov.state === 'on', reason: 'manual', until: ov.until };
+        if (!c.vacant_off) return { on: true, reason: 'always' };
+        const today = berlinToday();
+        const rows = sql().prepare(`SELECT * FROM bookings WHERE checkin IS NOT NULL AND checkout >= date(?, '-1 day') AND checkin <= date(?, '+400 days') ORDER BY checkin`).all(today, today);
+        for (const b of rows) {
+            const w = windowOf(b);
+            if (now >= w.from && now <= w.until) return { on: true, reason: 'guest', until: new Date(w.until).toISOString(), name: guestName(b) || 'Gast' };
+        }
+        const next = rows.map(b => windowOf(b)).filter(w => w.from > now).sort((a, b) => a.from - b.from)[0];
+        return { on: false, reason: 'vacant', next: next ? new Date(next.from).toISOString() : null };
+    }
+
+    function setPowerOverride(mode) {
+        const st = db.getSetting('guest_wifi_state') || {};
+        let ov = null;
+        if (mode === 'on24') ov = { state: 'on', until: new Date(Date.now() + 24 * 3600 * 1000).toISOString() };
+        else if (mode === 'off24') ov = { state: 'off', until: new Date(Date.now() + 24 * 3600 * 1000).toISOString() };
+        db.setSetting('guest_wifi_state', { ...st, portal_power: ov });
     }
 
     // -----------------------------------------------------------------------
@@ -278,7 +401,21 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
         const rhid = enqueue(f.fas, minutes, `booking=${b.id}`);
         rememberDevice({ bookingId: b.id, kind: 'guest', mac: f.mac, fas: f.fas, ua, until: acc.until });
         db.logNotification('guest_wifi', `WLAN-Anmeldung (${how}) für ${guestName(b) || 'Gast'} ${formatDateDE(b.checkin)} – ${formatDateDE(b.checkout)}`, 'sent');
-        return { success: true, wait: rhid, name: firstName(guestName(b)), until: new Date(acc.until).toISOString(), checkout: b.checkout };
+        return { success: true, wait: rhid, name: firstName(guestName(b)), until: new Date(acc.until).toISOString(), checkout: b.checkout, welcome: welcomeFor(b) };
+    }
+
+    /** What the page shows after the login: check-out, house rules, contact (the live tips come from api/live). */
+    function welcomeFor(b) {
+        const site = getSite();
+        const v = db.getAllSettings().vermieter || {};
+        let chat = null;
+        try { chat = chatButton ? chatButton(b) : null; } catch (e) { chat = null; }
+        return {
+            checkout: b.checkout, checkoutTime: site.checkout_time || '',
+            rules: String(site.house_rules || '').slice(0, 3000),
+            whatsapp: chat && chat.url ? chat.url : '',
+            phone: site.show_contact !== false ? String(v.telefon || '') : ''
+        };
     }
 
     function refusal(acc) {
@@ -357,7 +494,11 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
             res.set('Cache-Control', 'no-store');
             if (req.body && req.body.preview) {
                 const code = normCode(req.body.code);
-                return res.json(code.length === 6 ? { success: true, preview: true, name: 'Anna', until: new Date(Date.now() + 3 * 864e5).toISOString() }
+                const site = getSite();
+                const sample = { checkout: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10), checkoutTime: site.checkout_time || '', rules: String(site.house_rules || ''),
+                    whatsapp: (chatButton && (() => { try { const c = chatButton(null); return c && c.url; } catch (e) { return ''; } })()) || '',
+                    phone: site.show_contact !== false ? String((db.getAllSettings().vermieter || {}).telefon || '') : '' };
+                return res.json(code.length === 6 ? { success: true, preview: true, name: 'Anna', until: new Date(Date.now() + 3 * 864e5).toISOString(), welcome: sample }
                     : refusal({ reason: 'code' }));
             }
             if (!active()) return res.status(503).json({ success: false, error: 'Die WLAN-Anmeldung ist gerade ausgeschaltet. Bitte melden Sie sich bei uns.' });
@@ -461,7 +602,7 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
         return rows.map(r => {
             const b = r.booking_id ? sql().prepare('SELECT * FROM bookings WHERE id = ?').get(r.booking_id) : null;
             return {
-                id: r.id, kind: r.kind, mac: r.mac, ua: deviceLabel(r.user_agent), since: r.first_at, last: r.last_at, until: r.until,
+                id: r.id, kind: r.kind, mac: r.mac, ua: deviceLabel(r.user_agent), volume: fmtKb((r.down_kb || 0) + (r.up_kb || 0)), since: r.first_at, last: r.last_at, until: r.until,
                 who: r.kind === 'owner' ? 'Gastgeber-Code' : (b ? `${guestName(b) || 'Gast'} · ${formatDateDE(b.checkin)} – ${formatDateDE(b.checkout)}` : 'Buchung gelöscht')
             };
         });
@@ -488,7 +629,9 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
             command: setupCommand(),
             fasUrl: (fasTarget() || {}).url || '',
             publicUrlProblem: fasTarget() ? '' : (publicBase() ? 'Die öffentliche Adresse muss mit https:// beginnen.' : 'Unter Webseite → Einrichtung fehlt die öffentliche Adresse (z. B. https://beckhome.cloud).'),
-            devices: adminDevices()
+            devices: adminDevices(),
+            stats: adminStats(),
+            power: { ...powerState(), vacantOff: !!cfg().vacant_off }
         };
     }
 
@@ -518,8 +661,8 @@ function createWifiPortal({ db, getConfig, savePortal, getSite, guestBooking, gu
     }
 
     return {
-        registerRoutes, adminState, removeDevice, watch, setupCommand, setupScript, bookingAccess, windowOf,
-        _test: { parseFas, gatewayHashes, queues, acked, berlinEpoch, enqueue, rhidOf }
+        registerRoutes, adminState, removeDevice, watch, setPowerOverride, powerState, setupCommand, setupScript, bookingAccess, windowOf,
+        _test: { processStats, adminStats, parseFas, gatewayHashes, queues, acked, berlinEpoch, enqueue, rhidOf }
     };
 }
 
@@ -708,6 +851,32 @@ uci add_list $O.authenticated_users='block to 192.168.0.0/16'
 uci add_list $O.authenticated_users='allow all'
 ok "openNDS mit $FQDN$FASPATH"
 
+# Alle 2 Minuten: Geräte + Datenvolumen an den Server melden, WLAN nach dessen Antwort an/aus (Leerstand).
+# Ohne Antwort bleibt (bzw. geht) das WLAN an, damit Gäste nie ohne Netz dastehen.
+cat > /usr/bin/beckhome-wlan-sync <<'SYNC'
+#!/bin/sh
+CL=$(ndsctl json 2>/dev/null | tr ',{}' '\n\n\n' | awk -F'"' '/"mac":/ { m=$4 } /"state":/ { s=$4 } /"download_this_session":/ { d=$4 } /"upload_this_session":/ { if (s=="Authenticated") printf "%s,%s,%s;", m, d, $4 }')
+ON=1
+[ "$(uci -q get wireless.gaeste_radio0.disabled)" = "1" ] && ON=0
+UP=$(cut -d. -f1 /proc/uptime)
+R=$(/usr/lib/opennds/libopennds.sh send_to_fas_custom "stats1 wifi=$ON up=$UP clients=$CL" 2>/dev/null)
+WANT=1
+case "$R" in *wifi=off*) WANT=0 ;; esac
+[ "$WANT" = "$ON" ] && exit 0
+for s in $(uci -q show wireless | sed -n "s/^wireless\.\(gaeste_[^.=]*\)=wifi-iface$/\1/p"); do
+    uci set wireless.$s.disabled=$((1 - WANT))
+done
+uci commit wireless
+wifi reload
+if [ "$WANT" = 1 ]; then logger -t beckhome "Gaeste-WLAN an"; else logger -t beckhome "Gaeste-WLAN aus (Leerstand)"; fi
+SYNC
+chmod +x /usr/bin/beckhome-wlan-sync
+touch /etc/crontabs/root
+grep -v beckhome-wlan-sync /etc/crontabs/root > /tmp/bh-cron; echo "*/2 * * * * /usr/bin/beckhome-wlan-sync" >> /tmp/bh-cron
+cat /tmp/bh-cron > /etc/crontabs/root; rm -f /tmp/bh-cron
+/etc/init.d/cron enable >/dev/null 2>&1
+ok "Meldung an den Server alle 2 Minuten (Geräte, Datenvolumen, WLAN an/aus)"
+
 # --- 6. Übernehmen ----------------------------------------------------------------
 say "6/6 Einstellungen übernehmen und neu starten"
 uci commit
@@ -720,6 +889,7 @@ wifi reload
 sleep 2
 /etc/init.d/opennds enable
 /etc/init.d/opennds restart
+/etc/init.d/cron restart >/dev/null 2>&1
 sleep 12
 if ndsctl status >/dev/null 2>&1; then
     ok "openNDS läuft"

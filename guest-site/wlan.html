@@ -47,6 +47,29 @@
         .wl-terms ul { margin: .6rem 0 0; padding-left: 1.1rem; }
         .wl-contact { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .92rem; color: var(--ink-soft); }
         .wl-contact a { font-weight: 600; color: var(--ink); }
+        .wl-facts.three { grid-template-columns: 1fr 1fr 1fr; }
+        @media (max-width: 480px) { .wl-facts.three { grid-template-columns: 1fr 1fr; } .wl-facts.three div:nth-child(3) { grid-column: 1 / -1; padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } }
+        .wl-talk { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .6rem; margin-bottom: 1.4rem; }
+        .wl-talk .btn { padding: .95rem 1rem; }
+        .wl-talk svg { width: 19px; height: 19px; }
+        .wl-live { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: clamp(16px, 4vw, 24px); margin-bottom: 1.4rem; }
+        .wl-live-kicker { display: block; font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .7rem; }
+        .wl-live h3 { font-size: 1.35rem; margin: 1.1rem 0 .4rem; }
+        .wl-live-wx { display: flex; gap: .9rem; align-items: center; }
+        .wl-live-wx svg.wx { width: 44px; height: 44px; stroke-width: 1.4; flex: none; }
+        .wl-live-wx strong { font: 400 1.9rem/1 var(--serif); }
+        .wl-live-wx small { display: block; color: var(--ink-soft); font-size: .88rem; margin-top: .2rem; }
+        .wl-live-list { list-style: none; margin: 0; padding: 0; }
+        .wl-live-list li { display: flex; justify-content: space-between; gap: .8rem; padding: .55rem 0; border-top: 1px solid var(--line); font-size: .95rem; }
+        .wl-live-list li:first-child { border-top: 0; }
+        .wl-live-list small { color: var(--muted); white-space: nowrap; }
+        .wl-live-list a { text-decoration: none; }
+        .wl-live-list em { font-style: normal; font-size: .85rem; white-space: nowrap; }
+        .wl-live-list em.open { color: var(--ok); } .wl-live-list em.soon { color: var(--warn); } .wl-live-list em.closed { color: var(--bad); }
+        .wl-more { display: inline-block; margin-top: .8rem; font-size: .9rem; color: var(--accent); }
+        .wl-rules { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: .9rem 1.1rem; margin-bottom: 1.4rem; }
+        .wl-rules summary { cursor: pointer; font: 400 1.35rem/1.2 var(--serif); }
+        .wl-rules .prose { margin-top: .7rem; font-size: .95rem; }
         .wl-preview { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--ink); color: var(--paper); text-align: center; font-size: .82rem; padding: .55rem 1rem; letter-spacing: .02em; }
         .masthead .brand { pointer-events: none; }
     </style>
@@ -63,6 +86,7 @@
     </main>
     <div class="wl-preview" id="preview" hidden>Vorschau der WLAN-Anmeldeseite · jeder 6-stellige Code wird angenommen</div>
 
+    <script src="live-icons.js"></script>
     <script src="wlan.js"></script>
 </body>
 </html>

@@ -79,19 +79,62 @@
             <p class="wl-lead" id="wait-note">Das dauert meist nur ein paar Sekunden.</p></div>`);
     }
 
-    function online({ name, until, owner } = {}) {
+    const dateText = ymd => new Date(ymd + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    const ICON_WA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.6a8.2 8.2 0 0 1-12.1 7.2L4 20l1.3-3.8A8.2 8.2 0 1 1 20 11.6z"/><path d="M9.2 8.6c.2-.4.5-.4.7-.4h.5c.2 0 .4.1.5.4l.6 1.4c.1.2 0 .4-.1.6l-.4.5c-.1.1-.1.3 0 .5.5.9 1.3 1.6 2.2 2.1.2.1.4.1.5 0l.5-.5c.2-.2.4-.2.6-.1l1.4.6c.3.1.4.3.4.5v.5c0 .3-.1.6-.4.7-.6.4-1.4.5-2.1.3-2.4-.7-4.3-2.6-5-5-.2-.7-.1-1.5.3-2.1z"/></svg>';
+    const ICON_PHONE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3.5l1.5 4-2 1.3a10 10 0 0 0 4.7 4.7L14 12l4 1.5V17a2 2 0 0 1-2 2A13 13 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>';
+
+    function online({ name, until, owner, welcome } = {}) {
         $('#kicker').textContent = 'Verbunden';
+        const w = welcome || null;
+        const tel = w && w.phone ? w.phone.replace(/[^\d+]/g, '') : '';
         show(`<div class="wl-ok">${ICON_OK}</div>
             <h1>${name ? `Viel Spaß, <em>${esc(name)}</em>!` : 'Sie sind <em>online</em>.'}</h1>
-            <p class="wl-lead">${owner ? 'Gastgeber-Zugang für eine Woche.' : 'Ihr Gerät ist jetzt mit dem Internet verbunden. Dieses Fenster können Sie schließen.'}</p>
-            <div class="wl-facts">
+            <p class="wl-lead">${owner ? 'Gastgeber-Zugang für eine Woche.' : 'Sie sind jetzt mit dem Internet verbunden. Hier noch das Wichtigste für Ihren Aufenthalt.'}</p>
+            <div class="wl-facts${w && w.checkout ? ' three' : ''}">
                 <div><span>Netzwerk</span><strong>${esc(site.ssid)}</strong></div>
                 <div><span>Online bis</span><strong>${esc(untilText(until) || 'Abreise')}</strong></div>
+                ${w && w.checkout ? `<div><span>Check-out</span><strong>${esc(dateText(w.checkout))}${w.checkoutTime ? `, ${esc(w.checkoutTime)} Uhr` : ''}</strong></div>` : ''}
             </div>
+            ${w && (w.whatsapp || tel) ? `<div class="wl-talk">
+                ${w.whatsapp ? `<a class="btn btn-dark" href="${esc(w.whatsapp)}" target="_blank" rel="noopener">${ICON_WA}WhatsApp an uns</a>` : ''}
+                ${tel ? `<a class="btn btn-ghost" href="tel:${esc(tel)}">${ICON_PHONE}${esc(w.phone)}</a>` : ''}
+            </div>` : ''}
+            <div id="wl-live"></div>
+            ${w && w.rules ? `<details class="wl-rules"><summary>Hausregeln</summary><div class="prose">${esc(w.rules)}</div></details>` : ''}
             <div class="wl-actions">
                 <a class="btn btn-dark wl-go" href="meine-buchung">Zu Meine Buchung</a>
                 <a class="btn btn-ghost wl-go" href="./">Zur Webseite der Ferienwohnung</a>
             </div>`);
+        if (w) {
+            $('#contact').hidden = true;
+            loadLive();
+        }
+    }
+
+    // Live tips (weather, open now, events), like on "Meine Buchung", in short
+    async function loadLive() {
+        let d = null;
+        try { d = await fetch('api/live?for=app', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()); } catch (e) { d = null; }
+        const box = $('#wl-live');
+        if (!box || !d || !d.success || !d.enabled) return;
+        const icon = k => (window.liveWeatherIcon ? window.liveWeatherIcon(k, 'wx') : '');
+        const parts = [];
+        if (d.weather && d.weather.now) {
+            const n = d.weather.now, t = d.weather.days && d.weather.days[0];
+            parts.push(`<div class="wl-live-wx">${icon(n.icon)}<div><strong>${esc(n.temp)}°</strong> ${esc(n.label)}${d.place ? ` in ${esc(d.place)}` : ''}
+                ${t ? `<small>Heute ${esc(t.min)}° bis ${esc(t.max)}°${t.rain != null ? ` · Regenrisiko ${esc(t.rain)} %` : ''}</small>` : ''}</div></div>`);
+        }
+        const places = (d.places || []).filter(p => p.open !== null).sort((a, b) => (b.open === true) - (a.open === true)).slice(0, 4);
+        if (places.length) {
+            parts.push(`<h3>Jetzt geöffnet?</h3><ul class="wl-live-list">${places.map(p => `<li><span>${esc(p.name)}${p.distance ? ` <small>${esc(p.distance)}</small>` : ''}</span>
+                <em class="${p.open ? (p.soon ? 'soon' : 'open') : 'closed'}">${esc(p.state || (p.open ? 'geöffnet' : 'geschlossen'))}</em></li>`).join('')}</ul>`);
+        }
+        const ev = (d.events || []).slice(0, 3);
+        if (ev.length) {
+            parts.push(`<h3>Veranstaltungen</h3><ul class="wl-live-list">${ev.map(e => `<li><span>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title)}</span>
+                <small>${esc(dateText(e.date))}${e.time ? `, ${esc(e.time)} Uhr` : ''}</small></li>`).join('')}</ul>`);
+        }
+        if (parts.length) box.innerHTML = `<section class="wl-live"><span class="wl-live-kicker">Live-Tipps</span>${parts.join('')}<a class="wl-more" href="meine-buchung">Mehr auf Meine Buchung</a></section>`;
     }
 
     function message(title, text) {
