@@ -1,6 +1,20 @@
 {
-    "currentVersion": "1.49.0",
+    "currentVersion": "1.50.0",
     "releases": [
+        {
+            "version": "1.50.0",
+            "date": "2026-11-17",
+            "title": "Handy verbinden: Gäste streamen vom Handy auf den Fernseher",
+            "features": [
+                "Neuer Knopf „Handy verbinden“ auf dem TV-Welcome-Screen (auch auf dem Offline-Bildschirm): die TV-Box startet ihre Empfangs-App, der Fernseher erscheint auf dem Handy als „Beckhome TV“, der Gast verbindet sich und streamt, was er will",
+                "Am besten mit AirScreen aus dem Play Store: iPhone/iPad über AirPlay (Bildschirmsynchronisierung), Android über Google Cast und Miracast (Übertragen / Smart View). Hat die Box nur Chromecast built-in, zeigt der Fernseher eine kurze Anleitung in der Sprache des Gastes",
+                "Der Kiosk-Modus lässt die Empfangs-App zu, auch wenn sich ein Handy meldet, während der Welcome-Screen läuft",
+                "Beim Check-out (ab der Check-out-Zeit) bzw. beim Gästewechsel beendet die Box die Empfangs-App, die Verbindung des alten Gastes ist weg",
+                "Admin → Einstellungen → TV-Box zeigt, welche Empfangs-App die Box hat, und den Namen des Fernsehers (änderbar); der Knopf erscheint nur, wenn die Box ein Handy empfangen kann",
+                "TV-App 1.11"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.49.0",
             "date": "2026-11-17",

@@ -70,10 +70,12 @@ public class MainActivity extends Activity {
         }
     };
     private WifiManager.WifiLock wifiLock;
+    /** Anleitung „Handy verbinden“ ist sichtbar (Zurück führt zum Welcome-Screen). */
+    private boolean onStreamGuide = false;
     private final Runnable idleReturn = new Runnable() {
         @Override
         public void run() {
-            if (!isOnWelcomePage()) loadWelcomePage();
+            if (onStreamGuide || !isOnWelcomePage()) loadWelcomePage();
         }
     };
 
@@ -162,7 +164,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 if (url != null && url.contains("/welcome.html") && !pageFailed) welcomeLoaded = true;
                 retryHandler.removeCallbacks(idleReturn);
-                if (!isOnWelcomePage()) retryHandler.postDelayed(idleReturn, IDLE_RETURN_MS);
+                if (onStreamGuide || !isOnWelcomePage()) retryHandler.postDelayed(idleReturn, IDLE_RETURN_MS);
             }
 
             // Kein Internet (z.B. Box startet schneller als das WLAN): Hinweis zeigen und neu versuchen
@@ -396,7 +398,9 @@ public class MainActivity extends Activity {
                 + "<p class='msg'>Wir wünschen Ihnen einen angenehmen Aufenthalt!</p>"
                 + (facts.length() > 0 ? "<div class='facts'>" + facts + "</div>" : "") + "</div>"
                 + "<div class='apps'><div>Für Ihren Aufenthalt</div>"
-                + "<a id='tv' href='intent://de.exaring.waiputv#Intent;scheme=app;package=de.exaring.waiputv;end'>Fernsehen schauen</a></div>"
+                + "<a id='tv' href='intent://de.exaring.waiputv#Intent;scheme=app;package=de.exaring.waiputv;end'>Fernsehen schauen</a>"
+                + (Streaming.receiverPackage(this) != null || Streaming.chromecastBuiltIn(this)
+                        ? "<a href='beckhome://stream'>Handy verbinden</a>" : "") + "</div>"
                 + "</div><script>"
                 + "function u(){var n=new Date();document.getElementById('t').textContent=n.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});"
                 + "document.getElementById('d').textContent=n.toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});}"
@@ -470,6 +474,14 @@ public class MainActivity extends Activity {
 
     /** Netzwerk-Knöpfe: ohne Kopplung frei (Ersteinrichtung), danach nur mit PIN. */
     private void handleLocalButton(String what) {
+        if ("stream".equals(what)) {
+            startStreaming();
+            return;
+        }
+        if ("home".equals(what)) {
+            loadWelcomePage();
+            return;
+        }
         if ("pin".equals(what) || RemoteControl.isPaired(prefs)) {
             openSettings(); // PIN-Abfrage, dort gibt es WLAN und Android-Einstellungen
             return;
@@ -489,6 +501,80 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {
             }
         }
+    }
+
+    /**
+     * Knopf „Handy verbinden“: Empfangs-App der Box starten (zeigt „Beckhome TV“ und wartet auf das Handy).
+     * Ohne Empfangs-App, aber mit Chromecast built-in: Anleitung zeigen, die Box ist dann schon bereit.
+     */
+    private void startStreaming() {
+        Streaming.applyDeviceName(this);
+        String pkg = Streaming.receiverPackage(this);
+        Intent launch = Streaming.launchIntent(getPackageManager(), pkg);
+        if (launch != null) {
+            try {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                allowInLockTask(pkg);
+                Streaming.markUsed(this, pkg);
+                startActivity(launch);
+                return;
+            } catch (Exception ignored) {
+            }
+        }
+        showStreamGuide(Streaming.chromecastBuiltIn(this));
+    }
+
+    private static final String[][] STREAM_TEXT = {
+            // de, en, nl, pl
+            {"Handy auf den Fernseher", "Phone to TV", "Telefoon naar tv", "Telefon na telewizor"},
+            {"Ihr Handy muss im WLAN der Ferienwohnung sein.", "Your phone must be on the apartment's Wi-Fi.",
+                    "Uw telefoon moet met de wifi van het appartement verbonden zijn.",
+                    "Telefon musi być połączony z Wi-Fi apartamentu."},
+            {"Android: Schnelleinstellungen öffnen → „Übertragen“ / „Smart View“ / „Bildschirm übertragen“ → diesen Fernseher wählen.",
+                    "Android: open Quick Settings → “Cast” / “Smart View” / “Screen cast” → choose this TV.",
+                    "Android: open Snelle instellingen → „Casten” / „Smart View” → kies deze tv.",
+                    "Android: otwórz Szybkie ustawienia → „Przesyłaj” / „Smart View” → wybierz ten telewizor."},
+            {"In YouTube, Netflix & Co. geht auch das Cast-Symbol in der App.",
+                    "In YouTube, Netflix etc. you can also tap the Cast icon in the app.",
+                    "In YouTube, Netflix enz. kunt u ook op het cast-pictogram in de app tikken.",
+                    "W YouTube, Netflix itp. możesz też użyć ikony przesyłania w aplikacji."},
+            {"Auf diesem Fernseher ist das Streamen gerade nicht verfügbar. Bitte melden Sie sich bei uns.",
+                    "Streaming is not available on this TV right now. Please contact us.",
+                    "Streamen is op deze tv nu niet beschikbaar. Neem contact met ons op.",
+                    "Przesyłanie na ten telewizor jest teraz niedostępne. Prosimy o kontakt."},
+            {"Zurück", "Back", "Terug", "Wstecz"},
+    };
+
+    private String guestLang() {
+        try {
+            return new org.json.JSONObject(prefs.getString("welcome_json", "{}")).optString("lang", "de");
+        } catch (Exception e) {
+            return "de";
+        }
+    }
+
+    /** Anleitung (Chromecast built-in) bzw. Hinweis, dass keine Empfangs-App da ist. */
+    private void showStreamGuide(boolean cast) {
+        retryHandler.removeCallbacks(retryRunnable);
+        retryHandler.removeCallbacks(pairingPoll);
+        welcomeLoaded = false;
+        int l = java.util.Arrays.asList("de", "en", "nl", "pl").indexOf(guestLang());
+        if (l < 0) l = 0;
+        String body;
+        if (cast) {
+            body = "<div class='s'>" + h(STREAM_TEXT[1][l]) + "</div>"
+                    + "<div style='font-size:64px;margin:26px 0 10px;font-weight:bold'>" + h(Streaming.deviceName(this)) + "</div>"
+                    + "<div class='s' style='max-width:1100px;margin:18px auto 0'>" + h(STREAM_TEXT[2][l]) + "</div>"
+                    + "<div class='s' style='max-width:1100px;margin:14px auto 0'>" + h(STREAM_TEXT[3][l]) + "</div>";
+        } else {
+            body = "<div class='s' style='max-width:1000px;margin:24px auto 0'>" + h(STREAM_TEXT[4][l]) + "</div>";
+        }
+        String html = "<html><head><meta charset='utf-8'>" + SCREEN_CSS + "</head><body><div>"
+                + "<div style='font-size:40px'>" + h(STREAM_TEXT[0][l]) + "</div>" + body
+                + "<div style='margin-top:34px'><a id='b1' href='beckhome://home'>" + h(STREAM_TEXT[5][l]) + "</a></div>"
+                + "</div><script>document.getElementById('b1').focus();</script></body></html>";
+        onStreamGuide = true;
+        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
     }
 
     private boolean networkConnected() {
@@ -545,6 +631,7 @@ public class MainActivity extends Activity {
     }
 
     private void loadWelcomePage() {
+        onStreamGuide = false;
         // Get settings from SharedPreferences
         retryHandler.removeCallbacks(retryRunnable);
         retryHandler.removeCallbacks(idleReturn);
@@ -717,7 +804,9 @@ public class MainActivity extends Activity {
             } else if (event.getAction() == KeyEvent.ACTION_UP) {
                 retryHandler.removeCallbacks(backLongPress);
                 // kurz gedrückt auf einer externen Seite: eine Seite zurück, sonst zum Welcome-Screen
-                if (!backLongPressFired && !isOnWelcomePage()) {
+                if (!backLongPressFired && onStreamGuide) {
+                    loadWelcomePage();
+                } else if (!backLongPressFired && !isOnWelcomePage()) {
                     if (webView.canGoBack()) webView.goBack();
                     else loadWelcomePage();
                 }
@@ -726,7 +815,7 @@ public class MainActivity extends Activity {
         }
         // Auf einer externen Seite (urlaub.saarland …): nach längerer Ruhe zurück zum Welcome-Screen
         retryHandler.removeCallbacks(idleReturn);
-        if (!isOnWelcomePage()) retryHandler.postDelayed(idleReturn, IDLE_RETURN_MS);
+        if (onStreamGuide || !isOnWelcomePage()) retryHandler.postDelayed(idleReturn, IDLE_RETURN_MS);
         return super.dispatchKeyEvent(event);
     }
 

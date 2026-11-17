@@ -143,6 +143,7 @@ final class RemoteControl {
         body.put("pairCode", pairCode(p));
         body.put("printers", Printer.foundJson());
         body.put("printError", Printer.lastError);
+        body.put("stream", Streaming.info(ctx)); // Empfangs-App für „Handy verbinden“
 
         String text;
         try {
@@ -166,6 +167,13 @@ final class RemoteControl {
 
         JSONObject cfg = res.optJSONObject("config");
         if (cfg != null) applyConfig(ctx, p, cfg);
+
+        // „Handy verbinden“: Name setzen, Empfangs-App im Kiosk erlauben, beim Check-out/Gästewechsel beenden
+        Streaming.applyDeviceName(ctx);
+        Streaming.allowInKiosk(ctx);
+        if (res.has("stay") && Streaming.onStayChanged(ctx, res.optString("stay", ""))) {
+            showWelcome(ctx, false);
+        }
 
         // Neue Buchungen drucken (im Hintergrund, der Fernseher zeigt davon nichts)
         Printer.discoverIfDue(ctx);
@@ -203,6 +211,7 @@ final class RemoteControl {
         e.putFloat("idle_hours", (float) cfg.optDouble("idleHours", 4));
         String pin = cfg.optString("adminPin", "");
         if (!pin.isEmpty()) e.putString("admin_pin", pin);
+        e.putString("stream_name", cfg.optString("streamName", ""));
         e.putInt("remote_config_version", cfg.optInt("version", 0));
         e.commit();
         if (wasOff != off) {

@@ -148,6 +148,8 @@ rem WLAN nie schlafen legen (Dauerbetrieb)
 rem Fernseher aus = Box schlaeft mit (HDMI-CEC), danach zeigt die App wieder den Welcome-Screen
 "%ADB%" -s %BOX% shell settings put global hdmi_control_enabled 1 >nul 2>nul
 "%ADB%" -s %BOX% shell settings put global hdmi_control_auto_device_off_enabled 1 >nul 2>nul
+rem Handy verbinden: unter diesem Namen finden Gaeste den Fernseher (Miracast/Bluetooth; AirScreen hat einen eigenen Namen)
+"%ADB%" -s %BOX% shell settings put global device_name "Beckhome TV" >nul 2>nul
 
 rem ---------- PIN fuer die App-Einstellungen ----------
 echo.

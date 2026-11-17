@@ -5,6 +5,14 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.0] - 2026-11-17
+
+### Neu
+- „Handy verbinden“ (TV-App 1.11, `Streaming.java`): Knopf auf `welcome.html` und dem Offline-Welcome (`beckhome://stream`). Die App startet die Empfangs-App der Box (AirScreen `com.ionitech.airscreen` bevorzugt, sonst bekannte/per Stichwort gefundene Miracast-/Spiegeln-Apps), ohne Empfangs-App mit Chromecast built-in (`com.google.android.apps.mediashell`) eine Anleitung DE/EN/NL/PL. Empfangs-App steht dauerhaft auf der Lock-Task-Liste
+- Gerätename „Beckhome TV“: Box setzt `Settings.Global device_name` (WRITE_SECURE_SETTINGS, auch in `TV-Box-einrichten.bat`), Name im Admin änderbar (`tvbox_config.streamName`)
+- `/api/tv-box/sync`: Box meldet `stream` (App, Chromecast, Name gesetzt); Antwort enthält `stay` (Buchung im Haus, am Abreisetag nur bis zur Check-out-Zeit). Wechselt `stay`, beendet die Box die zuletzt benutzte Empfangs-App (`setApplicationHidden` an/aus)
+- `/api/welcome` liefert `stream` (Knopf nur, wenn die Box ein Handy empfangen kann); Admin → TV-Box zeigt den Empfangs-Status mit Hinweis zu AirScreen
+
 ## [1.49.0] - 2026-11-17
 
 ### Neu

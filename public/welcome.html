@@ -160,6 +160,7 @@
         <nav class="tv-apps" aria-label="TV &amp; Unterhaltung">
             <div class="tv-apps-title" data-t>Für Ihren Aufenthalt</div>
             <button class="app-btn" id="btn-launch-tv"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg><span data-t>Fernsehen schauen</span></button>
+            <button class="app-btn" id="btn-stream" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><span data-t>Handy verbinden</span></button>
             <button class="app-btn" id="btn-region-info"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/></svg><span data-t>Vor-Ort-Informationen</span></button>
         </nav>
     </div>
@@ -234,6 +235,7 @@
                 if (!has(checkin) && d.checkinTime) $('welcome-checkin').textContent = T('ab {t} Uhr', { t: d.checkinTime });
                 if (!has(checkout) && d.checkoutTime) $('welcome-checkout').textContent = T('bis {t} Uhr', { t: d.checkoutTime });
                 if (d.title) $('welcome-logo').textContent = d.title;
+                $('btn-stream').hidden = !d.stream; // only when the box has a receiver (AirScreen, Miracast, Chromecast)
                 // WLAN of the current guest (own password with the FRITZ!Box) with QR code; URL parameters win
                 if (!has(wifiName) && !has(wifiPass)) {
                     const w = d.wifi;
@@ -326,6 +328,8 @@
         $('btn-launch-tv').addEventListener('click', () => {
             window.location.href = 'intent://de.exaring.waiputv#Intent;scheme=app;package=de.exaring.waiputv;end';
         });
+        // Handy verbinden: the TV app starts the receiver app (AirScreen …) or shows the Chromecast guide
+        $('btn-stream').addEventListener('click', () => { window.location.href = 'beckhome://stream'; });
         // Vor-Ort-Informationen: Tourismus-Seite des Saarlands im Welcome-Fenster (Zurück-Taste führt hierher zurück)
         $('btn-region-info').addEventListener('click', () => { window.location.href = 'https://www.urlaub.saarland/'; });
         // Remote control: first button has focus, so OK works right away

@@ -37,6 +37,9 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
         <package android:name="de.exaring.waiputv" />
+        <!-- Handy verbinden: Empfangs-Apps (AirScreen …) und Chromecast built-in -->
+        <package android:name="com.ionitech.airscreen" />
+        <package android:name="com.google.android.apps.mediashell" />
         <package android:name="com.netflix.mediaclient" />
         <package android:name="com.netflix.ninja" />
         <package android:name="com.google.android.youtube.tv" />

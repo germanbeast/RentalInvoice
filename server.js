@@ -1237,7 +1237,7 @@ app.get('/api/tv-app', (req, res) => {
 // configuration (PIN, kiosk on/off, idle time) and remote commands. Unknown boxes are only
 // listed as "waiting for pairing".
 const TVBOX_COMMANDS = ['show_welcome', 'reload', 'open_settings', 'reboot', 'update_check'];
-const TVBOX_DEFAULT_CONFIG = { kiosk: true, idleHours: 4, adminPin: '' };
+const TVBOX_DEFAULT_CONFIG = { kiosk: true, idleHours: 4, adminPin: '', streamName: 'Beckhome TV' };
 let tvboxLive = null; // last status report (in memory, the DB copy is written at most every 10 min)
 // Boxes waiting for pairing: deviceId -> { keyHash, code, model, ip, versionName, firstSeen, lastSeen }.
 // In memory only: an unpaired box asks every few seconds, so after a restart it is back at once.
@@ -1257,6 +1257,27 @@ function tvboxDeviceAuthorized(req) {
 /** Welcome screen: only the paired box, or a logged-in admin (preview). */
 function tvboxViewAllowed(req) {
     return !!(req.session && req.session.user) || tvboxDeviceAuthorized(req);
+}
+
+/** The box can receive a phone (receiver app or Chromecast built-in). */
+function tvboxStreamAvailable(st) {
+    if (st) return !!(st.stream && (st.stream.app || st.stream.chromecast));
+    const d = db.getSetting('tvbox_device');
+    return !!(d && d.streamOk);
+}
+/** Booking currently in the apartment; on the departure day only until the check-out time (default 11:00). */
+function tvboxStayId() {
+    const today = berlinToday();
+    const s = db.getAllSettings();
+    const m = String((s.site && s.site.checkout_time) || '').match(/(\d{1,2})[:.](\d{2})/);
+    const outMin = m ? (+m[1]) * 60 + (+m[2]) : 11 * 60;
+    const nowHm = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
+    const [hh, mm] = nowHm.split(':').map(Number);
+    const afterCheckout = hh * 60 + mm >= outMin;
+    const cur = loadBookingRows()
+        .filter(r => r.checkin <= today && r.checkout >= today && !(r.checkout === today && afterCheckout))
+        .sort((a, b) => a.checkin.localeCompare(b.checkin))[0]; // changeover day: the leaving guest until check-out
+    return cur ? String(cur.id) : '';
 }
 
 function tvboxConfig() {
@@ -1296,6 +1317,11 @@ app.post('/api/tv-box/sync', (req, res) => {
                 port: parseInt(x && x.port, 10) || 631, path: clip(x && x.path, 100)
             })).filter(x => x.host),
             printError: clip(b.printError, 200),
+            // "Handy verbinden": receiver app on the box (AirScreen, built-in Miracast app …) and Chromecast built-in
+            stream: b.stream && typeof b.stream === 'object' ? {
+                app: clip(b.stream.app, 100), label: clip(b.stream.label, 60), chromecast: !!b.stream.chromecast,
+                name: clip(b.stream.name, 40), nameSet: !!b.stream.nameSet
+            } : null,
             lastSeen: now
         };
         res.set('Cache-Control', 'no-store');
@@ -1315,15 +1341,18 @@ app.post('/api/tv-box/sync', (req, res) => {
 
         tvboxLive = status;
         const prevDev = db.getSetting('tvbox_device') || {};
-        if (prevDev.versionCode !== status.versionCode || !prevDev.lastSeen || now - prevDev.lastSeen > 10 * 60 * 1000) {
-            db.setSetting('tvbox_device', { versionCode: status.versionCode, versionName: status.versionName, lastSeen: now });
+        const streamOk = tvboxStreamAvailable(status);
+        if (prevDev.versionCode !== status.versionCode || prevDev.streamOk !== streamOk || !prevDev.lastSeen || now - prevDev.lastSeen > 10 * 60 * 1000) {
+            db.setSetting('tvbox_device', { versionCode: status.versionCode, versionName: status.versionName, streamOk, lastSeen: now });
         }
         const cfg = tvboxConfig();
         const cmd = db.getSetting('tvbox_command');
         res.json({
             success: true,
             paired: true,
-            config: { version: cfg.version || 0, kiosk: cfg.kiosk !== false, idleHours: cfg.idleHours, adminPin: cfg.adminPin || '' },
+            config: { version: cfg.version || 0, kiosk: cfg.kiosk !== false, idleHours: cfg.idleHours, adminPin: cfg.adminPin || '', streamName: cfg.streamName || 'Beckhome TV' },
+            // current stay (booking id, '' after check-out time): when it changes, the box ends the guest's phone connection
+            stay: (() => { try { return tvboxStayId(); } catch (e) { return undefined; } })(),
             welcome: (() => { try { return welcomeData(); } catch (e) { return null; } })(), // offline copy on the box
             command: cmd && cmd.seq > status.ackSeq && now - cmd.createdAt < 24 * 60 * 60 * 1000 ? { seq: cmd.seq, type: cmd.type } : null,
             print: (() => { try { return printJobs.forBox(); } catch (e) { console.error('Druckaufträge:', e.message); return null; } })()
@@ -1373,7 +1402,8 @@ function welcomeData() {
         checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
         title: (s.site && s.site.title) || '',
         wifi: current ? guestWifi.tvView() : null,
-        lang: current ? guestLang.langOrDe(current) : 'de'
+        lang: current ? guestLang.langOrDe(current) : 'de',
+        stream: tvboxStreamAvailable(tvboxLive) // button "Handy verbinden"
     };
 }
 
@@ -2585,6 +2615,11 @@ app.put('/api/settings/tvbox/config', apiLimiter, (req, res) => {
         const h = Number(b.idleHours);
         if (!Number.isFinite(h) || h < 0 || h > 48) return res.status(400).json({ error: 'Ruhezeit: 0 bis 48 Stunden (0 = aus).' });
         next.idleHours = Math.round(h * 2) / 2;
+    }
+    if (b.streamName !== undefined) {
+        const n = String(b.streamName).trim().replace(/\s+/g, ' ');
+        if (!n || n.length > 30 || /[<>"]/.test(n)) return res.status(400).json({ error: 'Name des Fernsehers: 1 bis 30 Zeichen.' });
+        next.streamName = n;
     }
     if (b.adminPin !== undefined && b.adminPin !== '') {
         const pin = String(b.adminPin).trim();

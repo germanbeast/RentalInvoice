@@ -509,6 +509,7 @@
         'Für Ihren Aufenthalt': ['For your stay', 'Voor uw verblijf', 'Na pobyt'],
         'Fernsehen schauen': ['Watch TV', 'Televisie kijken', 'Oglądaj telewizję'],
         'Vor-Ort-Informationen': ['Local information', 'Lokale informatie', 'Informacje lokalne'],
+        'Handy verbinden': ['Connect phone', 'Telefoon verbinden', 'Połącz telefon'],
         'bis {d}': ['until {d}', 'tot {d}', 'do {d}']
     };
 

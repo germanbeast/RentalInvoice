@@ -5543,6 +5543,27 @@
             + (live.keyWatch ? '' : ' (Ruhe-Erkennung nicht aktiv, .bat erneut ausführen)');
         $('#tvbox-live-device').textContent = !live ? '–' : `${live.model || '?'}, Android ${live.android || '?'}, App ${live.versionName || '?'}${live.ip ? ', IP ' + live.ip : ''}`;
 
+        // "Handy verbinden": which receiver the box has (Streaming.java in the TV app)
+        const st = live && live.stream;
+        const sName = cfg.streamName || 'Beckhome TV';
+        $('#tvbox-live-stream').textContent = !live ? '–' : !st ? 'TV-App zu alt (ab Version 1.11)'
+            : st.app ? `bereit über ${st.label || st.app}${st.chromecast ? ' + Chromecast' : ''}`
+            : st.chromecast ? 'nur Chromecast (Android-Handys; für iPhones AirScreen installieren)'
+            : 'keine Empfangs-App, Knopf ist ausgeblendet';
+        const hint = $('#tvbox-stream-hint');
+        let hintText = '';
+        if (live && st && !st.app) {
+            hintText = 'Damit iPhones (AirPlay) und Android-Handys (Cast/Miracast) den Fernseher finden: auf der Box im Play Store „AirScreen“ installieren (Kiosk vorher kurz ausschalten), einmal öffnen, in den AirScreen-Einstellungen den Namen „' + sName + '“ eintragen und „Beim Start ausführen“ einschalten.';
+        } else if (live && st && st.app === 'com.ionitech.airscreen') {
+            hintText = 'In den AirScreen-Einstellungen einmal den Gerätenamen „' + sName + '“ eintragen (den Systemnamen setzt die Box selbst' + (st.nameSet ? ', erledigt' : '') + ').';
+        } else if (live && st && !st.nameSet) {
+            hintText = 'Die Box konnte ihren Namen nicht auf „' + sName + '“ setzen. Einmal die .bat erneut ausführen (Recht zum Ändern der Einstellungen).';
+        }
+        hint.textContent = hintText;
+        show(hint, !!hintText);
+        const sn = $('#tvbox-cfg-stream-name');
+        if (document.activeElement !== sn) sn.value = sName;
+
         const form = $('#tvbox-cfg-kiosk');
         if (document.activeElement !== form) form.value = cfg.kiosk === false ? '0' : '1';
         const idle = $('#tvbox-cfg-idle');
@@ -5576,7 +5597,8 @@
         if (await tvboxPost('/api/settings/tvbox/unpair')) loadTvbox();
     });
     if ($('#btn-tvbox-cfg-save')) $('#btn-tvbox-cfg-save').addEventListener('click', async () => {
-        const body = { kiosk: $('#tvbox-cfg-kiosk').value === '1', idleHours: Number($('#tvbox-cfg-idle').value) };
+        const body = { kiosk: $('#tvbox-cfg-kiosk').value === '1', idleHours: Number($('#tvbox-cfg-idle').value),
+            streamName: $('#tvbox-cfg-stream-name').value.trim() || 'Beckhome TV' };
         const pin = $('#tvbox-cfg-pin').value.trim();
         if (pin) body.adminPin = pin;
         if (await tvboxPost('/api/settings/tvbox/config', body, 'PUT')) {

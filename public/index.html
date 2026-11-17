@@ -2617,6 +2617,8 @@
                                         <div class="info-row"><span>Gerade sichtbar:</span> <strong id="tvbox-live-screen">–</strong></div>
                                         <div class="info-row"><span>Letzter Tastendruck:</span> <strong id="tvbox-live-idle">–</strong></div>
                                         <div class="info-row"><span>Gerät:</span> <strong id="tvbox-live-device">–</strong></div>
+                                        <div class="info-row"><span>Handy verbinden:</span> <strong id="tvbox-live-stream">–</strong></div>
+                                        <p class="text-muted" id="tvbox-stream-hint" style="font-size:.85rem; margin-top:.5rem; display:none"></p>
                                     </div>
 
                                     <div class="card" style="margin-top: 1rem;">
@@ -2631,6 +2633,10 @@
                                         <div class="form-group">
                                             <label for="tvbox-cfg-idle">Zurück zum Welcome-Screen nach … Stunden ohne Tastendruck (0 = nie)</label>
                                             <input type="number" id="tvbox-cfg-idle" min="0" max="48" step="0.5">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="tvbox-cfg-stream-name">Name des Fernsehers, wenn Gäste ihr Handy verbinden</label>
+                                            <input type="text" id="tvbox-cfg-stream-name" maxlength="30" placeholder="Beckhome TV">
                                         </div>
                                         <div class="form-group">
                                             <label for="tvbox-cfg-pin">Neue Admin-PIN der Box (leer lassen = unverändert)</label>
