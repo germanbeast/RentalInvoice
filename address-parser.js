@@ -447,12 +447,14 @@ function parseAddress(text) {
 
     // Classify
     const kinds = tokens.map(() => null);
+    // Country first, wherever it stands: the postcode check below depends on it
     tokens.forEach((t, i) => {
-        if (!r.country && countryFromText(t)) {
-            // "DE" alone is a country only near the end or after the town
-            const c = countryFromText(t);
-            if (t.length > 3 || i === tokens.length - 1) { r.country = c.name; r.countryCode = c.code; kinds[i] = 'country'; return; }
-        }
+        const c = !r.country && countryFromText(t);
+        // "DE" alone is a country only near the end or after the town
+        if (c && (t.length > 3 || i === tokens.length - 1)) { r.country = c.name; r.countryCode = c.code; kinds[i] = 'country'; }
+    });
+    tokens.forEach((t, i) => {
+        if (kinds[i]) return;
         if (!r.zip) {
             const zc = parseZipCity(t);
             // "A.Hlinka 3118" with a Slovak address: street + house number, the postcode follows elsewhere
@@ -510,6 +512,9 @@ function parseAddress(text) {
         if (beforeAddress && !r.name && looksLikeName(t) && !COMPANY.test(t)) { r.name = cleanName(t); kinds[i] = 'name'; return; }
         if (beforeAddress && !r.company && COMPANY.test(t) && t.split(' ').length <= 6 && !/[.!?]$/.test(t)) { r.company = t; kinds[i] = 'company'; return; }
         if (!r.name && looksLikeName(t) && !COMPANY.test(t) && streetIdx < 0 && zipIdx < 0) { r.name = cleanName(t); kinds[i] = 'name'; return; }
+        // No postcode: the last free name-like token after the street is the town ("Musterstr. 1 / Berlin")
+        if (!r.city && zipIdx < 0 && streetIdx >= 0 && i > streetIdx && looksLikeName(t)
+            && !tokens.some((u, k) => k > i && !kinds[k] && looksLikeName(u))) { r.city = t; kinds[i] = 'city'; return; }
         // Between street and town: address addition ("Hinterhaus", "Apt 4")
         if (streetIdx >= 0 && i > streetIdx && (zipIdx < 0 || i < zipIdx)) { extras.push(t); kinds[i] = 'extra'; return; }
         // GB: town on its own line before the postcode
