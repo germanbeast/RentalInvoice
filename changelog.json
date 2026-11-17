@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.48.1",
+    "currentVersion": "1.48.2",
     "releases": [
+        {
+            "version": "1.48.2",
+            "date": "2026-11-17",
+            "title": "Anschrift: Booking.com-Zusatzangaben werden sauber aussortiert",
+            "features": [],
+            "fixes": [
+                "„Erwachsener 1“, „Bevorzugte Sprache Englisch“ und „Land/Region“ landen nicht mehr in der Adresse, auch wenn alles in einer Zeile steht",
+                "Passt eine Postleitzahl nicht zum Land (z. B. „3118 A.Hlinka“ bei Slowakei), wird sie als Hausnummer erkannt: „A.Hlinka 3118/37, Slowakei“",
+                "Zeilen wie „Zeitraum:“, „Betrag:“ oder andere unbekannte Beschriftungen werden übersprungen",
+                "Eine Anschrift aus Straße und Land ohne Ort wird ebenfalls übernommen; bereits falsch gespeicherte Adressen werden beim nächsten Rechnung-Erstellen bereinigt"
+            ]
+        },
         {
             "version": "1.48.1",
             "date": "2026-11-17",

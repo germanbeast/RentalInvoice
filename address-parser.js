@@ -110,7 +110,7 @@ const LABELS = [
     ['email', /^(e-mail|email|e-mail-adresse|email address|e-mail address|mail|e-mailadres)$/]
 ];
 // Beschriftungen, deren Wert keine Anschrift ist (z. B. aus dem Booking.com-Extranet mitkopiert): Zeile weg
-const IGNORE_LABEL = /^(erwachsener?|erwachsene|adult|kind|kinder|child|babys?|haustiere?|pets?|bevorzugte sprache|preferred language|sprachen?|unterkunft|property|objekt|zimmertyp|room type|wohnungstyp|unit type|ankunftszeit|estimated arrival time|geschätzte ankunftszeit|reiseanlass|reason for travel|purpose of trip|geschäftsreise|business trip|stornierungsbedingungen|cancellation policy|bezahlung|payment method|zahlungsart|kreditkarte|credit card|genius-level|buchung über|booked via|buchungsdetails|reservation details|reservierungsdetails|gastdaten|guest details|kontaktdaten|contact details|buchungsnummer|booking number|reservation number|reservierungsnummer|bestätigungsnummer|confirmation( code| number)?|buchungscode|pin( code)?|anreise|abreise|check-?in|check-?out|ankunft|arrival|departure|aufenthalt|dauer|nächte|naechte|nights|preis|gesamtpreis|price|total|total price|betrag|provision|commission|zahlung|payment|personen|gäste|gaeste|guests|erwachsene|adults|kinder|children|zimmer|room|unit|wohneinheit|sprache|language|nationalität|nationality|staatsangehörigkeit|geburtsdatum|date of birth|ankunftszeit|arrival time|voraussichtliche ankunft|nachricht|message|anmerkung|anmerkungen|notiz|notes|remarks|bemerkung|bemerkungen|wünsche|special requests|status|quelle|source|kanal|channel|gebucht am|booked on|buchungsdatum|booking date|genius)$/;
+const IGNORE_LABEL = /^(zeitraum|bezahlt via|bezahlt|betrag|summe|rechnungsnummer|rechnungsdatum|leistungszeitraum|erwachsener?|erwachsene|adult|kind|kinder|child|babys?|haustiere?|pets?|bevorzugte sprache|preferred language|sprachen?|unterkunft|property|objekt|zimmertyp|room type|wohnungstyp|unit type|ankunftszeit|estimated arrival time|geschätzte ankunftszeit|reiseanlass|reason for travel|purpose of trip|geschäftsreise|business trip|stornierungsbedingungen|cancellation policy|bezahlung|payment method|zahlungsart|kreditkarte|credit card|genius-level|buchung über|booked via|buchungsdetails|reservation details|reservierungsdetails|gastdaten|guest details|kontaktdaten|contact details|buchungsnummer|booking number|reservation number|reservierungsnummer|bestätigungsnummer|confirmation( code| number)?|buchungscode|pin( code)?|anreise|abreise|check-?in|check-?out|ankunft|arrival|departure|aufenthalt|dauer|nächte|naechte|nights|preis|gesamtpreis|price|total|total price|betrag|provision|commission|zahlung|payment|personen|gäste|gaeste|guests|erwachsene|adults|kinder|children|zimmer|room|unit|wohneinheit|sprache|language|nationalität|nationality|staatsangehörigkeit|geburtsdatum|date of birth|ankunftszeit|arrival time|voraussichtliche ankunft|nachricht|message|anmerkung|anmerkungen|notiz|notes|remarks|bemerkung|bemerkungen|wünsche|special requests|status|quelle|source|kanal|channel|gebucht am|booked on|buchungsdatum|booking date|genius)$/;
 
 const SALUTATION = /^(herr|frau|hr\.?|fr\.?|mr\.?|mrs\.?|ms\.?|miss|mx\.?|monsieur|madame|mme\.?|m\.|mevrouw|mevr\.?|meneer|dhr\.?|de heer|pan|pani|signor|signora|sig\.?|sig\.ra|señor|señora|sr\.?|sra\.?|herrn)\s+/i;
 const COMPANY = /\b(gmbh|ag|ug|kg|ohg|gbr|e\.\s?k\.?|e\.\s?v\.?|mbh|se|ltd\.?|limited|llc|inc\.?|corp\.?|b\.\s?v\.?|bv|n\.\s?v\.?|nv|s\.a\.?|sarl|s\.a\.r\.l\.?|s\.r\.l\.?|srl|spa|s\.p\.a\.?|sp\.? z o\.?o\.?|s\.r\.o\.?|a\/s|aps|oy|ab|plc|co\.? kg|holding|group|gruppe|firma|stiftung|verein|praxis|kanzlei|hotel|consulting|services|solutions|software|systems|bank|versicherung|universität|university|institut|institute|agentur|agency|werk|werke|handel|bau)\b/i;
@@ -245,6 +245,17 @@ function parseZipCity(token) {
     return null;
 }
 
+const ZIP_FORMATS = {
+    DE: /^\d{5}$/, AT: /^\d{4}$/, CH: /^\d{4}$/, LI: /^\d{4}$/, BE: /^\d{4}$/, LU: /^\d{4}$/, DK: /^\d{4}$/, NO: /^\d{4}$/,
+    HU: /^\d{4}$/, SI: /^\d{4}$/, AU: /^\d{4}$/, BG: /^\d{4}$/, NL: /^\d{4} ?[A-Z]{2}$/, PL: /^\d{2}-\d{3}$/,
+    CZ: /^\d{3} ?\d{2}$/, SK: /^\d{3} ?\d{2}$/, SE: /^\d{3} ?\d{2}$/, GR: /^\d{3} ?\d{2}$/, FR: /^\d{5}$/, IT: /^\d{5}$/,
+    ES: /^\d{5}$/, FI: /^\d{5}$/, HR: /^\d{5}$/, TR: /^\d{5}$/, UA: /^\d{5}$/, LT: /^(LT-)?\d{5}$/, EE: /^\d{5}$/,
+    US: /^\d{5}(-\d{4})?$/, PT: /^\d{4}(-\d{3})?$/, RO: /^\d{6}$/, LV: /^(LV-)?\d{4}$/, IE: /^[A-Z0-9]{3} ?[A-Z0-9]{4}$/
+};
+const ZIP_FORMAT_OK = (code, zip) => !ZIP_FORMATS[code] || ZIP_FORMATS[code].test(zip);
+// Words that turned up as "street" in pasted portal texts
+const COUNT_STREET = /^(erwachsene[rn]?|adults?|kinder|personen|gäste|guests?|nächte|nights?)$/i;
+
 function looksLikeName(s) {
     const t = cleanSpaces(s);
     if (!t || /\d/.test(t) || t.length > 60) return false;
@@ -273,6 +284,8 @@ function labelOf(line) {
         const field = tryLabel(m[1]);
         // "12:30" or "Hauptstr. 1 - 3": not a label
         if (field) return { field, value: m[2].trim() };
+        if (line.includes(':') && /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-/]*( [A-Za-zÀ-ÿ\-/]+){0,2}$/.test(m[1].trim()) && m[2].trim()
+            && !/^(c\/o|z\.?\s?hd)/i.test(m[1].trim())) return { field: 'ignore', value: m[2].trim() };
     }
     // Label on its own line ("Telefon"), the value follows in the next line
     const alone = tryLabel(line.replace(/:$/, ''));
@@ -385,6 +398,37 @@ function parseAddress(text) {
         if (/^[A-Z]{2}\s+\d{5}(-\d{4})?$/.test(tokens[i]) && !/\d/.test(tokens[i - 1])) tokens.splice(i - 1, 2, `${tokens[i - 1]}, ${tokens[i]}`);
     }
 
+    // Inside a text pasted as one block (Booking.com copies): labels without colon, counts, "37 Slowakei"
+    let looseNumber = '';
+    {
+        const out = [];
+        const COUNT = /^(?:(erwachsene[rn]?|adults?|kinder|kind|children|child|babys?|nächte|naechte|nights?|personen|gäste|gaeste|guests?|zimmer|rooms?)\s*:?\s*\d+|\d+\s+(erwachsene[rn]?|adults?|kinder|kind|children|nächte|nights?|personen|gäste|guests?))$/i;
+        for (let i = 0; i < tokens.length; i++) {
+            const t = tokens[i];
+            if (COUNT.test(t)) continue;
+            const lab = labelOf(t);
+            if (lab && lab.alone) {
+                const next = tokens[i + 1];
+                if (lab.field === 'ignore') { if (next !== undefined && !labelOf(next)) i++; continue; }
+                if (lab.field === 'country' && next !== undefined) {
+                    const m = next.match(/^(\d+[a-z]?)\s+(.+)$/i) || next.match(/^()(.+)$/);
+                    const c = countryFromText(m[2]);
+                    if (c && !r.country) { r.country = c.name; r.countryCode = c.code; if (m[1]) looseNumber = m[1]; i++; continue; }
+                }
+                continue; // other labels alone: the value follows as its own token
+            }
+            const num = t.match(/^(\d+[a-z]?)\s+(\D+)$/i);
+            if (num && countryFromText(num[2]) && num[2].length > 3) {
+                const c = countryFromText(num[2]);
+                if (!r.country) { r.country = c.name; r.countryCode = c.code; }
+                looseNumber = num[1];
+                continue;
+            }
+            out.push(t);
+        }
+        tokens = out;
+    }
+
     // E-mail and phone can sit anywhere, also inside a line
     tokens = tokens.map(t => {
         const mail = t.match(EMAIL);
@@ -470,6 +514,16 @@ function parseAddress(text) {
     });
     if (extras.length && !r.extra) r.extra = extras.join(', ');
 
+    // "3118 A.Hlinka" with a Slovak address is house number + street, not postcode + town
+    if (r.countryCode && r.zip && !ZIP_FORMAT_OK(r.countryCode, r.zip) && /^\d+$/.test(r.zip) && r.city
+        && (!r.street || /^\d+$/.test(r.houseNumber) === false || COUNT_STREET.test(r.street))) {
+        r.street = tidyCase(r.city);
+        r.houseNumber = looseNumber ? `${r.zip}/${looseNumber}` : r.zip;
+        r.zip = '';
+        r.city = '';
+        looseNumber = '';
+    }
+
     // Tidy up
     r.city = tidyCase(stripEdges(r.city.replace(/,\s*[A-Z]{2}$/, '')));
     r.extra = cleanSpaces(r.extra);
@@ -532,7 +586,7 @@ function formatAddress(r) {
 /** True when the text holds enough of an address to be worth offering "Anschrift übernehmen". */
 function looksLikeAddress(text) {
     const r = parseAddress(text);
-    return Boolean((r.street && (r.zip || r.city)) || (r.zip && r.city && (r.name || r.street)));
+    return Boolean((r.street && (r.zip || r.city || r.country)) || (r.zip && r.city && (r.name || r.street)));
 }
 
 /** Stored guest address ("Straße Nr.\nPLZ Ort\nLand") split into form fields (Meldeschein, invoice). */

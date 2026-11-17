@@ -5,6 +5,12 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.2] - 2026-11-17
+
+### Behoben
+- `address-parser`: Anzahl-Angaben („Erwachsener 1“, „2 Adults“) fallen weg; Beschriftungen ohne Doppelpunkt mitten im Text („Bevorzugte Sprache“, „Land/Region“) samt Wert; „37 Slowakei“ → Land + Restnummer; PLZ passt nicht zum Land → Hausnummer + Straße (`ZIP_FORMATS`); unbekannte „Beschriftung: Wert“-Zeilen werden ignoriert
+- Straße + Land ohne Ort gilt als Anschrift (`looksLikeAddress`, Rechnungsdialog, Bereinigung gespeicherter Adressen)
+
 ## [1.48.1] - 2026-11-17
 
 ### Behoben

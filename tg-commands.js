@@ -917,7 +917,7 @@ function tidyAddress(text, { strict = false } = {}) {
     const typed = String(text || '').split('\n').map(l => l.trim()).filter(Boolean).join('\n');
     if (!typed) return '';
     const p = addressParser.parseAddress(typed);
-    if (p.street && (p.zip || p.city)) return p.address;
+    if (p.street && (p.zip || p.city || p.country)) return p.address;
     if (strict) return '';
     return typed.split('\n').length <= 4 ? typed : '';
 }
@@ -1219,7 +1219,7 @@ async function startFlow(bot, chatId, flowName, initialText, prefill) {
         const flatIdx = m ? initialText.replace(/\n/g, ' ').indexOf(m) : -1;
         const work = flatIdx >= 0 ? initialText.slice(0, flatIdx) + '\n' + initialText.slice(flatIdx + m.length) : initialText;
         const addr = addressParser.parseAddress(work);
-        data.gAdresse = addr.street && (addr.zip || addr.city) ? addr.address : tidyAddress(data.gAdresse, { strict: data.gAdresse.split('\n').length > 4 });
+        data.gAdresse = addr.street && (addr.zip || addr.city || addr.country) ? addr.address : tidyAddress(data.gAdresse, { strict: data.gAdresse.split('\n').length > 4 });
         if (!data.gEmail && addr.email) data.gEmail = addr.email;
     }
     if (prefill) Object.assign(data, prefill);
