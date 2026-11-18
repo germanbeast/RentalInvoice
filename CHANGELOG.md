@@ -5,6 +5,19 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.1] - 2026-11-18
+
+### Behoben
+- Admin „Rechnung erstellen“ an einer Buchung (`invoiceFromBooking`): setzte nur Felder mit Wert, die Anschrift gar nicht. Anschrift, E-Mail, Türcode und Gutschein der vorherigen Rechnung (Entwurf im Formular) blieben stehen. Jetzt `GET /api/invoices/prefill/:bookingId` (Gast der Buchung, Meldeschein als Rückfall), alle Gastfelder werden ersetzt, `bookingId`/`guestId` reisen mit der Rechnung
+- Speichern (`POST /api/invoices`, Telegram-Rechnung aus Buchung): `address-check.bindInvoiceGuest()` bindet die Rechnung an den Gast der Buchung (Platzhalter → `applyGuestName`) und aktualisiert nur dessen Anschrift
+- `db.findOrCreateGuest`: überschreibt keine gespeicherte Anschrift mehr (füllt nur leere); E-Mail-Treffer zählt nur bei passendem Namen
+- Bereits vergebene Rechnungsnummer wird beim Erstellen aus einer Buchung durch die nächste freie ersetzt (höhere aus lokalem Zähler und Server)
+- Meldeschein und Gast-Rechnung: vom Gast bestätigte Anschrift ersetzt die gespeicherte
+- Gäste-Dialog: Adresse als `textarea`
+
+### Neu
+- `address-check.js` + Dialog „Anschriften prüfen“ (Hinweis unter Start/Kalender): Rechnungen mit derselben Anschrift wie eine frühere Rechnung einer anderen Person oder abweichend vom Meldeschein; Gäste mit fremder Anschrift. `POST /api/invoices/:id/address` (alter Wert bleibt in `addressCorrections`), `POST /api/guests/:id/address`, `POST /api/invoices/address-check/ack`
+
 ## [1.49.0] - 2026-11-17
 
 ### Neu
