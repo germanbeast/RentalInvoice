@@ -1,9 +1,9 @@
 {
-    "currentVersion": "1.50.0",
+    "currentVersion": "1.51.0",
     "releases": [
         {
-            "version": "1.50.0",
-            "date": "2026-11-17",
+            "version": "1.51.0",
+            "date": "2026-11-18",
             "title": "Hintergrund-Video der Ferienwohnung auf Webseite, Meine Buchung und TV",
             "features": [
                 "Unter Webseite → Inhalte → „Hintergrund-Video“ ein Video der Wohnung hochladen (auch große Handy-Videos bis 2 GB, der Upload läuft in Stücken)",
@@ -13,6 +13,23 @@
                 "TV-App 1.11: Video startet ohne Tastendruck"
             ],
             "fixes": []
+        },
+        {
+            "version": "1.50.1",
+            "date": "2026-11-18",
+            "title": "Rechnung: immer die Anschrift des richtigen Gastes",
+            "features": [
+                "Neu unter Start bzw. im Kalender: „Anschriften prüfen“ zeigt Rechnungen und Gäste, die wahrscheinlich die Anschrift einer anderen Person tragen, mit Vorschlag aus dem Meldeschein. Mit einem Klick übernehmen, selbst korrigieren oder als richtig markieren",
+                "Hat ein Gast noch keine Anschrift, aber einen Meldeschein ausgefüllt, wird beim Erstellen der Rechnung die Meldeschein-Anschrift eingesetzt"
+            ],
+            "fixes": [
+                "„Rechnung erstellen“ an einer Buchung übernahm die Anschrift (und E-Mail, Türcode, Gutschein) der vorherigen Rechnung im Formular, wenn beim neuen Gast nichts hinterlegt war. Jetzt kommen alle Gastdaten frisch vom Gast genau dieser Buchung",
+                "Beim Speichern wurde die Rechnung über Name oder E-Mail einem Gast zugeordnet und dessen Anschrift überschrieben, so verbreitete sich eine falsche Anschrift in der Gästeliste. Jetzt ist die Rechnung fest mit Buchung und Gast verbunden; ohne diese Verbindung wird keine gespeicherte Anschrift mehr überschrieben",
+                "Eine bereits gespeicherte Rechnungsnummer wird beim Erstellen aus einer Buchung nicht wiederverwendet (das hätte die alte Rechnung überschrieben)",
+                "Gleiche E-Mail bei zwei verschiedenen Namen legt keine zwei Personen mehr zusammen",
+                "Anschrift aus Meldeschein oder Gast-Rechnung ersetzt eine falsch gespeicherte Anschrift statt sie stehen zu lassen",
+                "Gästeliste: Adressfeld ist jetzt mehrzeilig, Zeilenumbrüche gehen beim Speichern nicht mehr verloren"
+            ]
         },
         {
             "version": "1.49.0",

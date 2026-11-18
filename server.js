@@ -23,6 +23,7 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const multer = require('multer');
 const db = require('./db');
+const addressCheck = require('./address-check');
 const vouchers = require('./vouchers');
 const waCommands = require('./wa-commands');
 const tgCommands = require('./tg-commands');
@@ -2306,6 +2307,10 @@ app.get('/api/overview', apiLimiter, (req, res) => {
             inHouse: inHouse.map(redact), events: events.slice(0, 12).map(e => ({ ...e, booking: redact(e.booking) })),
             namesMissing: active.filter(r => r.needsName && r.source !== 'manual').length,
             openInvoices: permissions.can(perms, 'invoices') ? { count: open.length, total: openTotal } : null,
+            addressIssues: permissions.can(perms, 'invoices', 'edit') ? (() => {
+                try { const r = addressCheck.audit(); return r.invoices.length + (permissions.can(perms, 'bookings', 'edit') ? r.guests.length : 0); }
+                catch (e) { return 0; }
+            })() : 0,
             warnings, sync
         });
     } catch (e) {
@@ -3099,12 +3104,66 @@ app.get('/api/invoices/guest/:guestId', apiLimiter, (req, res) => {
     }
 });
 
-app.post('/api/invoices', apiLimiter, (req, res) => {
+// Start data for "Rechnung erstellen" at a booking: always the guest of THIS booking (fresh from the database),
+// plus the next free invoice number when the number in the form is already used.
+app.get('/api/invoices/prefill/:bookingId', apiLimiter, (req, res) => {
+    try {
+        const g = addressCheck.bookingGuest(parseInt(req.params.bookingId, 10));
+        if (!g) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+        const current = String(req.query.current || '').trim();
+        const numberTaken = !current || !!db.getDb().prepare('SELECT 1 FROM invoices WHERE invoice_number = ?').get(current);
+        res.json({ success: true, ...g, numberTaken, nextNumber: db.getNextInvoiceNumber() });
+    } catch (e) {
+        console.error('Invoice prefill Error:', e.message);
+        res.status(500).json({ success: false, error: 'Gastdaten konnten nicht geladen werden' });
+    }
+});
+
+// Check of saved invoices/guests for another guest's address (see address-check.js)
+app.get('/api/invoices/address-check', apiLimiter, (req, res) => {
+    try {
+        const r = addressCheck.audit();
+        const canGuests = permissions.can(req.user.permissions, 'bookings', 'edit');
+        res.json({ success: true, invoices: r.invoices, guests: canGuests ? r.guests : [], canGuests });
+    } catch (e) {
+        console.error('Address check Error:', e.message);
+        res.status(500).json({ success: false, error: 'Prüfung fehlgeschlagen' });
+    }
+});
+
+app.post('/api/invoices/address-check/ack', apiLimiter, (req, res) => {
+    const key = String((req.body && req.body.key) || '');
+    if (!/^(inv|guest):\d+:/.test(key)) return res.status(400).json({ success: false, error: 'Ungültig' });
+    addressCheck.acknowledge(key);
+    res.json({ success: true });
+});
+
+app.post('/api/invoices/:id/address', apiLimiter, (req, res) => {
+    const address = String((req.body && req.body.address) || '').trim().slice(0, 400);
+    if (address.length < 5) return res.status(400).json({ success: false, error: 'Bitte eine vollständige Anschrift angeben.' });
+    const ok = addressCheck.fixInvoiceAddress(parseInt(req.params.id, 10), address);
+    if (!ok) return res.status(404).json({ success: false, error: 'Rechnung nicht gefunden' });
+    console.log(`🧾 Anschrift von Rechnung ${req.params.id} korrigiert (${req.user.username})`);
+    res.json({ success: true });
+});
+
+app.post('/api/guests/:id/address', apiLimiter, (req, res) => {
+    const address = String((req.body && req.body.address) || '').trim().slice(0, 400);
+    const g = db.getGuestById(parseInt(req.params.id, 10));
+    if (!g) return res.status(404).json({ success: false, error: 'Gast nicht gefunden' });
+    db.updateGuest(g.id, { ...g, address: address || null });
+    res.json({ success: true });
+});
+
+app.post('/api/invoices', apiLimiter, async (req, res) => {
     try {
         const data = req.body;
         if (!data.rNummer && !data.invoice_number) {
             return res.status(400).json({ error: 'Rechnungsnummer ist erforderlich' });
         }
+        // Tie the invoice to the guest of its booking (or the guest picked in the form)
+        try { await addressCheck.bindInvoiceGuest(data); }
+        catch (e) { console.warn('Rechnung: Gast der Buchung nicht zuordenbar:', e.message); }
         // Voucher redeemed in the invoice form ("Gutschein einlösen")
         let voucherWarning = null, redeemVoucher = null;
         if (data.voucherCode) {
@@ -3124,7 +3183,7 @@ app.post('/api/invoices', apiLimiter, (req, res) => {
             const line = (data.positions || []).filter(p => String(p.desc || '').startsWith(`Gutschein ${redeemVoucher.code}`));
             const net = -line.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.price) || 0), 0);
             const gross = data.kleinunternehmer ? net : net * (1 + (Number(data.mwstSatz) || 0) / 100);
-            const stay = db.getDb().prepare('SELECT id FROM bookings WHERE checkin = ? AND checkout = ? LIMIT 1').get(data.aAnreise || null, data.aAbreise || null);
+            const stay = data.bookingId ? { id: data.bookingId } : db.getDb().prepare('SELECT id FROM bookings WHERE checkin = ? AND checkout = ? LIMIT 1').get(data.aAnreise || null, data.aAbreise || null);
             vouchers.redeem(redeemVoucher.id, {
                 invoiceId: result.id, bookingId: stay ? stay.id : null, checkin: data.aAnreise || null, checkout: data.aAbreise || null,
                 value: gross > 0 ? Math.round(gross * 100) / 100 : null, via: 'Rechnung'

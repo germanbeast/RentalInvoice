@@ -690,7 +690,8 @@ function createGuestPortal({ videoFor, express, rateLimit, db, botLogic, nodemai
             const address = [f.street, `${f.zip} ${f.city}`, foreign ? f.country : ''].filter(Boolean).join('\n');
             if (guestId) {
                 const g = db.getGuestById(guestId);
-                if (g) db.updateGuest(g.id, { ...g, address: g.address || address, email: g.email || f.email });
+                // The guest typed and confirmed the address: it replaces whatever was stored before
+                if (g) db.updateGuest(g.id, { ...g, address, email: g.email || f.email });
             }
 
             // Number and save in one synchronous step: never two invoices for one stay, never one number twice

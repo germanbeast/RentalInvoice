@@ -2937,6 +2937,23 @@
             </div>
         </div>
 
+        <div class="modal-overlay" id="modal-addr-check" style="display:none;">
+            <div class="modal modal-wide">
+                <div class="modal-header">
+                    <h3>Anschriften prüfen</h3>
+                    <button type="button" id="btn-close-addr-check" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="ac-intro">Bis Version 1.50.0 konnte beim Erstellen einer Rechnung aus einer Buchung die Anschrift der vorherigen Rechnung stehen bleiben. Hier stehen Rechnungen und Gäste, deren Anschrift wahrscheinlich zu einer anderen Person gehört. Bitte jeweils prüfen: <b>Vorschlag übernehmen</b>, selbst korrigieren oder <b>ist richtig</b>.</p>
+                    <div id="addr-check-body"><p class="ac-empty">Wird geprüft …</p></div>
+                </div>
+            </div>
+        </div>
+
         <div class="modal-overlay" id="modal-guests" style="display:none;">
             <div class="modal modal-wide">
                 <div class="modal-header">
@@ -3003,7 +3020,7 @@
                                     </div>
                                     <div class="form-group">
                                         <label for="guest-edit-address">Adresse</label>
-                                        <input type="text" id="guest-edit-address" placeholder="Adresse">
+                                        <textarea id="guest-edit-address" rows="3" placeholder="Straße Nr.&#10;PLZ Ort&#10;Land"></textarea>
                                     </div>
                                 </div>
                                 <div class="form-group">

@@ -325,6 +325,9 @@
     // =======================
     let positions = [];
     let positionIdCounter = 0;
+    // Which booking/guest the invoice in the form belongs to. The server takes the guest from here,
+    // never from a name match, so another guest's address can't end up on (or be copied from) the invoice.
+    let invoiceLink = { bookingId: null, guestId: null };
 
     // Initial Auth Check
     checkAuth();
@@ -1409,6 +1412,8 @@
             nukiPin: $('#nuki-pin-result').style.display !== 'none' ? $('#nuki-pin-code').textContent : null,
             positions: positions.map(p => ({ desc: p.desc, qty: p.qty, price: p.price })),
             voucherCode: invoiceVoucherCode(),
+            bookingId: invoiceLink.bookingId || null,
+            guestId: invoiceLink.guestId || null,
             timestamp: Date.now()
         };
     }
@@ -1429,6 +1434,7 @@
         if (!raw) return false;
         try {
             const d = JSON.parse(raw);
+            invoiceLink = { bookingId: d.bookingId || null, guestId: d.guestId || null };
             if (d.gName) $('#g-name').value = d.gName;
             if (d.gAdresse) $('#g-adresse').value = d.gAdresse;
             if (d.gEmail) $('#g-email').value = d.gEmail;
@@ -1718,6 +1724,7 @@
             const todo = [];
             if (d.namesMissing > 0) todo.push(`<div class="today-warn">❓ ${d.namesMissing} Buchung${d.namesMissing === 1 ? '' : 'en'} ohne Namen – <button class="today-link" data-goto="noname">jetzt eintragen</button></div>`);
             if (d.openInvoices && d.openInvoices.count > 0) todo.push(`<div>🧾 ${d.openInvoices.count} offene Rechnung${d.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(d.openInvoices.total)})</div>`);
+            if (d.addressIssues > 0) todo.push(`<div class="today-warn">📇 ${d.addressIssues} Anschrift${d.addressIssues === 1 ? '' : 'en'} vermutlich vertauscht – <button class="today-link" data-addrcheck="1">jetzt prüfen</button></div>`);
             d.warnings.forEach(w => {
                 const bad = w.type === 'overlap' || w.type === 'sync' || w.bad;
                 const icon = w.type === 'lock' ? '🔋' : '⚠️';
@@ -1725,6 +1732,7 @@
                 todo.push(`<div class="${bad ? 'today-bad' : 'today-warn'}">${icon} ${escapeHtml(w.text)}${ack}</div>`);
             });
             $('#today-todo').innerHTML = todo.length ? todo.join('') : '<div class="today-empty">✅ Alles erledigt – nichts offen.</div>';
+            $('#today-todo').querySelectorAll('[data-addrcheck]').forEach(b => b.addEventListener('click', () => openAddressCheck()));
             $('#today-todo').querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => {
                 bookingsFilter = 'noname';
                 switchView('bookings');
@@ -1903,14 +1911,71 @@
         input.addEventListener('blur', save);
     }
 
-    function invoiceFromBooking(b) {
+    /** Next invoice number: the higher of the local counter and the server (Telegram and guests number there too). */
+    function freshInvoiceNumber(serverNext) {
+        let nr = getNextRechnungsnr();
+        const num = x => parseInt(String(x || '').split('-')[1], 10) || 0;
+        const year = new Date().getFullYear();
+        if (serverNext && String(serverNext).startsWith(`${year}-`) && num(serverNext) > num(nr)) {
+            nr = serverNext;
+            localStorage.setItem(STORAGE_KEYS.rechnungsnr, JSON.stringify({ nr: num(serverNext), year }));
+        }
+        return nr;
+    }
+
+    /**
+     * New invoice for a booking. Everything guest-related is replaced (also with empty values), so nothing of the
+     * previous invoice in the form survives: name, e-mail, address, door code, voucher. The data comes fresh from the
+     * server for exactly this booking; the list entry is only the fallback.
+     */
+    async function invoiceFromBooking(b) {
         switchView('invoice');
-        const set = (sel, val) => { const el = $(sel); if (el && val) { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } };
-        set('#g-name', b.name);
-        set('#g-email', b.guestEmail);
-        set('#a-anreise', b.checkin);
-        set('#a-abreise', b.checkout);
-        if (!b.name) showToast('Bitte noch den Gastnamen eintragen', 'info');
+        let p = null;
+        try { p = await apiJson(`/api/invoices/prefill/${encodeURIComponent(b.id)}?current=${encodeURIComponent($('#r-nummer').value || '')}`); }
+        catch (e) { p = null; }
+        if (!p || !p.success) {
+            p = { name: b.name || '', email: b.guestEmail || '', address: b.guestAddress || '', checkin: b.checkin, checkout: b.checkout, guestId: b.guestId || null, numberTaken: false };
+        }
+        const put = (sel, val) => {
+            const el = $(sel);
+            if (!el) return;
+            el.value = val || '';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        put('#g-name', p.name);
+        put('#g-email', p.email);
+        put('#g-adresse', p.address);
+        put('#a-anreise', p.checkin || b.checkin);
+        put('#a-abreise', p.checkout || b.checkout);
+        if ($('#guest-autocomplete')) $('#guest-autocomplete').style.display = 'none';
+        invoiceLink = { bookingId: b.id, guestId: p.guestId || null };
+
+        // The number of an invoice that is already saved must not be reused (saving would overwrite it)
+        if (p.numberTaken || !$('#r-nummer').value) put('#r-nummer', freshInvoiceNumber(p.nextNumber));
+        put('#r-datum', new Date().toISOString().split('T')[0]);
+
+        // Door code of this booking, not of the previous invoice
+        if (b.pin) {
+            $('#nuki-pin-result').style.display = 'block';
+            $('#nuki-pin-code').textContent = b.pin;
+        } else {
+            $('#nuki-pin-result').style.display = 'none';
+            $('#nuki-pin-code').textContent = '——-';
+        }
+        // Voucher lines belong to the previous invoice; nights follow the new stay
+        const nights = calcNights(p.checkin || b.checkin, p.checkout || b.checkout);
+        positions = positions.filter(x => !/^Gutschein [A-Z0-9-]{4,}/.test(String(x.desc || '')));
+        positions.forEach(x => { if (/^Übernachtung/i.test(String(x.desc || '')) && nights > 0) x.qty = nights; });
+        renderPositions();
+        if ($('#inv-voucher-info')) $('#inv-voucher-info').hidden = true;
+        updateSummary();
+        updatePreview();
+        saveDraft();
+
+        if (!p.name) showToast('Bitte noch den Gastnamen eintragen', 'info');
+        else if (!p.address) showToast('Für diesen Gast ist noch keine Anschrift hinterlegt', 'info');
+        else if (p.addressSource === 'meldeschein') showToast('Anschrift aus dem Meldeschein übernommen', 'info');
         if (b.voucherCode && !invoiceVoucherCode()) setTimeout(() => applyInvoiceVoucher(b.voucherCode, b.id), 300);
     }
 
@@ -2131,6 +2196,7 @@
         const list = [];
         if (o.namesMissing > 0) list.push(`<button type="button" class="alert warn" data-goto="noname">${o.namesMissing} Buchung${o.namesMissing === 1 ? '' : 'en'} ohne Namen – jetzt eintragen</button>`);
         if (calHome.requests.length) list.push(`<button type="button" class="alert info" data-goto="requests">${calHome.requests.length} offene Anfrage${calHome.requests.length === 1 ? '' : 'n'} von der Webseite</button>`);
+        if (o.addressIssues > 0) list.push(`<button type="button" class="alert warn" data-goto="addrcheck">${o.addressIssues} Anschrift${o.addressIssues === 1 ? '' : 'en'} vermutlich vertauscht – jetzt prüfen</button>`);
         if (o.openInvoices && o.openInvoices.count > 0) list.push(`<span class="alert">${o.openInvoices.count} offene Rechnung${o.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(o.openInvoices.total)})</span>`);
         (o.warnings || []).forEach(w => list.push(`<span class="alert ${w.type === 'overlap' || w.type === 'sync' ? 'bad' : 'warn'}">${escapeHtml(w.text)}</span>`));
         box.innerHTML = list.join('');
@@ -2237,6 +2303,7 @@
                 const g = goto.dataset.goto;
                 if (g === 'requests') return openRequests();
                 if (g === 'invoice') return switchView('invoice');
+                if (g === 'addrcheck') return openAddressCheck();
                 if (g === 'noname') { bookingsFilter = 'noname'; return switchView('bookings'); }
             }
             const bEl = e.target.closest('[data-bid]');
@@ -4289,6 +4356,82 @@
     btnSyncPaperless.addEventListener('click', syncPaperlessExpenses);
 
 
+    // =======================
+    // Anschriften prüfen (invoices/guests that probably carry another guest's address)
+    // =======================
+    const modalAddrCheck = $('#modal-addr-check');
+    async function openAddressCheck() {
+        if (!modalAddrCheck) return;
+        modalAddrCheck.style.display = 'flex';
+        const body = $('#addr-check-body');
+        body.innerHTML = '<p class="ac-empty">Wird geprüft …</p>';
+        let d = null;
+        try { d = await apiJson('/api/invoices/address-check'); } catch (e) { d = null; }
+        if (!d || !d.success) { body.innerHTML = `<p class="ac-empty">${escapeHtml((d && d.error) || 'Prüfung fehlgeschlagen')}</p>`; return; }
+        const nl = t => escapeHtml(t || '').replace(/\n/g, '<br>');
+        const stay = x => x.arrival && x.departure ? `${fmtDEfull(x.arrival)} – ${fmtDEfull(x.departure)}` : '';
+        const inv = d.invoices.map(x => `
+            <div class="ac-item" data-kind="inv" data-id="${x.invoiceId}" data-key="${escapeHtml(x.key)}">
+                <div class="ac-head"><b>Rechnung ${escapeHtml(x.number)} · ${escapeHtml(x.name)}</b><small>${stay(x)}${x.guestInvoice ? ' · vom Gast selbst erstellt' : ''}</small></div>
+                ${x.reasons.map(r => `<div class="ac-reason">⚠️ ${escapeHtml(r)}</div>`).join('')}
+                <div class="ac-addr">
+                    <div><label>Steht auf der Rechnung</label><div class="ac-old">${nl(x.address)}</div></div>
+                    <div><label>${x.suggestion ? `Richtige Anschrift (Vorschlag: ${escapeHtml(x.suggestionSource)})` : 'Richtige Anschrift'}</label><textarea>${escapeHtml(x.suggestion || '')}</textarea></div>
+                </div>
+                <div class="ac-actions">
+                    <button type="button" class="btn btn-primary btn-sm" data-ac="save">Anschrift übernehmen</button>
+                    <button type="button" class="btn btn-outline btn-sm" data-ac="open">Rechnung öffnen</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-ac="ok">Ist richtig</button>
+                </div>
+            </div>`).join('');
+        const gst = d.guests.map(x => `
+            <div class="ac-item" data-kind="guest" data-id="${x.guestId}" data-key="${escapeHtml(x.key)}">
+                <div class="ac-head"><b>Gast ${escapeHtml(x.name)}</b></div>
+                ${x.reasons.map(r => `<div class="ac-reason">⚠️ ${escapeHtml(r)}</div>`).join('')}
+                <div class="ac-addr">
+                    <div><label>Gespeicherte Anschrift</label><div class="ac-old">${nl(x.address)}</div></div>
+                    <div><label>${x.suggestion ? `Richtige Anschrift (Vorschlag: ${escapeHtml(x.suggestionSource)})` : 'Richtige Anschrift (leer lassen, wenn unbekannt)'}</label><textarea>${escapeHtml(x.suggestion || '')}</textarea></div>
+                </div>
+                <div class="ac-actions">
+                    <button type="button" class="btn btn-primary btn-sm" data-ac="save">Anschrift speichern</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-ac="ok">Ist richtig</button>
+                </div>
+            </div>`).join('');
+        if (!inv && !gst) { body.innerHTML = '<p class="ac-empty">✅ Keine auffälligen Anschriften gefunden.</p>'; return; }
+        body.innerHTML =
+            (inv ? `<h4 class="ac-section">Rechnungen (${d.invoices.length})</h4>${inv}<p class="ac-note">Wurde eine Rechnung schon verschickt: nach dem Korrigieren über „Rechnung öffnen“ das PDF neu erstellen und dem Gast schicken.</p>` : '') +
+            (gst ? `<h4 class="ac-section">Gästeliste (${d.guests.length})</h4>${gst}<p class="ac-note">Eine leere Anschrift ist besser als eine falsche: sie wird beim nächsten Meldeschein oder der nächsten Anschrift per Telegram gefüllt.</p>` : '');
+    }
+
+    if (modalAddrCheck) {
+        $('#btn-close-addr-check').addEventListener('click', () => { modalAddrCheck.style.display = 'none'; });
+        modalAddrCheck.addEventListener('click', async e => {
+            if (e.target === modalAddrCheck) { modalAddrCheck.style.display = 'none'; return; }
+            const btn = e.target.closest('[data-ac]');
+            if (!btn) return;
+            const item = btn.closest('.ac-item');
+            const { kind, id, key } = item.dataset;
+            const act = btn.dataset.ac;
+            const post = (url, payload) => apiJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            try {
+                if (act === 'open') { modalAddrCheck.style.display = 'none'; return loadArchivedInvoiceById(id); }
+                let r;
+                if (act === 'ok') r = await post('/api/invoices/address-check/ack', { key });
+                else {
+                    const address = item.querySelector('textarea').value.trim();
+                    if (kind === 'inv' && address.length < 5) { showToast('Bitte die richtige Anschrift eintragen', 'error'); return; }
+                    r = await post(kind === 'inv' ? `/api/invoices/${id}/address` : `/api/guests/${id}/address`, { address });
+                }
+                if (!r || !r.success) { showToast((r && r.error) || 'Speichern fehlgeschlagen', 'error'); return; }
+                showToast(act === 'ok' ? 'Als richtig markiert' : 'Anschrift gespeichert', 'success');
+                item.remove();
+                if (kind === 'inv' && act === 'save') fetchArchive();
+                if (!$('#addr-check-body .ac-item')) openAddressCheck();
+                loadOverview();
+            } catch (err) { showToast('Speichern fehlgeschlagen', 'error'); }
+        });
+    }
+
     async function loadArchivedInvoiceById(dbId) {
         if (!dbId) return;
         if (cachedArchive.length === 0) await fetchArchive();
@@ -4320,6 +4463,7 @@
         $('#g-name').value = d.gName || '';
         $('#g-adresse').value = d.gAdresse || '';
         $('#g-email').value = d.gEmail || '';
+        invoiceLink = { bookingId: d.bookingId || null, guestId: d.guestId || null };
 
         // Invoice details
         $('#r-nummer').value = d.rNummer || '';
@@ -5030,6 +5174,8 @@
         // Clear guest
         $('#g-name').value = '';
         $('#g-adresse').value = '';
+        if ($('#g-email')) $('#g-email').value = '';
+        invoiceLink = { bookingId: null, guestId: null };
 
         // Clear dates
         $('#a-anreise').value = '';
@@ -5926,8 +6072,11 @@
     let acTimer = null;
 
     if (gNameInput && acDropdown) {
-        gNameInput.addEventListener('input', () => {
+        gNameInput.addEventListener('input', e => {
+            // Name typed by hand: no longer tied to the picked guest (the booking link stays)
             clearTimeout(acTimer);
+            if (!e.isTrusted) { acDropdown.style.display = 'none'; return; } // filled by the app, not typed
+            invoiceLink.guestId = null;
             const q = gNameInput.value.trim();
             if (q.length < 2) { acDropdown.style.display = 'none'; return; }
             acTimer = setTimeout(async () => {
@@ -5955,6 +6104,7 @@
                 gNameInput.value = item.dataset.name;
                 $('#g-email').value = item.dataset.email || '';
                 $('#g-adresse').value = item.dataset.address || '';
+                invoiceLink.guestId = Number(item.dataset.id) || null;
                 acDropdown.style.display = 'none';
                 updatePreview();
                 scheduleDraftSave();
