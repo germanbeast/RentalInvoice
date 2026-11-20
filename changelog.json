@@ -1,15 +1,32 @@
 {
-    "currentVersion": "1.49.1",
+    "currentVersion": "1.50.2",
     "releases": [
         {
-            "version": "1.49.1",
-            "date": "2026-11-17",
+            "version": "1.50.2",
+            "date": "2026-11-20",
             "title": "Kartenabgleich: Ersatzdienst und Grund bei Störung",
             "features": [],
             "fixes": [
                 "Blockiert OpenStreetMap (Nominatim) Anfragen vom Server oder antwortet zu langsam, fragt der Bot jetzt automatisch Photon (ebenfalls OpenStreetMap-Daten) statt „Kartenabgleich gerade nicht möglich“ zu melden",
                 "Ein einzelner Fehler bricht den Abgleich nicht mehr ab; das Zeitlimit reicht jetzt für alle Suchschritte",
                 "Klappt es trotzdem nicht, steht der Grund dabei (z. B. „Kartendienst blockiert Anfragen von diesem Server“ oder „antwortet nicht rechtzeitig“), die Anschrift bleibt so wie erkannt"
+            ]
+        },
+        {
+            "version": "1.50.1",
+            "date": "2026-11-18",
+            "title": "Rechnung: immer die Anschrift des richtigen Gastes",
+            "features": [
+                "Neu unter Start bzw. im Kalender: „Anschriften prüfen“ zeigt Rechnungen und Gäste, die wahrscheinlich die Anschrift einer anderen Person tragen, mit Vorschlag aus dem Meldeschein. Mit einem Klick übernehmen, selbst korrigieren oder als richtig markieren",
+                "Hat ein Gast noch keine Anschrift, aber einen Meldeschein ausgefüllt, wird beim Erstellen der Rechnung die Meldeschein-Anschrift eingesetzt"
+            ],
+            "fixes": [
+                "„Rechnung erstellen“ an einer Buchung übernahm die Anschrift (und E-Mail, Türcode, Gutschein) der vorherigen Rechnung im Formular, wenn beim neuen Gast nichts hinterlegt war. Jetzt kommen alle Gastdaten frisch vom Gast genau dieser Buchung",
+                "Beim Speichern wurde die Rechnung über Name oder E-Mail einem Gast zugeordnet und dessen Anschrift überschrieben, so verbreitete sich eine falsche Anschrift in der Gästeliste. Jetzt ist die Rechnung fest mit Buchung und Gast verbunden; ohne diese Verbindung wird keine gespeicherte Anschrift mehr überschrieben",
+                "Eine bereits gespeicherte Rechnungsnummer wird beim Erstellen aus einer Buchung nicht wiederverwendet (das hätte die alte Rechnung überschrieben)",
+                "Gleiche E-Mail bei zwei verschiedenen Namen legt keine zwei Personen mehr zusammen",
+                "Anschrift aus Meldeschein oder Gast-Rechnung ersetzt eine falsch gespeicherte Anschrift statt sie stehen zu lassen",
+                "Gästeliste: Adressfeld ist jetzt mehrzeilig, Zeilenumbrüche gehen beim Speichern nicht mehr verloren"
             ]
         },
         {

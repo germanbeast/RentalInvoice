@@ -165,7 +165,8 @@ function createMeldeschein({ rateLimit, express, db, botLogic, notify, getSite, 
             if (guestId) {
                 const gg = db.getGuestById(guestId);
                 const address = [f.street, `${f.zip} ${f.city}`, isGerman(f.country) ? '' : f.country].filter(Boolean).join('\n');
-                if (gg) db.updateGuest(gg.id, { ...gg, address: gg.address || address, email: gg.email || f.email, phone: gg.phone || f.phone });
+                // Signed by the guest: the Meldeschein address replaces whatever was stored before
+                if (gg) db.updateGuest(gg.id, { ...gg, address, email: gg.email || f.email, phone: gg.phone || f.phone });
             }
 
             const people = 1 + companions.length;

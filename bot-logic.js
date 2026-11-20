@@ -702,7 +702,9 @@ async function finalizeInvoiceData(data) {
     const invoiceData = buildInvoiceData(data);
 
     // Nuki Logic
-    const existingBooking = db.findBookingForStay(data.gName, data.arrival, data.departure);
+    // Started from a booking: exactly that one, otherwise look it up by name and dates
+    const existingBooking = (data.bookingId && db.getDb().prepare('SELECT * FROM bookings WHERE id = ?').get(data.bookingId))
+        || db.findBookingForStay(data.gName, data.arrival, data.departure);
     if (existingBooking && existingBooking.nuki_pin) {
         // Reuse the already-created PIN (e.g. from iCal or Telegram PIN-only flow)
         invoiceData.nukiPin = existingBooking.nuki_pin;

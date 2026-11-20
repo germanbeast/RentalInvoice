@@ -3,6 +3,7 @@ const botLogic = require('./bot-logic');
 const permissions = require('./permissions');
 const LANG_LABEL = { de: '🇩🇪 Deutsch', en: '🇬🇧 Englisch', nl: '🇳🇱 Niederländisch', pl: '🇵🇱 Polnisch' };
 const addressParser = require('./address-parser');
+const addressCheck = require('./address-check');
 const ocr = require('./screenshot-ocr');
 const geoCheck = require('./geo-check');
 const os = require('os');
@@ -359,8 +360,10 @@ async function startInvoiceFromBooking(bot, chatId, bookingId) {
     if (!b || !b.guest_name || botLogic.isPlaceholderGuestName(b.guest_name)) {
         return send(bot, chatId, '⚠️ Bitte zuerst den Gastnamen eintragen.', keyboard([[btn('👤 Namen eintragen', `nm:${bookingId}`), btn('🏠 Hauptmenü', 'menu')]]));
     }
-    const prefill = { gName: b.guest_name, arrival: b.checkin, departure: b.checkout };
-    if (b.guest_address) { const clean = tidyAddress(b.guest_address); if (clean) prefill.gAdresse = clean; }
+    // Everything from THIS booking's guest (Meldeschein as fallback for the address); the invoice stays tied to it
+    const g = addressCheck.bookingGuest(b.id) || {};
+    const prefill = { gName: b.guest_name, arrival: b.checkin, departure: b.checkout, bookingId: b.id, gAdresse: '' };
+    if (g.address) { const clean = tidyAddress(g.address); if (clean) prefill.gAdresse = clean; }
     if (b.guest_email) prefill.gEmail = b.guest_email;
     return startFlow(bot, chatId, 'invoice', '', prefill);
 }
@@ -1344,6 +1347,9 @@ async function executeSession(bot, chatId, session, q) {
             bot.sendChatAction(chatId, 'upload_document').catch(() => { });
 
             const invoiceData = await botLogic.finalizeInvoiceData(data);
+            if (data.bookingId) invoiceData.bookingId = data.bookingId;
+            try { await addressCheck.bindInvoiceGuest(invoiceData); }
+            catch (e) { console.warn('[TG] Rechnung: Gast der Buchung nicht zuordenbar:', e.message); }
             db.saveInvoice(invoiceData);
             const { filePath } = await botLogic.generateInvoicePdf(invoiceData);
             try {

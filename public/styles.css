@@ -3627,3 +3627,19 @@ a.pill { text-decoration: none; }
 
 /* Buchung: Sprache der Gäste-App + Gastdaten einfügen */
 .pop-lang { font: inherit; font-size: .84rem; padding: .2rem .4rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card, #fff); color: var(--ink); max-width: 100%; }
+
+/* Anschriften prüfen */
+.ac-intro { color: var(--text-muted); font-size: .9rem; margin: 0 0 1rem; }
+.ac-section { margin: 1.25rem 0 .5rem; font-size: 1rem; }
+.ac-item { border: 1px solid var(--border); border-radius: var(--radius); padding: .85rem 1rem; margin-bottom: .75rem; }
+.ac-head { display: flex; flex-wrap: wrap; gap: .25rem .75rem; align-items: baseline; }
+.ac-head b { font-size: .98rem; }
+.ac-head small { color: var(--text-muted); }
+.ac-reason { color: var(--warn); font-size: .85rem; margin: .35rem 0; }
+.ac-addr { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin: .5rem 0; }
+.ac-addr label { display: block; font-size: .75rem; color: var(--text-muted); margin-bottom: .2rem; }
+.ac-addr textarea { width: 100%; min-height: 4.6rem; font: inherit; font-size: .9rem; }
+.ac-addr .ac-old { white-space: pre-line; font-size: .9rem; padding: .4rem .5rem; background: var(--warn-soft); border-radius: 6px; color: #3d2a00; }
+.ac-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .35rem; }
+.ac-note { font-size: .8rem; color: var(--text-muted); margin-top: .4rem; }
+.ac-empty { color: var(--text-muted); }
