@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.50.1",
+    "currentVersion": "1.50.2",
     "releases": [
+        {
+            "version": "1.50.2",
+            "date": "2026-11-20",
+            "title": "Gäste-WLAN: Anleitung für den GL.iNet GL-A1300",
+            "features": [],
+            "fixes": [
+                "Die Router-Anleitung unter Webseite → WLAN beschreibt jetzt den GL.iNet GL-A1300 (Slate Plus) statt des Cudy WR3000. Die neue Hardware-Version WR3000 V2 hat einen anderen Chip und läuft nicht mit OpenWrt"
+            ]
+        },
         {
             "version": "1.50.1",
             "date": "2026-11-18",

@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.2] - 2026-11-20
+
+### Geändert
+- Admin Webseite → WLAN: Kurzanleitung für den Router auf den GL.iNet GL-A1300 (Slate Plus, ipq40xx) umgestellt, Flashen per GL.iNet-Menü (Local Upgrade, sysupgrade) statt Cudy-Übergangs-Firmware. Der Cudy WR3000 V2 (HiSilicon) hat kein OpenWrt
+
 ## [1.50.1] - 2026-11-18
 
 ### Behoben
