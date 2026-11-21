@@ -456,6 +456,8 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         };
         router.get('/wlan', page);
         router.post('/wlan', page);
+        // openNDS checks at start-up that the FAS answers, it fetches faspath with a trailing dot (".../wlan.")
+        router.get('/wlan.', (req, res) => res.set('Cache-Control', 'no-store').type('text/plain').send('ok'));
 
         // Setup script for the router (one command in the guide, protected by the setup token)
         router.get('/wlan/setup.sh', pageLimiter, (req, res) => {

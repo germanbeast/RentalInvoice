@@ -10,6 +10,9 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Geändert
 - Admin Webseite → WLAN: Kurzanleitung für den Router auf den GL.iNet GL-A1300 (Slate Plus, ipq40xx) umgestellt, Flashen per GL.iNet-Menü (Local Upgrade, sysupgrade) statt Cudy-Übergangs-Firmware. Der Cudy WR3000 V2 (HiSilicon) hat kein OpenWrt
 
+### Behoben
+- `GET /wlan.` antwortet jetzt mit 200: openNDS 10.3.1 prüft beim Start die FAS-Erreichbarkeit mit `faspath` plus Punkt und meldete sonst `uclient-fetch … failed with status 8`
+
 ## [1.50.1] - 2026-11-18
 
 ### Behoben

@@ -7,7 +7,8 @@
             "title": "Gäste-WLAN: Anleitung für den GL.iNet GL-A1300",
             "features": [],
             "fixes": [
-                "Die Router-Anleitung unter Webseite → WLAN beschreibt jetzt den GL.iNet GL-A1300 (Slate Plus) statt des Cudy WR3000. Die neue Hardware-Version WR3000 V2 hat einen anderen Chip und läuft nicht mit OpenWrt"
+                "Die Router-Anleitung unter Webseite → WLAN beschreibt jetzt den GL.iNet GL-A1300 (Slate Plus) statt des Cudy WR3000. Die neue Hardware-Version WR3000 V2 hat einen anderen Chip und läuft nicht mit OpenWrt",
+                "Gäste-WLAN: openNDS meldete beim Start „FAS nicht erreichbar“, weil seine Prüf-Adresse /wlan. (mit Punkt) nicht beantwortet wurde"
             ]
         },
         {
