@@ -5,6 +5,15 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.2] - 2026-11-20
+
+### Geändert
+- Admin Webseite → WLAN: Kurzanleitung für den Router auf den GL.iNet GL-A1300 (Slate Plus, ipq40xx) umgestellt, Flashen per GL.iNet-Menü (Local Upgrade, sysupgrade) statt Cudy-Übergangs-Firmware. Der Cudy WR3000 V2 (HiSilicon) hat kein OpenWrt
+
+### Behoben
+- `GET /wlan.` antwortet jetzt mit 200: openNDS 10.3.1 prüft beim Start die FAS-Erreichbarkeit mit `faspath` plus Punkt und meldete sonst `uclient-fetch … failed with status 8`
+- Anmeldeseite (`guest-site/wlan.js`): Eingabe auf 6 Ziffern gekürzt, der 8-stellige Gastgeber-Code war so nicht nutzbar. Jetzt 6 oder 8 Ziffern, engere Schrift ab der 7. Ziffer
+
 ## [1.50.1] - 2026-11-18
 
 ### Behoben

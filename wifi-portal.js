@@ -1,5 +1,5 @@
 /**
- * Gäste-WLAN mit Anmeldeseite: eigener Router (Cudy WR3000 mit OpenWrt + openNDS) an der FRITZ!Box.
+ * Gäste-WLAN mit Anmeldeseite: eigener Router (z. B. GL.iNet GL-A1300 mit OpenWrt + openNDS) an der FRITZ!Box.
  *
  * How it works (openNDS "Forward Authentication Service", fas_secure_enabled 4):
  *  1. A phone joins the WLAN "Beckhome Gäste". openNDS on the router sends it to https://<public_url>/wlan?fas=<base64>
@@ -456,6 +456,8 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         };
         router.get('/wlan', page);
         router.post('/wlan', page);
+        // openNDS checks at start-up that the FAS answers, it fetches faspath with a trailing dot (".../wlan.")
+        router.get('/wlan.', (req, res) => res.set('Cache-Control', 'no-store').type('text/plain').send('ok'));
 
         // Setup script for the router (one command in the guide, protected by the setup token)
         router.get('/wlan/setup.sh', pageLimiter, (req, res) => {
