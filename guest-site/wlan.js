@@ -50,7 +50,7 @@
                     <div class="wl-or">${T('oder mit Code')}</div>` : ''}
                 <form id="code-form" novalidate>
                     <label>${T('Zugangscode')}
-                        <input class="wl-code" id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="7"
+                        <input class="wl-code" id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="9"
                             autocomplete="one-time-code" placeholder="000000" aria-describedby="where" required>
                     </label>
                     <button type="submit" class="btn ${session ? 'btn-ghost' : 'btn-dark'} wl-go">${T('Verbinden')}</button>
@@ -68,11 +68,15 @@
                 </ul>
             </details>`);
         const input = $('#code');
-        input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); });
+        // 6 digits per booking, 8 for the host's own code (narrower spacing so it fits)
+        input.addEventListener('input', () => {
+            input.value = input.value.replace(/\D/g, '').slice(0, 8);
+            input.classList.toggle('long', input.value.length > 6);
+        });
         $('#code-form').addEventListener('submit', e => {
             e.preventDefault();
             const code = input.value.replace(/\D/g, '');
-            if (code.length !== 6) { input.focus(); input.setAttribute('aria-invalid', 'true'); return; }
+            if (code.length !== 6 && code.length !== 8) { input.focus(); input.setAttribute('aria-invalid', 'true'); return; }
             login({ code });
         });
         const s = $('#as-session');
