@@ -12,6 +12,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Behoben
 - `GET /wlan.` antwortet jetzt mit 200: openNDS 10.3.1 prüft beim Start die FAS-Erreichbarkeit mit `faspath` plus Punkt und meldete sonst `uclient-fetch … failed with status 8`
+- Anmeldeseite (`guest-site/wlan.js`): Eingabe auf 6 Ziffern gekürzt, der 8-stellige Gastgeber-Code war so nicht nutzbar. Jetzt 6 oder 8 Ziffern, engere Schrift ab der 7. Ziffer
 
 ## [1.50.1] - 2026-11-18
 
