@@ -1,8 +1,8 @@
 {
-    "currentVersion": "1.50.6",
+    "currentVersion": "1.50.7",
     "releases": [
         {
-            "version": "1.50.6",
+            "version": "1.50.7",
             "date": "2026-11-22",
             "title": "Kartenabgleich: Ersatzdienst und Grund bei Störung",
             "features": [],
@@ -10,6 +10,15 @@
                 "Blockiert OpenStreetMap (Nominatim) Anfragen vom Server oder antwortet zu langsam, fragt der Bot jetzt automatisch Photon (ebenfalls OpenStreetMap-Daten) statt „Kartenabgleich gerade nicht möglich“ zu melden",
                 "Ein einzelner Fehler bricht den Abgleich nicht mehr ab; das Zeitlimit reicht jetzt für alle Suchschritte",
                 "Klappt es trotzdem nicht, steht der Grund dabei (z. B. „Kartendienst blockiert Anfragen von diesem Server“ oder „antwortet nicht rechtzeitig“), die Anschrift bleibt so wie erkannt"
+            ]
+        },
+        {
+            "version": "1.50.6",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Internet nach dem Login",
+            "features": [],
+            "fixes": [
+                "Nach dem WLAN-Login kam das Handy nicht ins Internet. Die Anmeldeseite (openNDS) hat die Sperre für das Heimnetz falsch umgesetzt und dadurch alles gesperrt. Das Heimnetz bleibt weiter über die Firewall des Routers gesperrt. Bestehende Router: Einrichtungsbefehl einmal neu ausführen"
             ]
         },
         {
