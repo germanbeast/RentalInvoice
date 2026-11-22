@@ -449,7 +449,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false, wifi: () => { try { return guestWifi; } catch (e) { return null; } } }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -1348,7 +1348,8 @@ const printJobs = require('./print-jobs')({
     },
     isPlaceholderName: (n) => require('./bot-logic').isPlaceholderGuestName(n),
     nightsBetween: (a, b) => nightsBetween(a, b),
-    formatDateDE: (d) => formatDateDE(d)
+    formatDateDE: (d) => formatDateDE(d),
+    wifiFor: (bookingId) => guestWifi.printView(bookingId)
 });
 printJobs.registerBoxRoutes(app, { authorized: tvboxDeviceAuthorized, limiter: apiLimiter });
 cron.schedule('*/15 * * * *', () => {

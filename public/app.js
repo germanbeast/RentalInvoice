@@ -3604,7 +3604,7 @@
         try {
             const d = await apiJson(`/api/site/wifi/portal/device/${id}`, { method: 'DELETE' });
             if (d.config) fillWifi(d);
-            showToast('Gerät vergessen: zählt nicht mehr zum Limit und muss den Code beim nächsten Mal neu eingeben', 'success');
+            showToast('Gerät vergessen: es wird in spätestens 2 Minuten vom WLAN abgemeldet und muss den Code neu eingeben', 'success');
         } catch (err) { showToast('Fehlgeschlagen', 'error'); }
     });
 

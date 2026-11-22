@@ -14,6 +14,15 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - TV-App 1.11: `setMediaPlaybackRequiresUserGesture(false)`
 - `setup.sh` installiert ffmpeg, `update.sh` weist darauf hin, wenn es fehlt
 
+## [1.51.0] - 2026-11-22
+
+### Neu
+- Telegram `/wlan [Dauer] [Notiz]` und Menü-Knopf „📶 WLAN-Codes“: zusätzliche 6-stellige Zugangscodes (Tabelle `wifi_portal_codes`, Geräte mit `kind = 'code'` und `code_id`), gültig ab sofort, gleiches Geräte-Limit wie eine Buchung. Löschen meldet die Geräte ab. Recht: Webseite bearbeiten
+- Buchungsblatt (`print-jobs.js`): WLAN, WLAN-Kennwort und WLAN-Code über `wifi.printView()`
+
+### Behoben
+- „Vergessen“ im Admin meldet das Gerät auch am Router ab: Die Antwort auf die Router-Meldung alle 2 Minuten enthält `kick=<mac>,…`, `beckhome-wlan-sync` führt `ndsctl deauth` aus. Bestehende Router brauchen den Einrichtungsbefehl noch einmal
+
 ## [1.50.6] - 2026-11-22
 
 ### Behoben
