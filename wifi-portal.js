@@ -858,9 +858,8 @@ uci -q delete $O.walledgarden_port_list
 uci add_list $O.walledgarden_fqdn_list="$FQDN fonts.googleapis.com fonts.gstatic.com"
 uci add_list $O.walledgarden_port_list='443'
 uci -q delete $O.authenticated_users
-uci add_list $O.authenticated_users='block to 10.0.0.0/8'
-uci add_list $O.authenticated_users='block to 172.16.0.0/12'
-uci add_list $O.authenticated_users='block to 192.168.0.0/16'
+# Private Netze sperrt schon die Firewall-Zone oben. openNDS 10.x mit nftables verliert bei
+# 'block to <Netz>' die Adresse und sperrt dann alles, darum hier nur 'allow all'.
 uci add_list $O.authenticated_users='allow all'
 ok "openNDS mit $FQDN$FASPATH"
 
