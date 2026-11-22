@@ -5757,7 +5757,7 @@
     if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
 
     // Drucker: new bookings are printed by the TV box in the apartment's network (print-jobs.js)
-    const PRINT_STATUS = { pending: 'wartet auf die Box', sent: 'wird gedruckt …', printed: 'gedruckt ✓', failed: 'fehlgeschlagen' };
+    const PRINT_STATUS = { waiting: 'wartet auf Name/Screenshot per Telegram', pending: 'wartet auf die Box', sent: 'wird gedruckt …', printed: 'gedruckt ✓', failed: 'fehlgeschlagen' };
     async function loadPrinter() {
         const d = await apiJson('/api/settings/printer').catch(() => null);
         if (!d || !d.success) { $('#printer-box-state').textContent = 'Konnte die Einstellungen nicht laden.'; return; }
@@ -5794,8 +5794,8 @@
         $('#printer-jobs').innerHTML = !jobs.length ? 'Noch nichts gedruckt.' : jobs.map(j => `
             <div class="info-row" style="align-items:center">
                 <span>${escapeHtml(j.title || 'Druck')} <small class="text-muted">(${fmtT(j.created_at)})</small></span>
-                <strong>${PRINT_STATUS[j.status] || escapeHtml(j.status)}${j.error && j.status !== 'printed' ? ` <small class="text-muted">${escapeHtml(j.error)}</small>` : ''}
-                ${j.status === 'failed' || j.status === 'printed' ? ` <button type="button" class="btn btn-ghost btn-sm" data-printer-retry="${j.id}">${j.status === 'failed' ? 'Erneut versuchen' : 'Nochmal drucken'}</button>` : ''}</strong>
+                <strong>${PRINT_STATUS[j.status] || escapeHtml(j.status)}${j.error && j.status !== 'printed' ? ` <small class="text-muted">(Versuch ${j.attempts})</small>` : ''}${j.error && j.status !== 'printed' ? ` <small class="text-muted">${escapeHtml(j.error)}</small>` : ''}
+                ${['failed', 'printed', 'waiting'].includes(j.status) ? ` <button type="button" class="btn btn-ghost btn-sm" data-printer-retry="${j.id}">${j.status === 'failed' ? 'Erneut versuchen' : j.status === 'waiting' ? 'Jetzt drucken' : 'Nochmal drucken'}</button>` : ''}</strong>
             </div>`).join('');
         $('#printer-jobs').querySelectorAll('[data-printer-retry]').forEach(b => b.addEventListener('click', async () => {
             const r = await apiJson(`/api/settings/printer/jobs/${b.dataset.printerRetry}/retry`, { method: 'POST' }).catch(() => null);

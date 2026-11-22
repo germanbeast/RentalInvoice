@@ -949,6 +949,7 @@ async function executeAddress(bot, chatId, session, q) {
         sessions.delete(chatId);
         if (q && q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
         console.log(`📇 Anschrift für Gast ${g.id} (Buchung ${b.id}) per Telegram gespeichert`);
+        botLogic.guestDataSaved(b.id); // e.g. the automatic print waits for these details
         let photoNote = '';
         if (session.photoMsgId) {
             const ok = await bot.deleteMessage(chatId, session.photoMsgId).then(() => true).catch(() => false);
