@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.50.3",
+    "currentVersion": "1.50.4",
     "releases": [
+        {
+            "version": "1.50.4",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router wird nicht mehr ausgebremst",
+            "features": [],
+            "fixes": [
+                "Der WLAN-Router fragt jede Sekunde beim Server nach und teilt sich die Internet-Adresse mit allen Geräten im Haus. Die allgemeine Bremse von 100 Anfragen pro Minute hat ihn deshalb abgewiesen: Router nicht verbunden, Anmeldung lud endlos. Seine Abfragen sind jetzt davon ausgenommen"
+            ]
+        },
         {
             "version": "1.50.3",
             "date": "2026-11-22",
