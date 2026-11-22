@@ -5,7 +5,7 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.52.0] - 2026-11-22
+## [1.53.0] - 2026-11-22
 
 ### Neu
 - Selbst-Update des Routers: `setup.sh` trägt `SETUPURL`/`SETUPVER` (Hash ohne Zeitstempel) ein und schreibt `/etc/beckhome-wlan.conf`. `beckhome-wlan-sync` meldet `ver=`, der Server antwortet `setup=<version>` (und `now=1` nach „Jetzt aktualisieren“). Bei Abweichung lädt der Router das Skript und führt es aus, 3–5 Uhr Ortszeit, ohne angemeldete Gäste oder sofort auf Wunsch, je Version höchstens ein Versuch pro Tag. Admin zeigt den Stand (`update` in adminState, `POST /api/site/wifi/portal/update`)
