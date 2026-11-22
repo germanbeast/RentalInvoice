@@ -12,6 +12,16 @@
     const params = new URLSearchParams(location.search);
     // The router sends "fas" (base64, '+' may arrive as a space); "status" when the device is already online
     const fas = (params.get('fas') || '').replace(/ /g, '+');
+    // The page the phone wanted to open (its captive-portal check, e.g. captive.apple.com). Opening it after the
+    // login makes iOS/Android notice the free internet and close the login window ("Fertig").
+    const originUrl = (() => {
+        try {
+            const m = /(?:^|,\s*)originurl=([^,]*)/.exec(atob(fas));
+            const u = m ? decodeURIComponent(m[1].trim()) : '';
+            if (/^https?:\/\/[^\s"'<>]+$/i.test(u)) return u;
+        } catch (e) { /* no fas (preview, direct visit) */ }
+        return 'http://captive.apple.com/hotspot-detect.html';
+    })();
     const status = params.has('status');
     const preview = params.has('preview');
     const box = $('#box');
@@ -115,10 +125,11 @@
             <div id="wl-live"></div>
             ${w && w.rules ? `<details class="wl-rules"><summary>${T('Hausregeln')}</summary><div class="prose">${esc(w.rules)}</div></details>` : ''}
             <div class="wl-actions">
-                <a class="btn btn-dark wl-go" href="meine-buchung">${T('Zu Meine Buchung')}</a>
+                <a class="btn btn-dark wl-go" href="${esc(originUrl)}">${T('Weiter ins Internet')}</a>
+                <a class="btn btn-ghost wl-go" href="meine-buchung">${T('Zu Meine Buchung')}</a>
                 <a class="btn btn-ghost wl-go" href="./">${T('Zur Webseite der Ferienwohnung')}</a>
             </div>
-            <p class="wl-close">${T('Dieses Fenster bleibt offen? Einfach oben auf „Fertig“ tippen (iPhone) oder zurück wischen (Android). Das Internet läuft schon.')}</p>`);
+            <p class="wl-close">${T('Dieses Fenster bleibt offen? Auf „Weiter ins Internet“ tippen, danach oben auf „Fertig“ (iPhone) oder zurück (Android).')}</p>`);
         if (w) {
             $('#contact').hidden = true;
             loadLive();

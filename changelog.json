@@ -15,6 +15,15 @@
             "fixes": []
         },
         {
+            "version": "1.50.5",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Anmeldefenster schließt sich",
+            "features": [],
+            "fixes": [
+                "Nach dem WLAN-Login blieb das Anmeldefenster des iPhones offen und iOS zeigte kein WLAN-Symbol. Neuer Knopf „Weiter ins Internet“ öffnet die Prüfseite des Handys, danach erkennt iOS bzw. Android das freie Internet und das Fenster lässt sich mit „Fertig“ schließen"
+            ]
+        },
+        {
             "version": "1.50.4",
             "date": "2026-11-22",
             "title": "Gäste-WLAN: Router wird nicht mehr ausgebremst",
