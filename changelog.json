@@ -7,7 +7,8 @@
             "title": "Gäste-WLAN: Router wird nicht mehr ausgebremst",
             "features": [],
             "fixes": [
-                "Der WLAN-Router fragt jede Sekunde beim Server nach und teilt sich die Internet-Adresse mit allen Geräten im Haus. Die allgemeine Bremse von 100 Anfragen pro Minute hat ihn deshalb abgewiesen: Router nicht verbunden, Anmeldung lud endlos. Seine Abfragen sind jetzt davon ausgenommen"
+                "Der WLAN-Router fragt jede Sekunde beim Server nach und teilt sich die Internet-Adresse mit allen Geräten im Haus. Die allgemeine Bremse von 100 Anfragen pro Minute hat ihn deshalb abgewiesen: Router nicht verbunden, Anmeldung lud endlos. Seine Abfragen sind jetzt davon ausgenommen",
+                "Begrüßungsseite nach dem WLAN-Login: Hinweis, dass sich das Anmeldefenster des Handys nicht selbst schließt (oben auf „Fertig“ tippen)"
             ]
         },
         {

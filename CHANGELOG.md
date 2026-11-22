@@ -9,6 +9,8 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Behoben
 - Globaler Rate-Limiter (100/min pro IP) überspringt `/wlan` und `/wlan.`: openNDS-authmon pollt etwa sekündlich (`wget_request` → `GET faspath?auth_get=…`) von der gemeinsamen Hausadresse und bekam 429 (`failed with status 8`), dadurch keine Freischaltungen und kein Router-Kontakt. Die Anfragen sind per Gateway-Hash bzw. HMAC geprüft
+- Anmeldeseite: Hinweis unter der Begrüßung, dass das Captive-Portal-Fenster (iOS „Fertig“, Android zurück) von Hand geschlossen wird
+- Ursache von „status 8“ am echten Router war Cloudflare (403 für die openNDS-Kennung mit Anführungszeichen); behoben per Cloudflare-Einstellung, nicht im Code
 
 ## [1.50.3] - 2026-11-22
 
