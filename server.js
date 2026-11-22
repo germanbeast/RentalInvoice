@@ -1104,7 +1104,10 @@ const globalLimiter = rateLimit({
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'Zu viele Anfragen. Bitte warten.' }
+    message: { error: 'Zu viele Anfragen. Bitte warten.' },
+    // The guest Wi-Fi router (openNDS authmon) polls /wlan about once a second from the house's shared IP;
+    // those requests are checked by gateway hash / HMAC in wifi-portal.js and must never get a 429.
+    skip: (req) => /^\/(gast\/)?wlan\.?$/.test(req.path)
 });
 app.use(globalLimiter);
 

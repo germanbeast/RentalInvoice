@@ -454,6 +454,7 @@
         'WhatsApp an uns': ['WhatsApp us', 'WhatsApp ons', 'Napisz na WhatsApp'],
         'Zu Meine Buchung': ['Go to My booking', 'Naar Mijn boeking', 'Do Mojej rezerwacji'],
         'Zur Webseite der Ferienwohnung': ['Apartment website', 'Naar de website van het appartement', 'Strona mieszkania'],
+        'Dieses Fenster bleibt offen? Einfach oben auf „Fertig“ tippen (iPhone) oder zurück wischen (Android). Das Internet läuft schon.': ['Window still open? Just tap “Done” at the top (iPhone) or swipe back (Android). You are already online.', 'Blijft dit venster open? Tik bovenaan op „Gereed” (iPhone) of veeg terug (Android). Het internet werkt al.', 'Okno się nie zamyka? Stuknij u góry „Gotowe” (iPhone) lub cofnij (Android). Internet już działa.'],
         'Live-Tipps': ['Live tips', 'Live-tips', 'Na żywo'],
         'Mehr auf Meine Buchung': ['More on My booking', 'Meer op Mijn boeking', 'Więcej w Mojej rezerwacji'],
         ' in {place}': [' in {place}', ' in {place}', ' w {place}'],
