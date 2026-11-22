@@ -5,11 +5,16 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.50.3] - 2026-11-21
+## [1.50.4] - 2026-11-22
 
 ### Behoben
 - `geo-check.js`: Fehler bei Nominatim (403/429/Zeitüberschreitung) brachen den ganzen Abgleich ab → jetzt Ersatz über Photon (photon.komoot.io), Nominatim wird nach einem Fehler 10 Minuten übersprungen; Gesamtbudget 12 s statt 15-s-Race mit bis zu 5 Anfragen à 6 s
 - Fehlermeldung im Bot nennt den Grund (`reasonOf`), Log `[Geo]` mit Statuscode und Antwortanfang
+
+## [1.50.3] - 2026-11-22
+
+### Behoben
+- `/wlan` und `/wlan.` lesen jetzt auch `application/x-www-form-urlencoded` und `text/plain` (openNDS-authmon und libopennds posten so). Vorher gab es ohne JSON-Body ein 404, openNDS loggte `failed with status 8` und kein Router-Kontakt kam an. Ohne Parameter antworten die Pfade nie mit einem Fehler
 
 ## [1.50.2] - 2026-11-20
 

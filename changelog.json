@@ -1,15 +1,24 @@
 {
-    "currentVersion": "1.50.3",
+    "currentVersion": "1.50.4",
     "releases": [
         {
-            "version": "1.50.3",
-            "date": "2026-11-21",
+            "version": "1.50.4",
+            "date": "2026-11-22",
             "title": "Kartenabgleich: Ersatzdienst und Grund bei Störung",
             "features": [],
             "fixes": [
                 "Blockiert OpenStreetMap (Nominatim) Anfragen vom Server oder antwortet zu langsam, fragt der Bot jetzt automatisch Photon (ebenfalls OpenStreetMap-Daten) statt „Kartenabgleich gerade nicht möglich“ zu melden",
                 "Ein einzelner Fehler bricht den Abgleich nicht mehr ab; das Zeitlimit reicht jetzt für alle Suchschritte",
                 "Klappt es trotzdem nicht, steht der Grund dabei (z. B. „Kartendienst blockiert Anfragen von diesem Server“ oder „antwortet nicht rechtzeitig“), die Anschrift bleibt so wie erkannt"
+            ]
+        },
+        {
+            "version": "1.50.3",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router meldet sich wieder",
+            "features": [],
+            "fixes": [
+                "Der Router (openNDS) schickt seine Abfragen als Formular, die App hat nur JSON gelesen und mit „nicht gefunden“ geantwortet. Deshalb meldete openNDS „FAS nicht erreichbar“ und der Router erschien im Admin nicht als verbunden"
             ]
         },
         {

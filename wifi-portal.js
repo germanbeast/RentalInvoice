@@ -20,6 +20,7 @@
 const crypto = require('crypto');
 const guestLang = require('./guest-lang');
 const path = require('path');
+const express = require('express');
 
 const SITE_DIR = path.join(__dirname, 'guest-site');
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -450,14 +451,23 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         const page = (req, res) => {
             if (req.query && req.query.auth_get !== undefined) return handleAuthGet(req, res);
             if (req.body && req.body.auth_get !== undefined) return handleAuthGet(req, res);
-            if (req.method !== 'GET') return res.status(404).end();
+            // openNDS (start-up check, authmon) must never see an HTTP error here, or it treats the FAS as down
+            if (req.method !== 'GET' || req.path === '/wlan.') return res.set('Cache-Control', 'no-store').type('text/plain').send('ok');
             res.set('Cache-Control', 'no-store');
             res.sendFile(path.join(SITE_DIR, 'wlan.html'));
         };
-        router.get('/wlan', page);
-        router.post('/wlan', page);
-        // openNDS checks at start-up that the FAS answers, it fetches faspath with a trailing dot (".../wlan.")
-        router.get('/wlan.', (req, res) => res.set('Cache-Control', 'no-store').type('text/plain').send('ok'));
+        // openNDS' authmon and libopennds post their requests form-encoded (the app itself only parses JSON);
+        // the start-up check fetches faspath with a trailing dot (".../wlan.")
+        const form = express.urlencoded({ extended: false, limit: '64kb' });
+        const text = express.text({ type: 'text/plain', limit: '64kb' });
+        const parseText = (req, res, next) => {
+            if (typeof req.body === 'string') { req.body = Object.fromEntries(new URLSearchParams(req.body)); }
+            next();
+        };
+        router.all(['/wlan', '/wlan.'], form, text, parseText, (req, res, next) => {
+            if (req.method === 'GET' || req.method === 'POST' || req.method === 'HEAD') return page(req, res);
+            next();
+        });
 
         // Setup script for the router (one command in the guide, protected by the setup token)
         router.get('/wlan/setup.sh', pageLimiter, (req, res) => {
