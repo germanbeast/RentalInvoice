@@ -1,6 +1,6 @@
 {
   "name": "ferienwohnung-rechnung",
-  "version": "1.52.0",
+  "version": "1.54.0",
   "description": "",
   "main": "app.js",
   "scripts": {

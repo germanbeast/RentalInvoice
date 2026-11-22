@@ -1,8 +1,8 @@
 {
-    "currentVersion": "1.52.0",
+    "currentVersion": "1.54.0",
     "releases": [
         {
-            "version": "1.52.0",
+            "version": "1.54.0",
             "date": "2026-11-22",
             "title": "Hintergrund-Video der Ferienwohnung auf Webseite, Meine Buchung und TV",
             "features": [

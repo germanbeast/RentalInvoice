@@ -5,7 +5,7 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.52.0] - 2026-11-22
+## [1.54.0] - 2026-11-22
 
 ### Neu
 - `site-video.js`: Hintergrund-Video der Wohnung. Upload in 8-MB-Stücken (`/api/site/video/start|chunk|finish`, bis 2 GB, Cloudflare-Limit 100 MB pro Anfrage), ffmpeg erzeugt Master (1280 px, ohne Ton, max. 60 s), unscharfe Fassung (960 px, `gblur` eingerechnet) und Standbild; neue Unschärfe wird aus dem Master gerechnet. Ohne ffmpeg: MP4/WebM bis 60 MB unverändert, Unschärfe per CSS. Einstellungen in `site_video` (Startseite, Meine Buchung, TV, Handys)
