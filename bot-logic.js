@@ -601,6 +601,16 @@ function cleanupPlaceholderGuest(guestId) {
     return false;
 }
 
+// Listeners for "guest details of a booking were saved" (name entered, Telegram screenshot/address).
+// The automatic print waits for this, see print-jobs.js.
+const guestDataListeners = [];
+function onGuestData(fn) { guestDataListeners.push(fn); }
+function guestDataSaved(bookingId) {
+    for (const fn of guestDataListeners) {
+        try { fn(bookingId); } catch (e) { console.error('guestDataSaved:', e.message); }
+    }
+}
+
 /**
  * Assigns a real guest name to a booking: links/creates the guest, renames the Nuki code
  * and removes the placeholder guest if nothing else references it.
@@ -630,6 +640,7 @@ async function applyGuestName(bookingId, fullName) {
     }
 
     if (oldGuestId && oldGuestId !== guest.id) cleanupPlaceholderGuest(oldGuestId);
+    guestDataSaved(bookingId);
 
     return { guestId: guest.id, name, nukiRenamed, nukiError, booking };
 }
@@ -814,6 +825,8 @@ module.exports = {
     getNukiLock,
     nukiLockAction,
     applyGuestName,
+    onGuestData,
+    guestDataSaved,
     isPlaceholderGuestName,
     cleanupPlaceholderGuest
 };
