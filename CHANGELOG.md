@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.5] - 2026-11-22
+
+### Behoben
+- Begrüßungsseite (`guest-site/wlan.js`): Knopf „Weiter ins Internet“ führt zur `originurl` aus dem openNDS-`fas` (z. B. `http://captive.apple.com/hotspot-detect.html`, Rückfall genau diese). Erst dieser Seitenaufruf lässt das Captive-Network-Fenster von iOS die Freischaltung erkennen („Fertig“, WLAN-Symbol)
+
 ## [1.50.4] - 2026-11-22
 
 ### Behoben
