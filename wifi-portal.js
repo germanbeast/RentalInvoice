@@ -106,7 +106,20 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         const dc = sql().prepare('PRAGMA table_info(wifi_portal_devices)').all().map(c => c.name);
         if (!dc.includes('down_kb')) sql().exec('ALTER TABLE wifi_portal_devices ADD COLUMN down_kb INTEGER NOT NULL DEFAULT 0');
         if (!dc.includes('up_kb')) sql().exec('ALTER TABLE wifi_portal_devices ADD COLUMN up_kb INTEGER NOT NULL DEFAULT 0');
+        if (!dc.includes('code_id')) sql().exec('ALTER TABLE wifi_portal_devices ADD COLUMN code_id INTEGER');
     }
+    // Extra access codes made by the host (e.g. per Telegram) for visitors, craftsmen, own use
+    sql().exec(`
+        CREATE TABLE IF NOT EXISTS wifi_portal_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            note TEXT,
+            created_at TEXT NOT NULL,
+            created_by TEXT,
+            valid_until TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_wifi_portal_codes_code ON wifi_portal_codes(code);
+    `);
 
     // gatewayhash -> Map(rhid -> { line, at, deviceId })
     const queues = new Map();
@@ -148,6 +161,81 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
 
     function devicesOf(bookingId) {
         return sql().prepare(`SELECT * FROM wifi_portal_devices WHERE booking_id = ? AND kind = 'guest' ORDER BY first_at`).all(bookingId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Extra codes (made per Telegram): 6 digits, valid from now for some hours or days
+    // -----------------------------------------------------------------------
+    function extraByCode(code) {
+        if (!/^\d{6}$/.test(code)) return null;
+        return sql().prepare('SELECT * FROM wifi_portal_codes WHERE code = ? AND valid_until > ? ORDER BY id DESC LIMIT 1').get(code, new Date().toISOString()) || null;
+    }
+
+    function listExtraCodes() {
+        const rows = sql().prepare('SELECT * FROM wifi_portal_codes WHERE valid_until > ? ORDER BY valid_until').all(new Date().toISOString());
+        return rows.map(r => ({ ...r, devices: sql().prepare(`SELECT COUNT(*) AS n FROM wifi_portal_devices WHERE kind = 'code' AND code_id = ?`).get(r.id).n }));
+    }
+
+    /** New extra code, valid for `hours` from now. Returns the row. */
+    function createExtraCode({ hours, note = '', by = '' }) {
+        const h = Math.min(24 * 60, Math.max(1, Math.round(Number(hours) || 24)));
+        const nowIso = new Date().toISOString();
+        const today = berlinToday();
+        const owner = String(cfg().owner_code || '');
+        for (let i = 0; i < 50; i++) {
+            const code = String(100000 + crypto.randomInt(900000));
+            if (owner.startsWith(code)) continue;
+            if (sql().prepare(`SELECT 1 FROM bookings WHERE wifi_code = ? AND checkout >= date(?, '-2 days')`).get(code, today)) continue;
+            if (sql().prepare('SELECT 1 FROM wifi_portal_codes WHERE code = ? AND valid_until > ?').get(code, nowIso)) continue;
+            const until = new Date(Date.now() + h * 3600 * 1000).toISOString();
+            const id = sql().prepare('INSERT INTO wifi_portal_codes (code, note, created_at, created_by, valid_until) VALUES (?, ?, ?, ?, ?)')
+                .run(code, String(note || '').slice(0, 80), nowIso, String(by || '').slice(0, 60), until).lastInsertRowid;
+            db.logNotification('guest_wifi', `WLAN-Code ${code} erstellt (gültig ${h} Std.)${by ? ` von ${by}` : ''}`, 'sent');
+            return sql().prepare('SELECT * FROM wifi_portal_codes WHERE id = ?').get(id);
+        }
+        throw new Error('Kein freier Code gefunden');
+    }
+
+    /** Deletes an extra code; its devices are logged out at the router's next report. */
+    function deleteExtraCode(id) {
+        const row = sql().prepare('SELECT * FROM wifi_portal_codes WHERE id = ?').get(id);
+        if (!row) return null;
+        for (const d of sql().prepare(`SELECT mac FROM wifi_portal_devices WHERE kind = 'code' AND code_id = ?`).all(id)) queueKick(d.mac);
+        sql().prepare(`DELETE FROM wifi_portal_devices WHERE kind = 'code' AND code_id = ?`).run(id);
+        sql().prepare('DELETE FROM wifi_portal_codes WHERE id = ?').run(id);
+        return row;
+    }
+
+    // -----------------------------------------------------------------------
+    // Logging devices out: the router gets "kick=mac,…" in the answer to its report every 2 minutes
+    // and runs "ndsctl deauth". Kept until the router no longer lists the device (at most 30 minutes).
+    // -----------------------------------------------------------------------
+    const KICK_TTL_MS = 30 * 60 * 1000;
+    function kickList() {
+        const list = (db.getSetting('guest_wifi_state') || {}).portal_kick;
+        return list && typeof list === 'object' && !Array.isArray(list) ? list : {};
+    }
+    function saveKicks(list) {
+        db.setSetting('guest_wifi_state', { ...(db.getSetting('guest_wifi_state') || {}), portal_kick: list });
+    }
+    function queueKick(mac) {
+        const m = normMac(mac);
+        if (m.length !== 17) return;
+        saveKicks({ ...kickList(), [m]: Date.now() });
+    }
+    /** MACs the router should log out now; drops entries the router no longer lists as logged in. */
+    function kicksFor(clients) {
+        const list = kickList();
+        const online = new Set(clients.map(c => c.mac));
+        const now = Date.now();
+        const out = [];
+        let changed = false;
+        for (const [mac, at] of Object.entries(list)) {
+            if (!online.has(mac) || now - at > KICK_TTL_MS) { delete list[mac]; changed = true; continue; }
+            out.push(mac);
+        }
+        if (changed) saveKicks(list);
+        return out;
     }
 
     // -----------------------------------------------------------------------
@@ -237,8 +325,9 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         try { decoded = Buffer.from(payload, 'base64').toString('utf8'); } catch (e) { decoded = ''; }
 
         if (action === 'custom' && /^stats1\b/.test(decoded)) {
-            processStats(decoded);
-            return res.send(`ack wifi=${powerState().on ? 'on' : 'off'}`);
+            const clients = processStats(decoded);
+            const kick = kicksFor(clients);
+            return res.send(`ack wifi=${powerState().on ? 'on' : 'off'}${kick.length ? ` kick=${kick.join(',')}` : ''}`);
         }
         if (action === 'deauthed' || action === 'custom') return res.send('ack');
         if (action === 'clear') { queues.delete(gw); return res.send(''); }
@@ -292,6 +381,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         if (!prevStats.at || now.getTime() - prevStats.at > 10 * 60 * 1000 || prevStats.wifiOn !== liveStats.wifiOn) {
             db.setSetting('guest_wifi_state', { ...st, portal_stats: { at: liveStats.at, wifiOn: liveStats.wifiOn } });
         }
+        return clients;
     }
 
     const fmtKb = kb => kb >= 1024 * 1024 ? `${(kb / 1024 / 1024).toFixed(1).replace('.', ',')} GB` : kb >= 1024 ? `${Math.round(kb / 1024)} MB` : `${kb} KB`;
@@ -307,7 +397,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         const online = fresh && liveStats ? liveStats.clients.map(c => {
             const dev = sql().prepare('SELECT * FROM wifi_portal_devices WHERE mac = ? ORDER BY last_at DESC LIMIT 1').get(c.mac);
             const b = dev && dev.booking_id ? sql().prepare('SELECT * FROM bookings WHERE id = ?').get(dev.booking_id) : null;
-            return { mac: c.mac, kind: dev ? deviceLabel(dev.user_agent) : 'Gerät', who: dev ? (dev.kind === 'owner' ? 'Gastgeber' : (guestName(b) || 'Gast')) : '?', session: fmtKb(c.down + c.up) };
+            return { mac: c.mac, kind: dev ? deviceLabel(dev.user_agent) : 'Gerät', who: dev ? (dev.kind === 'owner' ? 'Gastgeber' : dev.kind === 'code' ? extraLabel(dev.code_id) : (guestName(b) || 'Gast')) : '?', session: fmtKb(c.down + c.up) };
         }) : [];
         // current stay: sum of its devices
         const cur = sql().prepare('SELECT * FROM bookings WHERE checkin <= ? AND checkout >= ? ORDER BY (checkout = ?) ASC, checkin ASC LIMIT 1').get(today, today, today);
@@ -377,16 +467,16 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         return { fas, mac };
     }
 
-    function rememberDevice({ bookingId, kind, mac, fas, ua, until }) {
+    function rememberDevice({ bookingId, kind, mac, fas, ua, until, codeId = null }) {
         const now = new Date().toISOString();
         const untilIso = new Date(until).toISOString();
-        const row = sql().prepare('SELECT id FROM wifi_portal_devices WHERE mac = ? AND kind = ? AND COALESCE(booking_id, 0) = COALESCE(?, 0)').get(mac, kind, bookingId);
+        const row = sql().prepare('SELECT id FROM wifi_portal_devices WHERE mac = ? AND kind = ? AND COALESCE(booking_id, 0) = COALESCE(?, 0) AND COALESCE(code_id, 0) = COALESCE(?, 0)').get(mac, kind, bookingId, codeId);
         if (row) {
             sql().prepare('UPDATE wifi_portal_devices SET ip = ?, gateway = ?, user_agent = ?, last_at = ?, until = ? WHERE id = ?')
                 .run(String(fas.clientip || '').slice(0, 45), String(fas.gatewayname || '').slice(0, 80), ua, now, untilIso, row.id);
         } else {
-            sql().prepare('INSERT INTO wifi_portal_devices (booking_id, kind, mac, ip, gateway, user_agent, first_at, last_at, until) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-                .run(bookingId, kind, mac, String(fas.clientip || '').slice(0, 45), String(fas.gatewayname || '').slice(0, 80), ua, now, now, untilIso);
+            sql().prepare('INSERT INTO wifi_portal_devices (booking_id, kind, mac, ip, gateway, user_agent, first_at, last_at, until, code_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                .run(bookingId, kind, mac, String(fas.clientip || '').slice(0, 45), String(fas.gatewayname || '').slice(0, 80), ua, now, now, untilIso, codeId);
         }
     }
 
@@ -404,6 +494,19 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         rememberDevice({ bookingId: b.id, kind: 'guest', mac: f.mac, fas: f.fas, ua, until: acc.until });
         db.logNotification('guest_wifi', `WLAN-Anmeldung (${how}) für ${guestName(b) || 'Gast'} ${formatDateDE(b.checkin)} – ${formatDateDE(b.checkout)}`, 'sent');
         return { success: true, wait: rhid, name: firstName(guestName(b)), until: new Date(acc.until).toISOString(), checkout: b.checkout, welcome: welcomeFor(b), lang: guestLang.forBooking(b).lang };
+    }
+
+    /** Lets a device in with an extra code (same device limit as a booking). */
+    function admitExtra(x, f, ua) {
+        const c = cfg();
+        const until = Date.parse(x.valid_until);
+        const known = sql().prepare(`SELECT mac FROM wifi_portal_devices WHERE kind = 'code' AND code_id = ?`).all(x.id);
+        if (!known.some(d => d.mac === f.mac) && known.length >= c.max_devices) {
+            return { success: false, reason: 'limit', error: `Mit diesem Code sind schon ${known.length} Geräte angemeldet (höchstens ${c.max_devices}). Bitte melden Sie sich bei uns, dann schalten wir ein weiteres frei.` };
+        }
+        const rhid = enqueue(f.fas, Math.max(15, (until - Date.now()) / 60000), 'code');
+        rememberDevice({ bookingId: null, kind: 'code', mac: f.mac, fas: f.fas, ua, until, codeId: x.id });
+        return { success: true, wait: rhid, name: '', until: new Date(until).toISOString() };
     }
 
     /** What the page shows after the login: check-out, house rules, contact (the live tips come from api/live). */
@@ -431,6 +534,11 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         const rows = sql().prepare(`SELECT * FROM wifi_portal_devices WHERE mac = ? AND until > ? ORDER BY last_at DESC LIMIT 5`).all(mac, new Date().toISOString());
         for (const r of rows) {
             if (r.kind === 'owner') return { owner: true, row: r };
+            if (r.kind === 'code') {
+                const x = r.code_id ? sql().prepare('SELECT * FROM wifi_portal_codes WHERE id = ? AND valid_until > ?').get(r.code_id, new Date().toISOString()) : null;
+                if (x) return { extra: x, row: r };
+                continue;
+            }
             const b = sql().prepare('SELECT * FROM bookings WHERE id = ?').get(r.booking_id);
             if (b && bookingAccess(b).ok) return { booking: b, row: r };
         }
@@ -495,6 +603,10 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
                 rememberDevice({ bookingId: null, kind: 'owner', mac: f.mac, fas: f.fas, ua, until: Date.parse(known.row.until) });
                 return res.json({ ...base, auto: true, wait: rhid, name: '' });
             }
+            if (known && known.extra) {
+                const r = admitExtra(known.extra, f, ua);
+                if (r.success) return res.json({ ...base, auto: true, ...r });
+            }
             if (known && known.booking) {
                 const r = admitBooking(known.booking, f, ua, 'Gerät bekannt');
                 if (r.success) return res.json({ ...base, auto: true, ...r });
@@ -533,6 +645,12 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
                 rememberDevice({ bookingId: null, kind: 'owner', mac: f.mac, fas: f.fas, ua, until });
                 db.logNotification('guest_wifi', 'WLAN-Anmeldung mit dem Gastgeber-Code', 'sent');
                 return res.json({ success: true, wait: rhid, name: '', owner: true, until: new Date(until).toISOString() });
+            }
+            const x = extraByCode(code);
+            if (x) {
+                const r = admitExtra(x, f, ua);
+                if (r.success) db.logNotification('guest_wifi', `WLAN-Anmeldung mit Code ${x.code}${x.note ? ` (${x.note})` : ''}`, 'sent');
+                return res.json(r);
             }
             const b = bookingByCode(code);
             if (!b) { noteFailure(f.mac, gw); return res.json(refusal({ reason: 'code' })); }
@@ -616,7 +734,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
             const b = r.booking_id ? sql().prepare('SELECT * FROM bookings WHERE id = ?').get(r.booking_id) : null;
             return {
                 id: r.id, kind: r.kind, mac: r.mac, ua: deviceLabel(r.user_agent), volume: fmtKb((r.down_kb || 0) + (r.up_kb || 0)), since: r.first_at, last: r.last_at, until: r.until,
-                who: r.kind === 'owner' ? 'Gastgeber-Code' : (b ? `${guestName(b) || 'Gast'} · ${formatDateDE(b.checkin)} – ${formatDateDE(b.checkout)}` : 'Buchung gelöscht')
+                who: r.kind === 'owner' ? 'Gastgeber-Code' : r.kind === 'code' ? extraLabel(r.code_id) : (b ? `${guestName(b) || 'Gast'} · ${formatDateDE(b.checkin)} – ${formatDateDE(b.checkout)}` : 'Buchung gelöscht')
             };
         });
     }
@@ -632,8 +750,18 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         return 'Gerät';
     }
 
+    function extraLabel(codeId) {
+        const x = codeId ? sql().prepare('SELECT code, note FROM wifi_portal_codes WHERE id = ?').get(codeId) : null;
+        return x ? `WLAN-Code ${x.code}${x.note ? ` · ${x.note}` : ''}` : 'WLAN-Code';
+    }
+
+    /** Forgets a device and logs it out on the router (at its next report, within 2 minutes). */
     function removeDevice(id) {
-        return sql().prepare('DELETE FROM wifi_portal_devices WHERE id = ?').run(id).changes > 0;
+        const row = sql().prepare('SELECT mac FROM wifi_portal_devices WHERE id = ?').get(id);
+        if (!row) return false;
+        sql().prepare('DELETE FROM wifi_portal_devices WHERE id = ?').run(id);
+        queueKick(row.mac);
+        return true;
     }
 
     function adminState() {
@@ -675,7 +803,8 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
 
     return {
         registerRoutes, adminState, removeDevice, watch, setPowerOverride, powerState, setupCommand, setupScript, bookingAccess, windowOf,
-        _test: { processStats, adminStats, parseFas, gatewayHashes, queues, acked, berlinEpoch, enqueue, rhidOf }
+        createExtraCode, listExtraCodes, deleteExtraCode, routerStatus,
+        _test: { processStats, adminStats, parseFas, gatewayHashes, queues, acked, berlinEpoch, enqueue, rhidOf, kicksFor, queueKick, extraByCode, handleAuthGet }
     };
 }
 
@@ -872,6 +1001,10 @@ ON=1
 [ "$(uci -q get wireless.gaeste_radio0.disabled)" = "1" ] && ON=0
 UP=$(cut -d. -f1 /proc/uptime)
 R=$(/usr/lib/opennds/libopennds.sh send_to_fas_custom "stats1 wifi=$ON up=$UP clients=$CL" 2>/dev/null)
+# Im Admin gelöschte Geräte abmelden
+for m in $(echo "$R" | sed -n 's/.*kick=\([0-9a-f:,]*\).*/\1/p' | tr ',' ' '); do
+    ndsctl deauth "$m" >/dev/null 2>&1 && logger -t beckhome "Gerät $m abgemeldet"
+done
 WANT=1
 case "$R" in *wifi=off*) WANT=0 ;; esac
 [ "$WANT" = "$ON" ] && exit 0

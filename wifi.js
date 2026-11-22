@@ -261,6 +261,17 @@ function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, chatBu
         return site.wifi_name ? { name: site.wifi_name, password: site.wifi_password || '', personal: false } : null;
     }
 
+    /** For the printed booking sheet: WLAN name, password and (portal) access code of a booking, or null. */
+    function printView(bookingId) {
+        const c = getConfig();
+        const b = sql().prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+        if (!b) return null;
+        if (c.mode === 'portal') return { name: c.portal.ssid, password: c.portal.wpa, code: ensureCode(b.id) };
+        if (c.mode === 'fritzbox' && fritzReady(c)) return { name: ssid(c), password: ensurePassword(b.id) };
+        const site = getSite();
+        return site.wifi_name ? { name: site.wifi_name, password: site.wifi_password || '' } : null;
+    }
+
     /** For the TV welcome screen: only while a guest stays (fritz mode), null = keep the WLAN box neutral. */
     function tvView() {
         const c = getConfig();
@@ -521,7 +532,7 @@ function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, chatBu
     }
 
     return {
-        registerAdminRoutes, startScheduler, portal: wifiPortal, ensureCode,
+        registerAdminRoutes, startScheduler, portal: wifiPortal, ensureCode, printView,
         registerPublicRoutes: (router, opts) => wifiPortal.registerRoutes(router, opts), tick, apply, renew, guestView, arrivalView, tvView, getConfig, save, desired,
         _test: { nightNow, bookingForNight, berlinTime }
     };
