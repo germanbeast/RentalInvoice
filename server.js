@@ -701,14 +701,16 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
                 console.warn('⚠️ Auto-Nuki PIN fehlgeschlagen:', ne.message);
             }
 
-            const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}`;
+            // the booking sheet waits until name / screenshot are in, so it prints with the right data
+            const printWaits = !!printJobs.queueBooking(result.id, 'portal');
+            const printMsg = printWaits ? '\n🖨️ Ausdruck folgt, sobald du den Namen oder den Buchungs-Screenshot schickst.' : '';
+            const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}${printMsg}`;
             // Calendars rarely contain the guest name -> offer to add it right from the Telegram message
             const tgKeyboard = needsName
                 ? { inline_keyboard: [[{ text: '👤 Namen eintragen', callback_data: `nm:${result.id}` }]] }
-                : undefined;
+                : printWaits ? { inline_keyboard: [[{ text: '📇 Anschrift / Screenshot', callback_data: `adr:${result.id}` }]] } : undefined;
             const sent = await sendToAllRecipients(msg, { tgKeyboard, type: 'new_booking' });
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
-            printJobs.queueBooking(result.id, 'portal');
             await sendGuestMessageToTelegram(result.id);
         }
     }
@@ -1352,6 +1354,8 @@ const printJobs = require('./print-jobs')({
     wifiFor: (bookingId) => guestWifi.printView(bookingId)
 });
 printJobs.registerBoxRoutes(app, { authorized: tvboxDeviceAuthorized, limiter: apiLimiter });
+// Portal bookings print once the name / Telegram screenshot is in (applyGuestName, address dialog)
+require('./bot-logic').onGuestData((bookingId) => printJobs.releaseBooking(bookingId));
 cron.schedule('*/15 * * * *', () => {
     printJobs.checkStale().catch(e => console.error('Druck-Prüfung:', e.message));
 });

@@ -6,9 +6,16 @@
 // and sends it to the printer over IPP (port 631) or raw port 9100. It then reports the result.
 //
 // Settings key "printer": { enabled, host, port, path, mode: 'auto'|'ipp'|'raw', copies, manual }
+//
+// Portal bookings (Booking.com/Airbnb) come without guest details, so their job waits (status
+// 'waiting') until the host sent the name or the Booking screenshot via Telegram (or entered the name
+// in the admin): releaseBooking() then hands it to the box. Every result is reported back to the host:
+// printed, printer not reachable (keeps trying with growing pauses for about 9 hours), finally failed.
 
 const DEFAULTS = { enabled: false, host: '', port: 631, path: 'ipp/print', mode: 'auto', copies: 1, manual: true };
-const MAX_ATTEMPTS = 4;
+const MAX_ATTEMPTS = 12;
+/** Pause before the next try after a failed one: 10, 20 … 60 minutes (printer off or asleep). */
+const retryDelayMs = (attempts) => Math.min(Math.max(attempts, 1), 6) * 10 * 60 * 1000;
 const RETRY_SENT_MS = 10 * 60 * 1000; // box took the job but never answered: hand it out again
 const KEEP_DAYS = 60;
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -30,6 +37,7 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
             updated_at INTEGER NOT NULL
         );
     `);
+    try { sql().exec('ALTER TABLE print_jobs ADD COLUMN fail_noted INTEGER DEFAULT 0'); } catch (e) { /* exists */ }
 
     function getConfig() {
         const c = db.getSetting('printer');
@@ -53,10 +61,10 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
         };
     }
 
-    function addJob(kind, bookingId, title) {
+    function addJob(kind, bookingId, title, status = 'pending') {
         const now = Date.now();
         const r = sql().prepare('INSERT INTO print_jobs (booking_id, kind, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-            .run(bookingId || null, kind, String(title || '').slice(0, 200), 'pending', now, now);
+            .run(bookingId || null, kind, String(title || '').slice(0, 200), status, now, now);
         return Number(r.lastInsertRowid);
     }
 
@@ -71,11 +79,33 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
             if (origin === 'manual' && !cfg.manual) return null;
             const d = bookingData(bookingId);
             if (!d) return null;
-            return addJob('booking', bookingId, `${d.name || 'Neue Buchung'} ${formatDateDE(d.checkin)}`);
+            // portal bookings: wait for the name / screenshot from Telegram, so the sheet has the right data
+            return addJob('booking', bookingId, `${d.name || 'Neue Buchung'} ${formatDateDE(d.checkin)}`, origin === 'portal' ? 'waiting' : 'pending');
         } catch (e) {
             console.error('Druckauftrag anlegen:', e.message);
             return null;
         }
+    }
+
+    /** Guest details of a booking were saved (name, Telegram screenshot/address): print its waiting sheet now. */
+    function releaseBooking(bookingId) {
+        try {
+            const jobs = sql().prepare("SELECT id FROM print_jobs WHERE booking_id = ? AND status = 'waiting'").all(bookingId);
+            if (!jobs.length) return 0;
+            const d = bookingData(bookingId);
+            const title = d ? `${d.name || 'Buchung'} ${formatDateDE(d.checkin)}` : null;
+            const up = sql().prepare("UPDATE print_jobs SET status = 'pending', title = COALESCE(?, title), updated_at = ? WHERE id = ?");
+            for (const j of jobs) up.run(title, Date.now(), j.id);
+            return jobs.length;
+        } catch (e) {
+            console.error('Druckauftrag freigeben:', e.message);
+            return 0;
+        }
+    }
+
+    /** Is there a sheet waiting for the guest details of this booking? (for the Telegram message) */
+    function isWaiting(bookingId) {
+        try { return !!sql().prepare("SELECT 1 FROM print_jobs WHERE booking_id = ? AND status = 'waiting'").get(bookingId); } catch (e) { return false; }
     }
 
     /** Jobs the box should print now (part of the sync answer). */
@@ -84,11 +114,14 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
         if (!cfg.enabled || !cfg.host) return null;
         const now = Date.now();
         const jobs = sql().prepare(`
-            SELECT id, kind, title FROM print_jobs
+            SELECT id, kind, title, attempts, error, updated_at, status FROM print_jobs
             WHERE attempts < ? AND created_at > ?
               AND (status = 'pending' OR (status = 'sent' AND updated_at < ?))
-            ORDER BY id LIMIT 5
-        `).all(MAX_ATTEMPTS, now - 7 * 24 * 60 * 60 * 1000, now - RETRY_SENT_MS);
+            ORDER BY id LIMIT 20
+        `).all(MAX_ATTEMPTS, now - 7 * 24 * 60 * 60 * 1000, now - RETRY_SENT_MS)
+            // after a failed try wait a while (printer off / asleep) instead of trying every minute
+            .filter(j => j.status === 'sent' || !j.error || now - j.updated_at >= retryDelayMs(j.attempts))
+            .slice(0, 5);
         if (!jobs.length) return null;
         const mark = sql().prepare("UPDATE print_jobs SET status = 'sent', attempts = attempts + 1, updated_at = ? WHERE id = ?");
         for (const j of jobs) mark.run(now, j.id);
@@ -102,17 +135,23 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
         const job = sql().prepare('SELECT * FROM print_jobs WHERE id = ?').get(id);
         if (!job) return false;
         const now = Date.now();
+        const name = job.kind === 'test' ? 'Testseite' : (job.title || 'Buchungsblatt');
         if (ok) {
+            if (job.status === 'printed') return true; // duplicate report
             sql().prepare("UPDATE print_jobs SET status = 'printed', error = ?, updated_at = ? WHERE id = ?").run(via ? `über ${via}` : null, now, id);
+            await notify(`🖨️ *Gedruckt:* ${name}${job.attempts > 1 ? ` (im ${job.attempts}. Versuch)` : ''}`, 'print_ok');
             return true;
         }
         const msg = String(error || 'unbekannter Fehler').slice(0, 300);
         const final = job.attempts >= MAX_ATTEMPTS;
-        // not final: back to "pending", the box tries again with the next sync
+        // not final: back to "pending", the box tries again after a pause (retryDelayMs)
         sql().prepare('UPDATE print_jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?').run(final ? 'failed' : 'pending', msg, now, id);
         if (final && !job.warned) {
             sql().prepare('UPDATE print_jobs SET warned = 1 WHERE id = ?').run(id);
-            await notify(`🖨️ *Drucken fehlgeschlagen*\n${job.title || 'Druckauftrag'}\n${msg}\n\nIm Admin unter Einstellungen → Drucker kannst du es erneut versuchen.`, 'print_failed');
+            await notify(`❌ *Drucken endgültig fehlgeschlagen*\n${name}\n${msg}\n\nIch habe es ${job.attempts}-mal versucht. Im Admin unter Einstellungen → Drucker kannst du es erneut starten.`, 'print_failed');
+        } else if (!final && !job.fail_noted) {
+            sql().prepare('UPDATE print_jobs SET fail_noted = 1 WHERE id = ?').run(id);
+            await notify(`⚠️ *Drucker nicht erreichbar*\n${name}\n${msg}\n\nIst der Drucker aus oder offline? Ich versuche es automatisch weiter (zuerst in 10 Minuten, dann seltener) und melde mich, sobald es gedruckt ist.`, 'print_failed');
         }
         return true;
     }
@@ -135,7 +174,7 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
     }
 
     function retryJob(id) {
-        const r = sql().prepare("UPDATE print_jobs SET status = 'pending', attempts = 0, warned = 0, error = NULL, updated_at = ? WHERE id = ?").run(Date.now(), id);
+        const r = sql().prepare("UPDATE print_jobs SET status = 'pending', attempts = 0, warned = 0, fail_noted = 0, error = NULL, updated_at = ? WHERE id = ?").run(Date.now(), id);
         return r.changes > 0;
     }
 
@@ -345,7 +384,7 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
         });
     }
 
-    return { getConfig, queueBooking, forBox, reportResult, checkStale, registerBoxRoutes, registerAdminRoutes, _sheetHtml: sheetHtml, _bookingData: bookingData };
+    return { getConfig, queueBooking, releaseBooking, isWaiting, forBox, reportResult, checkStale, registerBoxRoutes, registerAdminRoutes, _sheetHtml: sheetHtml, _bookingData: bookingData };
 }
 
 module.exports = createPrintJobs;
