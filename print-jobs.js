@@ -13,7 +13,7 @@ const RETRY_SENT_MS = 10 * 60 * 1000; // box took the job but never answered: ha
 const KEEP_DAYS = 60;
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetween, formatDateDE }) {
+function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetween, formatDateDE, wifiFor }) {
     const sql = () => db.getDb();
 
     sql().exec(`
@@ -154,7 +154,10 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
         if (isPlaceholderName(name)) name = '';
         const ref = (String(b.summary || '').match(/\(([^)]+)\)\s*$/) || [])[1] || '';
         const site = db.getSetting('site') || {};
+        let wifi = null;
+        try { wifi = wifiFor ? wifiFor(b.id) : null; } catch (e) { wifi = null; }
         return {
+            wifi,
             id: b.id, source, name, checkin: b.checkin, checkout: b.checkout,
             nights: nightsBetween(b.checkin, b.checkout),
             adults: req ? req.adults : null, children: req ? req.children : null,
@@ -186,7 +189,10 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
             ['Preis', d.price ? money(d.price) : ''],
             ['Türcode', d.pin ? `<b class="pin">${esc(d.pin)}</b>` : '', true],
             ['Buchungscode', d.code],
-            ['Buchungsnummer', d.ref]
+            ['Buchungsnummer', d.ref],
+            ['WLAN', d.wifi && d.wifi.name],
+            ['WLAN-Kennwort', d.wifi && d.wifi.password ? `<b class="pin">${esc(d.wifi.password)}</b>` : '', true],
+            ['WLAN-Code', d.wifi && d.wifi.code ? `<b class="pin">${esc(d.wifi.code)}</b>` : '', true]
         ].filter(r => r[1]);
         const notes = [['Nachricht des Gastes', d.message], ['Notiz', d.hostNote], ['Notiz', d.note]].filter(n => n[1]);
         return `<!doctype html><html lang="de"><head><meta charset="utf-8"><style>
@@ -235,6 +241,7 @@ function createPrintJobs({ db, puppeteer, notify, isPlaceholderName, nightsBetwe
         return {
             id: 0, source: 'Test', name: 'Max Mustermann', checkin: ymd(7), checkout: ymd(10), nights: 3,
             adults: 2, children: 1, phone: '+49 170 1234567', email: 'max@example.de', price: 285, pin: '123456',
+            wifi: { name: 'Beckhome Gäste', password: '', code: '654321' },
             code: 'TEST01', ref: '', message: '', note: '', hostNote: '',
             title: site.title || 'Ferienwohnung', checkinTime: site.checkin_time || '', checkoutTime: site.checkout_time || ''
         };
