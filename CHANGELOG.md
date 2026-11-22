@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.3] - 2026-11-22
+
+### Behoben
+- `/wlan` und `/wlan.` lesen jetzt auch `application/x-www-form-urlencoded` und `text/plain` (openNDS-authmon und libopennds posten so). Vorher gab es ohne JSON-Body ein 404, openNDS loggte `failed with status 8` und kein Router-Kontakt kam an. Ohne Parameter antworten die Pfade nie mit einem Fehler
+
 ## [1.50.2] - 2026-11-20
 
 ### Geändert

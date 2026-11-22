@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.50.2",
+    "currentVersion": "1.50.3",
     "releases": [
+        {
+            "version": "1.50.3",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router meldet sich wieder",
+            "features": [],
+            "fixes": [
+                "Der Router (openNDS) schickt seine Abfragen als Formular, die App hat nur JSON gelesen und mit „nicht gefunden“ geantwortet. Deshalb meldete openNDS „FAS nicht erreichbar“ und der Router erschien im Admin nicht als verbunden"
+            ]
+        },
         {
             "version": "1.50.2",
             "date": "2026-11-20",
