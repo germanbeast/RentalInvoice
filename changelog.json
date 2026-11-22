@@ -1,8 +1,8 @@
 {
-    "currentVersion": "1.50.5",
+    "currentVersion": "1.50.6",
     "releases": [
         {
-            "version": "1.50.5",
+            "version": "1.50.6",
             "date": "2026-11-22",
             "title": "Kartenabgleich: Ersatzdienst und Grund bei Störung",
             "features": [],
@@ -10,6 +10,15 @@
                 "Blockiert OpenStreetMap (Nominatim) Anfragen vom Server oder antwortet zu langsam, fragt der Bot jetzt automatisch Photon (ebenfalls OpenStreetMap-Daten) statt „Kartenabgleich gerade nicht möglich“ zu melden",
                 "Ein einzelner Fehler bricht den Abgleich nicht mehr ab; das Zeitlimit reicht jetzt für alle Suchschritte",
                 "Klappt es trotzdem nicht, steht der Grund dabei (z. B. „Kartendienst blockiert Anfragen von diesem Server“ oder „antwortet nicht rechtzeitig“), die Anschrift bleibt so wie erkannt"
+            ]
+        },
+        {
+            "version": "1.50.5",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Anmeldefenster schließt sich",
+            "features": [],
+            "fixes": [
+                "Nach dem WLAN-Login blieb das Anmeldefenster des iPhones offen und iOS zeigte kein WLAN-Symbol. Neuer Knopf „Weiter ins Internet“ öffnet die Prüfseite des Handys, danach erkennt iOS bzw. Android das freie Internet und das Fenster lässt sich mit „Fertig“ schließen"
             ]
         },
         {
