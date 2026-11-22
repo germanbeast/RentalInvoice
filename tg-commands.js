@@ -29,6 +29,7 @@ function callbackRight(data) {
     if (data.startsWith('lock:')) return 'lock';
     if (data === 'gm' || data.startsWith('gm:')) return 'nachricht';
     if (data.startsWith('gl:')) return 'guestlink';
+    if (data === 'wl' || data.startsWith('wl:')) return 'wlan';
     if (data.startsWith('inv:') || data === 'new:invoice') return 'rechnung';
     if (data === 'new:pin') return 'pin';
     return null;
@@ -109,7 +110,8 @@ function mainMenuKeyboard() {
         [btn('🔐 Türcodes', 'codes'), btn('📅 Anreisen', 'arrivals')],
         [btn('✉️ Gästenachricht', 'gm'), btn('📋 Offene Rechnungen', 'open')],
         [btn('🔄 Kalender abfragen', 'sync'), btn('🚪 Schloss', 'lock:status')],
-        [btn('📇 Anschrift einfügen', 'adr'), btn('❓ Hilfe', 'help')]
+        [btn('📇 Anschrift einfügen', 'adr'), btn('📶 WLAN-Codes', 'wl')],
+        [btn('❓ Hilfe', 'help')]
     ]);
 }
 
@@ -193,6 +195,7 @@ async function showHelp(bot, chatId) {
         '• <code>/schloss</code> – Schloss-Status und Batterie\n' +
         '• <code>/zu</code> – Tür abschließen\n' +
         '• <code>/jahr</code> – Jahresrückblick (z. B. <code>/jahr 2025</code>)\n' +
+        '• <code>/wlan</code> – WLAN-Codes für Besucher (z. B. <code>/wlan 3</code> = 3 Tage, <code>/wlan 4h Handwerker</code>)\n' +
         '• <code>/auf</code> – Tür aufschließen/öffnen (mit Rückfrage)\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
@@ -432,6 +435,67 @@ async function showLockStatus(bot, chatId, intro) {
     if (lock.doorsensorBatteryCritical) text += '🪫 Türsensor-Batterie fast leer\n';
     text += `Gast im Haus: ${hooks.isOccupied && hooks.isOccupied() ? 'ja' : 'nein'}`;
     return send(bot, chatId, text, lockKeyboard());
+}
+
+// ---------------------------------------------------------------------------
+// WLAN-Codes (eigener Router mit Anmeldeseite): zusätzliche Codes für Besucher, Handwerker usw.
+// ---------------------------------------------------------------------------
+function wifiPortal() {
+    const w = hooks.wifi ? hooks.wifi() : null;
+    if (!w) return { error: 'WLAN ist gerade nicht verfügbar.' };
+    if (w.getConfig().mode !== 'portal') return { error: 'WLAN-Codes gibt es nur mit dem eigenen WLAN-Router mit Anmeldeseite (Admin → Webseite → WLAN).' };
+    return { w, portal: w.portal };
+}
+
+function fmtUntil(iso) {
+    return new Date(iso).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+}
+
+/** "/wlan 3", "/wlan 4h Handwerker", "2 tage" -> { hours, note } or null */
+function parseWifiArg(arg) {
+    const m = String(arg || '').trim().match(/^(\d{1,3})\s*(h|std\.?|stunden?|t|d|tage?|w|wochen?)?\b\s*(.*)$/i);
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    const u = (m[2] || 't').toLowerCase();
+    const hours = /^(h|std|stunde)/.test(u) ? n : /^w/.test(u) ? n * 7 * 24 : n * 24;
+    if (!n || hours > 60 * 24) return null;
+    return { hours, note: m[3].trim() };
+}
+
+async function showWifiCodes(bot, chatId, intro) {
+    const { w, portal, error } = wifiPortal();
+    if (error) return send(bot, chatId, `📶 ${esc(error)}`, menuOnlyKeyboard());
+    let text = (intro ? `${intro}\n\n` : '') + `<b>📶 WLAN-Codes</b> · WLAN „${esc(w.getConfig().portal.ssid)}“\n`;
+    try {
+        const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+        const b = db.getDb().prepare('SELECT b.*, g.name AS guest_name FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id WHERE b.checkin <= ? AND b.checkout >= ? ORDER BY (b.checkout = ?) ASC, b.checkin ASC LIMIT 1').get(today, today, today);
+        if (b) text += `\nGast jetzt: ${esc(b.guest_name || 'Gast')} – Code <code>${esc(w.ensureCode(b.id))}</code> (bis ${fmtDate(b.checkout)})\n`;
+    } catch (e) { /* ohne Gast */ }
+    const codes = portal.listExtraCodes();
+    text += codes.length ? '\n<b>Zusätzliche Codes</b>\n' + codes.map(c => `• <code>${esc(c.code)}</code>${c.note ? ` ${esc(c.note)}` : ''} – bis ${esc(fmtUntil(c.valid_until))}${c.devices ? ` · ${c.devices} Gerät${c.devices === 1 ? '' : 'e'}` : ''}`).join('\n') + '\n'
+        : '\nKeine zusätzlichen Codes aktiv.\n';
+    text += '\nNeuen Code erzeugen (gilt ab sofort). Mit Notiz: z. B. <code>/wlan 4h Handwerker</code>';
+    const rows = [
+        [btn('4 Stunden', 'wl:new:4'), btn('1 Tag', 'wl:new:24')],
+        [btn('3 Tage', 'wl:new:72'), btn('1 Woche', 'wl:new:168')]
+    ];
+    for (const c of codes.slice(0, 8)) rows.push([btn(`🗑 ${c.code} löschen${c.note ? ` (${short(c.note, 16)})` : ''}`, `wl:del:${c.id}`)]);
+    rows.push([btn('🏠 Hauptmenü', 'menu')]);
+    return send(bot, chatId, text, keyboard(rows));
+}
+
+async function createWifiCode(bot, chatId, hours, note, who) {
+    const { w, portal, error } = wifiPortal();
+    if (error) return send(bot, chatId, `📶 ${esc(error)}`, menuOnlyKeyboard());
+    let x;
+    try { x = portal.createExtraCode({ hours, note, by: who }); } catch (e) { return send(bot, chatId, `❌ ${esc(e.message)}`, menuOnlyKeyboard()); }
+    const c = w.getConfig().portal;
+    const text = `✅ <b>Neuer WLAN-Code</b>${x.note ? ` (${esc(x.note)})` : ''}\n\n` +
+        `WLAN: <b>${esc(c.ssid)}</b>${c.wpa ? `\nKennwort: <code>${esc(c.wpa)}</code>` : ''}\n` +
+        `Code: <code>${esc(x.code)}</code>\n` +
+        `Gültig bis ${esc(fmtUntil(x.valid_until))}, für bis zu ${c.max_devices} Geräte.\n\n` +
+        '<i>Mit dem WLAN verbinden, auf der Anmeldeseite den Code eingeben.</i>';
+    return send(bot, chatId, text, keyboard([[btn('📶 Alle WLAN-Codes', 'wl')], [btn('🏠 Hauptmenü', 'menu')]]));
 }
 
 async function showYearReview(bot, chatId, year) {
@@ -1494,6 +1558,17 @@ async function processMessage(bot, msg) {
         return showYearReview(bot, chatId, yearCmd[2] ? parseInt(yearCmd[2], 10) : null);
     }
 
+    // WLAN-Codes: /wlan, /wlan 3, /wlan 4h Handwerker
+    const wifiCmd = body.match(/^\/(wlan|wifi)(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+    if (wifiCmd) {
+        if (!allowed('wlan')) return send(bot, chatId, DENIED);
+        if (active) await cancelSession(bot, chatId, active, true);
+        if (!wifiCmd[2]) return showWifiCodes(bot, chatId);
+        const a = parseWifiArg(wifiCmd[2]);
+        if (!a) return showWifiCodes(bot, chatId, '🤔 Dauer nicht erkannt. Beispiele: <code>/wlan 3</code> (3 Tage), <code>/wlan 4h</code>, <code>/wlan 1w Eltern</code>');
+        return createWifiCode(bot, chatId, a.hours, a.note, msg.from && (msg.from.username || msg.from.first_name));
+    }
+
     let cmd = detectCommand(body);
     // Im laufenden Dialog gelten nur echte Slash-Befehle als Befehle - sonst könnte eine Antwort
     // wie "Status Quo" als Name versehentlich einen Befehl auslösen.
@@ -1739,6 +1814,17 @@ async function processCallback(bot, q) {
             case data === 'aok':
                 if (active.flow !== 'address' || active.step !== 'confirm') return;
                 return executeAddress(bot, chatId, active, q);
+            case data === 'wl':
+                return showWifiCodes(bot, chatId);
+            case data.startsWith('wl:new:'):
+                return createWifiCode(bot, chatId, parseInt(data.slice(7), 10), '', who);
+            case data.startsWith('wl:del:'): {
+                const { portal, error } = wifiPortal();
+                if (error) return send(bot, chatId, `📶 ${esc(error)}`, menuOnlyKeyboard());
+                const row = portal.deleteExtraCode(parseInt(data.slice(7), 10));
+                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+                return showWifiCodes(bot, chatId, row ? `🗑 Code <code>${esc(row.code)}</code> gelöscht. Angemeldete Geräte fliegen in spätestens 2 Minuten raus.` : 'Dieser Code war schon gelöscht.');
+            }
             case data.startsWith('ovl:'): {
                 const n = hooks.ackOverlap ? hooks.ackOverlap(data.slice(4)) : 0;
                 if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
@@ -1821,6 +1907,7 @@ async function setup(bot, options = {}) {
             { command: 'schloss', description: 'Schloss-Status und Batterie' },
             { command: 'zu', description: 'Tür abschließen' },
             { command: 'jahr', description: 'Jahresrückblick mit Statistik' },
+            { command: 'wlan', description: 'WLAN-Codes für Besucher erzeugen' },
             { command: 'auf', description: 'Tür aufschließen (mit Rückfrage)' },
             { command: 'abbrechen', description: 'Aktuellen Vorgang abbrechen' },
             { command: 'hilfe', description: 'Hilfe anzeigen' }
@@ -1836,5 +1923,5 @@ module.exports = {
     setup,
     showGuestMessage,
     // für Tests
-    _internal: { sessions, detectCommand, applyInput, FLOWS, isAddressText, addressCandidates, nameScore }
+    _internal: { parseWifiArg, sessions, detectCommand, applyInput, FLOWS, isAddressText, addressCandidates, nameScore }
 };
