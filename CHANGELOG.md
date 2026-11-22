@@ -5,11 +5,18 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.50.4] - 2026-11-22
+## [1.50.5] - 2026-11-22
 
 ### Behoben
 - `geo-check.js`: Fehler bei Nominatim (403/429/Zeitüberschreitung) brachen den ganzen Abgleich ab → jetzt Ersatz über Photon (photon.komoot.io), Nominatim wird nach einem Fehler 10 Minuten übersprungen; Gesamtbudget 12 s statt 15-s-Race mit bis zu 5 Anfragen à 6 s
 - Fehlermeldung im Bot nennt den Grund (`reasonOf`), Log `[Geo]` mit Statuscode und Antwortanfang
+
+## [1.50.4] - 2026-11-22
+
+### Behoben
+- Globaler Rate-Limiter (100/min pro IP) überspringt `/wlan` und `/wlan.`: openNDS-authmon pollt etwa sekündlich (`wget_request` → `GET faspath?auth_get=…`) von der gemeinsamen Hausadresse und bekam 429 (`failed with status 8`), dadurch keine Freischaltungen und kein Router-Kontakt. Die Anfragen sind per Gateway-Hash bzw. HMAC geprüft
+- Anmeldeseite: Hinweis unter der Begrüßung, dass das Captive-Portal-Fenster (iOS „Fertig“, Android zurück) von Hand geschlossen wird
+- Ursache von „status 8“ am echten Router war Cloudflare (403 für die openNDS-Kennung mit Anführungszeichen); behoben per Cloudflare-Einstellung, nicht im Code
 
 ## [1.50.3] - 2026-11-22
 

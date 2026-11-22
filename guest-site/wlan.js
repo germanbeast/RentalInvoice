@@ -117,7 +117,8 @@
             <div class="wl-actions">
                 <a class="btn btn-dark wl-go" href="meine-buchung">${T('Zu Meine Buchung')}</a>
                 <a class="btn btn-ghost wl-go" href="./">${T('Zur Webseite der Ferienwohnung')}</a>
-            </div>`);
+            </div>
+            <p class="wl-close">${T('Dieses Fenster bleibt offen? Einfach oben auf „Fertig“ tippen (iPhone) oder zurück wischen (Android). Das Internet läuft schon.')}</p>`);
         if (w) {
             $('#contact').hidden = true;
             loadLive();
