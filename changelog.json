@@ -1,9 +1,9 @@
 {
-    "currentVersion": "1.51.0",
+    "currentVersion": "1.52.0",
     "releases": [
         {
-            "version": "1.51.0",
-            "date": "2026-11-18",
+            "version": "1.52.0",
+            "date": "2026-11-22",
             "title": "Hintergrund-Video der Ferienwohnung auf Webseite, Meine Buchung und TV",
             "features": [
                 "Unter Webseite → Inhalte → „Hintergrund-Video“ ein Video der Wohnung hochladen (auch große Handy-Videos bis 2 GB, der Upload läuft in Stücken)",
