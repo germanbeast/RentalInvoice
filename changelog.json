@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.50.5",
+    "currentVersion": "1.50.6",
     "releases": [
+        {
+            "version": "1.50.6",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Internet nach dem Login",
+            "features": [],
+            "fixes": [
+                "Nach dem WLAN-Login kam das Handy nicht ins Internet. Die Anmeldeseite (openNDS) hat die Sperre für das Heimnetz falsch umgesetzt und dadurch alles gesperrt. Das Heimnetz bleibt weiter über die Firewall des Routers gesperrt. Bestehende Router: Einrichtungsbefehl einmal neu ausführen"
+            ]
+        },
         {
             "version": "1.50.5",
             "date": "2026-11-22",

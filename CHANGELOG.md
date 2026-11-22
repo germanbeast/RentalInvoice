@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.6] - 2026-11-22
+
+### Behoben
+- `setup.sh` (`wifi-portal.js`): openNDS `authenticated_users` nur noch `allow all`. openNDS 10.3.1 mit nftables (OpenWrt 25.12) legt `block to 10.0.0.0/8` usw. ohne Adress-Bedingung an, die Kette `ndsAUT` verwirft dadurch jedes Paket freigeschalteter Geräte. Private Netze sperrt weiterhin die fw4-Regel `gaeste_privat`
+
 ## [1.50.5] - 2026-11-22
 
 ### Behoben
