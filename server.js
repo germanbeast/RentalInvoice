@@ -1385,14 +1385,14 @@ function welcomeData() {
         name = mode === 'full' ? current.name : parts[0];
     }
     return {
+        ...tvGuest.welcomeExtras(current), // farewell on departure day, towel button (tv-guest.js)
         success: true, today,
         guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
         phone: (s.vermieter && s.vermieter.telefon) || '',
         checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
         title: (s.site && s.site.title) || '',
         wifi: current ? guestWifi.tvView() : null,
-        lang: current ? guestLang.langOrDe(current) : 'de',
-        ...tvGuest.welcomeExtras(current) // farewell on departure day, towel button
+        lang: current ? guestLang.langOrDe(current) : 'de'
     };
 }
 
