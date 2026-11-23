@@ -1360,6 +1360,17 @@ cron.schedule('*/15 * * * *', () => {
     printJobs.checkStale().catch(e => console.error('Druck-Prüfung:', e.message));
 });
 
+// Farewell on departure day + towel button on the TV, see tv-guest.js
+const tvGuest = require('./tv-guest')({
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg, { type });
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+        return sent;
+    },
+    berlinToday: () => berlinToday(),
+    formatDateDE: (d) => formatDateDE(d)
+});
+
 // Public, minimal data for the TV welcome screen (no door codes, no invoices). The guest WLAN only while a guest stays
 // and only when "Auf dem Fernseher zeigen" is on (Webseite → WLAN): with the FRITZ!Box it is that guest's own password.
 // Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
@@ -1367,9 +1378,7 @@ function welcomeData() {
     const s = db.getAllSettings();
     const today = berlinToday();
     const mode = ['first', 'full', 'none'].includes(s.welcome_name_mode) ? s.welcome_name_mode : 'first';
-    const current = loadBookingRows()
-        .filter(r => r.checkin <= today && r.checkout >= today && r.state !== 'past')
-        .sort((a, b) => (a.checkout === today) - (b.checkout === today) || a.checkin.localeCompare(b.checkin))[0];
+    const current = tvGuest.pickCurrent(loadBookingRows(), s.site && s.site.checkout_time);
     let name = '';
     if (current && current.name && mode !== 'none') {
         const parts = current.name.trim().split(/\s+/);
@@ -1382,7 +1391,8 @@ function welcomeData() {
         checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
         title: (s.site && s.site.title) || '',
         wifi: current ? guestWifi.tvView() : null,
-        lang: current ? guestLang.langOrDe(current) : 'de'
+        lang: current ? guestLang.langOrDe(current) : 'de',
+        ...tvGuest.welcomeExtras(current) // farewell on departure day, towel button
     };
 }
 
@@ -1394,6 +1404,15 @@ app.get('/api/welcome', (req, res) => {
     } catch (e) {
         res.status(500).json({ success: false });
     }
+});
+
+// "Neue Handtücher" on the TV (see tv-guest.js): paired box or admin preview, at most every 30 min per booking
+const towelLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
+tvGuest.registerRoutes(app, {
+    allowed: tvboxViewAllowed,
+    isAdmin: req => !!(req.session && req.session.user) && !tvboxDeviceAuthorized(req),
+    current: () => { const s = db.getAllSettings(); return tvGuest.pickCurrent(loadBookingRows(), s.site && s.site.checkout_time); },
+    limiter: towelLimiter
 });
 
 // Live tips (weather, events, opening hours) for the TV welcome screen and "Meine Buchung", see local-live.js.
@@ -2543,6 +2562,8 @@ async function tvboxLatest() {
         published: apk.updated_at || rel.published_at || null
     };
 }
+
+tvGuest.registerAdminRoutes(app, apiLimiter); // Abreisetag & Handtücher (Settings → TV-Box)
 
 app.get('/api/settings/tvbox', apiLimiter, async (req, res) => {
     let latest = null, error = null;

@@ -511,7 +511,38 @@
         'Für Ihren Aufenthalt': ['For your stay', 'Voor uw verblijf', 'Na pobyt'],
         'Fernsehen schauen': ['Watch TV', 'Televisie kijken', 'Oglądaj telewizję'],
         'Vor-Ort-Informationen': ['Local information', 'Lokale informatie', 'Informacje lokalne'],
-        'bis {d}': ['until {d}', 'tot {d}', 'do {d}']
+        'bis {d}': ['until {d}', 'tot {d}', 'do {d}'],
+
+        // ---- TV: Abreisetag ----
+        'Abreise heute': ['Departure today', 'Vertrek vandaag', 'Wyjazd dzisiaj'],
+        'Check-out bis {t} Uhr': ['Check-out by {t}', 'Uitchecken tot {t} uur', 'Wymeldowanie do godz. {t}'],
+        'Danke, {name}!': ['Thank you, {name}!', 'Bedankt, {name}!', 'Dziękujemy, {name}!'],
+        'Vielen Dank!': ['Thank you very much!', 'Hartelijk dank!', 'Serdecznie dziękujemy!'],
+        'Schön, dass Sie bei uns waren. Wir wünschen Ihnen eine gute Heimreise und hoffen, Sie bald wieder begrüßen zu dürfen!': [
+            'It was lovely to have you. We wish you a safe journey home and hope to welcome you again soon!',
+            'Fijn dat u bij ons was. Wij wensen u een goede thuisreis en hopen u snel weer te mogen verwelkomen!',
+            'Cieszymy się, że byli Państwo u nas. Życzymy szczęśliwej podróży do domu i mamy nadzieję wkrótce znów Państwa gościć!'],
+        'Fragen? Rufen Sie uns an:': ['Questions? Call us:', 'Vragen? Bel ons:', 'Pytania? Zadzwoń do nas:'],
+        'Vor der Abreise': ['Before you leave', 'Voor vertrek', 'Przed wyjazdem'],
+        'Geschirr spülen oder in die Spülmaschine räumen': ['Wash the dishes or put them in the dishwasher', 'Afwassen of de vaat in de vaatwasser zetten', 'Umyć naczynia lub włożyć je do zmywarki'],
+        'Müll in die Tonnen vor dem Haus bringen': ['Take the rubbish to the bins in front of the house', 'Het afval naar de containers voor het huis brengen', 'Wynieść śmieci do pojemników przed domem'],
+        'Benutzte Handtücher ins Bad legen': ['Leave used towels in the bathroom', 'Gebruikte handdoeken in de badkamer leggen', 'Zostawić użyte ręczniki w łazience'],
+        'Fenster schließen und Heizung herunterdrehen': ['Close the windows and turn down the heating', 'Ramen sluiten en de verwarming lager zetten', 'Zamknąć okna i skręcić ogrzewanie'],
+        'Licht und Geräte ausschalten': ['Switch off lights and appliances', 'Licht en apparaten uitschakelen', 'Wyłączyć światło i urządzenia'],
+        'Wohnungstür beim Gehen fest zuziehen': ['Pull the apartment door firmly shut when you leave', 'De voordeur bij vertrek stevig dichttrekken', 'Wychodząc, mocno zatrzasnąć drzwi mieszkania'],
+
+        // ---- TV: Handtücher ----
+        'Neue Handtücher': ['Fresh towels', 'Nieuwe handdoeken', 'Nowe ręczniki'],
+        'Neue Handtücher anfordern?': ['Request fresh towels?', 'Nieuwe handdoeken aanvragen?', 'Poprosić o nowe ręczniki?'],
+        'Wir bekommen sofort eine Nachricht und kümmern uns darum.': ['We will get a message right away and take care of it.', 'Wij krijgen direct een bericht en regelen het.', 'Od razu dostaniemy wiadomość i się tym zajmiemy.'],
+        'Ja, anfordern': ['Yes, request', 'Ja, aanvragen', 'Tak, poproś'],
+        'Danke, wir haben Bescheid bekommen!': ['Thank you, we have been notified!', 'Bedankt, wij hebben het bericht ontvangen!', 'Dziękujemy, otrzymaliśmy wiadomość!'],
+        'Wir bringen Ihnen so bald wie möglich frische Handtücher.': ['We will bring you fresh towels as soon as possible.', 'Wij brengen u zo snel mogelijk nieuwe handdoeken.', 'Przyniesiemy świeże ręczniki tak szybko, jak to możliwe.'],
+        'Ihre Anfrage ist schon bei uns angekommen.': ['Your request has already reached us.', 'Uw aanvraag is al bij ons binnen.', 'Twoja prośba już do nas dotarła.'],
+        'Das hat leider nicht geklappt.': ['Unfortunately, that did not work.', 'Dat is helaas niet gelukt.', 'Niestety, to się nie udało.'],
+        'Bitte rufen Sie uns an: {phone}': ['Please call us: {phone}', 'Bel ons alstublieft: {phone}', 'Prosimy o telefon: {phone}'],
+        'Bitte versuchen Sie es später noch einmal.': ['Please try again later.', 'Probeer het later nog eens.', 'Spróbuj ponownie później.'],
+        'OK': ['OK', 'OK', 'OK']
     };
 
     // ---------------------------------------------------------------------------------------------

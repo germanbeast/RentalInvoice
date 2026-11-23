@@ -4480,7 +4480,7 @@
 
                 if (targetId === 'settings-push') loadPushSettings();
                 if (targetId === 'settings-users') loadUsers();
-                if (targetId === 'settings-tvbox') loadTvbox();
+                if (targetId === 'settings-tvbox') { loadTvbox(); loadTvGuest(); }
                 if (targetId === 'settings-printer') loadPrinter();
 
                 // Toggle larger modal for designer
@@ -5740,6 +5740,33 @@
         }
     }));
     if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
+
+    // TV: farewell on departure day + towel button (tv-guest.js)
+    let tvGuestDefaults = [];
+    async function loadTvGuest() {
+        const d = await apiJson('/api/settings/tv-guest').catch(() => null);
+        if (!d || !d.success) return;
+        tvGuestDefaults = d.defaults || [];
+        $('#tvguest-farewell').checked = d.config.farewell !== false;
+        $('#tvguest-towels').checked = d.config.towels !== false;
+        $('#tvguest-hints').value = (d.config.hints || []).join('\n');
+        $('#tvguest-message').value = d.config.message || '';
+        const fmt = ts => new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const list = $('#tvguest-requests');
+        list.innerHTML = (d.requests || []).length
+            ? d.requests.map(r => `<li>${escapeHtml(fmt(r.at))} Uhr: ${escapeHtml(r.name || 'Gast')}${r.stay ? ' (' + escapeHtml(r.stay) + ')' : ''}${r.preview ? ' · Test aus der Vorschau' : ''}${r.sent ? '' : ' · Nachricht nicht zugestellt'}</li>`).join('')
+            : '<li style="list-style:none; margin-left:-1.1rem">Noch keine Anfragen.</li>';
+    }
+    if ($('#btn-tvguest-defaults')) $('#btn-tvguest-defaults').addEventListener('click', () => { $('#tvguest-hints').value = tvGuestDefaults.join('\n'); });
+    if ($('#btn-tvguest-save')) $('#btn-tvguest-save').addEventListener('click', async () => {
+        const body = {
+            farewell: $('#tvguest-farewell').checked,
+            towels: $('#tvguest-towels').checked,
+            hints: $('#tvguest-hints').value,
+            message: $('#tvguest-message').value
+        };
+        if (await tvboxPost('/api/settings/tv-guest', body, 'PUT')) { showToast('Gespeichert, der Fernseher zeigt es spätestens nach 10 Minuten', 'success'); loadTvGuest(); }
+    });
 
     // Drucker: new bookings are printed by the TV box in the apartment's network (print-jobs.js)
     const PRINT_STATUS = { waiting: 'wartet auf Name/Screenshot per Telegram', pending: 'wartet auf die Box', sent: 'wird gedruckt …', printed: 'gedruckt ✓', failed: 'fehlgeschlagen' };

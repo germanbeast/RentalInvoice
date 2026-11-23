@@ -5,6 +5,13 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.55.0] - 2026-11-23
+
+### Neu
+- TV-Welcome-Screen am Abreisetag (`tv-guest.js`, `public/welcome.html`): „Danke, <Name>!“, Check-out-Zeit, Abschiedstext und eine Liste mit Hinweisen zum Check-out, in der Sprache des Gastes. Die vorgegebenen Hinweise sind in `guest-site/i18n.js` übersetzt, eigene erscheinen wie eingegeben. Einstellbar unter Einstellungen → TV-Box → „Abreisetag & Handtücher“ (Setting `tv_guest`)
+- Am Wechseltag zeigt der Fernseher den abreisenden Gast bis 30 Minuten nach der Check-out-Zeit (ohne Zeit bis 12:30), danach den neuen Gast (`tvGuest.pickCurrent`). Vorher stand der neue Gast schon morgens auf dem Bildschirm
+- Knopf „Neue Handtücher“ dezent rechts unten auf dem TV, nur während eines Aufenthalts. Rückfrage mit Fokus auf „Abbrechen“, danach `POST /api/tv-box/towels` (nur gekoppelte Box oder Admin-Vorschau, JSON) → Nachricht an alle Empfänger (Telegram, WhatsApp, Push, Typ `towels`) mit Gast und Aufenthalt. Höchstens eine Nachricht pro Buchung alle 30 Minuten, der Gast sieht eine Bestätigung. Die letzten Anfragen stehen im Admin (Setting `towel_requests`)
+
 ## [1.51.0] - 2026-11-22
 
 ### Neu
