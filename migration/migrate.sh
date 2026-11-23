@@ -100,7 +100,7 @@ cmd_install() {
     load_state
     export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
     # Keine versteckten Rückfragen (Konfigurationsdateien), Ausgabe bleibt sichtbar
-    APT=(apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o Dpkg::Use-Pty=0)
+    APT=(apt-get -y -o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o Dpkg::Use-Pty=0)
 
     step "Internet im Container prüfen"
     if ! timeout 15 curl -fsS -o /dev/null https://deb.nodesource.com; then
@@ -115,7 +115,7 @@ cmd_install() {
 
     step "Systempakete (dauert beim ersten Mal ein paar Minuten)"
     dpkg --configure -a || true
-    apt-get update || die "apt-get update fehlgeschlagen"
+    apt-get -o DPkg::Lock::Timeout=600 update || die "apt-get update fehlgeschlagen"
     "${APT[@]}" upgrade || die "apt upgrade fehlgeschlagen"
     "${APT[@]}" install git curl ca-certificates gnupg rsync sqlite3 openssh-client build-essential python3 ffmpeg \
         jq lsof locales tzdata fonts-liberation fonts-dejavu-core fonts-noto-color-emoji fontconfig xdg-utils wget || die "apt install fehlgeschlagen"
