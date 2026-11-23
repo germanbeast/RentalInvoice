@@ -5,6 +5,12 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.57.0] - 2026-11-23
+
+### Neu
+- Admin: Dunkelmodus mit Umschalter Hell / Dunkel / Automatisch oben rechts (`<html data-theme>`, Skript im `<head>` gegen Aufblitzen). Wahl je Benutzer in `users.theme` (Migration), `PUT /api/me/theme`, `/api/me` liefert `theme`; das Gerät merkt sich die letzte Wahl in `localStorage.adminTheme`
+- `styles.css`: feste Hellfarben im App-Look durch Variablen ersetzt (hell unverändert), Block „DUNKELMODUS“ nur `@media screen`; Diagramme lesen `--chart-*`, Leaflet-Kacheln werden abgedunkelt
+
 ## [1.55.1] - 2026-11-23
 
 ### Behoben

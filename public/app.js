@@ -2594,6 +2594,89 @@
         try { localStorage.setItem('navCollapsed', on ? '1' : '0'); } catch (e) { /* ignore */ }
     });
 
+    // ---- Darstellung: Hell / Dunkel / Automatisch (je Benutzer gespeichert, Gerät merkt sich die letzte Wahl)
+    const THEME_KEY = 'adminTheme';
+    const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    let themePref = 'auto';
+    try { themePref = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) { /* ignore */ }
+
+    function isDarkTheme() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+
+    function applyTheme(pref) {
+        themePref = ['light', 'dark', 'auto'].includes(pref) ? pref : 'auto';
+        const dark = themePref === 'dark' || (themePref === 'auto' && !!(darkQuery && darkQuery.matches));
+        const changed = isDarkTheme() !== dark;
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        try { localStorage.setItem(THEME_KEY, themePref); } catch (e) { /* ignore */ }
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#161c25' : '#ffffff');
+        document.querySelectorAll('#theme-menu [data-theme-pref]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.themePref === themePref)));
+        if (changed) restyleCharts();
+    }
+
+    /** Farben für Chart.js aus den CSS-Variablen (hell oder dunkel) */
+    function chartColors() {
+        const cs = getComputedStyle(document.documentElement);
+        const v = (n, f) => (cs.getPropertyValue(n) || '').trim() || f;
+        return { text: v('--chart-text', '#6b7385'), grid: v('--chart-grid', '#e4e7ee'), bar: v('--chart-bar', '#2b62e3'), bar2: v('--chart-bar-2', '#c4b8a5') };
+    }
+    window.chartColors = chartColors;
+
+    function setChartDefaults() {
+        if (!window.Chart) return;
+        const c = chartColors();
+        Chart.defaults.color = c.text;
+        Chart.defaults.borderColor = c.grid;
+    }
+
+    // Bereits gezeichnete Diagramme an die neue Darstellung anpassen
+    function restyleCharts() {
+        if (!window.Chart) return;
+        setChartDefaults();
+        const c = chartColors();
+        [window.myRevenueChart, window.myReviewRevenueChart, window.myReviewChart].forEach(ch => {
+            if (!ch) return;
+            Object.values(ch.options.scales || {}).forEach(sc => {
+                if (sc.ticks) sc.ticks.color = c.text;
+                if (sc.grid) sc.grid.color = c.grid;
+                if (sc.border) sc.border.color = c.grid;
+                if (sc.title) sc.title.color = c.text;
+            });
+            if (ch.options.plugins && ch.options.plugins.legend && ch.options.plugins.legend.labels) ch.options.plugins.legend.labels.color = c.text;
+            ch.data.datasets.forEach((ds, i) => { ds.backgroundColor = i === 0 ? c.bar : c.bar2; });
+            ch.update('none');
+        });
+    }
+
+    applyTheme(themePref);
+    if (darkQuery) {
+        const onSystemChange = () => { if (themePref === 'auto') applyTheme('auto'); };
+        if (darkQuery.addEventListener) darkQuery.addEventListener('change', onSystemChange);
+        else if (darkQuery.addListener) darkQuery.addListener(onSystemChange);
+    }
+
+    (function initThemeSwitch() {
+        const btn = $('#theme-btn');
+        const menu = $('#theme-menu');
+        if (!btn || !menu) return;
+        const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = menu.hidden;
+            menu.hidden = !open;
+            btn.setAttribute('aria-expanded', String(open));
+        });
+        menu.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-theme-pref]');
+            if (!b) return;
+            applyTheme(b.dataset.themePref);
+            close();
+            fetch('/api/me/theme', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: themePref }) }).catch(() => { });
+        });
+        document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.theme-switch')) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) close(); });
+    })();
+
     // ---- Benutzername oben rechts
     async function loadTopbarUser() {
         try {
@@ -2602,6 +2685,8 @@
             const name = typeof u === 'string' ? u : (u && (u.username || u.name)) || '';
             const el = $('#topbar-user');
             if (el) el.textContent = name;
+            // Darstellung des Benutzers übernehmen (z. B. auf einem neuen Gerät)
+            if (u && typeof u === 'object' && u.theme && u.theme !== themePref) applyTheme(u.theme);
         } catch (e) { /* ignore */ }
     }
 
@@ -3843,8 +3928,7 @@
         if (window.myRevenueChart) window.myRevenueChart.destroy();
         // Schrift und Linien wie im restlichen Design
         Chart.defaults.font.family = "'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif";
-        Chart.defaults.color = '#675e52';
-        Chart.defaults.borderColor = '#e4dccf';
+        setChartDefaults();
         window.myRevenueChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -3857,13 +3941,13 @@
                     {
                         label: 'Umsatz',
                         data: revValues,
-                        backgroundColor: '#2b62e3',
+                        backgroundColor: chartColors().bar,
                         borderRadius: 1
                     },
                     {
                         label: 'Ausgaben',
                         data: expValues,
-                        backgroundColor: '#c4b8a5',
+                        backgroundColor: chartColors().bar2,
                         borderRadius: 1
                     }
                 ]
@@ -3961,8 +4045,9 @@
         const canvas = $('#reviewRevenueChart');
         if (!canvas || typeof Chart === 'undefined') return;
         if (window.myReviewRevenueChart) window.myReviewRevenueChart.destroy();
-        const datasets = [{ label: String(r.year), data: r.revenueByMonth, backgroundColor: '#2b62e3', borderRadius: 1 }];
-        if (r.previous && r.previous.revenueByMonth) datasets.push({ label: String(r.year - 1), data: r.previous.revenueByMonth, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        const datasets = [{ label: String(r.year), data: r.revenueByMonth, backgroundColor: chartColors().bar, borderRadius: 1 }];
+        if (r.previous && r.previous.revenueByMonth) datasets.push({ label: String(r.year - 1), data: r.previous.revenueByMonth, backgroundColor: chartColors().bar2, borderRadius: 1 });
+        setChartDefaults();
         window.myReviewRevenueChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: { labels: MONTHS_SHORT, datasets },
@@ -4038,8 +4123,9 @@
         const canvas = $('#reviewMonthsChart');
         if (!canvas || typeof Chart === 'undefined') return;
         if (window.myReviewChart) window.myReviewChart.destroy();
-        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: '#2b62e3', borderRadius: 1 }];
-        if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: chartColors().bar, borderRadius: 1 }];
+        if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: chartColors().bar2, borderRadius: 1 });
+        setChartDefaults();
         window.myReviewChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: { labels: MONTHS_SHORT, datasets },

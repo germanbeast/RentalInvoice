@@ -1797,11 +1797,19 @@ app.get('/api/me', (req, res) => {
     if (req.session && req.session.user && req.user) {
         res.json({
             authenticated: true,
-            user: { id: req.user.id, username: req.user.username, role: req.user.role, permissions: req.user.permissions }
+            user: { id: req.user.id, username: req.user.username, role: req.user.role, permissions: req.user.permissions, theme: req.user.theme || 'auto' }
         });
     } else {
         res.json({ authenticated: false });
     }
+});
+
+// Darstellung (Hell/Dunkel/Automatisch) des angemeldeten Benutzers
+app.put('/api/me/theme', (req, res) => {
+    if (!req.user) return res.status(401).json({ success: false });
+    const theme = String((req.body && req.body.theme) || '');
+    if (!db.setUserTheme(req.user.id, theme)) return res.status(400).json({ success: false, error: 'Ungültige Darstellung' });
+    res.json({ success: true, theme });
 });
 
 // Version Info

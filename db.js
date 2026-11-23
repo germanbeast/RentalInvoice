@@ -146,6 +146,10 @@ function initSchema() {
     if (!tableInfo.some(col => col.name === 'phone')) {
         db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''");
     }
+    if (!tableInfo.some(col => col.name === 'theme')) {
+        // Hell/Dunkel/Automatisch im Admin, je Benutzer
+        db.exec("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'auto'");
+    }
 
     // Migration: add status + updated_at to telegram_requests
     const tgReqInfo = db.prepare("PRAGMA table_info(telegram_requests)").all();
@@ -277,6 +281,13 @@ function getUser(username) {
 
 function getUserById(id) {
     return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id);
+}
+
+const THEMES = ['auto', 'light', 'dark'];
+function setUserTheme(id, theme) {
+    if (!THEMES.includes(theme)) return false;
+    getDb().prepare('UPDATE users SET theme = ? WHERE id = ?').run(theme, id);
+    return true;
 }
 
 function getAllUsers() {
@@ -1189,6 +1200,7 @@ module.exports = {
     // Users
     getUser,
     getUserById,
+    setUserTheme,
     getAllUsers,
     getUserByPhone,
     getUserByTelegramId,

@@ -76,7 +76,7 @@ function within(wanted, granter) {
 // ---------------------------------------------------------------------------
 const R = (methods, pattern, area, level) => ({ methods, pattern, area, level });
 const RULES = [
-    R('*', /^\/api\/(me|version|changelog|health|logout)$/, 'any'),
+    R('*', /^\/api\/(me|me\/theme|version|changelog|health|logout)$/, 'any'),
     R('*', /^\/api\/push\/(key|subscribe|unsubscribe|test)$/, 'any'),
     R('*', /^\/api\/push\/devices(\/|$)/, 'settings'),
 
@@ -166,7 +166,7 @@ function createGuard(db) {
             return req.session.destroy(() => res.status(401).json({ error: 'Benutzer existiert nicht mehr' }));
         }
         const perms = forUser(user);
-        req.user = { id: user.id, username: user.username, role: user.role, permissions: perms };
+        req.user = { id: user.id, username: user.username, role: user.role, permissions: perms, theme: user.theme || 'auto' };
         if (!su.id || su.username !== user.username || su.role !== user.role) {
             req.session.user = { id: user.id, username: user.username, role: user.role };
         }
