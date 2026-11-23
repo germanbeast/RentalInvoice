@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.53.0",
+    "currentVersion": "1.54.0",
     "releases": [
+        {
+            "version": "1.54.0",
+            "date": "2026-11-22",
+            "title": "Hintergrund-Video der Ferienwohnung auf Webseite, Meine Buchung und TV",
+            "features": [
+                "Unter Webseite → Inhalte → „Hintergrund-Video“ ein Video der Wohnung hochladen (auch große Handy-Videos bis 2 GB, der Upload läuft in Stücken)",
+                "Der Server kürzt es auf 60 Sekunden, entfernt den Ton, rechnet die Unschärfe ein und macht es klein (meist unter 2 MB), dazu ein Standbild",
+                "Das Video läuft stumm in Endlosschleife im Hintergrund der Startseite, von „Meine Buchung“ und des TV-Welcome-Screens; Unschärfe per Regler, jede Stelle einzeln abschaltbar",
+                "Auf Handys optional; bei „Bewegung reduzieren“, Datensparmodus oder langsamer Verbindung bleibt es beim Standbild. Außerhalb des Bildschirms pausiert das Video",
+                "TV-App 1.11: Video startet ohne Tastendruck"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.53.0",
             "date": "2026-11-22",

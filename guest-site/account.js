@@ -34,6 +34,11 @@
             $('#account-media').innerHTML = `<img src="${esc(d.photos[0])}" alt="">`;
             $('#app-hero-media').innerHTML = `<img src="${esc(d.photos[0])}" alt="">`;
         }
+        // Hintergrund-Video der Wohnung (bg-video.js): Anmeldeseite und Kopf der Gäste-App
+        if (d.video && d.video.account && window.bgVideo) {
+            window.bgVideo($('#account-media'), d.video.account, { poster: !d.photos.length });
+            window.bgVideo($('#app-hero-media'), d.video.account, { poster: !d.photos.length });
+        }
         $('#app-brand').textContent = d.title;
         $('#app-menu-title').textContent = d.title;
         if (d.contact && (d.contact.phone || d.contact.email)) {

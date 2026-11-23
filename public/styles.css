@@ -3643,3 +3643,13 @@ a.pill { text-decoration: none; }
 .ac-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .35rem; }
 .ac-note { font-size: .8rem; color: var(--text-muted); margin-top: .4rem; }
 .ac-empty { color: var(--text-muted); }
+
+/* Hintergrund-Video (Webseite → Bilder) */
+.site-video { position: relative; width: min(100%, 420px); aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-hover); background: var(--bg-secondary, #eee); }
+.site-video video, .site-video img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.site-video .site-video-empty { display: grid; place-items: center; height: 100%; font-size: .85rem; color: var(--text-muted); padding: 1rem; text-align: center; }
+.site-video .site-video-meta { position: absolute; left: 6px; bottom: 6px; font-size: .7rem; padding: 1px 6px; border-radius: 6px; background: rgba(31, 28, 24, .7); color: #fff; }
+.site-video-progress { margin-top: .6rem; width: min(100%, 420px); }
+.site-video-bar { height: 6px; border-radius: 3px; background: var(--border-hover); overflow: hidden; }
+.site-video-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.site-video-progress small { display: block; margin-top: .3rem; font-size: .78rem; color: var(--text-muted); }

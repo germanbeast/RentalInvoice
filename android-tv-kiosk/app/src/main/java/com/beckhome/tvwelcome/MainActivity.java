@@ -119,6 +119,8 @@ public class MainActivity extends Activity {
         webSettings.setBuiltInZoomControls(false);
         webSettings.setDisplayZoomControls(false);
         webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // Hintergrund-Video der Wohnung (stumm) soll ohne Tastendruck starten
+        webSettings.setMediaPlaybackRequiresUserGesture(false);
 
         // Set WebView client
         webView.setWebViewClient(new WebViewClient() {
