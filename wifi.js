@@ -516,6 +516,10 @@ function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, chatBu
             wifiPortal.setPowerOverride(mode);
             res.json({ success: true, ...adminState() });
         });
+        app.post('/api/site/wifi/portal/update', apiLimiter, (req, res) => {
+            wifiPortal.requestUpdateNow();
+            res.json({ success: true, ...adminState() });
+        });
         app.delete('/api/site/wifi/portal/device/:id', apiLimiter, (req, res) => {
             wifiPortal.removeDevice(parseInt(req.params.id, 10));
             res.json({ success: true, ...adminState() });

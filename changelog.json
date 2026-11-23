@@ -13,6 +13,15 @@
             "fixes": []
         },
         {
+            "version": "1.53.0",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router aktualisiert sich selbst",
+            "features": [
+                "Der WLAN-Router holt sich neue Versionen seines Einrichtungs-Skripts selbst vom Server: nachts zwischen 3 und 5 Uhr oder sobald kein Gast online ist. Unter Webseite → WLAN steht, ob er aktuell ist, mit Knopf „Jetzt aktualisieren“. Einmalig muss der Einrichtungsbefehl noch von Hand laufen"
+            ],
+            "fixes": []
+        },
+        {
             "version": "1.51.0",
             "date": "2026-11-22",
             "title": "Gäste-WLAN: Codes per Telegram, Geräte rauswerfen, WLAN auf dem Ausdruck",
