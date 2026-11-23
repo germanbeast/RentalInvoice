@@ -155,10 +155,18 @@
         .wifi-qr { width: 6.4rem; height: 6.4rem; background: #fff; border-radius: 3px; padding: .3rem; }
         .wifi-qr svg { display: block; width: 100%; height: 100%; }
         .wifi-qr + div small.scan { color: var(--accent); font-size: .9rem; }
+        /* Hintergrund-Video der Wohnung (Admin → Webseite → Bilder), abgedunkelt, damit alles lesbar bleibt */
+        .tv-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .tv-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(31, 28, 24, .55) 0%, rgba(31, 28, 24, .42) 40%, rgba(31, 28, 24, .78) 100%); }
+        .tv { position: relative; z-index: 1; }
+        body.has-video .panel { background: rgba(43, 38, 33, .78); }
+        body.has-video .app-btn:not(:focus):not(:hover) { background: rgba(42, 37, 32, .82); }
+        body.has-video .tv-name, body.has-video .tv-time { text-shadow: 0 .1rem 1.6rem rgba(0, 0, 0, .35); }
         [hidden] { display: none !important; }
     </style>
 </head>
 <body>
+    <div class="tv-bg" id="tv-bg" hidden></div>
     <div class="tv">
         <header class="tv-top">
             <div class="tv-brand" id="welcome-logo">Ferienwohnung Beckhome</div>
@@ -223,6 +231,7 @@
 
     <script src="/live-icons.js"></script>
     <script src="/guest-i18n.js"></script>
+    <script src="/bg-video.js"></script>
     <script>
         const $ = id => document.getElementById(id);
         const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -292,6 +301,7 @@
                 if (!has(checkin) && d.checkinTime) $('welcome-checkin').textContent = T('ab {t} Uhr', { t: d.checkinTime });
                 if (!has(checkout) && d.checkoutTime) $('welcome-checkout').textContent = T('bis {t} Uhr', { t: d.checkoutTime });
                 if (d.title) $('welcome-logo').textContent = d.title;
+                showVideo(d.video);
                 // WLAN of the current guest (own password with the FRITZ!Box) with QR code; URL parameters win
                 if (!has(wifiName) && !has(wifiPass)) {
                     const w = d.wifi;
@@ -303,6 +313,19 @@
                 }
             } catch (e) { /* offline: keep what is shown */ }
         }
+        // Hintergrund-Video: nur neu aufbauen, wenn im Admin ein anderes Video hochgeladen oder es abgeschaltet wurde
+        let videoUrl = '';
+        function showVideo(v) {
+            const url = (v && v.url) || '';
+            if (url === videoUrl) return;
+            videoUrl = url;
+            const bg = $('tv-bg');
+            bg.innerHTML = '';
+            bg.hidden = !url;
+            document.body.classList.toggle('has-video', !!url);
+            if (url && window.bgVideo) window.bgVideo(bg, v);
+        }
+
         loadFromServer();
         setInterval(loadFromServer, 10 * 60 * 1000);
 

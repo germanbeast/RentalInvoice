@@ -14,7 +14,7 @@ echo "🚀 Starte All-in-One Setup für RentalInvoice..."
 # 1. System-Updates & Basis-Abhängigkeiten
 echo "📦 Aktualisiere Systempakete & installiere Abhängigkeiten..."
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl build-essential python3
+sudo apt install -y git curl build-essential python3 ffmpeg
 
 # 2. Projekt herunterladen (falls noch nicht vorhanden)
 if [ -f "package.json" ]; then
