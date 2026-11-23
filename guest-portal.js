@@ -66,7 +66,7 @@ const RATING_PLATFORMS = { booking: { name: 'Booking.com', max: 10 }, airbnb: { 
 const MAX_REVIEWS = 40;
 const MAX_TIPS = 24;
 
-function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multer, notify, chatButton, arrivalFor, wifiFor, createNukiPin, deleteNukiPin, onNewBooking, berlinToday, addDays, nightsBetween, formatDateDE }) {
+function createGuestPortal({ videoFor, express, rateLimit, db, botLogic, nodemailer, multer, notify, chatButton, arrivalFor, wifiFor, createNukiPin, deleteNukiPin, onNewBooking, berlinToday, addDays, nightsBetween, formatDateDE }) {
     if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
     const sql = () => db.getDb();
@@ -451,6 +451,7 @@ function createGuestPortal({ express, rateLimit, db, botLogic, nodemailer, multe
             reviews: (s.reviews || []).map(r => ({ ...r, platformName: (RATING_PLATFORMS[r.platform] || { name: 'Direkt' }).name })),
             address: s.address || '', showMap: s.show_map !== false && !!s.address, directions: s.directions || '',
             tips: s.tips || [],
+            video: videoFor ? { site: videoFor('site'), account: videoFor('account') } : null,
             today: berlinToday()
         });
     });

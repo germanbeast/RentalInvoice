@@ -628,6 +628,24 @@
                         <div class="site-photos" id="site-photos"></div>
                         <label class="btn-mini" style="display:inline-block;margin-top:.5rem">+ Bild hochladen<input type="file" id="site-photo-input" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
                     </div>
+                    <div class="card site-card" id="site-video-card">
+                        <div class="today-title">Hintergrund-Video</div>
+                        <p class="text-muted" style="font-size:.85rem">Ein kurzes Video der Wohnung läuft stumm und leicht unscharf im Hintergrund: auf der Startseite, auf „Meine Buchung“ und auf dem Fernseher. Einfach das Handy-Video hochladen (auch groß, bis 2 GB). Der Server kürzt es auf 60 Sekunden, entfernt den Ton und macht es klein, damit es auch auf Handys schnell lädt. Am besten quer filmen, ruhig schwenken, 15–40 Sekunden.</p>
+                        <div class="site-video" id="site-video-preview"></div>
+                        <div class="site-video-progress" id="site-video-progress" hidden><div class="site-video-bar"><span id="site-video-bar"></span></div><small id="site-video-step"></small></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
+                            <label class="btn-mini" style="display:inline-block" id="site-video-pick">Video hochladen<input type="file" id="site-video-input" accept="video/*" hidden></label>
+                            <button type="button" class="btn-mini" id="site-video-del" hidden>Entfernen</button>
+                        </div>
+                        <div id="site-video-opts" hidden>
+                            <div class="form-group" style="margin-top:1rem"><label for="site-video-blur">Unschärfe <small id="site-video-blur-val"></small> <small class="text-muted">(0 = scharf, 6 = leicht, 20 = stark)</small></label><input type="range" id="site-video-blur" min="0" max="20" step="1" style="width:min(100%,420px)"></div>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-on-site"> Startseite der Webseite</label>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-on-account"> Meine Buchung (Gäste-App)</label>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-on-tv"> Fernseher (TV-Box)</label>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-phones"> Auch auf Handys abspielen <small class="text-muted">(sonst nur das Standbild, spart Datenvolumen)</small></label>
+                            <p class="text-muted" style="font-size:.8rem;margin-top:.4rem">Bei „Bewegung reduzieren“, im Datensparmodus oder bei langsamer Verbindung zeigen die Seiten immer nur das Standbild.</p>
+                        </div>
+                    </div>
                     <div class="card site-card">
                         <div class="today-title">Grundriss</div>
                         <p class="text-muted" style="font-size:.85rem">Erscheint als Knopf „Grundriss“ unter den Fotos und öffnet sich im Vollbild. Am besten ein Bild mit hellem Hintergrund (JPEG, PNG, WebP, max. 8 MB).</p>
@@ -772,6 +790,7 @@
                     <div class="card site-card" id="wifi-portal-card" hidden>
                         <div class="today-title">Router mit Anmeldeseite</div>
                         <div id="wifi-portal-status" class="wifi-status"></div>
+                        <div id="wifi-portal-update" class="wifi-status" hidden></div>
                         <div class="form-row">
                             <div class="form-group"><label for="wifi-portal-ssid">WLAN-Name</label><input type="text" id="wifi-portal-ssid" maxlength="32" autocomplete="off" spellcheck="false"></div>
                             <div class="form-group"><label for="wifi-portal-wpa">WLAN-Passwort <small>(leer = offenes WLAN, mind. 8 Zeichen)</small></label><input type="text" id="wifi-portal-wpa" maxlength="63" autocomplete="off" spellcheck="false" placeholder="ohne Passwort"></div>
@@ -2652,11 +2671,38 @@
                                         <p class="text-muted" id="tvbox-cmd-state" style="font-size:.85rem; margin-top:.75rem"></p>
                                     </div>
                                 </div>
+
+                                <h3 style="margin-top: 2rem;">Abreisetag &amp; Handtücher</h3>
+                                <p class="text-muted">Am Abreisetag zeigt der Fernseher bis eine halbe Stunde nach dem Check-out „Danke, &lt;Name&gt;“, die Check-out-Zeit und deine Hinweise, in der Sprache des Gastes. Die vorgegebenen Hinweise werden automatisch übersetzt, eigene erscheinen so, wie du sie schreibst. Der Knopf „Neue Handtücher“ sitzt dezent rechts unten. Nach einer Rückfrage auf dem Fernseher bekommst du eine Nachricht per Telegram (höchstens alle 30 Minuten pro Buchung).</p>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="tvguest-farewell"> Abschiedsgruß am Abreisetag zeigen
+                                        </label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tvguest-hints">Hinweise zum Check-out (einer pro Zeile, höchstens 8)</label>
+                                        <textarea id="tvguest-hints" rows="7"></textarea>
+                                        <button type="button" id="btn-tvguest-defaults" class="btn btn-ghost btn-sm" style="margin-top:.4rem">Vorgaben wiederherstellen</button>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tvguest-message">Eigener Abschiedstext (leer = „Schön, dass Sie bei uns waren …“, übersetzt)</label>
+                                        <input type="text" id="tvguest-message" maxlength="200">
+                                    </div>
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="tvguest-towels"> Knopf „Neue Handtücher“ auf dem Fernseher zeigen
+                                        </label>
+                                    </div>
+                                    <button type="button" id="btn-tvguest-save" class="btn btn-primary">Speichern</button>
+                                    <h4 style="margin-top:1.5rem">Letzte Handtuch-Anfragen</h4>
+                                    <ul id="tvguest-requests" class="text-muted" style="margin:0; padding-left:1.1rem; font-size:.9rem"></ul>
+                                </div>
                             </section>
 
                             <section id="settings-printer" class="settings-page">
                                 <h2>Drucker</h2>
-                                <p class="text-muted">Bei jeder neuen Buchung kommt automatisch ein Buchungsblatt aus deinem Drucker (Gast, Zeitraum, Personen, Kontakt, Preis, Türcode). Der Server kann den Drucker in der Wohnung nicht direkt erreichen, deshalb druckt die gekoppelte TV-Box im Hintergrund: Sie holt neue Aufträge jede Minute ab und schickt sie übers WLAN an den Drucker. Der Fernseher zeigt davon nichts. Ist die Box aus, wird gedruckt, sobald sie wieder läuft.</p>
+                                <p class="text-muted">Bei jeder neuen Buchung kommt automatisch ein Buchungsblatt aus deinem Drucker (Gast, Zeitraum, Personen, Kontakt, Preis, Türcode). Der Server kann den Drucker in der Wohnung nicht direkt erreichen, deshalb druckt die gekoppelte TV-Box im Hintergrund: Sie holt neue Aufträge jede Minute ab und schickt sie übers WLAN an den Drucker. Der Fernseher zeigt davon nichts. Ist die Box aus, wird gedruckt, sobald sie wieder läuft. Buchungen von Booking.com und Airbnb werden erst gedruckt, wenn du per Telegram den Namen oder den Buchungs-Screenshot geschickt hast. Nach jedem Druck bekommst du eine Telegram-Nachricht, ist der Drucker aus, versucht die Box es etwa 9 Stunden lang weiter.</p>
                                 <div class="card" style="margin-top: 1.5rem;">
                                     <div class="form-group">
                                         <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">

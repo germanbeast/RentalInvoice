@@ -2661,6 +2661,7 @@
             if (!d.success) return;
             siteData = d.site;
             fillSiteForm(d);
+            loadSiteVideo();
         } catch (e) { showToast('Webseiten-Einstellungen konnten nicht geladen werden', 'error'); }
     }
 
@@ -2731,6 +2732,128 @@
             } catch (x) { showToast('Upload fehlgeschlagen', 'error'); }
         }
         e.target.value = '';
+    });
+
+    // Background video of the apartment (site-video.js): chunked upload, server converts it with ffmpeg
+    let siteVideo = null;
+    let siteVideoTimer = null;
+    const mb = n => `${(n / 1048576).toLocaleString('de-DE', { maximumFractionDigits: n < 10485760 ? 1 : 0 })} MB`;
+
+    function videoProgress(pct, text) {
+        const box = $('#site-video-progress');
+        box.hidden = pct == null;
+        if (pct == null) return;
+        $('#site-video-bar').style.width = `${Math.max(2, Math.min(100, pct))}%`;
+        $('#site-video-step').textContent = text || '';
+    }
+
+    function renderSiteVideo(d) {
+        siteVideo = d;
+        const v = d.video || {};
+        const job = d.job;
+        const busy = job && job.state === 'processing';
+        const prev = $('#site-video-preview');
+        const cur = prev.dataset.url || '';
+        if (v.url !== cur) {
+            prev.dataset.url = v.url || '';
+            prev.innerHTML = v.url
+                ? `<video src="${escapeHtml(v.url)}" ${v.posterUrl ? `poster="${escapeHtml(v.posterUrl)}"` : ''} muted loop autoplay playsinline style="${v.baked ? '' : `filter:blur(${Number(v.blur) || 0}px);transform:scale(1.08)`}"></video>`
+                + `<span class="site-video-meta">${[v.duration ? `${v.duration} s` : '', v.size ? mb(v.size) : ''].filter(Boolean).join(' · ')}</span>`
+                : '<div class="site-video-empty">Noch kein Video. Ohne Video zeigen die Seiten wie bisher das Titelbild.</div>';
+            const vid = prev.querySelector('video');
+            if (vid) { vid.muted = true; vid.play().catch(() => { }); }
+        }
+        $('#site-video-del').hidden = !v.url || busy;
+        $('#site-video-opts').hidden = !v.url;
+        $('#site-video-pick').style.display = busy ? 'none' : 'inline-block';
+        $('#site-video-pick').firstChild.textContent = v.url ? 'Anderes Video hochladen' : 'Video hochladen';
+        $('#site-video-blur').value = v.blur;
+        $('#site-video-blur-val').textContent = `(${Number(v.blur) ? v.blur : 'aus'})`;
+        $('#site-video-blur').disabled = !!busy;
+        $('#site-video-on-site').checked = !!v.on_site;
+        $('#site-video-on-account').checked = !!v.on_account;
+        $('#site-video-on-tv').checked = !!v.on_tv;
+        $('#site-video-phones').checked = !!v.phones;
+        clearTimeout(siteVideoTimer);
+        if (busy) {
+            const steps = { master: 'Video wird umgewandelt', blur: 'Unschärfe wird eingerechnet', poster: 'Standbild wird erstellt' };
+            videoProgress(job.progress || 1, `${steps[job.step] || 'Wird verarbeitet'} … ${job.progress || 0} %. Du kannst die Seite verlassen.`);
+            siteVideoTimer = setTimeout(loadSiteVideo, 1500);
+        } else if (job && job.state === 'error') {
+            videoProgress(null);
+            if (!renderSiteVideo.shownError || renderSiteVideo.shownError !== job.error) showToast(`Video: ${job.error}`, 'error', 8000);
+            renderSiteVideo.shownError = job.error;
+        } else {
+            videoProgress(null);
+            renderSiteVideo.shownError = '';
+        }
+        if (!d.ffmpeg) $('#site-video-step').textContent = 'Hinweis: Auf dem Server fehlt ffmpeg. Dann geht nur eine fertige MP4-Datei (max. ~50 MB), die Unschärfe macht der Browser.';
+    }
+
+    async function loadSiteVideo() {
+        try {
+            const d = await apiJson('/api/site/video');
+            if (d && d.success) renderSiteVideo(d);
+        } catch (e) { /* ignore */ }
+    }
+
+    async function uploadSiteVideo(file) {
+        const json = (url, body) => apiJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const start = await json('/api/site/video/start', { name: file.name, size: file.size });
+        if (!start || !start.success) { showToast((start && start.error) || 'Upload fehlgeschlagen', 'error'); return; }
+        $('#site-video-pick').style.display = 'none';
+        const size = start.chunkSize || 8388608;
+        let offset = 0;
+        try {
+            while (offset < file.size) {
+                const part = file.slice(offset, offset + size);
+                let res = null;
+                for (let attempt = 0; attempt < 4; attempt++) {
+                    try {
+                        res = await fetch(`/api/site/video/chunk/${start.id}?offset=${offset}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: part });
+                        if (res.ok || res.status === 409 || res.status === 404) break;
+                    } catch (e) { res = null; }
+                    await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+                }
+                const d = res ? await res.json().catch(() => null) : null;
+                if (res && res.status === 409 && d && typeof d.size === 'number') { offset = d.size; continue; }
+                if (!d || !d.success) throw new Error((d && d.error) || 'Verbindung unterbrochen');
+                offset = d.size;
+                videoProgress(offset / file.size * 100, `Hochladen … ${mb(offset)} von ${mb(file.size)}`);
+            }
+            const fin = await apiJson(`/api/site/video/finish/${start.id}`, { method: 'POST' });
+            if (!fin || !fin.success) throw new Error((fin && fin.error) || 'Upload fehlgeschlagen');
+            renderSiteVideo(fin);
+        } catch (e) {
+            showToast(`Video-Upload: ${e.message}`, 'error', 8000);
+            loadSiteVideo();
+        }
+    }
+
+    $('#site-video-input').addEventListener('change', e => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (file) uploadSiteVideo(file);
+    });
+
+    async function saveSiteVideo() {
+        const body = {
+            blur: Number($('#site-video-blur').value),
+            on_site: $('#site-video-on-site').checked, on_account: $('#site-video-on-account').checked,
+            on_tv: $('#site-video-on-tv').checked, phones: $('#site-video-phones').checked
+        };
+        const d = await apiJson('/api/site/video', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (d && d.success) { renderSiteVideo(d); showToast('Video-Einstellungen gespeichert', 'success'); }
+        else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
+    }
+    ['#site-video-on-site', '#site-video-on-account', '#site-video-on-tv', '#site-video-phones', '#site-video-blur'].forEach(sel => $(sel).addEventListener('change', saveSiteVideo));
+    $('#site-video-blur').addEventListener('input', e => { $('#site-video-blur-val').textContent = `(${Number(e.target.value) ? e.target.value : 'aus'})`; });
+
+    $('#site-video-del').addEventListener('click', async () => {
+        if (!confirm('Hintergrund-Video entfernen? Die Seiten zeigen dann wieder das Titelbild.')) return;
+        const d = await apiJson('/api/site/video', { method: 'DELETE' });
+        if (d && d.success) renderSiteVideo(d);
+        else showToast((d && d.error) || 'Aktion fehlgeschlagen', 'error');
     });
 
     // Floor plan, reviews, location and excursion tips
@@ -3303,6 +3426,11 @@
         if (ps.command) { cmd.textContent = ps.command; cmd.classList.remove('empty'); }
         else { cmd.textContent = ps.publicUrlProblem || 'Erscheint nach dem Speichern.'; cmd.classList.add('empty'); }
         $('#wifi-portal-copy').disabled = !ps.command;
+        const up = ps.update || {}, upEl = $('#wifi-portal-update');
+        upEl.hidden = !(r.lastSeen && up.current);
+        if (!up.router) upEl.innerHTML = '<span class="wifi-dot warn"></span>Automatische Updates sind auf dem Router noch nicht eingerichtet. Einmal den Einrichtungs-Befehl unten auf dem Router ausführen, danach aktualisiert er sich selbst.';
+        else if (up.upToDate) upEl.innerHTML = '<span class="wifi-dot ok"></span>Router-Skript ist aktuell. Neue Versionen holt sich der Router selbst.';
+        else upEl.innerHTML = `<span class="wifi-dot warn"></span>${up.now ? 'Update angefordert, der Router holt es sich in den nächsten Minuten.' : 'Neue Version für den Router liegt bereit. Er holt sie nachts zwischen 3 und 5 Uhr oder sobald kein Gast online ist.'} ${up.now ? '' : '<button type="button" class="btn-mini" id="wifi-portal-update-now">Jetzt aktualisieren</button>'}`;
         fillWifiPower(ps.power, ps.stats);
         fillWifiStats(ps.stats);
         const list = ps.devices || [];
@@ -3443,6 +3571,16 @@
             if (d.config) fillWifi(d);
             showToast(d.success ? (portal ? `Neuer Code: ${d.code}` : (d.applied ? 'Neues Passwort, FRITZ!Box umgestellt' : 'Neues Passwort erzeugt')) : (d.error || 'Fehlgeschlagen'), d.success ? 'success' : 'error');
         } catch (err) { showToast('Fehlgeschlagen', 'error'); } finally { btn.disabled = false; }
+    });
+
+    $('#wifi-portal-update').addEventListener('click', async e => {
+        if (!e.target.closest('#wifi-portal-update-now')) return;
+        if (!confirm('Router jetzt aktualisieren? Das WLAN ist dabei etwa eine Minute weg. Bekannte Geräte kommen danach ohne Code wieder rein, die Anmeldeseite kann kurz aufgehen.')) return;
+        try {
+            const d = await apiJson('/api/site/wifi/portal/update', { method: 'POST' });
+            if (d.config) fillWifi(d);
+            showToast('Update angefordert, der Router holt es sich innerhalb von 2 Minuten', 'success');
+        } catch (err) { showToast('Fehlgeschlagen', 'error'); }
     });
 
     $('#wifi-portal-copy').addEventListener('click', async () => {
@@ -4480,7 +4618,7 @@
 
                 if (targetId === 'settings-push') loadPushSettings();
                 if (targetId === 'settings-users') loadUsers();
-                if (targetId === 'settings-tvbox') loadTvbox();
+                if (targetId === 'settings-tvbox') { loadTvbox(); loadTvGuest(); }
                 if (targetId === 'settings-printer') loadPrinter();
 
                 // Toggle larger modal for designer
@@ -5741,8 +5879,35 @@
     }));
     if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
 
+    // TV: farewell on departure day + towel button (tv-guest.js)
+    let tvGuestDefaults = [];
+    async function loadTvGuest() {
+        const d = await apiJson('/api/settings/tv-guest').catch(() => null);
+        if (!d || !d.success) return;
+        tvGuestDefaults = d.defaults || [];
+        $('#tvguest-farewell').checked = d.config.farewell !== false;
+        $('#tvguest-towels').checked = d.config.towels !== false;
+        $('#tvguest-hints').value = (d.config.hints || []).join('\n');
+        $('#tvguest-message').value = d.config.message || '';
+        const fmt = ts => new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const list = $('#tvguest-requests');
+        list.innerHTML = (d.requests || []).length
+            ? d.requests.map(r => `<li>${escapeHtml(fmt(r.at))} Uhr: ${escapeHtml(r.name || 'Gast')}${r.stay ? ' (' + escapeHtml(r.stay) + ')' : ''}${r.preview ? ' · Test aus der Vorschau' : ''}${r.sent ? '' : ' · Nachricht nicht zugestellt'}</li>`).join('')
+            : '<li style="list-style:none; margin-left:-1.1rem">Noch keine Anfragen.</li>';
+    }
+    if ($('#btn-tvguest-defaults')) $('#btn-tvguest-defaults').addEventListener('click', () => { $('#tvguest-hints').value = tvGuestDefaults.join('\n'); });
+    if ($('#btn-tvguest-save')) $('#btn-tvguest-save').addEventListener('click', async () => {
+        const body = {
+            farewell: $('#tvguest-farewell').checked,
+            towels: $('#tvguest-towels').checked,
+            hints: $('#tvguest-hints').value,
+            message: $('#tvguest-message').value
+        };
+        if (await tvboxPost('/api/settings/tv-guest', body, 'PUT')) { showToast('Gespeichert, der Fernseher zeigt es spätestens nach 10 Minuten', 'success'); loadTvGuest(); }
+    });
+
     // Drucker: new bookings are printed by the TV box in the apartment's network (print-jobs.js)
-    const PRINT_STATUS = { pending: 'wartet auf die Box', sent: 'wird gedruckt …', printed: 'gedruckt ✓', failed: 'fehlgeschlagen' };
+    const PRINT_STATUS = { waiting: 'wartet auf Name/Screenshot per Telegram', pending: 'wartet auf die Box', sent: 'wird gedruckt …', printed: 'gedruckt ✓', failed: 'fehlgeschlagen' };
     async function loadPrinter() {
         const d = await apiJson('/api/settings/printer').catch(() => null);
         if (!d || !d.success) { $('#printer-box-state').textContent = 'Konnte die Einstellungen nicht laden.'; return; }
@@ -5779,8 +5944,8 @@
         $('#printer-jobs').innerHTML = !jobs.length ? 'Noch nichts gedruckt.' : jobs.map(j => `
             <div class="info-row" style="align-items:center">
                 <span>${escapeHtml(j.title || 'Druck')} <small class="text-muted">(${fmtT(j.created_at)})</small></span>
-                <strong>${PRINT_STATUS[j.status] || escapeHtml(j.status)}${j.error && j.status !== 'printed' ? ` <small class="text-muted">${escapeHtml(j.error)}</small>` : ''}
-                ${j.status === 'failed' || j.status === 'printed' ? ` <button type="button" class="btn btn-ghost btn-sm" data-printer-retry="${j.id}">${j.status === 'failed' ? 'Erneut versuchen' : 'Nochmal drucken'}</button>` : ''}</strong>
+                <strong>${PRINT_STATUS[j.status] || escapeHtml(j.status)}${j.error && j.status !== 'printed' ? ` <small class="text-muted">(Versuch ${j.attempts})</small>` : ''}${j.error && j.status !== 'printed' ? ` <small class="text-muted">${escapeHtml(j.error)}</small>` : ''}
+                ${['failed', 'printed', 'waiting'].includes(j.status) ? ` <button type="button" class="btn btn-ghost btn-sm" data-printer-retry="${j.id}">${j.status === 'failed' ? 'Erneut versuchen' : j.status === 'waiting' ? 'Jetzt drucken' : 'Nochmal drucken'}</button>` : ''}</strong>
             </div>`).join('');
         $('#printer-jobs').querySelectorAll('[data-printer-retry]').forEach(b => b.addEventListener('click', async () => {
             const r = await apiJson(`/api/settings/printer/jobs/${b.dataset.printerRetry}/retry`, { method: 'POST' }).catch(() => null);

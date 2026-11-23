@@ -701,14 +701,16 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
                 console.warn('⚠️ Auto-Nuki PIN fehlgeschlagen:', ne.message);
             }
 
-            const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}`;
+            // the booking sheet waits until name / screenshot are in, so it prints with the right data
+            const printWaits = !!printJobs.queueBooking(result.id, 'portal');
+            const printMsg = printWaits ? '\n🖨️ Ausdruck folgt, sobald du den Namen oder den Buchungs-Screenshot schickst.' : '';
+            const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}${printMsg}`;
             // Calendars rarely contain the guest name -> offer to add it right from the Telegram message
             const tgKeyboard = needsName
                 ? { inline_keyboard: [[{ text: '👤 Namen eintragen', callback_data: `nm:${result.id}` }]] }
-                : undefined;
+                : printWaits ? { inline_keyboard: [[{ text: '📇 Anschrift / Screenshot', callback_data: `adr:${result.id}` }]] } : undefined;
             const sent = await sendToAllRecipients(msg, { tgKeyboard, type: 'new_booking' });
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
-            printJobs.queueBooking(result.id, 'portal');
             await sendGuestMessageToTelegram(result.id);
         }
     }
@@ -1352,8 +1354,21 @@ const printJobs = require('./print-jobs')({
     wifiFor: (bookingId) => guestWifi.printView(bookingId)
 });
 printJobs.registerBoxRoutes(app, { authorized: tvboxDeviceAuthorized, limiter: apiLimiter });
+// Portal bookings print once the name / Telegram screenshot is in (applyGuestName, address dialog)
+require('./bot-logic').onGuestData((bookingId) => printJobs.releaseBooking(bookingId));
 cron.schedule('*/15 * * * *', () => {
     printJobs.checkStale().catch(e => console.error('Druck-Prüfung:', e.message));
+});
+
+// Farewell on departure day + towel button on the TV, see tv-guest.js
+const tvGuest = require('./tv-guest')({
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg, { type });
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+        return sent;
+    },
+    berlinToday: () => berlinToday(),
+    formatDateDE: (d) => formatDateDE(d)
 });
 
 // Public, minimal data for the TV welcome screen (no door codes, no invoices). The guest WLAN only while a guest stays
@@ -1363,22 +1378,22 @@ function welcomeData() {
     const s = db.getAllSettings();
     const today = berlinToday();
     const mode = ['first', 'full', 'none'].includes(s.welcome_name_mode) ? s.welcome_name_mode : 'first';
-    const current = loadBookingRows()
-        .filter(r => r.checkin <= today && r.checkout >= today && r.state !== 'past')
-        .sort((a, b) => (a.checkout === today) - (b.checkout === today) || a.checkin.localeCompare(b.checkin))[0];
+    const current = tvGuest.pickCurrent(loadBookingRows(), s.site && s.site.checkout_time);
     let name = '';
     if (current && current.name && mode !== 'none') {
         const parts = current.name.trim().split(/\s+/);
         name = mode === 'full' ? current.name : parts[0];
     }
     return {
+        ...tvGuest.welcomeExtras(current), // farewell on departure day, towel button (tv-guest.js)
         success: true, today,
         guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
         phone: (s.vermieter && s.vermieter.telefon) || '',
         checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
         title: (s.site && s.site.title) || '',
         wifi: current ? guestWifi.tvView() : null,
-        lang: current ? guestLang.langOrDe(current) : 'de'
+        lang: current ? guestLang.langOrDe(current) : 'de',
+        video: siteVideo.publicInfo('tv')
     };
 }
 
@@ -1390,6 +1405,15 @@ app.get('/api/welcome', (req, res) => {
     } catch (e) {
         res.status(500).json({ success: false });
     }
+});
+
+// "Neue Handtücher" on the TV (see tv-guest.js): paired box or admin preview, at most every 30 min per booking
+const towelLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
+tvGuest.registerRoutes(app, {
+    allowed: tvboxViewAllowed,
+    isAdmin: req => !!(req.session && req.session.user) && !tvboxDeviceAuthorized(req),
+    current: () => { const s = db.getAllSettings(); return tvGuest.pickCurrent(loadBookingRows(), s.site && s.site.checkout_time); },
+    limiter: towelLimiter
 });
 
 // Live tips (weather, events, opening hours) for the TV welcome screen and "Meine Buchung", see local-live.js.
@@ -1431,8 +1455,15 @@ const guestWifi = require('./wifi')({
     addDays: (ymd, n) => addDays(ymd, n),
     formatDateDE: (d) => formatDateDE(d)
 });
+// Background video of the apartment (muted loop, slightly blurred) for the guest pages and the TV, see site-video.js.
+// Served before the guest-domain rewrite, so the TV box gets it on the guest host too.
+const siteVideo = require('./site-video')({ db, express });
+app.get('/hintergrund-video/:file', siteVideo.serveFile);
+app.get('/bg-video.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'bg-video.js')); });
+
 // Public guest website (description, availability, booking requests, guest login + status)
 const guestPortal = require('./guest-portal')({
+    videoFor: (where) => siteVideo.publicInfo(where),
     express, rateLimit, db, nodemailer, multer,
     botLogic: require('./bot-logic'),
     notify: async (msg, type) => {
@@ -1986,6 +2017,7 @@ function loadBookingRows() {
 
 // Guest website admin: settings, photos, booking requests
 guestPortal.registerAdminRoutes(app, apiLimiter);
+siteVideo.registerAdminRoutes(app, apiLimiter);
 guestChat.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
 meldeschein.registerAdminRoutes(app, apiLimiter);
@@ -2539,6 +2571,8 @@ async function tvboxLatest() {
         published: apk.updated_at || rel.published_at || null
     };
 }
+
+tvGuest.registerAdminRoutes(app, apiLimiter); // Abreisetag & Handtücher (Settings → TV-Box)
 
 app.get('/api/settings/tvbox', apiLimiter, async (req, res) => {
     let latest = null, error = null;

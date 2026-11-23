@@ -327,7 +327,12 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         if (action === 'custom' && /^stats1\b/.test(decoded)) {
             const clients = processStats(decoded);
             const kick = kicksFor(clients);
-            return res.send(`ack wifi=${powerState().on ? 'on' : 'off'}${kick.length ? ` kick=${kick.join(',')}` : ''}`);
+            const up = updateState();
+            if (up.upToDate && (db.getSetting('guest_wifi_state') || {}).portal_update_now) {
+                db.setSetting('guest_wifi_state', { ...(db.getSetting('guest_wifi_state') || {}), portal_update_now: null });
+                up.now = false;
+            }
+            return res.send(`ack wifi=${powerState().on ? 'on' : 'off'}${kick.length ? ` kick=${kick.join(',')}` : ''}${up.current ? ` setup=${up.current}` : ''}${up.now ? ' now=1' : ''}`);
         }
         if (action === 'deauthed' || action === 'custom') return res.send('ack');
         if (action === 'clear') { queues.delete(gw); return res.send(''); }
@@ -375,11 +380,12 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
             }
         });
         tx();
-        liveStats = { at: now.getTime(), wifiOn: field('wifi') !== '0', uptime: parseInt(field('up'), 10) || 0, clients };
+        const ver = /^[0-9a-f]{12}$/.test(field('ver')) ? field('ver') : '';
+        liveStats = { at: now.getTime(), wifiOn: field('wifi') !== '0', uptime: parseInt(field('up'), 10) || 0, clients, ver };
         const st = db.getSetting('guest_wifi_state') || {};
         const prevStats = st.portal_stats || {};
-        if (!prevStats.at || now.getTime() - prevStats.at > 10 * 60 * 1000 || prevStats.wifiOn !== liveStats.wifiOn) {
-            db.setSetting('guest_wifi_state', { ...st, portal_stats: { at: liveStats.at, wifiOn: liveStats.wifiOn } });
+        if (!prevStats.at || now.getTime() - prevStats.at > 10 * 60 * 1000 || prevStats.wifiOn !== liveStats.wifiOn || (ver && st.portal_router_ver !== ver)) {
+            db.setSetting('guest_wifi_state', { ...st, portal_stats: { at: liveStats.at, wifiOn: liveStats.wifiOn }, ...(ver ? { portal_router_ver: ver } : {}) });
         }
         return clients;
     }
@@ -712,9 +718,33 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
             `FASPATH=${shq(t.path)}`,
             `GWNAME=${shq(c.gateway)}`,
             `MAXCLIENTS=${shq(Math.max(10, c.max_devices * 4))}`,
+            `SETUPURL=${shq(`${t.url}/setup.sh?k=${c.setup_token}`)}`,
             ''
         ];
-        return lines.join('\n') + SETUP_BODY;
+        // Version = hash of everything except the time stamp: the router updates itself when it differs
+        const ver = sha256(lines.filter(l => !l.startsWith('# Erstellt')).join('\n') + SETUP_BODY).slice(0, 12);
+        return lines.join('\n') + `SETUPVER='${ver}'\n` + SETUP_BODY;
+    }
+
+    /** Version of the setup script the server would hand out now ('' when it cannot be built). */
+    function setupVersion() {
+        const c = cfg();
+        if (!fasTarget() || !c.setup_token || !c.faskey) return '';
+        const m = /^SETUPVER='([0-9a-f]+)'$/m.exec(setupScript());
+        return m ? m[1] : '';
+    }
+
+    /** Router's script version and whether an update was asked for "now" in the admin. */
+    function updateState() {
+        const st = db.getSetting('guest_wifi_state') || {};
+        const current = setupVersion();
+        const router = (liveStats && liveStats.ver) || st.portal_router_ver || '';
+        const now = !!(st.portal_update_now && Date.now() - st.portal_update_now < 24 * 3600 * 1000);
+        return { current, router, upToDate: !!(current && router === current), pending: !!(current && router && router !== current), now };
+    }
+
+    function requestUpdateNow() {
+        db.setSetting('guest_wifi_state', { ...(db.getSetting('guest_wifi_state') || {}), portal_update_now: Date.now() });
     }
 
     // -----------------------------------------------------------------------
@@ -771,6 +801,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
             fasUrl: (fasTarget() || {}).url || '',
             publicUrlProblem: fasTarget() ? '' : (publicBase() ? 'Die öffentliche Adresse muss mit https:// beginnen.' : 'Unter Webseite → Einrichtung fehlt die öffentliche Adresse (z. B. https://beckhome.cloud).'),
             devices: adminDevices(),
+            update: updateState(),
             stats: adminStats(),
             power: { ...powerState(), vacantOff: !!cfg().vacant_off }
         };
@@ -803,7 +834,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
 
     return {
         registerRoutes, adminState, removeDevice, watch, setPowerOverride, powerState, setupCommand, setupScript, bookingAccess, windowOf,
-        createExtraCode, listExtraCodes, deleteExtraCode, routerStatus,
+        createExtraCode, listExtraCodes, deleteExtraCode, routerStatus, requestUpdateNow, updateState,
         _test: { processStats, adminStats, parseFas, gatewayHashes, queues, acked, berlinEpoch, enqueue, rhidOf, kicksFor, queueKick, extraByCode, handleAuthGet }
     };
 }
@@ -1000,7 +1031,29 @@ CL=$(ndsctl json 2>/dev/null | tr ',{}' '\n\n\n' | awk -F'"' '/"mac":/ { m=$4 } 
 ON=1
 [ "$(uci -q get wireless.gaeste_radio0.disabled)" = "1" ] && ON=0
 UP=$(cut -d. -f1 /proc/uptime)
-R=$(/usr/lib/opennds/libopennds.sh send_to_fas_custom "stats1 wifi=$ON up=$UP clients=$CL" 2>/dev/null)
+SETUPURL=''; SETUPVER=''
+[ -f /etc/beckhome-wlan.conf ] && . /etc/beckhome-wlan.conf
+R=$(/usr/lib/opennds/libopennds.sh send_to_fas_custom "stats1 wifi=$ON up=$UP ver=$SETUPVER clients=$CL" 2>/dev/null)
+# Neues Einrichtungs-Skript auf dem Server: nachts (3-5 Uhr), sobald kein Gast online ist oder wenn im Admin
+# "Jetzt aktualisieren" gedrückt wurde. Pro Version und Tag nur ein Versuch.
+NEW=$(echo "$R" | sed -n 's/.*setup=\([0-9a-f]*\).*/\1/p')
+if [ -n "$NEW" ] && [ -n "$SETUPURL" ] && [ "$NEW" != "$SETUPVER" ] && [ ! -e /tmp/bh-setup.lock ] \
+   && [ "$(cat /tmp/bh-setup.tried 2>/dev/null)" != "$NEW-$(date +%j)" ]; then
+    H=$(TZ='CET-1CEST,M3.5.0,M10.5.0/3' date +%H)
+    case "$R" in *now=1*) H=03 ;; esac
+    if [ -z "$CL" ] || [ "$H" = 03 ] || [ "$H" = 04 ]; then
+        echo "$NEW-$(date +%j)" > /tmp/bh-setup.tried
+        touch /tmp/bh-setup.lock
+        logger -t beckhome "Router-Skript wird aktualisiert ($SETUPVER -> $NEW)"
+        ( if wget -qO /tmp/bh-setup.sh "$SETUPURL" && sh /tmp/bh-setup.sh > /tmp/bh-setup.log 2>&1; then
+              logger -t beckhome "Router-Skript aktualisiert"
+          else
+              logger -t beckhome "Router-Skript-Update fehlgeschlagen, siehe /tmp/bh-setup.log"
+          fi
+          rm -f /tmp/bh-setup.lock ) </dev/null >/dev/null 2>&1 &
+        exit 0
+    fi
+fi
 # Im Admin gelöschte Geräte abmelden
 for m in $(echo "$R" | sed -n 's/.*kick=\([0-9a-f:,]*\).*/\1/p' | tr ',' ' '); do
     ndsctl deauth "$m" >/dev/null 2>&1 && logger -t beckhome "Gerät $m abgemeldet"
@@ -1041,6 +1094,12 @@ if ndsctl status >/dev/null 2>&1; then
 else
     fail "openNDS ist nicht gestartet. Bitte 'logread | grep -i opennds' ausführen und die Ausgabe schicken."
 fi
+
+# Für das automatische Update: woher das Skript kommt und welche Version jetzt läuft
+umask 077
+printf "SETUPURL='%s'\nSETUPVER='%s'\n" "$SETUPURL" "$SETUPVER" > /etc/beckhome-wlan.conf
+grep -q '^/etc/beckhome-wlan.conf$' /etc/sysupgrade.conf 2>/dev/null || echo /etc/beckhome-wlan.conf >> /etc/sysupgrade.conf
+ok "Automatische Updates eingeschaltet (Version $SETUPVER)"
 
 echo ""
 echo "============================================================"

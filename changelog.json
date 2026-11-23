@@ -1,9 +1,9 @@
 {
-    "currentVersion": "1.51.1",
+    "currentVersion": "1.55.1",
     "releases": [
         {
-            "version": "1.51.1",
-            "date": "2026-11-22",
+            "version": "1.55.1",
+            "date": "2026-11-23",
             "title": "Kartenabgleich: Ersatzdienst und Grund bei Störung",
             "features": [],
             "fixes": [
@@ -11,6 +11,39 @@
                 "Ein einzelner Fehler bricht den Abgleich nicht mehr ab; das Zeitlimit reicht jetzt für alle Suchschritte",
                 "Klappt es trotzdem nicht, steht der Grund dabei (z. B. „Kartendienst blockiert Anfragen von diesem Server“ oder „antwortet nicht rechtzeitig“), die Anschrift bleibt so wie erkannt"
             ]
+        },
+        {
+            "version": "1.55.0",
+            "date": "2026-11-23",
+            "title": "Fernseher: Abschiedsgruß am Abreisetag und Knopf für neue Handtücher",
+            "features": [
+                "Am Abreisetag zeigt der Fernseher „Danke, <Name>!“, die Check-out-Zeit und deine Hinweise für die Abreise (Geschirr, Müll, Fenster, Tür …), in der Sprache des Gastes. Hinweise und Abschiedstext änderst du unter Einstellungen → TV-Box",
+                "Am Wechseltag sieht der abreisende Gast seinen Abschiedsgruß bis eine halbe Stunde nach dem Check-out, danach begrüßt der Fernseher den neuen Gast",
+                "Neuer Knopf „Neue Handtücher“ dezent rechts unten auf dem Fernseher. Der Gast muss noch einmal bestätigen, dann bekommst du eine Telegram-Nachricht mit Name und Aufenthalt. Die letzten Anfragen siehst du unter Einstellungen → TV-Box"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.54.0",
+            "date": "2026-11-22",
+            "title": "Hintergrund-Video der Ferienwohnung auf Webseite, Meine Buchung und TV",
+            "features": [
+                "Unter Webseite → Inhalte → „Hintergrund-Video“ ein Video der Wohnung hochladen (auch große Handy-Videos bis 2 GB, der Upload läuft in Stücken)",
+                "Der Server kürzt es auf 60 Sekunden, entfernt den Ton, rechnet die Unschärfe ein und macht es klein (meist unter 2 MB), dazu ein Standbild",
+                "Das Video läuft stumm in Endlosschleife im Hintergrund der Startseite, von „Meine Buchung“ und des TV-Welcome-Screens; Unschärfe per Regler, jede Stelle einzeln abschaltbar",
+                "Auf Handys optional; bei „Bewegung reduzieren“, Datensparmodus oder langsamer Verbindung bleibt es beim Standbild. Außerhalb des Bildschirms pausiert das Video",
+                "TV-App 1.11: Video startet ohne Tastendruck"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.53.0",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router aktualisiert sich selbst",
+            "features": [
+                "Der WLAN-Router holt sich neue Versionen seines Einrichtungs-Skripts selbst vom Server: nachts zwischen 3 und 5 Uhr oder sobald kein Gast online ist. Unter Webseite → WLAN steht, ob er aktuell ist, mit Knopf „Jetzt aktualisieren“. Einmalig muss der Einrichtungsbefehl noch von Hand laufen"
+            ],
+            "fixes": []
         },
         {
             "version": "1.51.0",

@@ -5,11 +5,32 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.51.1] - 2026-11-22
+## [1.55.1] - 2026-11-23
 
 ### Behoben
 - `geo-check.js`: Fehler bei Nominatim (403/429/Zeitüberschreitung) brachen den ganzen Abgleich ab → jetzt Ersatz über Photon (photon.komoot.io), Nominatim wird nach einem Fehler 10 Minuten übersprungen; Gesamtbudget 12 s statt 15-s-Race mit bis zu 5 Anfragen à 6 s
 - Fehlermeldung im Bot nennt den Grund (`reasonOf`), Log `[Geo]` mit Statuscode und Antwortanfang
+
+## [1.55.0] - 2026-11-23
+
+### Neu
+- TV-Welcome-Screen am Abreisetag (`tv-guest.js`, `public/welcome.html`): „Danke, <Name>!“, Check-out-Zeit, Abschiedstext und eine Liste mit Hinweisen zum Check-out, in der Sprache des Gastes. Die vorgegebenen Hinweise sind in `guest-site/i18n.js` übersetzt, eigene erscheinen wie eingegeben. Einstellbar unter Einstellungen → TV-Box → „Abreisetag & Handtücher“ (Setting `tv_guest`)
+- Am Wechseltag zeigt der Fernseher den abreisenden Gast bis 30 Minuten nach der Check-out-Zeit (ohne Zeit bis 12:30), danach den neuen Gast (`tvGuest.pickCurrent`). Vorher stand der neue Gast schon morgens auf dem Bildschirm
+- Knopf „Neue Handtücher“ dezent rechts unten auf dem TV, nur während eines Aufenthalts. Rückfrage mit Fokus auf „Abbrechen“, danach `POST /api/tv-box/towels` (nur gekoppelte Box oder Admin-Vorschau, JSON) → Nachricht an alle Empfänger (Telegram, WhatsApp, Push, Typ `towels`) mit Gast und Aufenthalt. Höchstens eine Nachricht pro Buchung alle 30 Minuten, der Gast sieht eine Bestätigung. Die letzten Anfragen stehen im Admin (Setting `towel_requests`)
+
+## [1.54.0] - 2026-11-22
+
+### Neu
+- `site-video.js`: Hintergrund-Video der Wohnung. Upload in 8-MB-Stücken (`/api/site/video/start|chunk|finish`, bis 2 GB, Cloudflare-Limit 100 MB pro Anfrage), ffmpeg erzeugt Master (1280 px, ohne Ton, max. 60 s), unscharfe Fassung (960 px, `gblur` eingerechnet) und Standbild; neue Unschärfe wird aus dem Master gerechnet. Ohne ffmpeg: MP4/WebM bis 60 MB unverändert, Unschärfe per CSS. Einstellungen in `site_video` (Startseite, Meine Buchung, TV, Handys)
+- Öffentlich unter `/hintergrund-video/<datei>` (vor der Gäste-Domain-Umleitung, Range-Anfragen, nur aktuelle Dateien), Skript `guest-site/bg-video.js` (auch `/bg-video.js` für den TV): lädt erst bei Sichtbarkeit, pausiert außerhalb des Bildschirms, kein Video bei reduzierter Bewegung/Datensparmodus/2G/3G
+- `/gast/api/info` liefert `video.site`/`video.account`, `/api/welcome` liefert `video`; TV-Welcome mit abgedunkeltem Video-Hintergrund
+- TV-App 1.11: `setMediaPlaybackRequiresUserGesture(false)`
+- `setup.sh` installiert ffmpeg, `update.sh` weist darauf hin, wenn es fehlt
+
+## [1.53.0] - 2026-11-22
+
+### Neu
+- Selbst-Update des Routers: `setup.sh` trägt `SETUPURL`/`SETUPVER` (Hash ohne Zeitstempel) ein und schreibt `/etc/beckhome-wlan.conf`. `beckhome-wlan-sync` meldet `ver=`, der Server antwortet `setup=<version>` (und `now=1` nach „Jetzt aktualisieren“). Bei Abweichung lädt der Router das Skript und führt es aus, 3–5 Uhr Ortszeit, ohne angemeldete Gäste oder sofort auf Wunsch, je Version höchstens ein Versuch pro Tag. Admin zeigt den Stand (`update` in adminState, `POST /api/site/wifi/portal/update`)
 
 ## [1.51.0] - 2026-11-22
 
