@@ -3426,6 +3426,11 @@
         if (ps.command) { cmd.textContent = ps.command; cmd.classList.remove('empty'); }
         else { cmd.textContent = ps.publicUrlProblem || 'Erscheint nach dem Speichern.'; cmd.classList.add('empty'); }
         $('#wifi-portal-copy').disabled = !ps.command;
+        const up = ps.update || {}, upEl = $('#wifi-portal-update');
+        upEl.hidden = !(r.lastSeen && up.current);
+        if (!up.router) upEl.innerHTML = '<span class="wifi-dot warn"></span>Automatische Updates sind auf dem Router noch nicht eingerichtet. Einmal den Einrichtungs-Befehl unten auf dem Router ausführen, danach aktualisiert er sich selbst.';
+        else if (up.upToDate) upEl.innerHTML = '<span class="wifi-dot ok"></span>Router-Skript ist aktuell. Neue Versionen holt sich der Router selbst.';
+        else upEl.innerHTML = `<span class="wifi-dot warn"></span>${up.now ? 'Update angefordert, der Router holt es sich in den nächsten Minuten.' : 'Neue Version für den Router liegt bereit. Er holt sie nachts zwischen 3 und 5 Uhr oder sobald kein Gast online ist.'} ${up.now ? '' : '<button type="button" class="btn-mini" id="wifi-portal-update-now">Jetzt aktualisieren</button>'}`;
         fillWifiPower(ps.power, ps.stats);
         fillWifiStats(ps.stats);
         const list = ps.devices || [];
@@ -3566,6 +3571,16 @@
             if (d.config) fillWifi(d);
             showToast(d.success ? (portal ? `Neuer Code: ${d.code}` : (d.applied ? 'Neues Passwort, FRITZ!Box umgestellt' : 'Neues Passwort erzeugt')) : (d.error || 'Fehlgeschlagen'), d.success ? 'success' : 'error');
         } catch (err) { showToast('Fehlgeschlagen', 'error'); } finally { btn.disabled = false; }
+    });
+
+    $('#wifi-portal-update').addEventListener('click', async e => {
+        if (!e.target.closest('#wifi-portal-update-now')) return;
+        if (!confirm('Router jetzt aktualisieren? Das WLAN ist dabei etwa eine Minute weg. Bekannte Geräte kommen danach ohne Code wieder rein, die Anmeldeseite kann kurz aufgehen.')) return;
+        try {
+            const d = await apiJson('/api/site/wifi/portal/update', { method: 'POST' });
+            if (d.config) fillWifi(d);
+            showToast('Update angefordert, der Router holt es sich innerhalb von 2 Minuten', 'success');
+        } catch (err) { showToast('Fehlgeschlagen', 'error'); }
     });
 
     $('#wifi-portal-copy').addEventListener('click', async () => {
