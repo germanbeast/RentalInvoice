@@ -2671,6 +2671,33 @@
                                         <p class="text-muted" id="tvbox-cmd-state" style="font-size:.85rem; margin-top:.75rem"></p>
                                     </div>
                                 </div>
+
+                                <h3 style="margin-top: 2rem;">Abreisetag &amp; Handtücher</h3>
+                                <p class="text-muted">Am Abreisetag zeigt der Fernseher bis eine halbe Stunde nach dem Check-out „Danke, &lt;Name&gt;“, die Check-out-Zeit und deine Hinweise, in der Sprache des Gastes. Die vorgegebenen Hinweise werden automatisch übersetzt, eigene erscheinen so, wie du sie schreibst. Der Knopf „Neue Handtücher“ sitzt dezent rechts unten. Nach einer Rückfrage auf dem Fernseher bekommst du eine Nachricht per Telegram (höchstens alle 30 Minuten pro Buchung).</p>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="tvguest-farewell"> Abschiedsgruß am Abreisetag zeigen
+                                        </label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tvguest-hints">Hinweise zum Check-out (einer pro Zeile, höchstens 8)</label>
+                                        <textarea id="tvguest-hints" rows="7"></textarea>
+                                        <button type="button" id="btn-tvguest-defaults" class="btn btn-ghost btn-sm" style="margin-top:.4rem">Vorgaben wiederherstellen</button>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tvguest-message">Eigener Abschiedstext (leer = „Schön, dass Sie bei uns waren …“, übersetzt)</label>
+                                        <input type="text" id="tvguest-message" maxlength="200">
+                                    </div>
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="tvguest-towels"> Knopf „Neue Handtücher“ auf dem Fernseher zeigen
+                                        </label>
+                                    </div>
+                                    <button type="button" id="btn-tvguest-save" class="btn btn-primary">Speichern</button>
+                                    <h4 style="margin-top:1.5rem">Letzte Handtuch-Anfragen</h4>
+                                    <ul id="tvguest-requests" class="text-muted" style="margin:0; padding-left:1.1rem; font-size:.9rem"></ul>
+                                </div>
                             </section>
 
                             <section id="settings-printer" class="settings-page">

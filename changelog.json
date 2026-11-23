@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.54.0",
+    "currentVersion": "1.55.0",
     "releases": [
+        {
+            "version": "1.55.0",
+            "date": "2026-11-23",
+            "title": "Fernseher: Abschiedsgruß am Abreisetag und Knopf für neue Handtücher",
+            "features": [
+                "Am Abreisetag zeigt der Fernseher „Danke, <Name>!“, die Check-out-Zeit und deine Hinweise für die Abreise (Geschirr, Müll, Fenster, Tür …), in der Sprache des Gastes. Hinweise und Abschiedstext änderst du unter Einstellungen → TV-Box",
+                "Am Wechseltag sieht der abreisende Gast seinen Abschiedsgruß bis eine halbe Stunde nach dem Check-out, danach begrüßt der Fernseher den neuen Gast",
+                "Neuer Knopf „Neue Handtücher“ dezent rechts unten auf dem Fernseher. Der Gast muss noch einmal bestätigen, dann bekommst du eine Telegram-Nachricht mit Name und Aufenthalt. Die letzten Anfragen siehst du unter Einstellungen → TV-Box"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.54.0",
             "date": "2026-11-22",
