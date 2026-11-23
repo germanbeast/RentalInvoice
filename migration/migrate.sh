@@ -98,12 +98,27 @@ EOF
 
 cmd_install() {
     load_state
-    export DEBIAN_FRONTEND=noninteractive
-    step "Systempakete"
-    apt-get update -qq
-    apt-get -y -qq upgrade >/dev/null
-    apt-get install -y -qq git curl ca-certificates gnupg rsync sqlite3 openssh-client build-essential python3 ffmpeg \
-        jq lsof locales tzdata fonts-liberation fonts-dejavu-core fonts-noto-color-emoji fontconfig xdg-utils wget >/dev/null || die "apt install fehlgeschlagen"
+    export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+    # Keine versteckten Rückfragen (Konfigurationsdateien), Ausgabe bleibt sichtbar
+    APT=(apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o Dpkg::Use-Pty=0)
+
+    step "Internet im Container prüfen"
+    if ! timeout 15 curl -fsS -o /dev/null https://deb.nodesource.com; then
+        c_bad "Keine Verbindung nach draußen (DNS/Gateway des Containers prüfen: ping -c2 1.1.1.1; getent hosts github.com)"
+        die "Ohne Internet geht die Installation nicht."
+    fi
+    if ! timeout 10 curl -6 -fsS -o /dev/null https://deb.nodesource.com 2>/dev/null && ip -6 route 2>/dev/null | grep -q '^default'; then
+        echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
+        c_warn "IPv6 hat eine Route, aber kein Internet → apt nutzt nur IPv4"
+    fi
+    c_ok "Internet ok"
+
+    step "Systempakete (dauert beim ersten Mal ein paar Minuten)"
+    dpkg --configure -a || true
+    apt-get update || die "apt-get update fehlgeschlagen"
+    "${APT[@]}" upgrade || die "apt upgrade fehlgeschlagen"
+    "${APT[@]}" install git curl ca-certificates gnupg rsync sqlite3 openssh-client build-essential python3 ffmpeg \
+        jq lsof locales tzdata fonts-liberation fonts-dejavu-core fonts-noto-color-emoji fontconfig xdg-utils wget || die "apt install fehlgeschlagen"
 
     step "Bibliotheken für Chromium (Puppeteer für PDFs und WhatsApp)"
     local pkgs=() p alt
@@ -115,7 +130,7 @@ cmd_install() {
             if apt-cache show "$alt" >/dev/null 2>&1; then pkgs+=("$alt"); break; fi
         done
     done
-    apt-get install -y -qq "${pkgs[@]}" >/dev/null || die "Chromium-Bibliotheken fehlgeschlagen"
+    "${APT[@]}" install "${pkgs[@]}" || die "Chromium-Bibliotheken fehlgeschlagen"
 
     step "Zeitzone ${REMOTE_TZ:-Europe/Berlin} und deutsche Locale"
     timedatectl set-timezone "${REMOTE_TZ:-Europe/Berlin}" 2>/dev/null || ln -sf "/usr/share/zoneinfo/${REMOTE_TZ:-Europe/Berlin}" /etc/localtime
@@ -124,13 +139,13 @@ cmd_install() {
     local major="${NODE_MAJOR:-22}"
     step "Node.js $major (gleiche Hauptversion wie auf Netcup)"
     if ! command -v node >/dev/null || [ "$(node -v | sed -E 's/^v([0-9]+).*/\1/')" != "$major" ]; then
-        curl -fsSL "https://deb.nodesource.com/setup_${major}.x" | bash - >/dev/null || die "NodeSource-Setup fehlgeschlagen"
-        apt-get install -y -qq nodejs >/dev/null || die "nodejs fehlgeschlagen"
+        curl -fsSL "https://deb.nodesource.com/setup_${major}.x" | bash - || die "NodeSource-Setup fehlgeschlagen"
+        "${APT[@]}" install nodejs || die "nodejs fehlgeschlagen"
     fi
     c_ok "node $(node -v), npm $(npm -v)"
 
     step "PM2"
-    command -v pm2 >/dev/null || npm install -g pm2 --no-audit --no-fund >/dev/null
+    command -v pm2 >/dev/null || npm install -g pm2 --no-audit --no-fund
     c_ok "pm2 $(pm2 -v | tail -1)"
 
     if [ "${APP_OWNER:-root}" != root ] && ! id "$APP_OWNER" >/dev/null 2>&1; then
@@ -321,5 +336,5 @@ case "${1:-}" in
     selftest) cmd_selftest ;;
     start)    cmd_start ;;
     verify)   cmd_verify ;;
-    *) sed -n '2,15p' "$0"; exit 1 ;;
+    *) sed -n '2,13p' "$0"; exit 1 ;;
 esac
