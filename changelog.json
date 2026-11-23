@@ -1,6 +1,15 @@
 {
-    "currentVersion": "1.55.0",
+    "currentVersion": "1.55.1",
     "releases": [
+        {
+            "version": "1.55.1",
+            "date": "2026-11-23",
+            "title": "Gäste-WLAN: Einrichtung bricht nicht mehr zu früh ab",
+            "features": [],
+            "fixes": [
+                "Der Einrichtungsbefehl für den WLAN-Router meldete „openNDS ist nicht gestartet“, obwohl alles lief, weil er nur 12 Sekunden gewartet hat. Jetzt wartet er bis zu 90 Sekunden. Die automatischen Updates werden schon vorher eingeschaltet"
+            ]
+        },
         {
             "version": "1.55.0",
             "date": "2026-11-23",
