@@ -5,6 +5,11 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.55.1] - 2026-11-23
+
+### Behoben
+- `setup.sh`: Startprüfung von openNDS wartet bis zu 90 s (alle 5 s `ndsctl status`) statt fest 12 s. `/etc/beckhome-wlan.conf` wird vor Schritt 6 geschrieben, damit das Selbst-Update auch dann eingerichtet ist
+
 ## [1.55.0] - 2026-11-23
 
 ### Neu
