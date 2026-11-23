@@ -1075,6 +1075,11 @@ cat /tmp/bh-cron > /etc/crontabs/root; rm -f /tmp/bh-cron
 /etc/init.d/cron enable >/dev/null 2>&1
 ok "Meldung an den Server alle 2 Minuten (Geräte, Datenvolumen, WLAN an/aus)"
 
+# Für das automatische Update: woher das Skript kommt und welche Version jetzt läuft
+( umask 077; printf "SETUPURL='%s'\nSETUPVER='%s'\n" "$SETUPURL" "$SETUPVER" > /etc/beckhome-wlan.conf )
+grep -q '^/etc/beckhome-wlan.conf$' /etc/sysupgrade.conf 2>/dev/null || echo /etc/beckhome-wlan.conf >> /etc/sysupgrade.conf
+ok "Automatische Updates eingeschaltet (Version $SETUPVER)"
+
 # --- 6. Übernehmen ----------------------------------------------------------------
 say "6/6 Einstellungen übernehmen und neu starten"
 uci commit
@@ -1088,18 +1093,14 @@ sleep 2
 /etc/init.d/opennds enable
 /etc/init.d/opennds restart
 /etc/init.d/cron restart >/dev/null 2>&1
-sleep 12
+# openNDS prüft beim Start erst Internet und Anmeldeseite, das dauert je nach Leitung bis zu einer Minute
+N=0
+until ndsctl status >/dev/null 2>&1 || [ $N -ge 18 ]; do sleep 5; N=$((N + 1)); done
 if ndsctl status >/dev/null 2>&1; then
     ok "openNDS läuft"
 else
     fail "openNDS ist nicht gestartet. Bitte 'logread | grep -i opennds' ausführen und die Ausgabe schicken."
 fi
-
-# Für das automatische Update: woher das Skript kommt und welche Version jetzt läuft
-umask 077
-printf "SETUPURL='%s'\nSETUPVER='%s'\n" "$SETUPURL" "$SETUPVER" > /etc/beckhome-wlan.conf
-grep -q '^/etc/beckhome-wlan.conf$' /etc/sysupgrade.conf 2>/dev/null || echo /etc/beckhome-wlan.conf >> /etc/sysupgrade.conf
-ok "Automatische Updates eingeschaltet (Version $SETUPVER)"
 
 echo ""
 echo "============================================================"
