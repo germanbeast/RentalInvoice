@@ -72,6 +72,34 @@
         .wl-rules summary { cursor: pointer; font: 400 1.35rem/1.2 var(--serif); }
         .wl-rules .prose { margin-top: .7rem; font-size: .95rem; }
         .wl-close { margin-top: 1.2rem; font-size: .88rem; color: var(--muted); text-align: center; }
+        /* Start page after the login */
+        .wl-panel { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: clamp(16px, 4vw, 24px); margin-bottom: 1.4rem; }
+        .wl-panel-kicker { display: flex; align-items: center; gap: .45rem; font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .7rem; }
+        .wl-panel-kicker svg { width: 16px; height: 16px; }
+        .wl-panel h2 { font-size: 1.6rem; margin: 0 0 .35rem; }
+        .wl-panel h3 { font-size: 1.2rem; margin: 1rem 0 .4rem; }
+        .wl-panel p { margin: 0 0 .5rem; color: var(--ink-soft); }
+        .wl-panel p:last-child { margin-bottom: 0; }
+        .wl-tip-dist { font-size: .88rem; color: var(--muted) !important; }
+        .wl-tip-text { white-space: pre-line; }
+        .wl-tip-next { font-size: .82rem; color: var(--muted) !important; margin-top: .8rem !important; }
+        .wl-dep { border-color: var(--accent); }
+        .wl-check { list-style: none; margin: 0; padding: 0; }
+        .wl-check li { position: relative; padding: .45rem 0 .45rem 1.6rem; border-top: 1px solid var(--line); font-size: .95rem; }
+        .wl-check li:first-child { border-top: 0; }
+        .wl-check li::before { content: ''; position: absolute; left: .1rem; top: .72rem; width: .8rem; height: .8rem; border: 1.5px solid var(--accent); border-radius: 2px; }
+        .wl-days { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); margin: 1rem 0 0; padding: .8rem 0 0; border-top: 1px solid var(--line); }
+        .wl-days li { display: flex; flex-direction: column; align-items: center; gap: .2rem; font-size: .9rem; }
+        .wl-days li + li { border-left: 1px solid var(--line); }
+        .wl-days span { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+        .wl-days svg.wx-s { width: 26px; height: 26px; stroke-width: 1.4; }
+        .wl-days small { color: var(--muted); }
+        .wl-towel-row { display: flex; gap: 1rem; align-items: flex-start; }
+        .wl-towel-row h2 { font-size: 1.35rem; }
+        .wl-towel-icon { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: var(--paper); border: 1px solid var(--line); color: var(--accent); }
+        .wl-towel-icon svg { width: 22px; height: 22px; stroke-width: 1.6; }
+        .wl-towel-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin-top: 1rem; }
+        .wl-towel-btns .btn { padding: .95rem 1rem; }
         .wl-preview { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--ink); color: var(--paper); text-align: center; font-size: .82rem; padding: .55rem 1rem; letter-spacing: .02em; }
         .masthead .brand { pointer-events: none; }
         .masthead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }

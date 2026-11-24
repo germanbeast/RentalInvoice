@@ -85,7 +85,8 @@ module.exports = function tvGuest({ notify, berlinToday, formatDateDE }) {
     // ---- Towels ----
     function log() { return db.getSetting('towel_requests') || []; }
 
-    async function requestTowels(current, { preview } = {}) {
+    /** source: 'tv' (button on the TV) or 'wlan' (start page after the WLAN login). */
+    async function requestTowels(current, { preview, source = 'tv' } = {}) {
         if (!getConfig().towels) return { ok: false, status: 404, error: 'aus' };
         const now = Date.now();
         const key = current ? `b${current.id}` : 'none';
@@ -101,10 +102,10 @@ module.exports = function tvGuest({ notify, berlinToday, formatDateDE }) {
         const msg = `🧺 *Neue Handtücher gewünscht*\n`
             + `Gast: ${name}\n`
             + (stay ? `Aufenthalt: ${stay}${current.checkout === berlinToday() ? ' (reist heute ab)' : ''}\n` : '')
-            + `Angefragt am Fernseher um ${time} Uhr`
+            + `Angefragt ${source === 'wlan' ? 'auf der WLAN-Startseite' : 'am Fernseher'} um ${time} Uhr`
             + (preview ? '\n\n_Test aus der Admin-Vorschau_' : '');
         const sent = await notify(msg, 'towels');
-        entries.unshift({ key, at: now, bookingId: current ? current.id : null, name, stay, preview: !!preview, sent: !!sent });
+        entries.unshift({ key, at: now, bookingId: current ? current.id : null, name, stay, preview: !!preview, sent: !!sent, source });
         db.setSetting('towel_requests', entries.slice(0, LOG_MAX));
         return { ok: true, already: false, at: now, sent: !!sent };
     }
