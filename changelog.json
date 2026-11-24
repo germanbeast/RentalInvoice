@@ -13,6 +13,18 @@
             "fixes": []
         },
         {
+            "version": "1.56.0",
+            "date": "2026-11-23",
+            "title": "Gäste-WLAN: Startseite nach der Anmeldung",
+            "features": [
+                "Nach der WLAN-Anmeldung sieht der Gast eine Startseite: Wetter heute und für die nächsten drei Tage, einen Tipp des Tages aus deinen Ausflugstipps (jeden Tag ein anderer, ohne Ausflugstipps ein Abschnitt aus der Gästemappe), was gerade geöffnet hat und Veranstaltungen",
+                "Knopf „Neue Handtücher“ auf der Startseite mit Rückfrage. Du bekommst dieselbe Nachricht wie vom Fernseher, mit dem Zusatz „auf der WLAN-Startseite“. Höchstens einmal pro Buchung alle 30 Minuten, gemeinsam mit dem TV-Knopf. Ein- und ausschalten wie bisher unter Einstellungen → TV-Box",
+                "Am Abreisetag zeigt die Startseite „Danke, <Name>!“, die Check-out-Zeit und deine Hinweise für die Abreise, wie auf dem Fernseher",
+                "Öffnet der Gast die WLAN-Seite später noch einmal, erscheint wieder seine Startseite statt nur „Sie sind online“. Auch Gastgeber- und Zusatz-Codes sehen jetzt Wetter und Tipp"
+            ],
+            "fixes": []
+        },
+        {
             "version": "1.55.1",
             "date": "2026-11-23",
             "title": "Gäste-WLAN: Einrichtung bricht nicht mehr zu früh ab",

@@ -11,6 +11,15 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Admin: Dunkelmodus mit Umschalter Hell / Dunkel / Automatisch oben rechts (`<html data-theme>`, Skript im `<head>` gegen Aufblitzen). Wahl je Benutzer in `users.theme` (Migration), `PUT /api/me/theme`, `/api/me` liefert `theme`; das Gerät merkt sich die letzte Wahl in `localStorage.adminTheme`
 - `styles.css`: feste Hellfarben im App-Look durch Variablen ersetzt (hell unverändert), Block „DUNKELMODUS“ nur `@media screen`; Diagramme lesen `--chart-*`, Leaflet-Kacheln werden abgedunkelt
 
+## [1.56.0] - 2026-11-23
+
+### Neu
+- WLAN-Startseite nach der Anmeldung (`guest-site/wlan.js`, `wifi-portal.js`): Wetterkarte mit 3-Tage-Vorschau (aus `api/live`), „Tipp des Tages“ (`tipOfDay`: Ausflugstipps `site.tips` täglich rotierend, versetzt um die Buchungs-ID; Fallback Abschnitt der Gästemappe), Handtuch-Karte, Abreise-Karte am Abreisetag (Hinweise aus `tv_guest`), danach „Jetzt geöffnet?“ und Veranstaltungen
+- `POST /gast/api/wlan/towels` (JSON, 5/min): Buchung aus der WLAN-Sitzung oder „Meine Buchung“, ruft `tvGuest.requestTowels(…, { source: 'wlan' })` (gleiche 30-Minuten-Sperre wie der TV). Vorschau sendet nichts. Kein Handtuch-Knopf am Abreisetag
+- Die Anmeldung wird in der Sitzung gemerkt (`req.session.wlan`), `POST /gast/api/wlan/home` und `hello` mit `status` liefern die Startseite erneut
+- Admin: Handtuch-Anfragen von der WLAN-Seite sind im Protokoll markiert
+- Gastgeber- und Zusatz-Codes bekommen ebenfalls `welcome` (Wetter, Tipp, Kontakt)
+
 ## [1.55.1] - 2026-11-23
 
 ### Behoben

@@ -1453,7 +1453,16 @@ const guestWifi = require('./wifi')({
     telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
     berlinToday: () => berlinToday(),
     addDays: (ymd, n) => addDays(ymd, n),
-    formatDateDE: (d) => formatDateDE(d)
+    formatDateDE: (d) => formatDateDE(d),
+    // Start page after the WLAN login: towel button and check-out hints like on the TV (tv-guest.js)
+    home: {
+        towels: () => tvGuest.getConfig().towels,
+        departure: () => { const c = tvGuest.getConfig(); return c.farewell ? { hints: c.hints, message: c.message } : null; },
+        requestTowels: (b) => {
+            const g = b.guest_id ? db.getGuestById(b.guest_id) : null;
+            return tvGuest.requestTowels({ id: b.id, name: g && !require('./bot-logic').isPlaceholderGuestName(g.name) ? g.name : '', checkin: b.checkin, checkout: b.checkout }, { source: 'wlan' });
+        }
+    }
 });
 // Background video of the apartment (muted loop, slightly blurred) for the guest pages and the TV, see site-video.js.
 // Served before the guest-domain rewrite, so the TV box gets it on the guest host too.

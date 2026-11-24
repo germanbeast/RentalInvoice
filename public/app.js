@@ -5978,7 +5978,7 @@
         const fmt = ts => new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         const list = $('#tvguest-requests');
         list.innerHTML = (d.requests || []).length
-            ? d.requests.map(r => `<li>${escapeHtml(fmt(r.at))} Uhr: ${escapeHtml(r.name || 'Gast')}${r.stay ? ' (' + escapeHtml(r.stay) + ')' : ''}${r.preview ? ' · Test aus der Vorschau' : ''}${r.sent ? '' : ' · Nachricht nicht zugestellt'}</li>`).join('')
+            ? d.requests.map(r => `<li>${escapeHtml(fmt(r.at))} Uhr: ${escapeHtml(r.name || 'Gast')}${r.stay ? ' (' + escapeHtml(r.stay) + ')' : ''}${r.source === 'wlan' ? ' · über die WLAN-Seite' : ''}${r.preview ? ' · Test aus der Vorschau' : ''}${r.sent ? '' : ' · Nachricht nicht zugestellt'}</li>`).join('')
             : '<li style="list-style:none; margin-left:-1.1rem">Noch keine Anfragen.</li>';
     }
     if ($('#btn-tvguest-defaults')) $('#btn-tvguest-defaults').addEventListener('click', () => { $('#tvguest-hints').value = tvGuestDefaults.join('\n'); });

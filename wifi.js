@@ -77,7 +77,7 @@ function qrSvg(qrcode, text) {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}" shape-rendering="crispEdges"><rect width="${s}" height="${s}" style="fill:#fff;stroke:none"/><path style="fill:#000;stroke:none" d="${d}"/></svg>`;
 }
 
-function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, chatButton, telegram, berlinToday, addDays, formatDateDE }) {
+function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, chatButton, telegram, berlinToday, addDays, formatDateDE, home = null }) {
     const sql = () => db.getDb();
     const cols = sql().prepare('PRAGMA table_info(bookings)').all().map(c => c.name);
     if (!cols.includes('wifi_password')) sql().exec('ALTER TABLE bookings ADD COLUMN wifi_password TEXT');
@@ -329,7 +329,7 @@ function createWifi({ db, axios, qrcode, botLogic, getSite, guestBooking, chatBu
 
     const wifiPortal = createWifiPortal({
         db, getConfig, getSite, guestBooking: sess => (guestBooking ? guestBooking(sess) : null), guestName, chatButton,
-        telegram, berlinToday, formatDateDE
+        telegram, berlinToday, formatDateDE, home
     });
 
     let running = null;
