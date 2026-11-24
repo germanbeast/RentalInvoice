@@ -1,6 +1,17 @@
 {
-    "currentVersion": "1.56.0",
+    "currentVersion": "1.57.0",
     "releases": [
+        {
+            "version": "1.57.0",
+            "date": "2026-11-23",
+            "title": "Admin: Dunkelmodus",
+            "features": [
+                "Oben rechts neben „DE“ gibt es einen neuen Knopf (Sonne/Mond): Hell, Dunkel oder Automatisch. Automatisch folgt der Einstellung von Handy oder PC und wechselt abends mit",
+                "Die Wahl wird für jeden Benutzer gespeichert und gilt auch auf anderen Geräten nach dem Anmelden",
+                "Kalender, Buchungen, Dialoge, Einstellungen, Diagramme und die Karte im Jahresrückblick sind im Dunkelmodus angepasst. Die Rechnungsvorschau bleibt weißes Papier, Drucken bleibt immer hell"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.56.0",
             "date": "2026-11-23",
