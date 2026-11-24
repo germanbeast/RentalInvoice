@@ -10,8 +10,8 @@ android {
         applicationId "com.beckhome.tvwelcome"
         minSdk 21
         targetSdk 34
-        versionCode 15
-        versionName "1.11"
+        versionCode 16
+        versionName "1.12"
     }
 
     // Fester Signierschlüssel aus GitHub-Secrets (TV_KEYSTORE_B64/TV_KEYSTORE_PASSWORD, siehe Workflow).
@@ -48,4 +48,6 @@ android {
 dependencies {
     implementation 'androidx.leanback:leanback:1.0.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    // WebSocket für die Fernwartung (AdbTunnel)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }

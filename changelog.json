@@ -1,6 +1,18 @@
 {
-    "currentVersion": "1.57.0",
+    "currentVersion": "1.58.0",
     "releases": [
+        {
+            "version": "1.58.0",
+            "date": "2026-11-24",
+            "title": "TV-Box: Fernwartung mit Live-Bild im Browser",
+            "features": [
+                "Unter Einstellungen → TV-Box gibt es jetzt „Fernwartung“: Du siehst den Fernseher live im Browser und steuerst die Box mit Maus und Tastatur, auch von unterwegs",
+                "Die Box verbindet sich dafür selbst mit dem Server (TV-App 1.12). An der FRITZ!Box musst du nichts freigeben, nur „Fernwartung erlauben“ anhaken",
+                "Die Seite öffnet sich nur nach dem Admin-Login und nur für Benutzer mit dem Recht „Einstellungen & Integrationen: Bearbeiten“. Der Dienst dahinter ist von außen nicht erreichbar",
+                "Einmalig einrichten: Skript tools/tv-fernwartung.sh im Container und TV-Box-Fernwartung.bat am PC (Anleitung direkt im Admin)"
+            ],
+            "fixes": []
+        },
         {
             "version": "1.57.0",
             "date": "2026-11-23",
