@@ -1,6 +1,6 @@
 {
   "name": "ferienwohnung-rechnung",
-  "version": "1.57.0",
+  "version": "1.59.0",
   "description": "",
   "main": "app.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@tesseract.js-data/deu": "^1.0.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "axios": "^1.13.5",
@@ -31,6 +32,7 @@
     "node-ical": "^0.25.1",
     "node-telegram-bot-api": "^0.67.0",
     "nodemailer": "^10.3.1",
+    "pdf-parse": "^2.4.5",
     "puppeteer": "^24.37.3",
     "qrcode": "^1.5.4",
     "tesseract.js": "^7.0.0",

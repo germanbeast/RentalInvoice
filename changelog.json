@@ -1,6 +1,19 @@
 {
-    "currentVersion": "1.57.0",
+    "currentVersion": "1.59.0",
     "releases": [
+        {
+            "version": "1.59.0",
+            "date": "2026-11-25",
+            "title": "Belege per Telegram-Foto, Paperless",
+            "features": [
+                "Foto vom Kassenbon oder Rechnung als PDF an den Telegram-Bot schicken: Händler, Datum, Betrag, MwSt und Kategorie werden erkannt, du bestätigst oder änderst per Knopf",
+                "Gespeicherte Ausgaben stehen unter „Ausgaben“ und zählen in der Finanz-Auswertung, inklusive Vorsteuer",
+                "Belege landen auf Wunsch automatisch in Paperless (mit Tags, Händler als Korrespondent und Betrag); umgekehrt können Dokumente mit einem Tag aus Paperless als Ausgaben übernommen werden",
+                "Optional genauere Erkennung mit KI (Claude), einstellbar unter Einstellungen → Belege & KI-Erkennung",
+                "Neue Ausgaben-Seite mit Filtern, Beleg-Vorschau, Hochladen per Drag & Drop und Export „Alle Belege als ZIP“",
+                "Telegram: /beleg und /ausgaben"
+            ]
+        },
         {
             "version": "1.57.0",
             "date": "2026-11-23",

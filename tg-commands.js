@@ -17,7 +17,8 @@ function botPerms(chatId) {
 }
 const DENIED = '⛔ <b>Keine Berechtigung</b>\nDein Benutzer darf das nicht. Rechte vergibt der Inhaber in der Benutzerverwaltung.';
 const CMD_RIGHT = { status: 'offen', offen: 'offen', sync: 'sync', namen: 'namen', codes: 'codes', 'türcodes': 'codes', tuercodes: 'codes',
-    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin', adresse: 'adresse', anschrift: 'adresse' };
+    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin', adresse: 'adresse', anschrift: 'adresse',
+    beleg: 'beleg', quittung: 'beleg', ausgabe: 'beleg', ausgaben: 'review' };
 function callbackRight(data) {
     if (data === 'open') return 'offen';
     if (data === 'arrivals') return 'anreisen';
@@ -32,6 +33,8 @@ function callbackRight(data) {
     if (data === 'wl' || data.startsWith('wl:')) return 'wlan';
     if (data.startsWith('inv:') || data === 'new:invoice') return 'rechnung';
     if (data === 'new:pin') return 'pin';
+    if (data === 'rc:list') return 'review';
+    if (data.startsWith('rc:')) return 'beleg';
     return null;
 }
 const fs = require('fs');
@@ -111,6 +114,7 @@ function mainMenuKeyboard() {
         [btn('✉️ Gästenachricht', 'gm'), btn('📋 Offene Rechnungen', 'open')],
         [btn('🔄 Kalender abfragen', 'sync'), btn('🚪 Schloss', 'lock:status')],
         [btn('📇 Anschrift einfügen', 'adr'), btn('📶 WLAN-Codes', 'wl')],
+        [btn('📸 Beleg erfassen', 'rc:new'), btn('💶 Ausgaben', 'rc:list')],
         [btn('❓ Hilfe', 'help')]
     ]);
 }
@@ -195,6 +199,8 @@ async function showHelp(bot, chatId) {
         '• <code>/schloss</code> – Schloss-Status und Batterie\n' +
         '• <code>/zu</code> – Tür abschließen\n' +
         '• <code>/jahr</code> – Jahresrückblick (z. B. <code>/jahr 2025</code>)\n' +
+        '• <code>/beleg</code> – Beleg erfassen (Foto/PDF schicken, oder <code>/beleg 12,50 REWE Putzmittel</code>)\n' +
+        '• <code>/ausgaben</code> – Ausgaben im Monat und Jahr\n' +
         '• <code>/wlan</code> – WLAN-Codes für Besucher (z. B. <code>/wlan 3</code> = 3 Tage, <code>/wlan 4h Handwerker</code>)\n' +
         '• <code>/auf</code> – Tür aufschließen/öffnen (mit Rückfrage)\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
@@ -205,6 +211,9 @@ async function showHelp(bot, chatId) {
         '<b>Anschrift einfach reinkopieren</b>\n' +
         'Eine Anschrift ohne Datum (z. B. aus Booking.com kopiert) erkennt der Bot von selbst: Name, Straße, PLZ, Ort, Land, Telefon, E-Mail. ' +
         'Du wählst nur noch die Buchung und bestätigst. Das klappt auch mit einem 📷 Screenshot, der nach dem Speichern aus dem Chat gelöscht wird.\n\n' +
+        '<b>Belege</b>\n' +
+        'Schick einfach ein 📸 Foto vom Kassenbon oder eine Rechnung als PDF. Der Bot erkennt Betrag, Datum, Händler und Kategorie, ' +
+        'du bestätigst, und die Ausgabe landet in der Finanz-Auswertung (und auf Wunsch in Paperless).\n\n' +
         '<b>Jederzeit möglich</b>\n' +
         '• ⬅️ <b>Zurück</b> (oder „zurück“) – einen Schritt zurück\n' +
         '• ❌ <b>Abbrechen</b> (oder „abbrechen“) – Vorgang beenden\n' +
@@ -372,6 +381,16 @@ async function startInvoiceFromBooking(bot, chatId, bookingId) {
 }
 
 let hooks = {};
+
+// Belege per Foto/PDF (siehe tg-receipts.js)
+const tgReceipts = require('./tg-receipts')({
+    send, btn, keyboard, esc, fmtDate, fmtMoney, short, sessions, touch, menuOnlyKeyboard,
+    receipts: () => {
+        const r = hooks.receipts && hooks.receipts();
+        if (!r) throw new Error('Belege sind gerade nicht verfügbar');
+        return r;
+    }
+});
 
 async function runSync(bot, chatId) {
     if (!hooks.syncCalendars) {
@@ -1000,55 +1019,110 @@ function preferKnownGuestName(p, text) {
     } catch (e) { /* best-effort */ }
 }
 
+function receiptAutoDetect() {
+    try { return hooks.receipts ? hooks.receipts().getConfig().askInBot !== false : false; } catch (e) { return false; }
+}
+
+function isPdfDocument(msg) {
+    return Boolean(msg.document && (/pdf/i.test(msg.document.mime_type || '') || /\.pdf$/i.test(msg.document.file_name || '')));
+}
+
 /**
- * Photo or image file sent to the bot: read the text on it (on this server, see screenshot-ocr.js) and continue
- * like a pasted address. The image is only kept in a temp file during recognition; after saving, the photo message
- * is deleted from the chat as well.
+ * Photo, image file or PDF sent to the bot. Two uses:
+ *  - Beleg (Kassenbon/Rechnung): PDFs always, photos with a caption like "Beleg", during /beleg, or when the text
+ *    on the photo looks like a receipt -> tg-receipts.js (asks before saving)
+ *  - Anschrift-Screenshot: read the text on it (on this server, see screenshot-ocr.js) and continue like a pasted
+ *    address. The image is only kept in a temp file during recognition; after saving, the photo message is deleted.
  */
 async function processPhoto(bot, msg) {
     const chatId = msg.chat.id;
     if (!db.isTelegramIdAuthorized(chatId)) {
         return send(bot, chatId, '⛔ <b>Zugriff verweigert</b>\n\nBitte sende <code>/register</code>, um eine Zugangsanfrage zu stellen.');
     }
-    if (!permissions.canBot(botPerms(chatId), 'adresse')) return send(bot, chatId, DENIED);
+    const perms = botPerms(chatId);
+    const canReceipt = permissions.canBot(perms, 'beleg');
+    const canAddress = permissions.canBot(perms, 'adresse');
+    if (!canReceipt && !canAddress) return send(bot, chatId, DENIED);
     const file = msg.photo ? msg.photo[msg.photo.length - 1] : msg.document;
-    if (!file || (file.file_size && file.file_size > MAX_IMAGE_BYTES)) {
-        return send(bot, chatId, '⚠️ Das Bild ist zu groß (max. 10 MB). Bitte als normales Foto schicken.');
-    }
-    console.log(`[TG] Bild von [${chatId}] zur Texterkennung`);
+    if (!file) return;
 
     let session = getActiveSession(chatId);
+    const active = session && session !== 'expired' ? session : null;
+    if (active && active.busy) return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
+
+    const pdf = isPdfDocument(msg);
+    const caption = (msg.caption || '').trim();
+    let mode = null;
+    if (pdf) mode = 'receipt';
+    else if (active && active.flow === 'receipt') mode = 'receipt';
+    else if (active && active.flow === 'address') mode = 'address';
+    else if (/\b(beleg|quittung|kassenbon|bon|ausgabe|einkauf|rechnung)\b/i.test(caption)) mode = 'receipt';
+    else if (/\b(adresse|anschrift|gast|gastdaten)\b/i.test(caption)) mode = 'address';
+    if (!canAddress && mode !== 'receipt') mode = 'receipt';
+    if (mode === 'receipt' && !canReceipt) {
+        if (pdf || !canAddress) return send(bot, chatId, DENIED);
+        mode = 'address';
+    }
+    const limit = mode === 'address' ? MAX_IMAGE_BYTES : 20 * 1024 * 1024;
+    if (file.file_size && file.file_size > limit) {
+        return send(bot, chatId, `⚠️ Die Datei ist zu groß (max. ${Math.round(limit / 1048576)} MB). Bitte als normales Foto schicken.`);
+    }
+    console.log(`[TG] ${pdf ? 'PDF' : 'Bild'} von [${chatId}] (${mode || 'erkennen'})`);
+    const who = msg.from && (msg.from.username || msg.from.first_name);
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), tgReceipts.TMP_PREFIX));
+    let filePath;
+    try {
+        filePath = await bot.downloadFile(file.file_id, tmpDir);
+    } catch (e) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        console.error('[TG] Datei laden fehlgeschlagen:', e.message);
+        return send(bot, chatId, `❌ Die Datei konnte nicht von Telegram geladen werden: ${esc(short(e.message, 120))}`);
+    }
+    const mime = msg.document ? (msg.document.mime_type || (pdf ? 'application/pdf' : 'image/jpeg')) : 'image/jpeg';
+    const name = msg.document && msg.document.file_name ? msg.document.file_name : path.basename(filePath);
+
+    if (mode === 'receipt') {
+        return tgReceipts.fromFile(bot, chatId, { filePath, mime, name, tmpDir }, who);
+    }
+
+    // Text lesen, dann entscheiden (Beleg oder Anschrift)
+    if (active && active.flow === 'address') active.busy = true;
+    const waitMsg = await send(bot, chatId, '🔍 <b>Ich lese das Bild …</b>\nDas dauert ein paar Sekunden.');
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    let text = '';
+    let raw = '';
+    try {
+        const r = await ocr.recognize(filePath);
+        text = r.text;
+        raw = r.raw || r.text;
+    } catch (e) {
+        console.error('[TG] Texterkennung fehlgeschlagen:', e.message);
+        if (active && active.flow === 'address') active.busy = false;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        if (waitMsg) bot.deleteMessage(chatId, waitMsg.message_id).catch(() => { });
+        return send(bot, chatId, `❌ <b>Das Bild konnte nicht gelesen werden.</b>\n${esc(short(e.message, 160))}\n\nDu kannst die Anschrift auch als Text schicken.`, menuOnlyKeyboard());
+    }
+    if (waitMsg) bot.deleteMessage(chatId, waitMsg.message_id).catch(() => { });
+
+    if (mode === null && canReceipt && receiptAutoDetect() && require('./receipt-scan').looksLikeReceipt(raw)) {
+        if (active && active.flow === 'address') active.busy = false;
+        return tgReceipts.fromFile(bot, chatId, { filePath, mime, name, tmpDir, text: raw }, who);
+    }
+    // The image is not kept on the server
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    session = getActiveSession(chatId);
     if (!session || session === 'expired' || session.flow !== 'address') {
         if (session && session !== 'expired') await cancelSession(bot, chatId, session, true);
         session = await startAddressFlow(bot, chatId, null, true);
-    } else if (session.busy) {
-        return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
     } else if (session.step !== 'await' && !session.fixedBooking) {
         session.bookingId = null;
     }
-    session.busy = true;
-    const waitMsg = await send(bot, chatId, '🔍 <b>Ich lese den Screenshot …</b>\nDas dauert ein paar Sekunden.');
-    bot.sendChatAction(chatId, 'typing').catch(() => { });
-
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-ocr-'));
-    let text = '';
-    try {
-        const filePath = await bot.downloadFile(file.file_id, tmpDir);
-        const r = await ocr.recognize(filePath);
-        text = r.text;
-    } catch (e) {
-        console.error('[TG] Texterkennung fehlgeschlagen:', e.message);
-        session.busy = false;
-        return send(bot, chatId, `❌ <b>Der Screenshot konnte nicht gelesen werden.</b>\n${esc(short(e.message, 160))}\n\nDu kannst die Anschrift auch als Text schicken.`, keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
-    } finally {
-        // The image is not kept on the server
-        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
-        if (waitMsg) bot.deleteMessage(chatId, waitMsg.message_id).catch(() => { });
-    }
     session.busy = false;
     session.photoMsgId = msg.message_id;
-    const caption = msg.caption ? `${msg.caption.trim()}\n` : '';
-    return handleAddressText(bot, chatId, session, caption + text, true);
+    const cap = caption ? `${caption}\n` : '';
+    return handleAddressText(bot, chatId, session, cap + text, true);
 }
 
 /**
@@ -1307,6 +1381,7 @@ function applyInput(session, step, textRaw) {
 // Navigation: Zurück / Abbrechen
 // ---------------------------------------------------------------------------
 async function cancelSession(bot, chatId, session, silent) {
+    if (session && session.flow === 'receipt') tgReceipts.cleanup(session);
     if (session && session.lastMsgId) {
         bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: session.lastMsgId }).catch(() => { });
     }
@@ -1477,7 +1552,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|adresse|anschrift|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|adresse|anschrift|beleg|quittung|ausgabe|ausgaben|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -1491,7 +1566,7 @@ function detectCommand(body) {
 // ---------------------------------------------------------------------------
 async function processMessage(bot, msg) {
     const chatId = msg.chat.id;
-    if (!msg.text && (msg.photo || isImageDocument(msg))) return processPhoto(bot, msg);
+    if (!msg.text && (msg.photo || isImageDocument(msg) || isPdfDocument(msg))) return processPhoto(bot, msg);
     const body = msg.text ? msg.text.trim() : '';
     if (!body) return;
 
@@ -1533,7 +1608,10 @@ async function processMessage(bot, msg) {
     // --- Globale Navigation (in jedem Schritt) ---
     if (active) {
         if (CANCEL_WORDS.has(lower)) return cancelSession(bot, chatId, active, false);
-        if (BACK_WORDS.has(lower)) return active.flow === 'address' ? addressBack(bot, chatId, active) : goBack(bot, chatId, active);
+        if (BACK_WORDS.has(lower)) {
+            if (active.flow === 'receipt') return tgReceipts.handleCallback(bot, chatId, active, 'rc:back');
+            return active.flow === 'address' ? addressBack(bot, chatId, active) : goBack(bot, chatId, active);
+        }
         if (MENU_WORDS.has(lower)) return cancelSession(bot, chatId, active, false);
     } else if (BACK_WORDS.has(lower) || CANCEL_WORDS.has(lower) || MENU_WORDS.has(lower)) {
         return showMenu(bot, chatId);
@@ -1612,6 +1690,13 @@ async function processMessage(bot, msg) {
                 return startFlow(bot, chatId, 'invoice', cmd.rest);
             case 'pin':
                 return startFlow(bot, chatId, 'pin', cmd.rest);
+            case 'beleg':
+            case 'quittung':
+            case 'ausgabe':
+                if (active) await cancelSession(bot, chatId, active, true);
+                return cmd.rest ? tgReceipts.fromText(bot, chatId, cmd.rest) : tgReceipts.askForPhoto(bot, chatId);
+            case 'ausgaben':
+                return tgReceipts.showExpenses(bot, chatId);
             case 'adresse':
             case 'anschrift': {
                 if (active) await cancelSession(bot, chatId, active, true);
@@ -1625,6 +1710,9 @@ async function processMessage(bot, msg) {
     }
 
     // --- Antwort in laufendem Dialog ---
+    if (active && !active.busy && active.flow === 'receipt') {
+        return tgReceipts.handleInput(bot, chatId, active, body);
+    }
     if (active && !active.busy && active.flow === 'address') {
         return handleAddressInput(bot, chatId, active, body);
     }
@@ -1706,7 +1794,8 @@ async function processCallback(bot, q) {
     const active = session && session !== 'expired' ? session : null;
 
     // Alte Buttons, die nicht mehr zu einer Session passen
-    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit', 'aok', 'aname', 'aback'].includes(data) || data.startsWith('ef:') || data.startsWith('ab:') || data.startsWith('ageo:');
+    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit', 'aok', 'aname', 'aback'].includes(data) || data.startsWith('ef:') || data.startsWith('ab:') || data.startsWith('ageo:')
+        || (data.startsWith('rc:') && data !== 'rc:new' && data !== 'rc:list');
     if (needsSession && !active) {
         await answer(session === 'expired' ? '⏱ Abgelaufen' : 'Vorgang nicht mehr aktiv');
         // Buttons der alten Nachricht entfernen
@@ -1814,6 +1903,9 @@ async function processCallback(bot, q) {
             case data === 'aok':
                 if (active.flow !== 'address' || active.step !== 'confirm') return;
                 return executeAddress(bot, chatId, active, q);
+            case data.startsWith('rc:'):
+                if (data === 'rc:new' && active) await cancelSession(bot, chatId, active, true);
+                return tgReceipts.handleCallback(bot, chatId, data === 'rc:new' || data === 'rc:list' ? null : active, data, who);
             case data === 'wl':
                 return showWifiCodes(bot, chatId);
             case data.startsWith('wl:new:'):
@@ -1908,6 +2000,8 @@ async function setup(bot, options = {}) {
             { command: 'zu', description: 'Tür abschließen' },
             { command: 'jahr', description: 'Jahresrückblick mit Statistik' },
             { command: 'wlan', description: 'WLAN-Codes für Besucher erzeugen' },
+            { command: 'beleg', description: 'Beleg erfassen (Foto oder PDF)' },
+            { command: 'ausgaben', description: 'Ausgaben im Monat und Jahr' },
             { command: 'auf', description: 'Tür aufschließen (mit Rückfrage)' },
             { command: 'abbrechen', description: 'Aktuellen Vorgang abbrechen' },
             { command: 'hilfe', description: 'Hilfe anzeigen' }

@@ -10,7 +10,7 @@ const AREAS = [
     { key: 'bookings', label: 'Buchungen, Gäste & Anfragen', hint: 'Buchungsliste, Buchungen eintragen/löschen, Gästeliste, Anfragen der Webseite' },
     { key: 'invoices', label: 'Rechnungen', hint: 'Rechnungen erstellen, ansehen, versenden' },
     { key: 'vouchers', label: 'Gutscheine', hint: 'Gutscheine anlegen, drucken, entwerten (einlösen geht auch mit Rechnungen/Buchungen)' },
-    { key: 'finance', label: 'Finanzen & Exporte', hint: 'Umsätze, Auslastung & Jahresrückblick, Ausgaben, Erbverwaltung, Excel/CSV/ZIP' },
+    { key: 'finance', label: 'Finanzen & Exporte', hint: 'Umsätze, Auslastung & Jahresrückblick, Ausgaben & Belege (auch per Telegram), Erbverwaltung, Excel/CSV/ZIP' },
     { key: 'door', label: 'Türcodes & Notfall-Öffnen', hint: 'Nuki-Codes ansehen/anlegen/löschen, Notfall-Öffnen' },
     { key: 'messages', label: 'Gast-Nachrichten & Chat', hint: 'Gast-Nachricht/Link, WhatsApp/SMS-Postfach' },
     { key: 'meldescheine', label: 'Meldescheine', hint: 'Online-Meldescheine ansehen, drucken, exportieren' },
@@ -121,6 +121,7 @@ const RULES = [
     R('*', /^\/api\/vouchers(\/|$)/, 'vouchers'),
 
     // Finance
+    R('*', /^\/api\/receipts\/(settings|test-ai|test-paperless)$/, 'settings'),
     R('*', /^\/api\/(finance|expenses|estate|stats|review)(\/|$)/, 'finance'),
     R('*', /^\/uploads\/estate\//, 'finance'), // other /uploads paths (certificates …): full rights only
 
@@ -202,6 +203,7 @@ const BOT_COMMANDS = {
     codes: ['door', 'view'], pin: ['door', 'edit'], lock: ['door', 'edit'], lockstatus: ['door', 'view'],
     nachricht: ['messages', 'view'], guestlink: ['messages', 'edit'],
     review: ['finance', 'view'],
+    beleg: ['finance', 'edit'],
     wlan: ['website', 'edit']
 };
 

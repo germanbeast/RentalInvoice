@@ -5,6 +5,17 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.59.0] - 2026-11-25
+
+### Neu
+- Belege per Telegram: Foto oder PDF an den Bot schicken (`tg-receipts.js`). Texterkennung auf dem Server (`receipt-scan.js`: tesseract für Fotos, `pdf-parse` für PDFs, eingescannte PDFs als Bild der ersten Seite) erkennt Händler, Datum, Endbetrag, MwSt, Zahlart, Beleg-Nr. und Kategorie; Rückfrage mit Knöpfen (Speichern, Betrag/Datum/Händler/Kategorie/Beschreibung ändern, Paperless an/aus, Verwerfen). Fotos ohne Bildunterschrift werden automatisch als Beleg oder Anschrift-Screenshot erkannt (`looksLikeReceipt`), Bildunterschrift „Beleg“ erzwingt Beleg. `/beleg` (auch `/beleg 12,50 REWE Putzmittel` ohne Foto), `/ausgaben` (Monat, Jahr, Kategorien, letzte Belege), Hauptmenü-Knöpfe. Bot-Recht `beleg` = Finanzen bearbeiten
+- Optional KI-Erkennung über die Claude API (`@anthropic-ai/sdk`, strukturierte Ausgabe als JSON-Schema, Modell wählbar, Standard `claude-opus-5-5`, Server-Fallback bei Ablehnung). Fällt die KI aus, wird die Texterkennung benutzt
+- Ausgaben-Tabelle erweitert (Migration in `receipts.js`): Händler, MwSt-Satz, Vorsteuer, Zahlart, Beleg-Nr., Belegdatei (`uploads/receipts/`, nur über `/api/expenses/:id/receipt`), erkannter Text, Paperless-Status
+- Paperless-ngx: Beleg hochladen mit Titel, Datum, Korrespondent = Händler, Dokumenttyp, Tags (Namen, fehlende werden angelegt), Kategorie als Tag, Betrag ins Benutzerfeld (monetary/float/string); Aufgabe wird abgefragt bis zur Dokument-ID, Duplikate werden verknüpft. Übernahme aus Paperless (Tag als Name oder ID, alle Seiten, Betrag aus Benutzerfeld oder OCR-Text, Korrespondent als Händler), optional stündlich automatisch mit Meldung
+- Admin „Ausgaben“ neu: Kennzahlen, Filter Jahr/Kategorie/Suche, Beleg-Chips (Foto/PDF, Paperless ✓/⚠/→), Dialog „Neue Ausgabe“ mit Datei-Upload und sofortiger Erkennung, Drag & Drop, Bearbeiten, Handy-Ansicht, Dunkelmodus
+- Einstellungen → „Belege & KI-Erkennung“ (`/api/receipts/settings`, Recht Einstellungen; API-Schlüssel wird nie zurückgegeben), KI-Test, Paperless-Prüfung
+- Finanz-Auswertung: Blatt „Ausgaben“ mit Händler, Beleg-Nr., Zahlart, MwSt-Satz, Vorsteuer, Beleg; Übersicht mit „darin Vorsteuer“; neuer Export „Alle Belege als ZIP“ (`/api/finance/receipts.zip`, Dateien `Datum_Händler_Betrag`, mit CSV)
+
 ## [1.57.0] - 2026-11-23
 
 ### Neu
