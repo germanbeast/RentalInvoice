@@ -5877,7 +5877,9 @@
         else if (newer) hint.textContent = 'Eine neue Version ist da. Nach der Freigabe installiert die Box sie beim nächsten Nachfragen.';
         else if (d.device && d.approved && d.device.versionCode < d.approved.versionCode) hint.textContent = 'Freigegeben, die Box hat das Update aber noch nicht installiert.';
         else hint.textContent = 'Alles aktuell.';
+        window.__tvboxLive = d.live || null;
         renderTvboxRemote(d);
+        loadTvboxRc();
     }
 
     const TVBOX_CMD_LABELS = {
@@ -5964,6 +5966,46 @@
         }
     }));
     if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
+
+    // TV-Box Fernwartung (ws-scrcpy über den ADB-Tunnel der Box, tv-remote.js)
+    function renderTvboxRc(d) {
+        if (!d || !d.success) return;
+        const live = window.__tvboxLive || null;
+        $('#tvbox-rc-enabled').checked = !!d.enabled;
+        $('#tvbox-rc-scrcpy').textContent = d.scrcpy ? 'läuft' : 'nicht eingerichtet (Skript unten, Schritt 1)';
+        $('#tvbox-rc-tunnel').textContent = !d.enabled ? 'aus' : d.tunnel
+            ? `verbunden seit ${new Date(d.tunnel.since).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+            : 'wartet auf die Box (bis zu 1 Minute, braucht TV-App 1.12)';
+        const local = d.tunnel && d.tunnel.adbLocal != null ? d.tunnel.adbLocal : live ? live.adbLocal : null;
+        $('#tvbox-rc-adblocal').textContent = local == null ? '–' : local ? 'an (Port 5555)' : 'aus → TV-Box-Fernwartung.bat am PC ausführen';
+        const st = d.adb && d.adb.state;
+        $('#tvbox-rc-adb').textContent = !d.tunnel ? '–' : st === 'device' ? 'erteilt, bereit'
+            : st === 'unauthorized' ? 'wartet: am Fernseher „USB-Debugging zulassen?“ mit „Immer“ bestätigen'
+            : st === 'kein adb' ? 'adb fehlt auf dem Server (Skript unten, Schritt 1)'
+            : st === 'offline' || st === 'host' ? 'Box antwortet nicht, „Neu verbinden“ versuchen'
+            : (st || '–') + (d.adb && d.adb.error ? ` (${d.adb.error})` : '');
+        let hint = '';
+        if (!d.scrcpy) hint = 'ws-scrcpy läuft auf dem Server noch nicht. Einmal das Skript im Container ausführen (siehe „Einmalig einrichten“).';
+        else if (d.enabled && d.tunnel && st === 'device') hint = 'Alles bereit. „Fernwartung öffnen“ und beim Gerät auf „H264 Converter“ klicken.';
+        else if (d.enabled && d.tunnel && local === false) hint = 'Die Box ist verbunden, aber ADB über Netzwerk ist aus (z. B. nach einem Neustart). Am PC TV-Box-Fernwartung.bat ausführen.';
+        $('#tvbox-rc-hint').textContent = hint;
+        $('#btn-tvbox-rc-open').disabled = !d.scrcpy;
+        $('#btn-tvbox-rc-reconnect').style.display = d.tunnel ? '' : 'none';
+    }
+    async function loadTvboxRc() {
+        if (!$('#tvbox-rc-card')) return;
+        renderTvboxRc(await apiJson('/api/settings/tvbox/remote').catch(() => null));
+    }
+    if ($('#tvbox-rc-enabled')) $('#tvbox-rc-enabled').addEventListener('change', async (e) => {
+        const d = await tvboxPost('/api/settings/tvbox/remote', { enabled: e.target.checked }, 'PUT');
+        if (d) { renderTvboxRc(d); showToast(e.target.checked ? 'Fernwartung erlaubt, die Box verbindet sich innerhalb einer Minute' : 'Fernwartung ausgeschaltet', 'success'); }
+    });
+    if ($('#btn-tvbox-rc-open')) $('#btn-tvbox-rc-open').addEventListener('click', () => window.open('/tv-fernwartung/', '_blank', 'noopener'));
+    if ($('#btn-tvbox-rc-refresh')) $('#btn-tvbox-rc-refresh').addEventListener('click', loadTvboxRc);
+    if ($('#btn-tvbox-rc-reconnect')) $('#btn-tvbox-rc-reconnect').addEventListener('click', async () => {
+        const d = await tvboxPost('/api/settings/tvbox/remote/reconnect');
+        if (d) renderTvboxRc(d);
+    });
 
     // TV: farewell on departure day + towel button (tv-guest.js)
     let tvGuestDefaults = [];

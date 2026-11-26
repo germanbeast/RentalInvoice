@@ -143,6 +143,7 @@ final class RemoteControl {
         body.put("pairCode", pairCode(p));
         body.put("printers", Printer.foundJson());
         body.put("printError", Printer.lastError);
+        body.put("adbLocal", AdbTunnel.adbLocal()); // Fernwartung: ADB über Netzwerk auf der Box an?
 
         String text;
         try {
@@ -163,6 +164,13 @@ final class RemoteControl {
         if (!paired) return;
         JSONObject welcome = res.optJSONObject("welcome");
         if (welcome != null) p.edit().putString("welcome_json", welcome.toString()).apply(); // für den Offline-Welcome-Screen
+
+        // Fernwartung (ws-scrcpy im Admin): Tunnel zur eigenen ADB-Schnittstelle öffnen/schließen
+        JSONObject remote = res.optJSONObject("remote");
+        try {
+            AdbTunnel.ensure(server(p), authToken(p), remote != null && remote.optBoolean("adbTunnel", false));
+        } catch (Exception ignored) {
+        }
 
         JSONObject cfg = res.optJSONObject("config");
         if (cfg != null) applyConfig(ctx, p, cfg);

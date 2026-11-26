@@ -2700,6 +2700,36 @@
                                         </div>
                                         <p class="text-muted" id="tvbox-cmd-state" style="font-size:.85rem; margin-top:.75rem"></p>
                                     </div>
+
+                                    <div class="card" style="margin-top: 1rem;" id="tvbox-rc-card">
+                                        <h4 style="margin-top:0">Fernwartung (Live-Bild &amp; Steuerung)</h4>
+                                        <p class="text-muted" style="font-size:.9rem">Zeigt den Fernseher live im Browser, du steuerst ihn mit Maus und Tastatur (ws-scrcpy). Die Box verbindet sich dafür von sich aus mit dem Server, an der FRITZ!Box musst du nichts freigeben. Nur Benutzer mit dem Recht „Einstellungen &amp; Integrationen: Bearbeiten“ können die Seite öffnen.</p>
+                                        <div class="form-group">
+                                            <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                                <input type="checkbox" id="tvbox-rc-enabled"> Fernwartung erlauben
+                                            </label>
+                                        </div>
+                                        <div class="info-row"><span>Server (ws-scrcpy):</span> <strong id="tvbox-rc-scrcpy">–</strong></div>
+                                        <div class="info-row"><span>Verbindung der Box:</span> <strong id="tvbox-rc-tunnel">–</strong></div>
+                                        <div class="info-row"><span>ADB über Netzwerk auf der Box:</span> <strong id="tvbox-rc-adblocal">–</strong></div>
+                                        <div class="info-row"><span>ADB-Freigabe:</span> <strong id="tvbox-rc-adb">–</strong></div>
+                                        <p class="text-muted" id="tvbox-rc-hint" style="font-size:.85rem; margin-top:.75rem"></p>
+                                        <div class="btn-group" style="flex-wrap: wrap;">
+                                            <button type="button" id="btn-tvbox-rc-open" class="btn btn-primary">Fernwartung öffnen</button>
+                                            <button type="button" id="btn-tvbox-rc-reconnect" class="btn btn-outline">Neu verbinden</button>
+                                            <button type="button" id="btn-tvbox-rc-refresh" class="btn btn-ghost">Status aktualisieren</button>
+                                        </div>
+                                        <details style="margin-top:1rem">
+                                            <summary style="cursor:pointer">Einmalig einrichten</summary>
+                                            <ol style="font-size:.9rem; padding-left:1.2rem; margin:.5rem 0 0">
+                                                <li>Im Ferienwohnung-Container auf dem Proxmox (<code>pct enter &lt;ID&gt;</code>):<br><code>curl -fsSLO https://raw.githubusercontent.com/germanbeast/RentalInvoice/main/tools/tv-fernwartung.sh &amp;&amp; bash tv-fernwartung.sh</code></li>
+                                                <li>Am PC <code>TV-Box-Fernwartung.bat</code> ausführen (schaltet ADB über Netzwerk auf der Box ein). Das ist auch nach jedem Neustart der Box nötig, falls die Box es nicht dauerhaft speichert.</li>
+                                                <li>Hier „Fernwartung erlauben“ anhaken. Innerhalb einer Minute verbindet sich die Box.</li>
+                                                <li>Beim ersten Mal fragt der Fernseher „USB-Debugging zulassen?“. Haken bei „Immer von diesem Computer zulassen“ setzen und OK drücken.</li>
+                                                <li>„Fernwartung öffnen“, dann beim Gerät <code>127.0.0.1:15555</code> auf „H264 Converter“ klicken.</li>
+                                            </ol>
+                                        </details>
+                                    </div>
                                 </div>
 
                                 <h3 style="margin-top: 2rem;">Abreisetag &amp; Handtücher</h3>

@@ -197,6 +197,28 @@ if not "%PIN%"=="" set PINARG=--es admin_pin %PIN%
 "%ADB%" -s %BOX% shell am force-stop %PKG% >nul 2>nul
 "%ADB%" -s %BOX% shell am start -n %PKG%/.MainActivity --es server_url %SERVER% %PINARG%
 
+rem ---------- Fernwartung: ADB ueber Netzwerk (Port 5555) ----------
+echo.
+echo Fernwartung im Admin (Live-Bild + Steuerung im Browser) braucht "ADB ueber Netzwerk" auf der Box.
+set RC=
+set /p RC=ADB ueber Netzwerk fuer die Fernwartung einschalten? (J/n): 
+if /i "%RC%"=="n" goto done
+rem dauerhaft versuchen (klappt nicht auf jeder Box), danach Port 5555 bis zum naechsten Neustart
+"%ADB%" -s %BOX% shell setprop persist.adb.tcp.port 5555 >nul 2>nul
+"%ADB%" -s %BOX% shell getprop persist.adb.tcp.port >"%TEMP%\bh_adb.txt" 2>nul
+set PERSIST=
+set /p PERSIST=<"%TEMP%\bh_adb.txt"
+"%ADB%" -s %BOX% tcpip 5555
+if "%PERSIST%"=="5555" (
+  echo ADB ueber Netzwerk ist an und bleibt auch nach einem Neustart der Box an.
+) else (
+  echo ADB ueber Netzwerk ist an. Nach einem Neustart der Box TV-Box-Fernwartung.bat erneut ausfuehren.
+)
+echo Im Admin: Einstellungen - TV-Box - "Fernwartung erlauben" anhaken.
+echo Beim ersten Mal fragt der Fernseher "USB-Debugging zulassen?": Haken bei "Immer" und OK.
+
+:done
+
 echo.
 echo ============================================
 echo Fertig. Die Box zeigt jetzt den Welcome-Screen und startet ihn nach dem Einschalten.
