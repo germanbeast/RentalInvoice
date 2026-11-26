@@ -16,6 +16,16 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Einstellungen → „Belege & KI-Erkennung“ (`/api/receipts/settings`, Recht Einstellungen; API-Schlüssel wird nie zurückgegeben), KI-Test, Paperless-Prüfung
 - Finanz-Auswertung: Blatt „Ausgaben“ mit Händler, Beleg-Nr., Zahlart, MwSt-Satz, Vorsteuer, Beleg; Übersicht mit „darin Vorsteuer“; neuer Export „Alle Belege als ZIP“ (`/api/finance/receipts.zip`, Dateien `Datum_Händler_Betrag`, mit CSV)
 
+## [1.58.0] - 2026-11-24
+
+### Neu
+- TV-Box Fernwartung (`tv-remote.js`): ws-scrcpy (Live-Bild + Steuerung) über einen ADB-Tunnel, den die Box selbst aufbaut. TV-App 1.12 (`AdbTunnel.java`, OkHttp) öffnet bei `remote.adbTunnel` aus `/api/tv-box/sync` eine WebSocket-Verbindung zu `/api/tv-box/adb-tunnel` (Header `x-tvbox-auth`) und leitet sie an `127.0.0.1:5555` der Box weiter; der Server bietet sie als `127.0.0.1:15555` an (`TV_ADB_PORT`) und führt `adb connect` aus
+- ws-scrcpy läuft als PM2-Prozess `ws-scrcpy` nur auf `127.0.0.1:8000` (`WS_SCRCPY_URL`) und ist nur über den Admin erreichbar: `/tv-fernwartung/` (HTTP) und WebSockets `/?action=…`, beide mit Admin-Sitzung, Recht „Einstellungen: Bearbeiten“, gleicher Origin, nicht auf dem Gast-Host
+- `GET/PUT /api/settings/tvbox/remote`, `POST /api/settings/tvbox/remote/reconnect`; Sync meldet `adbLocal`
+- `tools/tv-fernwartung.sh`: installiert adb, baut ws-scrcpy v0.8.1 (auf 127.0.0.1 gepatcht) nach `/opt/ws-scrcpy`, PM2 als App-Benutzer, Prüfung (`status`)
+- `TV-Box-Fernwartung.bat` (neu) und optionaler Schritt in `TV-Box-einrichten.bat`: `setprop persist.adb.tcp.port 5555` (falls erlaubt) + `adb tcpip 5555`
+- Abhängigkeit `ws`
+
 ## [1.57.0] - 2026-11-23
 
 ### Neu

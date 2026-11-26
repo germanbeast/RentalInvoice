@@ -1162,7 +1162,7 @@ if (!process.env.SESSION_SECRET) {
 // otherwise it ends after 8 hours without activity (rolling: every request extends it).
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
-app.use(session({
+const sessionMiddleware = session({
     secret: sessionSecret,
     name: '__sid',
     store: require('./session-store')(session, db),
@@ -1176,7 +1176,8 @@ app.use(session({
         sameSite: 'strict',
         maxAge: SESSION_MS
     }
-}));
+});
+app.use(sessionMiddleware);
 
 function startUserSession(req, user, remember) {
     req.session.user = user;
@@ -1282,6 +1283,13 @@ function tvboxViewAllowed(req) {
     return !!(req.session && req.session.user) || tvboxDeviceAuthorized(req);
 }
 
+// Fernwartung: ws-scrcpy over an ADB tunnel the box opens itself (see tv-remote.js, tools/tv-fernwartung.sh)
+const tvRemote = require('./tv-remote')({
+    db, permissions, sessionMiddleware,
+    deviceAuthorized: (req) => tvboxDeviceAuthorized(req),
+    isAdminHost: (req) => { const g = guestDomain(); return !g || requestHost(req) !== g.host; }
+});
+
 function tvboxConfig() {
     return { ...TVBOX_DEFAULT_CONFIG, ...(db.getSetting('tvbox_config') || {}) };
 }
@@ -1319,6 +1327,7 @@ app.post('/api/tv-box/sync', (req, res) => {
                 port: parseInt(x && x.port, 10) || 631, path: clip(x && x.path, 100)
             })).filter(x => x.host),
             printError: clip(b.printError, 200),
+            adbLocal: b.adbLocal === undefined ? null : !!b.adbLocal, // port 5555 open on the box (Fernwartung)
             lastSeen: now
         };
         res.set('Cache-Control', 'no-store');
@@ -1348,6 +1357,7 @@ app.post('/api/tv-box/sync', (req, res) => {
             paired: true,
             config: { version: cfg.version || 0, kiosk: cfg.kiosk !== false, idleHours: cfg.idleHours, adminPin: cfg.adminPin || '' },
             welcome: (() => { try { return welcomeData(); } catch (e) { return null; } })(), // offline copy on the box
+            remote: tvRemote.syncInfo(), // Fernwartung: tunnel to the box's ADB (tv-remote.js)
             command: cmd && cmd.seq > status.ackSeq && now - cmd.createdAt < 24 * 60 * 60 * 1000 ? { seq: cmd.seq, type: cmd.type } : null,
             print: (() => { try { return printJobs.forBox(); } catch (e) { console.error('Druckaufträge:', e.message); return null; } })()
         });
@@ -2673,6 +2683,9 @@ app.put('/api/settings/tvbox/config', apiLimiter, (req, res) => {
     db.setSetting('tvbox_config', next);
     res.json({ success: true, ...tvboxRemoteState() });
 });
+
+// Fernwartung (ws-scrcpy): on/off, status, and the page itself under /tv-fernwartung/ (right: settings, edit)
+tvRemote.registerAdminRoutes(app, { limiter: apiLimiter });
 
 app.post('/api/settings/tvbox/command', apiLimiter, (req, res) => {
     const type = String((req.body || {}).type || '');
@@ -4369,7 +4382,7 @@ app.use((err, req, res, next) => {
 // =======================
 // LISTEN_HOST=127.0.0.1 in .env: reachable only through the tunnel/proxy on this machine, port 3000 closed to the outside
 const LISTEN_HOST = process.env.LISTEN_HOST || undefined;
-app.listen(PORT, LISTEN_HOST, () => {
+const httpServer = app.listen(PORT, LISTEN_HOST, () => {
     console.log(`🔒 Server (Hardened + SQLite) running on http://${LISTEN_HOST || 'localhost'}:${PORT}`);
     console.log(`   Static files: ${PUBLIC_DIR}`);
 
@@ -4377,6 +4390,8 @@ app.listen(PORT, LISTEN_HOST, () => {
     initWhatsApp();
     initTelegram();
 });
+// WebSockets: ADB tunnel of the TV box and the ws-scrcpy page (TV-Fernwartung, tv-remote.js)
+httpServer.on('upgrade', tvRemote.handleUpgrade);
 
 // Graceful shutdown
 // WhatsApp's Chromium is closed too, otherwise it keeps the profile locked for the next start
