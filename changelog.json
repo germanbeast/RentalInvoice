@@ -1,9 +1,9 @@
 {
-    "currentVersion": "1.37.0",
+    "currentVersion": "1.60.0",
     "releases": [
         {
-            "version": "1.37.0",
-            "date": "2026-11-01",
+            "version": "1.60.0",
+            "date": "2026-11-26",
             "title": "Server-Wächter",
             "features": [
                 "Neuer Server-Wächter als eigener Prozess: meldet per Telegram, wenn die App nicht antwortet (nach 3 Minuten), beckhome.cloud über den Cloudflare Tunnel nicht erreichbar ist (nach 5 Minuten), die Festplatte fast voll ist oder der Server neu gestartet wurde, jeweils auch wenn alles wieder läuft",
@@ -14,7 +14,378 @@
                 "Startet automatisch mit ./update.sh oder nach dem Update über den Knopf im Admin"
             ],
             "fixes": []
-
+        },
+        {
+            "version": "1.59.1",
+            "date": "2026-11-26",
+            "title": "Kartenabgleich: Ersatzdienst und Grund bei Störung",
+            "features": [],
+            "fixes": [
+                "Blockiert OpenStreetMap (Nominatim) Anfragen vom Server oder antwortet zu langsam, fragt der Bot jetzt automatisch Photon (ebenfalls OpenStreetMap-Daten) statt „Kartenabgleich gerade nicht möglich“ zu melden",
+                "Ein einzelner Fehler bricht den Abgleich nicht mehr ab; das Zeitlimit reicht jetzt für alle Suchschritte",
+                "Klappt es trotzdem nicht, steht der Grund dabei (z. B. „Kartendienst blockiert Anfragen von diesem Server“ oder „antwortet nicht rechtzeitig“), die Anschrift bleibt so wie erkannt"
+            ]
+        },
+        {
+            "version": "1.59.0",
+            "date": "2026-11-25",
+            "title": "Belege per Telegram-Foto, Paperless",
+            "features": [
+                "Foto vom Kassenbon oder Rechnung als PDF an den Telegram-Bot schicken: Händler, Datum, Betrag, MwSt und Kategorie werden erkannt, du bestätigst oder änderst per Knopf",
+                "Gespeicherte Ausgaben stehen unter „Ausgaben“ und zählen in der Finanz-Auswertung, inklusive Vorsteuer",
+                "Belege landen auf Wunsch automatisch in Paperless (mit Tags, Händler als Korrespondent und Betrag); umgekehrt können Dokumente mit einem Tag aus Paperless als Ausgaben übernommen werden",
+                "Optional genauere Erkennung mit KI (Claude), einstellbar unter Einstellungen → Belege & KI-Erkennung",
+                "Neue Ausgaben-Seite mit Filtern, Beleg-Vorschau, Hochladen per Drag & Drop und Export „Alle Belege als ZIP“",
+                "Telegram: /beleg und /ausgaben"
+            ]
+        },
+        {
+            "version": "1.58.0",
+            "date": "2026-11-24",
+            "title": "TV-Box: Fernwartung mit Live-Bild im Browser",
+            "features": [
+                "Unter Einstellungen → TV-Box gibt es jetzt „Fernwartung“: Du siehst den Fernseher live im Browser und steuerst die Box mit Maus und Tastatur, auch von unterwegs",
+                "Die Box verbindet sich dafür selbst mit dem Server (TV-App 1.12). An der FRITZ!Box musst du nichts freigeben, nur „Fernwartung erlauben“ anhaken",
+                "Die Seite öffnet sich nur nach dem Admin-Login und nur für Benutzer mit dem Recht „Einstellungen & Integrationen: Bearbeiten“. Der Dienst dahinter ist von außen nicht erreichbar",
+                "Einmalig einrichten: Skript tools/tv-fernwartung.sh im Container und TV-Box-Fernwartung.bat am PC (Anleitung direkt im Admin)"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.57.0",
+            "date": "2026-11-23",
+            "title": "Admin: Dunkelmodus",
+            "features": [
+                "Oben rechts neben „DE“ gibt es einen neuen Knopf (Sonne/Mond): Hell, Dunkel oder Automatisch. Automatisch folgt der Einstellung von Handy oder PC und wechselt abends mit",
+                "Die Wahl wird für jeden Benutzer gespeichert und gilt auch auf anderen Geräten nach dem Anmelden",
+                "Kalender, Buchungen, Dialoge, Einstellungen, Diagramme und die Karte im Jahresrückblick sind im Dunkelmodus angepasst. Die Rechnungsvorschau bleibt weißes Papier, Drucken bleibt immer hell"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.56.0",
+            "date": "2026-11-23",
+            "title": "Gäste-WLAN: Startseite nach der Anmeldung",
+            "features": [
+                "Nach der WLAN-Anmeldung sieht der Gast eine Startseite: Wetter heute und für die nächsten drei Tage, einen Tipp des Tages aus deinen Ausflugstipps (jeden Tag ein anderer, ohne Ausflugstipps ein Abschnitt aus der Gästemappe), was gerade geöffnet hat und Veranstaltungen",
+                "Knopf „Neue Handtücher“ auf der Startseite mit Rückfrage. Du bekommst dieselbe Nachricht wie vom Fernseher, mit dem Zusatz „auf der WLAN-Startseite“. Höchstens einmal pro Buchung alle 30 Minuten, gemeinsam mit dem TV-Knopf. Ein- und ausschalten wie bisher unter Einstellungen → TV-Box",
+                "Am Abreisetag zeigt die Startseite „Danke, <Name>!“, die Check-out-Zeit und deine Hinweise für die Abreise, wie auf dem Fernseher",
+                "Öffnet der Gast die WLAN-Seite später noch einmal, erscheint wieder seine Startseite statt nur „Sie sind online“. Auch Gastgeber- und Zusatz-Codes sehen jetzt Wetter und Tipp"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.55.1",
+            "date": "2026-11-23",
+            "title": "Gäste-WLAN: Einrichtung bricht nicht mehr zu früh ab",
+            "features": [],
+            "fixes": [
+                "Der Einrichtungsbefehl für den WLAN-Router meldete „openNDS ist nicht gestartet“, obwohl alles lief, weil er nur 12 Sekunden gewartet hat. Jetzt wartet er bis zu 90 Sekunden. Die automatischen Updates werden schon vorher eingeschaltet"
+            ]
+        },
+        {
+            "version": "1.55.0",
+            "date": "2026-11-23",
+            "title": "Fernseher: Abschiedsgruß am Abreisetag und Knopf für neue Handtücher",
+            "features": [
+                "Am Abreisetag zeigt der Fernseher „Danke, <Name>!“, die Check-out-Zeit und deine Hinweise für die Abreise (Geschirr, Müll, Fenster, Tür …), in der Sprache des Gastes. Hinweise und Abschiedstext änderst du unter Einstellungen → TV-Box",
+                "Am Wechseltag sieht der abreisende Gast seinen Abschiedsgruß bis eine halbe Stunde nach dem Check-out, danach begrüßt der Fernseher den neuen Gast",
+                "Neuer Knopf „Neue Handtücher“ dezent rechts unten auf dem Fernseher. Der Gast muss noch einmal bestätigen, dann bekommst du eine Telegram-Nachricht mit Name und Aufenthalt. Die letzten Anfragen siehst du unter Einstellungen → TV-Box"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.54.0",
+            "date": "2026-11-22",
+            "title": "Hintergrund-Video der Ferienwohnung auf Webseite, Meine Buchung und TV",
+            "features": [
+                "Unter Webseite → Inhalte → „Hintergrund-Video“ ein Video der Wohnung hochladen (auch große Handy-Videos bis 2 GB, der Upload läuft in Stücken)",
+                "Der Server kürzt es auf 60 Sekunden, entfernt den Ton, rechnet die Unschärfe ein und macht es klein (meist unter 2 MB), dazu ein Standbild",
+                "Das Video läuft stumm in Endlosschleife im Hintergrund der Startseite, von „Meine Buchung“ und des TV-Welcome-Screens; Unschärfe per Regler, jede Stelle einzeln abschaltbar",
+                "Auf Handys optional; bei „Bewegung reduzieren“, Datensparmodus oder langsamer Verbindung bleibt es beim Standbild. Außerhalb des Bildschirms pausiert das Video",
+                "TV-App 1.11: Video startet ohne Tastendruck"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.53.0",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router aktualisiert sich selbst",
+            "features": [
+                "Der WLAN-Router holt sich neue Versionen seines Einrichtungs-Skripts selbst vom Server: nachts zwischen 3 und 5 Uhr oder sobald kein Gast online ist. Unter Webseite → WLAN steht, ob er aktuell ist, mit Knopf „Jetzt aktualisieren“. Einmalig muss der Einrichtungsbefehl noch von Hand laufen"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.51.0",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Codes per Telegram, Geräte rauswerfen, WLAN auf dem Ausdruck",
+            "features": [
+                "Telegram /wlan (oder Knopf „📶 WLAN-Codes“): zusätzliche WLAN-Codes für Besucher oder Handwerker erzeugen, 4 Stunden bis 1 Woche, mit Notiz (z. B. /wlan 4h Handwerker). Codes anzeigen und löschen",
+                "Auf dem automatisch gedruckten Buchungsblatt stehen jetzt WLAN-Name, WLAN-Kennwort und der WLAN-Code der Buchung"
+            ],
+            "fixes": [
+                "Ein im Admin vergessenes Gerät wird jetzt auch vom WLAN abgemeldet, spätestens 2 Minuten später. Dafür einmal den Einrichtungsbefehl auf dem Router neu ausführen"
+            ]
+        },
+        {
+            "version": "1.50.6",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Internet nach dem Login",
+            "features": [],
+            "fixes": [
+                "Nach dem WLAN-Login kam das Handy nicht ins Internet. Die Anmeldeseite (openNDS) hat die Sperre für das Heimnetz falsch umgesetzt und dadurch alles gesperrt. Das Heimnetz bleibt weiter über die Firewall des Routers gesperrt. Bestehende Router: Einrichtungsbefehl einmal neu ausführen"
+            ]
+        },
+        {
+            "version": "1.50.5",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Anmeldefenster schließt sich",
+            "features": [],
+            "fixes": [
+                "Nach dem WLAN-Login blieb das Anmeldefenster des iPhones offen und iOS zeigte kein WLAN-Symbol. Neuer Knopf „Weiter ins Internet“ öffnet die Prüfseite des Handys, danach erkennt iOS bzw. Android das freie Internet und das Fenster lässt sich mit „Fertig“ schließen"
+            ]
+        },
+        {
+            "version": "1.50.4",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router wird nicht mehr ausgebremst",
+            "features": [],
+            "fixes": [
+                "Der WLAN-Router fragt jede Sekunde beim Server nach und teilt sich die Internet-Adresse mit allen Geräten im Haus. Die allgemeine Bremse von 100 Anfragen pro Minute hat ihn deshalb abgewiesen: Router nicht verbunden, Anmeldung lud endlos. Seine Abfragen sind jetzt davon ausgenommen",
+                "Begrüßungsseite nach dem WLAN-Login: Hinweis, dass sich das Anmeldefenster des Handys nicht selbst schließt (oben auf „Fertig“ tippen)"
+            ]
+        },
+        {
+            "version": "1.50.3",
+            "date": "2026-11-22",
+            "title": "Gäste-WLAN: Router meldet sich wieder",
+            "features": [],
+            "fixes": [
+                "Der Router (openNDS) schickt seine Abfragen als Formular, die App hat nur JSON gelesen und mit „nicht gefunden“ geantwortet. Deshalb meldete openNDS „FAS nicht erreichbar“ und der Router erschien im Admin nicht als verbunden"
+            ]
+        },
+        {
+            "version": "1.50.2",
+            "date": "2026-11-20",
+            "title": "Gäste-WLAN: Anleitung für den GL.iNet GL-A1300",
+            "features": [],
+            "fixes": [
+                "Die Router-Anleitung unter Webseite → WLAN beschreibt jetzt den GL.iNet GL-A1300 (Slate Plus) statt des Cudy WR3000. Die neue Hardware-Version WR3000 V2 hat einen anderen Chip und läuft nicht mit OpenWrt",
+                "Gäste-WLAN: openNDS meldete beim Start „FAS nicht erreichbar“, weil seine Prüf-Adresse /wlan. (mit Punkt) nicht beantwortet wurde",
+                "WLAN-Anmeldeseite: Der 8-stellige Gastgeber-Code passte nicht ins Eingabefeld und wurde nach 6 Ziffern abgeschnitten"
+            ]
+        },
+        {
+            "version": "1.50.1",
+            "date": "2026-11-18",
+            "title": "Rechnung: immer die Anschrift des richtigen Gastes",
+            "features": [
+                "Neu unter Start bzw. im Kalender: „Anschriften prüfen“ zeigt Rechnungen und Gäste, die wahrscheinlich die Anschrift einer anderen Person tragen, mit Vorschlag aus dem Meldeschein. Mit einem Klick übernehmen, selbst korrigieren oder als richtig markieren",
+                "Hat ein Gast noch keine Anschrift, aber einen Meldeschein ausgefüllt, wird beim Erstellen der Rechnung die Meldeschein-Anschrift eingesetzt"
+            ],
+            "fixes": [
+                "„Rechnung erstellen“ an einer Buchung übernahm die Anschrift (und E-Mail, Türcode, Gutschein) der vorherigen Rechnung im Formular, wenn beim neuen Gast nichts hinterlegt war. Jetzt kommen alle Gastdaten frisch vom Gast genau dieser Buchung",
+                "Beim Speichern wurde die Rechnung über Name oder E-Mail einem Gast zugeordnet und dessen Anschrift überschrieben, so verbreitete sich eine falsche Anschrift in der Gästeliste. Jetzt ist die Rechnung fest mit Buchung und Gast verbunden; ohne diese Verbindung wird keine gespeicherte Anschrift mehr überschrieben",
+                "Eine bereits gespeicherte Rechnungsnummer wird beim Erstellen aus einer Buchung nicht wiederverwendet (das hätte die alte Rechnung überschrieben)",
+                "Gleiche E-Mail bei zwei verschiedenen Namen legt keine zwei Personen mehr zusammen",
+                "Anschrift aus Meldeschein oder Gast-Rechnung ersetzt eine falsch gespeicherte Anschrift statt sie stehen zu lassen",
+                "Gästeliste: Adressfeld ist jetzt mehrzeilig, Zeilenumbrüche gehen beim Speichern nicht mehr verloren"
+            ]
+        },
+        {
+            "version": "1.49.0",
+            "date": "2026-11-17",
+            "title": "Anschrift mit OpenStreetMap abgleichen, Booking.com-Zusatzangaben aussortieren",
+            "features": [
+                "Jede Anschrift aus Telegram (Text oder Screenshot) wird mit OpenStreetMap abgeglichen: fehlende PLZ oder fehlender Ort werden ergänzt, die Schreibweise des Orts korrigiert (z. B. „Čadca“ statt „CADCA“)",
+                "Widerspricht die Karte (andere PLZ, anderer Straßenname), ändert der Bot nichts von selbst, sondern zeigt „Laut Karte eher …“ mit Knopf „Werte von der Karte übernehmen“; „Ohne Kartenabgleich“ stellt alles wie erkannt wieder her",
+                "Gibt es eine Straße in mehreren Orten und fehlt der Ort, sagt der Bot das statt zu raten; ist der Kartendienst nicht erreichbar, geht alles ohne Abgleich weiter"
+            ],
+            "fixes": [
+                "„Erwachsener 1“, „Bevorzugte Sprache Englisch“ und „Land/Region“ landen nicht mehr in der Adresse, auch wenn alles in einer Zeile steht",
+                "Passt eine Postleitzahl nicht zum Land (z. B. „3118 A.Hlinka“ bei Slowakei), wird sie als Hausnummer erkannt: „A.Hlinka 3118/37, Slowakei“",
+                "Zeilen wie „Zeitraum:“, „Betrag:“ oder andere unbekannte Beschriftungen werden übersprungen",
+                "Eine Anschrift aus Straße und Land ohne Ort wird ebenfalls übernommen; bereits falsch gespeicherte Adressen werden beim nächsten Rechnung-Erstellen bereinigt",
+                "Screenshot aus der Booking.com-App (auch im Dunkelmodus): Symbole vor Namen, E-Mail und Land werden nicht mehr als Buchstaben mitgelesen; „A.Hlinka 3118,, ČADCA, 02201“ wird zu „A.Hlinka 3118 / 022 01 Cadca / Slowakei“ (Hatschek-Buchstaben erkennt die Texterkennung nicht immer)"
+            ]
+        },
+        {
+            "version": "1.48.1",
+            "date": "2026-11-17",
+            "title": "Rechnung: nur die echte Anschrift übernehmen",
+            "features": [],
+            "fixes": [
+                "Wird ein ganzer Booking.com-Text in den Rechnungsdialog kopiert, landet nur noch die Anschrift auf der Rechnung, nicht mehr Wohnungsname, Erwachsene, Sprache usw.",
+                "„Land/Region“, „Erwachsener“, „Bevorzugte Sprache“ und weitere Booking.com-Beschriftungen werden erkannt bzw. ausgeblendet",
+                "Eine bereits gespeicherte, unordentliche Gast-Adresse wird beim Erstellen der Rechnung bereinigt",
+                "Slowakische und tschechische Postleitzahlen werden als „034 01“ geschrieben"
+            ]
+        },
+        {
+            "version": "1.48.0",
+            "date": "2026-11-17",
+            "title": "Gäste-App auf Englisch, Niederländisch und Polnisch",
+            "features": [
+                "Meine Buchung (mit Meldeschein, Ankunft, A–Z, Umgebung, Rechnung), die WLAN-Anmeldeseite, Notfall-Öffnen und der Fernseher gibt es jetzt auf Deutsch, Englisch, Niederländisch und Polnisch",
+                "Die Sprache wird automatisch gewählt: aus Meldeschein, Anschrift (auch der per Telegram eingefügten), Telefonvorwahl oder E-Mail des Gastes, sonst aus der Sprache des Browsers. Gäste können oben oder im Menü umschalten",
+                "Im Kalender-Popup einer Buchung lässt sich die Sprache festlegen (Automatisch, Deutsch, Englisch, Niederländisch, Polnisch); dort stehen jetzt auch Telefon und Anschrift des Gastes",
+                "Gästenachricht und Anreise-Nachricht kommen automatisch in der Sprache des Gastes, jetzt auch auf Niederländisch und Polnisch",
+                "Meldeschein und Rechnung auf Meine Buchung sind mit der gespeicherten Anschrift des Gastes vorausgefüllt"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.47.0",
+            "date": "2026-11-17",
+            "title": "Anschrift einfach in Telegram einfügen",
+            "features": [
+                "Anschrift unformatiert in Telegram schicken (z. B. aus Booking.com kopiert): Der Bot erkennt Name, Firma, Straße, Hausnummer, Zusatz, PLZ, Ort, Land, Telefon und E-Mail",
+                "Das Land wird auch erkannt, wenn es nicht dasteht: aus dem PLZ-Format (z. B. 1015 CJ, 00-590, SW1A 2AA), bekannten Orten (Wien, Zürich, Brüssel …) und der Telefonvorwahl",
+                "Danach nur noch die Buchung antippen (passender Name mit ⭐ oben) und bestätigen; gespeichert wird sauber formatiert beim Gast, die nächste Rechnung übernimmt die Anschrift",
+                "Hat die Buchung noch keinen Namen, bekommt sie ihn gleich mit (auch der Türcode wird umbenannt); ein abweichender Name wird nur auf Wunsch übernommen",
+                "Neu: /adresse und Knopf „📇 Anschrift einfügen“ im Hauptmenü und nach „Namen eintragen“",
+                "Im Rechnungsdialog wird eine eingefügte Adresse ebenfalls sauber formatiert",
+                "Auch ein Screenshot geht (z. B. aus der Booking.com-App): Der Text wird direkt auf deinem Server gelesen, nichts geht an fremde Dienste; das Bild wird nicht gespeichert und nach dem Speichern auch aus dem Telegram-Chat gelöscht"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.46.0",
+            "date": "2026-11-17",
+            "title": "Gäste-WLAN: eigenes Passwort pro Buchung oder eigener Router mit Anmeldeseite",
+            "features": [
+                "Neuer Bereich Webseite → WLAN mit drei Varianten: festes Passwort, eigenes Passwort pro Buchung über die FRITZ!Box, oder eigener Router (Cudy WR3000 mit OpenWrt) mit Anmeldeseite",
+                "Anmeldeseite im Stil der Gäste-Webseite: Gäste geben einen 6-stelligen Zugangscode ein und werden mit Namen begrüßt; der Code gilt vom Anreisetag bis zum Check-out (plus Nachlauf)",
+                "Geräte, die im Aufenthalt schon online waren, kommen ohne Code wieder rein; wer auf „Meine Buchung“ angemeldet ist, verbindet mit einem Tipp",
+                "Höchstzahl Geräte pro Buchung, Gastgeber-Code für eigene Geräte, Liste der angemeldeten Geräte, Telegram-Meldung, wenn der Router sich nicht mehr meldet",
+                "Router-Einrichtung mit einem einzigen Befehl samt Schritt-für-Schritt-Anleitung im Admin",
+                "Zugangsdaten mit QR-Code auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher",
+                "Begrüßungsseite nach dem WLAN-Login: Check-out-Zeit, Hausregeln, Wetter, geöffnete Ausflugsziele und Veranstaltungen, WhatsApp- und Telefon-Knopf",
+                "WLAN-Statistik im Admin: Geräte gerade online, Datenvolumen heute, im aktuellen Aufenthalt und in 30 Tagen, Balken der letzten 14 Tage, Volumen pro Gerät",
+                "Gäste-WLAN geht bei Leerstand automatisch aus und am Anreisetag um 0 Uhr wieder an; „24 Std. einschalten“ für eigene Geräte, „24 Std. ausschalten“ und „Automatik“"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.45.0",
+            "date": "2026-11-11",
+            "title": "Neue Buchungen automatisch ausdrucken",
+            "features": [
+                "Bei jeder neuen Buchung (Booking.com, Airbnb, Webseite, auf Wunsch auch selbst eingetragene) kommt automatisch ein Buchungsblatt aus dem Drucker: Gast, Zeitraum, Nächte, Personen, Telefon, E-Mail, Preis, Türcode, Nachricht",
+                "Gedruckt wird von der TV-Box im Hintergrund (TV-App 1.10): Sie holt neue Aufträge jede Minute ab und schickt sie per IPP/AirPrint oder Port 9100 an den Drucker im WLAN, der Fernseher zeigt davon nichts",
+                "Einstellungen → Drucker: Ein/Aus, Drucker-IP (die Box findet Drucker im WLAN selbst), Testseite, Muster-Blatt, letzte Druckaufträge mit „Erneut versuchen“",
+                "„Ausdrucken“ im Buchungs-Popup im Kalender",
+                "Telegram-Hinweis, wenn ein Druck fehlschlägt oder die Box ihn 2 Stunden lang nicht erledigt hat"
+            ]
+        },
+        {
+            "version": "1.44.1",
+            "date": "2026-11-07",
+            "title": "TV-Box bleibt bei Internet-Ausfall bedienbar",
+            "features": [
+                "Fällt das Internet aus, bleibt der Welcome-Screen stehen bzw. die Box zeigt ihn aus dem Speicher: mit Name, Zeiten, Uhr und dem Knopf „Fernsehen schauen“, ohne Fehlermeldung"
+            ]
+        },
+        {
+            "version": "1.44.0",
+            "date": "2026-11-07",
+            "title": "TV-Box: Welcome-Seite nur noch für die eigene Box",
+            "features": [
+                "Die Welcome-Seite ist nicht mehr öffentlich: nur die gekoppelte TV-Box und der angemeldete Gastgeber (Vorschau) sehen sie",
+                "Neue Box zeigt beim Start einen 6-stelligen Kopplungs-Code, der im Admin eingegeben wird",
+                "Ohne Internet: WLAN- und Netzwerk-Einstellungen direkt aus der App (nach der Kopplung nur mit PIN)"
+            ]
+        },
+        {
+            "version": "1.43.0",
+            "date": "2026-11-07",
+            "title": "TV-Box aus dem Admin fernsteuern",
+            "features": [
+                "TV-Box im Admin koppeln und dann von dort steuern: Kiosk-Modus an/aus, Ruhezeit, Admin-PIN",
+                "Befehle an die Box: Welcome-Screen zeigen, neu laden, Update suchen, Android-Einstellungen öffnen, Neustart",
+                "Live-Status der Box: online, Kiosk aktiv, was gerade läuft, letzter Tastendruck",
+                "Wird 4 Stunden lang keine Taste auf der Fernbedienung gedrückt, kehrt die Box von Waipu & Co. automatisch zum Welcome-Screen zurück"
+            ]
+        },
+        {
+            "version": "1.42.0",
+            "date": "2026-11-06",
+            "title": "TV-Box aktualisiert sich selbst",
+            "features": [
+                "Neue Einstellungsseite „TV-Box (Welcome-Screen)“: installierte und neueste App-Version auf einen Blick",
+                "Updates für die TV-Box mit einem Klick freigeben, die Box installiert sie danach selbst"
+            ]
+        },
+        {
+            "version": "1.41.3",
+            "date": "2026-11-06",
+            "title": "TV-Box: Welcome-Screen nach dem Einschalten",
+            "features": [
+                "Nach dem Aus- und Einschalten des Fernsehers erscheint zuverlässig wieder der Welcome-Screen, auch wenn nur der Fernseher ausgeschaltet wurde"
+            ]
+        },
+        {
+            "version": "1.41.2",
+            "date": "2026-11-06",
+            "title": "TV-Box: Ausstieg über Zurück-Taste",
+            "features": [
+                "Gastgeber-Menü am Fernseher: Zurück-Taste 10 Sekunden halten, dann PIN",
+                "Nach Aus- und Einschalten zeigt die Box immer den Welcome-Screen statt der zuletzt benutzten App"
+            ]
+        },
+        {
+            "version": "1.41.1",
+            "date": "2026-11-06",
+            "title": "TV-Box: Welcome-Screen mit PIN-Ausstieg",
+            "features": [
+                "Welcome-Screen am Fernseher zeigt nur noch „Fernsehen schauen“ und „Vor-Ort-Informationen“ (urlaub.saarland)",
+                "TV-App: Einstellungen nur mit PIN, darin WLAN, Android-Einstellungen und „Kiosk beenden“",
+                "WLAN der Box bleibt auch im Dauerbetrieb verbunden, Waipu wird zuverlässig gefunden"
+            ]
+        },
+        {
+            "version": "1.41.0",
+            "date": "2026-11-02",
+            "title": "Gutscheine für Gäste",
+            "features": [
+                "Neue Seite „Gutscheine“: Gratisnächte, Betrag oder Rabatt in Prozent, mit Code, Gast, Gültigkeit, Mindestaufenthalt und persönlichem Text",
+                "Gutschein drucken (A5-Karte, auch als PDF) oder fertigen Text mit Buchungslink für WhatsApp/E-Mail kopieren",
+                "Gäste lösen den Code bei der Buchungsanfrage auf der Webseite ein und sehen den Rabatt sofort im Preis",
+                "„Buchung eintragen“ und das Rechnungsformular („Gutschein einlösen“) verrechnen Gutscheine für Telefon- und Stammgast-Buchungen",
+                "Rechnungen für einen Aufenthalt mit Gutschein (Telegram-Bot, Gast-Rechnung) bekommen die Rabatt-Position automatisch",
+                "„Gutschein schenken“ direkt aus dem Kalender-Popup oder beim Gast; jeder Gutschein gilt einmal, eingelöste bleiben nachvollziehbar",
+                "Neues Recht „Gutscheine“ in der Benutzerverwaltung"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.40.0",
+            "date": "2026-11-02",
+            "title": "Anfahrts-Assistent am Anreisetag",
+            "features": [
+                "Neuer Bereich Webseite → Ankunft: Hinweis für die letzten Meter, Parken mit Foto, Beschreibung der Haustür mit Foto und Schritt für Schritt zum Öffnen (bis zu 10 Schritte, je mit Foto, {code} wird zum Türcode)",
+                "Am Anreisetag zur eingestellten Uhrzeit (Standard 10:00) bekommt der Gast automatisch Adresse, Routen-Link, Parkhinweis, Türcode und den Ablauf: per WhatsApp, sonst SMS (kurze Fassung), sonst E-Mail",
+                "Ohne Weg zum Gast (oft Booking.com/Airbnb) oder nach 3 Fehlversuchen kommt der fertige Text per Telegram zum Weiterleiten",
+                "„Meine Buchung“ hat den neuen Tab „Ankunft“ mit Route, Fotos und Schritten; am Vortag und Anreisetag zeigt „Aufenthalt“ einen Hinweis darauf",
+                "Vorschau, Englisch-Version und „Jetzt senden“ für jede Anreise der nächsten 30 Tage"
+            ],
+            "fixes": []
+        },
+        {
+            "version": "1.39.0",
+            "date": "2026-11-02",
+            "title": "Live-Tipps: Wetter, Veranstaltungen, Öffnungszeiten",
+            "features": [
+                "Neuer Bereich Webseite → Live-Tipps: Ort wählen, Wetter, Öffnungszeiten und Veranstaltungen für Fernseher und „Meine Buchung“",
+                "Wetter live von Open-Meteo (kostenlos, ohne Schlüssel): jetzt plus die nächsten 4 Tage",
+                "Öffnungszeiten: Geschäfte in der Nähe aus OpenStreetMap übernehmen oder von Hand eintragen; Gäste sehen „Geöffnet bis 18:00“ oder „Öffnet morgen 08:00“, inklusive Feiertagen",
+                "Veranstaltungen aus eigenen Terminen, Kalender-Links (iCal) und optional Ticketmaster; in „Meine Buchung“ nur die Termine während des Aufenthalts",
+                "TV-Welcome-Screen im Boutique-Stil mit Wetter, Öffnungszeiten und Veranstaltungen, passt ohne Scrollen auf jeden Fernseher"
+            ],
+            "fixes": [
+                "TV-Welcome-Screen zeigt Anreise- und Abreisezeit aus den Webseiten-Einstellungen"
+            ]
         },
         {
             "version": "1.36.1",

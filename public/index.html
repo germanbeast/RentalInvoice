@@ -18,7 +18,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=5.3">
+    <script>
+        // Hell/Dunkel vor dem ersten Zeichnen setzen, damit nichts aufblitzt (Wahl je Gerät gemerkt, nach dem Login vom Benutzer übernommen)
+        (function () {
+            var t = 'auto';
+            try { t = localStorage.getItem('adminTheme') || 'auto'; } catch (e) { }
+            var dark = t === 'dark' || (t !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        })();
+    </script>
+    <link rel="stylesheet" href="styles.css?v=5.4">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 </head>
 
@@ -105,6 +114,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.2 3.2 0 0 1 0 6.4M18 13.8c2.1.7 3.5 2.9 3.5 5.2"/></svg>
                     <span>Gäste</span>
                 </button>
+                <button class="sidebar-item" id="nav-vouchers" title="Gutscheine für Gäste">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="1.5"/><path d="M2.5 8h19v4h-19zM12 8v13"/><path d="M12 8c-1.5-3.5-5.5-4.5-5.5-2 0 1.6 2.5 2 5.5 2zM12 8c1.5-3.5 5.5-4.5 5.5-2 0 1.6-2.5 2-5.5 2z"/></svg>
+                    <span>Gutscheine</span>
+                </button>
                 <button class="sidebar-item" id="nav-website" title="Webseite &amp; Anfragen">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.6L3 21l1.4-5.6A8.5 8.5 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 14h4.5"/></svg>
                     <span>Anfragen</span><i class="nav-badge" id="website-badge" hidden></i>
@@ -169,6 +182,27 @@
                     <input type="search" id="topbar-search" placeholder="Gast oder Zeitraum suchen" autocomplete="off">
                 </label>
                 <div class="topbar-right">
+                    <div class="theme-switch">
+                        <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" title="Darstellung" aria-label="Darstellung: Hell, Dunkel oder Automatisch">
+                            <svg class="ti-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                            <svg class="ti-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+                        </button>
+                        <div class="theme-menu" id="theme-menu" role="menu" hidden>
+                            <button type="button" role="menuitemradio" data-theme-pref="light" aria-checked="false">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                                Hell<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>
+                            </button>
+                            <button type="button" role="menuitemradio" data-theme-pref="dark" aria-checked="false">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+                                Dunkel<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>
+                            </button>
+                            <button type="button" role="menuitemradio" data-theme-pref="auto" aria-checked="false">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                                Automatisch<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <span class="topbar-sep"></span>
                     <span class="topbar-lang">DE</span>
                     <span class="topbar-sep"></span>
                     <svg class="topbar-user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
@@ -411,6 +445,7 @@
                         <a class="pill pill-primary fin-dl" href="#" data-href="/api/finance/export.xlsx">Excel (.xlsx) mit allen Tabellen</a>
                         <a class="pill fin-dl" href="#" data-href="/api/finance/export-csv.zip">Alle Tabellen als CSV (ZIP)</a>
                         <button type="button" class="pill" id="fin-pdfs">Alle Rechnungen als PDF (ZIP)</button>
+                        <a class="pill fin-dl" id="fin-receipts" href="#" data-href="/api/finance/receipts.zip" hidden>Alle Belege als ZIP</a>
                     </div>
                     <div class="fin-export-csv">
                         <span class="review-hint">Einzelne CSV:</span>
@@ -451,18 +486,26 @@
             <!-- VIEW: EXPENSES -->
             <div id="view-expenses" class="content-view" style="display:none;">
                 <div class="content-header">
-                    <div class="content-breadcrumb">
-                        <h2>Ausgaben-Verwaltung</h2>
-                    </div>
+                    <div class="content-breadcrumb"><h2>Ausgaben</h2></div>
                     <div class="content-actions">
-                        <button type="button" id="btn-sync-paperless" class="btn btn-primary btn-sm">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path
-                                    d="M21.5 2v6h-6M2.5 22v-6h6M2 12c0-4.4 3.6-8 8-8 3.3 0 6.2 2 7.4 4.9M22 12c0 4.4-3.6 8-8 8-3.3 0-6.2-2-7.4-4.9" />
-                            </svg>
-                            Paperless Sync
+                        <button type="button" id="btn-sync-paperless" class="btn btn-outline btn-sm" hidden title="Dokumente mit dem Übernahme-Tag aus Paperless als Ausgaben anlegen">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 12c0-4.4 3.6-8 8-8 3.3 0 6.2 2 7.4 4.9M22 12c0 4.4-3.6 8-8 8-3.3 0-6.2-2-7.4-4.9" /></svg>
+                            Aus Paperless übernehmen
                         </button>
+                        <button type="button" id="btn-new-expense" class="btn btn-primary btn-sm">+ Neue Ausgabe</button>
+                    </div>
+                </div>
+                <div class="review-kpis ex-kpis" id="ex-kpis"></div>
+                <div class="bookings-toolbar ex-toolbar">
+                    <select id="ex-year" aria-label="Jahr"></select>
+                    <select id="ex-category" aria-label="Kategorie"></select>
+                    <input type="search" id="ex-search" placeholder="Suchen (Händler, Beschreibung, Beleg-Nr.)">
+                </div>
+                <div class="card ex-drop" id="ex-drop">
+                    <div class="ex-drop-icon">📸</div>
+                    <div>
+                        <strong>Beleg einfach per Telegram schicken</strong>
+                        <div class="review-hint">Foto vom Kassenbon oder PDF an den Bot: Betrag, Datum, Händler und Kategorie werden erkannt, du bestätigst, fertig. Hier kannst du Belege auch hochladen oder auf diese Fläche ziehen.</div>
                     </div>
                 </div>
                 <div class="card">
@@ -471,16 +514,14 @@
                             <thead>
                                 <tr>
                                     <th>Datum</th>
-                                    <th>Beschreibung</th>
+                                    <th>Händler / Beschreibung</th>
                                     <th>Kategorie</th>
-                                    <th>Quelle</th>
+                                    <th>Beleg</th>
                                     <th class="text-right">Betrag</th>
-                                    <th class="text-right">Aktion</th>
+                                    <th class="text-right"></th>
                                 </tr>
                             </thead>
-                            <tbody id="expenses-list">
-                                <!-- Expenses list filled by JS -->
-                            </tbody>
+                            <tbody id="expenses-list"></tbody>
                         </table>
                     </div>
                 </div>
@@ -526,6 +567,26 @@
                 <div id="bookings-list" class="bookings-list"></div>
             </div>
 
+            <!-- VIEW: GUTSCHEINE -->
+            <div id="view-vouchers" class="content-view" style="display:none;">
+                <div class="content-header">
+                    <div class="content-breadcrumb"><h2>Gutscheine</h2></div>
+                    <button type="button" class="btn btn-primary" id="btn-new-voucher">+ Neuer Gutschein</button>
+                </div>
+                <div class="review-kpis vc-kpis" id="vc-kpis"></div>
+                <div class="bookings-toolbar">
+                    <div class="seg" id="vc-filter">
+                        <button type="button" data-filter="open" class="active">Offen</button>
+                        <button type="button" data-filter="redeemed">Eingelöst</button>
+                        <button type="button" data-filter="closed">Abgelaufen &amp; entwertet</button>
+                        <button type="button" data-filter="all">Alle</button>
+                    </div>
+                    <input type="search" id="vc-search" placeholder="Suchen (Code, Gast, Notiz)">
+                </div>
+                <div id="vc-list" class="bookings-list"></div>
+                <p class="vc-help">Gäste lösen den Code bei der Buchungsanfrage auf der Webseite ein. Für Buchungen per Telefon oder E-Mail den Code unter „Buchung eintragen“ angeben, oder in der Rechnung über „Gutschein einlösen“ verrechnen. Jeder Gutschein gilt einmal.</p>
+            </div>
+
             <!-- VIEW: GÄSTE-WEBSEITE -->
             <div id="view-website" class="content-view" style="display:none;">
                 <div class="content-header">
@@ -539,6 +600,9 @@
                         <button type="button" data-tab="requests" class="active">Anfragen</button>
                         <button type="button" data-tab="meldescheine">Meldescheine</button>
                         <button type="button" data-tab="content">Inhalte</button>
+                        <button type="button" data-tab="arrival">Ankunft</button>
+                        <button type="button" data-tab="wifi">WLAN</button>
+                        <button type="button" data-tab="live">Live-Tipps</button>
                         <button type="button" data-tab="setup">Einrichtung</button>
                     </div>
                 </div>
@@ -601,6 +665,24 @@
                         <div class="site-photos" id="site-photos"></div>
                         <label class="btn-mini" style="display:inline-block;margin-top:.5rem">+ Bild hochladen<input type="file" id="site-photo-input" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
                     </div>
+                    <div class="card site-card" id="site-video-card">
+                        <div class="today-title">Hintergrund-Video</div>
+                        <p class="text-muted" style="font-size:.85rem">Ein kurzes Video der Wohnung läuft stumm und leicht unscharf im Hintergrund: auf der Startseite, auf „Meine Buchung“ und auf dem Fernseher. Einfach das Handy-Video hochladen (auch groß, bis 2 GB). Der Server kürzt es auf 60 Sekunden, entfernt den Ton und macht es klein, damit es auch auf Handys schnell lädt. Am besten quer filmen, ruhig schwenken, 15–40 Sekunden.</p>
+                        <div class="site-video" id="site-video-preview"></div>
+                        <div class="site-video-progress" id="site-video-progress" hidden><div class="site-video-bar"><span id="site-video-bar"></span></div><small id="site-video-step"></small></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
+                            <label class="btn-mini" style="display:inline-block" id="site-video-pick">Video hochladen<input type="file" id="site-video-input" accept="video/*" hidden></label>
+                            <button type="button" class="btn-mini" id="site-video-del" hidden>Entfernen</button>
+                        </div>
+                        <div id="site-video-opts" hidden>
+                            <div class="form-group" style="margin-top:1rem"><label for="site-video-blur">Unschärfe <small id="site-video-blur-val"></small> <small class="text-muted">(0 = scharf, 6 = leicht, 20 = stark)</small></label><input type="range" id="site-video-blur" min="0" max="20" step="1" style="width:min(100%,420px)"></div>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-on-site"> Startseite der Webseite</label>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-on-account"> Meine Buchung (Gäste-App)</label>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-on-tv"> Fernseher (TV-Box)</label>
+                            <label style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0"><input type="checkbox" id="site-video-phones"> Auch auf Handys abspielen <small class="text-muted">(sonst nur das Standbild, spart Datenvolumen)</small></label>
+                            <p class="text-muted" style="font-size:.8rem;margin-top:.4rem">Bei „Bewegung reduzieren“, im Datensparmodus oder bei langsamer Verbindung zeigen die Seiten immer nur das Standbild.</p>
+                        </div>
+                    </div>
                     <div class="card site-card">
                         <div class="today-title">Grundriss</div>
                         <p class="text-muted" style="font-size:.85rem">Erscheint als Knopf „Grundriss“ unter den Fotos und öffnet sich im Vollbild. Am besten ein Bild mit hellem Hintergrund (JPEG, PNG, WebP, max. 8 MB).</p>
@@ -648,6 +730,221 @@
                         <div class="form-group"><label for="site-privacy">Datenschutzerklärung</label><textarea id="site-privacy" rows="6"></textarea></div>
                     </div>
                     <button type="button" class="btn btn-primary site-save">Speichern</button>
+                </div>
+
+                <div class="site-pane" data-pane="arrival" style="display:none;">
+                    <div class="card site-card">
+                        <div class="today-title">Anfahrts-Assistent</div>
+                        <p class="text-muted" style="font-size:.85rem">Am Anreisetag bekommt der Gast automatisch Route, Parkhinweis, Türcode und den Ablauf zum Öffnen der Haustür. Gesendet wird über den Gäste-Chat: WhatsApp, wenn die Nummer WhatsApp hat, sonst SMS, sonst E-Mail. Kennen wir keinen Weg zum Gast (oft bei Booking.com und Airbnb), bekommst du den fertigen Text per Telegram zum Weiterleiten. Auf „Meine Buchung“ steht alles mit Fotos im Tab „Ankunft“.</p>
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem"><input type="checkbox" id="arr-auto"> Am Anreisetag automatisch senden</label>
+                        <div class="form-row">
+                            <div class="form-group"><label for="arr-time">Uhrzeit <small>(Türcodes gelten ab 11:00)</small></label><input type="time" id="arr-time"></div>
+                            <div class="form-group" style="align-self:end"><label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="arr-notify"> Mir per Telegram Bescheid geben, wenn gesendet</label></div>
+                        </div>
+                        <p class="text-muted" style="font-size:.82rem;margin:0" id="arr-channels"></p>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Anfahrt &amp; Parken</div>
+                        <p class="text-muted" style="font-size:.85rem;margin-top:0" id="arr-address-hint"></p>
+                        <div class="form-group"><label for="arr-route-note">Hinweis für die letzten Meter <small>(optional)</small></label><textarea id="arr-route-note" rows="2" maxlength="1000" placeholder="z. B. Im Navi „Musterstraße 1“ eingeben, die Einfahrt ist direkt hinter der Bäckerei."></textarea></div>
+                        <div class="form-group"><label for="arr-parking">Parken <small id="arr-parking-hint"></small></label><textarea id="arr-parking" rows="2" maxlength="1000"></textarea></div>
+                        <div class="arr-photo-slot" data-slot="parking_photo"></div>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Haustür</div>
+                        <div class="form-group"><label for="arr-door">Beschreibung <small>(wo ist die Tür, wo das Tastenfeld)</small></label><textarea id="arr-door" rows="3" maxlength="1500" placeholder="z. B. Die Haustür ist die graue Tür links neben der Garage. Das Tastenfeld hängt rechts neben der Tür auf Brusthöhe."></textarea></div>
+                        <div class="arr-photo-slot" data-slot="door_photo"></div>
+                        <div class="form-group" style="margin:1rem 0 .4rem"><label>Schritt für Schritt zum Öffnen <small>(höchstens 10, <code>{code}</code> wird zum Türcode des Gastes)</small></label></div>
+                        <div class="list-editor" id="arr-steps"></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                            <button type="button" class="btn-mini" id="arr-step-add">+ Schritt hinzufügen</button>
+                            <button type="button" class="btn-mini" id="arr-step-sample">Beispiel für Nuki-Tastenfeld einsetzen</button>
+                        </div>
+                    </div>
+                    <div class="card site-card">
+                        <div class="today-title">Vorschau &amp; Versand</div>
+                        <p class="text-muted" style="font-size:.85rem;margin-top:0">Anreisen der nächsten 30 Tage. „Vorschau“ zeigt die Nachricht so, wie der Gast sie bekommt. Erst speichern, dann ansehen.</p>
+                        <div id="arr-upcoming" class="arr-upcoming"></div>
+                        <div id="arr-preview" class="arr-preview" hidden></div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="arr-save" style="align-self:flex-start">Speichern</button>
+                </div>
+
+                <div class="site-pane" data-pane="wifi" style="display:none;">
+                    <div class="card site-card">
+                        <div class="today-title">WLAN für Gäste</div>
+                        <p class="text-muted" style="font-size:.85rem">Gäste sehen Netzwerk, Passwort und einen QR-Code zum Scannen auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher. Mit der FRITZ!Box bekommt jede Buchung ihr eigenes WLAN-Passwort, das nur während des Aufenthalts gilt.</p>
+                        <div class="wifi-modes">
+                            <label class="wifi-mode"><input type="radio" name="wifi-mode" value="static"><span><b>Festes Passwort</b><small>Netzwerk und Passwort aus Inhalte → Gästemappe, für alle Gäste gleich.</small></span></label>
+                            <label class="wifi-mode"><input type="radio" name="wifi-mode" value="fritzbox"><span><b>Eigenes Passwort pro Buchung (FRITZ!Box)</b><small>Der Server stellt das Gast-WLAN der FRITZ!Box zum Gästewechsel um. Der vorige Gast ist dann automatisch raus.</small></span></label>
+                            <label class="wifi-mode"><input type="radio" name="wifi-mode" value="portal"><span><b>Eigener Router mit Anmeldeseite (OpenWrt)</b><small>Eigenes Gäste-WLAN mit schöner Anmeldeseite im Stil der Webseite. Jede Buchung hat einen 6-stelligen Zugangscode, der bis zum Check-out gilt; begrüßt wird mit Namen.</small></span></label>
+                        </div>
+                        <p class="text-muted" style="font-size:.82rem;margin:.4rem 0 0" id="wifi-static-hint"></p>
+                        <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:.8rem">
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-show-arrival"> In der Anfahrts-Nachricht</label>
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-show-tv"> Auf dem Fernseher (während ein Gast da ist)</label>
+                        </div>
+                    </div>
+
+                    <div class="card site-card" id="wifi-fritz-card">
+                        <div class="today-title">FRITZ!Box</div>
+                        <div id="wifi-status" class="wifi-status"></div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-url">Adresse <small>(MyFRITZ!-Adresse mit HTTPS-Port)</small></label><input type="text" id="wifi-url" maxlength="200" placeholder="https://abc123xyz.myfritz.net:46123" autocomplete="off" spellcheck="false"></div>
+                            <div class="form-group"><label for="wifi-index">Gast-WLAN</label><select id="wifi-index"><option value="0">Automatisch (Gastzugang)</option></select></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-user">FRITZ!Box-Benutzer</label><input type="text" id="wifi-user" maxlength="100" autocomplete="off" spellcheck="false"></div>
+                            <div class="form-group"><label for="wifi-pass">Kennwort</label><input type="password" id="wifi-pass" maxlength="200" autocomplete="new-password"></div>
+                        </div>
+                        <label style="display:flex;gap:.5rem;align-items:center;font-size:.85rem;margin-bottom:.6rem"><input type="checkbox" id="wifi-insecure"> Selbstsigniertes Zertifikat erlauben <small class="text-muted">(nur nötig ohne MyFRITZ!-Adresse)</small></label>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem">
+                            <button type="button" class="btn-mini" id="wifi-test">Verbindung testen</button>
+                            <button type="button" class="btn-mini" id="wifi-apply">Jetzt umstellen</button>
+                        </div>
+                        <div id="wifi-test-result" class="text-muted" style="font-size:.85rem"></div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-switch-time">Wechsel um <small id="wifi-switch-hint">(leer = Check-out-Zeit)</small></label><input type="time" id="wifi-switch-time"></div>
+                            <div class="form-group" style="align-self:end;display:grid;gap:.4rem">
+                                <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-vacant-off"> Gast-WLAN ausschalten, wenn niemand da ist</label>
+                                <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="wifi-notify"> Per Telegram melden, wenn das Umstellen nicht klappt</label>
+                            </div>
+                        </div>
+                        <details class="wifi-howto">
+                            <summary>So richtest du die FRITZ!Box ein (einmalig, ca. 5 Minuten)</summary>
+                            <ol>
+                                <li><b>Gastzugang einschalten:</b> WLAN → Gastzugang → „Privater WLAN-Gastzugang aktiv“, Name z. B. „Beckhome Gäste“. Verschlüsselung WPA2 (oder WPA2 + WPA3). Den Haken „automatisch deaktivieren“ <b>nicht</b> setzen, das macht der Server.</li>
+                                <li><b>Benutzer anlegen:</b> System → FRITZ!Box-Benutzer → Benutzer hinzufügen, z. B. „beckhome“, mit eigenem Kennwort. Haken bei <b>„Zugang auch aus dem Internet erlaubt“</b> und bei <b>„FRITZ!Box Einstellungen“</b>. Alle anderen Rechte aus.</li>
+                                <li><b>Zugriff für Anwendungen:</b> Heimnetz → Netzwerk → Netzwerkeinstellungen → „Zugriff für Anwendungen zulassen“ einschalten (heißt auch TR-064).</li>
+                                <li><b>Internetzugriff:</b> Internet → MyFRITZ!-Konto: MyFRITZ! einrichten. Dann unter Internet → Freigaben → FRITZ!Box-Dienste „Internetzugriff auf die FRITZ!Box über HTTPS“ einschalten. Dort stehen die <b>MyFRITZ!-Adresse</b> und der <b>Port</b>, z. B. <code>https://abc123xyz.myfritz.net:46123</code>, das kommt oben ins Feld „Adresse“.</li>
+                                <li><b>Geräte prüfen:</b> TV-Box, Nuki-Bridge und alles, was fest in der Wohnung bleibt, gehören ins normale WLAN (oder per Kabel), nicht ins Gast-WLAN, sonst fliegen sie beim Wechsel raus.</li>
+                                <li>Hier „Verbindung testen“, das Gast-WLAN wählen, speichern. Fertig.</li>
+                            </ol>
+                            <p class="text-muted" style="font-size:.82rem">Hat der Anschluss keine eigene IPv4-Adresse (z. B. manche Glasfaser- oder Kabelanschlüsse, DS-Lite), erreicht MyFRITZ! die Box nur über IPv6. Klappt der Test dann nicht, kurz Bescheid geben.</p>
+                        </details>
+                    </div>
+
+                    <div class="card site-card" id="wifi-portal-card" hidden>
+                        <div class="today-title">Router mit Anmeldeseite</div>
+                        <div id="wifi-portal-status" class="wifi-status"></div>
+                        <div id="wifi-portal-update" class="wifi-status" hidden></div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-portal-ssid">WLAN-Name</label><input type="text" id="wifi-portal-ssid" maxlength="32" autocomplete="off" spellcheck="false"></div>
+                            <div class="form-group"><label for="wifi-portal-wpa">WLAN-Passwort <small>(leer = offenes WLAN, mind. 8 Zeichen)</small></label><input type="text" id="wifi-portal-wpa" maxlength="63" autocomplete="off" spellcheck="false" placeholder="ohne Passwort"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="wifi-portal-devices">Geräte pro Buchung</label><input type="number" id="wifi-portal-devices" min="1" max="20"></div>
+                            <div class="form-group"><label for="wifi-portal-grace">Online nach dem Check-out noch <small>(Minuten)</small></label><input type="number" id="wifi-portal-grace" min="0" max="600" step="15"></div>
+                        </div>
+                        <label style="display:flex;gap:.5rem;align-items:center;font-size:.88rem;margin-bottom:.4rem"><input type="checkbox" id="wifi-portal-alert"> Per Telegram melden, wenn sich der Router 15 Minuten nicht meldet</label>
+                        <label style="display:flex;gap:.5rem;align-items:center;font-size:.88rem;margin-bottom:.8rem"><input type="checkbox" id="wifi-portal-vacant"> Gäste-WLAN bei Leerstand ausschalten <small class="text-muted">(an ab 0 Uhr am Anreisetag bis nach dem Check-out)</small></label>
+                        <div class="wifi-portal-grid">
+                            <div>
+                                <div class="wifi-label">Gastgeber-Code <small>(eigene Geräte, je eine Woche)</small></div>
+                                <div class="wifi-inline"><code class="wifi-pw" id="wifi-portal-owner">–</code><button type="button" class="btn-mini" id="wifi-portal-owner-new">Neu</button></div>
+                            </div>
+                            <div>
+                                <div class="wifi-label">Anmeldeseite</div>
+                                <div class="wifi-inline"><a class="btn-mini" id="wifi-portal-preview" href="/gast/wlan?preview=1" target="_blank" rel="noopener">Vorschau öffnen</a></div>
+                            </div>
+                        </div>
+                        <details class="wifi-howto" id="wifi-portal-howto">
+                            <summary>So richtest du den Router ein (einmalig, ca. 30 Minuten)</summary>
+                            <p class="text-muted" style="font-size:.82rem;margin:.6rem 0">Die ausführliche Anleitung mit Bildern zum Nachlesen und Ausdrucken bekommst du zusätzlich als Dokument. Hier die Kurzfassung:</p>
+                            <ol>
+                                <li><b>Vorher:</b> Unten „Speichern“ drücken, damit der Einrichtungs-Befehl erscheint. Die Anleitung ist für den <b>GL.iNet GL-A1300 (Slate Plus)</b>. Bei einem anderen Router erst kurz Bescheid geben (ein Cudy WR3000 V2 funktioniert nicht).</li>
+                                <li><b>GL.iNet-Einrichtung:</b> Router mit Strom verbinden, Laptop per Kabel an einen <b>LAN</b>-Anschluss. Im Browser <code>http://192.168.8.1</code> öffnen, Sprache wählen und ein Admin-Passwort festlegen.</li>
+                                <li><b>OpenWrt aufspielen:</b> Im <a href="https://firmware-selector.openwrt.org/?target=ipq40xx%2Fgeneric&id=glinet_gl-a1300" target="_blank" rel="noopener">OpenWrt Firmware Selector</a> die neueste stabile Version wählen und die Datei <b>SYSUPGRADE</b> laden. Im GL.iNet-Menü unter System → Upgrade → Local Upgrade hochladen, „Keep Settings“ <b>abhaken</b>, Install. 4 Minuten warten, Strom nicht trennen.</li>
+                                <li><b>Passwort setzen:</b> Jetzt <code>http://192.168.1.1</code> (neue Adresse), als <code>root</code> ohne Passwort anmelden, System → Administration → Router-Passwort vergeben und gut aufheben.</li>
+                                <li><b>An die FRITZ!Box:</b> Netzwerkkabel vom <b>WAN</b>-Anschluss des Routers zu einem LAN-Anschluss der FRITZ!Box. Laptop bleibt am LAN-Anschluss.</li>
+                                <li><b>Befehl ausführen:</b> Am Laptop die Eingabeaufforderung öffnen (Windows-Taste, „cmd“), <code>ssh root@192.168.1.1</code> eingeben, „yes“ und das Router-Passwort. Dann den Befehl unten kopieren, mit Rechtsklick einfügen, Enter. Nach 2–3 Minuten steht da <b>FERTIG</b>.</li>
+                                <li><b>Testen:</b> Mit dem Handy ins WLAN, die Anmeldeseite öffnet sich, den Gastgeber-Code eingeben. Hier oben steht dann „Router verbunden“. Ist gerade kein Gast da und „bei Leerstand ausschalten“ angehakt, vorher unten „24 Std. einschalten“ drücken, sonst geht das WLAN nach 2 Minuten aus.</li>
+                                <li><b>Aufräumen:</b> Das alte Gast-WLAN der FRITZ!Box ausschalten (WLAN → Gastzugang), damit Gäste nur noch das neue sehen. TV-Box, Drucker und Nuki-Bridge bleiben an der FRITZ!Box.</li>
+                            </ol>
+                        </details>
+                        <div class="wifi-label" style="margin-top:.8rem">Einrichtungs-Befehl für den Router</div>
+                        <div class="wifi-cmd" id="wifi-portal-cmd"></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
+                            <button type="button" class="btn-mini" id="wifi-portal-copy">Befehl kopieren</button>
+                            <button type="button" class="btn-mini" id="wifi-portal-key-new" title="Neuer Schlüssel zwischen Router und Server; danach den Befehl auf dem Router noch einmal ausführen">Neuer Schlüssel</button>
+                        </div>
+                        <div class="today-title" style="margin-top:1.2rem;font-size:.95rem">WLAN an/aus</div>
+                        <div id="wifi-portal-power" class="wifi-status"></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 0">
+                            <button type="button" class="btn-mini" data-power="on24">24 Std. einschalten</button>
+                            <button type="button" class="btn-mini" data-power="off24">24 Std. ausschalten</button>
+                            <button type="button" class="btn-mini" data-power="auto" id="wifi-portal-power-auto">Automatik</button>
+                        </div>
+                        <div class="today-title" style="margin-top:1.2rem;font-size:.95rem">Statistik</div>
+                        <div id="wifi-portal-stats"></div>
+                        <div class="today-title" style="margin-top:1.2rem;font-size:.95rem">Angemeldete Geräte</div>
+                        <div id="wifi-portal-devices-list" class="arr-upcoming"></div>
+                    </div>
+
+                    <div class="card site-card" id="wifi-list-card">
+                        <div class="today-title" id="wifi-list-title">Passwörter der nächsten Buchungen</div>
+                        <p class="text-muted" style="font-size:.85rem;margin-top:0" id="wifi-list-hint">Jede Buchung bekommt automatisch ein leicht tippbares Passwort. Der Gast sieht es ab dem Anreisetag. „Neu“ erzeugt ein anderes Passwort, ist der Gast gerade da, wird die FRITZ!Box sofort umgestellt.</p>
+                        <div id="wifi-upcoming" class="arr-upcoming"></div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="wifi-save" style="align-self:flex-start">Speichern</button>
+                </div>
+
+                <div class="site-pane" data-pane="live" style="display:none;">
+                    <div class="card site-card">
+                        <div class="today-title">Live-Tipps: Wetter, Veranstaltungen, Öffnungszeiten</div>
+                        <p class="text-muted" style="font-size:.85rem">Erscheinen auf dem TV-Welcome-Screen und auf „Meine Buchung“ im Tab Umgebung. Wetter kommt von Open-Meteo, Öffnungszeiten auf Wunsch aus OpenStreetMap (beides kostenlos, ohne Schlüssel). Die Daten holt der Server, die Geräte der Gäste sprechen nur mit deiner Webseite.</p>
+                        <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem"><input type="checkbox" id="live-enabled"> Live-Tipps einschalten</label>
+                        <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem">
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="live-show-tv"> Auf dem Fernseher</label>
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="live-show-app"> Auf „Meine Buchung“</label>
+                            <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="live-weather"> Wetter zeigen</label>
+                        </div>
+                        <div class="form-group" style="margin-bottom:.4rem"><label for="live-place-q">Ort <small>(für Wetter, Veranstaltungen und die Suche nach Geschäften)</small></label>
+                            <div style="display:flex;gap:.5rem;flex-wrap:wrap"><input type="text" id="live-place-q" maxlength="100" placeholder="z. B. Altena oder 58762" style="flex:1;min-width:200px"><button type="button" class="btn-mini" id="live-place-search">Ort suchen</button></div>
+                        </div>
+                        <div id="live-place-results" class="live-results"></div>
+                        <p class="text-muted" style="font-size:.85rem;margin:.3rem 0 0" id="live-place-current"></p>
+                    </div>
+
+                    <div class="card site-card">
+                        <div class="today-title">Öffnungszeiten in der Nähe</div>
+                        <p class="text-muted" style="font-size:.85rem">Bäcker, Supermarkt, Apotheke, Restaurants … Gäste sehen sofort „Geöffnet bis 18:00“ oder „Öffnet morgen 08:00“. Öffnungszeiten im OpenStreetMap-Format, z. B. <code>Mo-Fr 08:00-18:00; Sa 08:00-13:00; So,PH off</code> (PH = Feiertag). Aus OpenStreetMap übernommene Orte holen ihre Zeiten einmal am Tag neu.</p>
+                        <div class="live-osm">
+                            <select id="live-osm-radius" aria-label="Umkreis">
+                                <option value="1000">1 km</option><option value="3000" selected>3 km</option><option value="5000">5 km</option><option value="10000">10 km</option>
+                            </select>
+                            <input type="text" id="live-osm-q" maxlength="60" placeholder="Name (optional), z. B. Bäckerei">
+                            <button type="button" class="btn-mini" id="live-osm-search">In OpenStreetMap suchen</button>
+                        </div>
+                        <div id="live-osm-results" class="live-results"></div>
+                        <div class="list-editor" id="live-places"></div>
+                        <button type="button" class="btn-mini" id="live-place-add" style="align-self:flex-start">+ Ort von Hand hinzufügen</button>
+                    </div>
+
+                    <div class="card site-card">
+                        <div class="today-title">Veranstaltungen</div>
+                        <p class="text-muted" style="font-size:.85rem">Drei Quellen, die zusammen angezeigt werden: deine eigenen Einträge, Kalender-Links (iCal, z. B. vom Stadtmarketing, Verein oder Theater) und optional Ticketmaster. In „Meine Buchung“ sieht der Gast die Termine während seines Aufenthalts.</p>
+                        <div class="form-row form-row-3">
+                            <div class="form-group"><label for="live-events-days">Tage voraus <small>(Fernseher)</small></label><input type="number" id="live-events-days" min="1" max="60"></div>
+                            <div class="form-group"><label for="live-radius">Umkreis Ticketmaster <small>(km)</small></label><input type="number" id="live-radius" min="1" max="100"></div>
+                            <div class="form-group"><label for="live-tm-key">Ticketmaster-API-Schlüssel <small>(optional, kostenlos auf developer.ticketmaster.com)</small></label><input type="password" id="live-tm-key" maxlength="100" autocomplete="off"></div>
+                        </div>
+                        <label class="live-tm-clear" id="live-tm-clear-wrap" hidden><input type="checkbox" id="live-tm-clear"> Gespeicherten Schlüssel entfernen</label>
+                        <div class="form-group"><label for="live-ics">Kalender-Links <small>(einer pro Zeile, .ics oder webcal://, höchstens 5)</small></label><textarea id="live-ics" rows="3" placeholder="https://www.stadt-beispiel.de/veranstaltungen.ics"></textarea></div>
+                        <div class="form-group" style="margin-bottom:.4rem"><label>Eigene Termine</label></div>
+                        <div class="list-editor" id="live-events"></div>
+                        <button type="button" class="btn-mini" id="live-event-add" style="align-self:flex-start">+ Termin hinzufügen</button>
+                    </div>
+
+                    <div class="card site-card">
+                        <div class="today-title">Vorschau</div>
+                        <div id="live-preview" class="live-preview"><p class="text-muted" style="font-size:.85rem">Nach dem Speichern siehst du hier, was die Gäste gerade sehen.</p></div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem">
+                            <button type="button" class="btn-mini" id="live-refresh">Jetzt neu abrufen</button>
+                            <a class="btn-mini" href="/welcome.html" target="_blank" rel="noopener">TV-Ansicht öffnen</a>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="live-save" style="align-self:flex-start">Speichern</button>
                 </div>
 
                 <div class="site-pane" data-pane="setup" style="display:none;">
@@ -1212,6 +1509,13 @@
                                     </svg>
                                     Position hinzufügen
                                 </button>
+                                <button type="button" id="btn-inv-voucher" class="btn btn-sm btn-outline btn-add">🎁 Gutschein einlösen</button>
+                                <div class="inv-voucher-form" id="inv-voucher-form" hidden>
+                                    <input type="text" id="inv-voucher-code" maxlength="24" placeholder="Gutscheincode, z. B. GS-AB12CD" autocapitalize="characters" spellcheck="false">
+                                    <button type="button" class="btn btn-sm btn-primary" id="btn-inv-voucher-apply">Verrechnen</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" id="btn-inv-voucher-cancel">Abbrechen</button>
+                                </div>
+                                <div class="inv-voucher-info" id="inv-voucher-info" hidden></div>
                             </div>
 
                             <!-- ZAHLUNG -->
@@ -1623,12 +1927,15 @@
                             <div class="nav-section">ADVANCED SETTINGS</div>
                             <a href="#" class="nav-item" data-target="settings-nuki">Nuki Smart Lock <i class="status-dot" data-status="nuki"></i></a>
                             <a href="#" class="nav-item" data-target="settings-paperless">Paperless NGX</a>
+                            <a href="#" class="nav-item" data-target="settings-receipts">Belege &amp; KI-Erkennung</a>
                             <a href="#" class="nav-item" data-target="settings-booking">Booking.com &amp; Airbnb <i class="status-dot" data-status="calendars"></i></a>
                             <a href="#" class="nav-item" data-target="settings-whatsapp">WhatsApp Web</a>
                             <a href="#" class="nav-item" data-target="settings-chat">Gäste-Chat, SMS &amp; E-Mail</a>
                             <a href="#" class="nav-item" data-target="settings-telegram">Telegram Bot <i class="status-dot" data-status="telegram"></i></a>
                             <a href="#" class="nav-item" data-target="settings-push">Handy-App &amp; Push</a>
                             <a href="#" class="nav-item" data-target="settings-users">Benutzer &amp; Rechte</a>
+                            <a href="#" class="nav-item" data-target="settings-tvbox">TV-Box (Welcome-Screen)</a>
+                            <a href="#" class="nav-item" data-target="settings-printer">Drucker</a>
                             <a href="#" class="nav-item" data-target="settings-system">System & Update</a>
                         </nav>
                     </aside>
@@ -2002,6 +2309,63 @@
                                 </div>
                             </section>
 
+                            <!-- BELEGE & KI -->
+                            <section id="settings-receipts" class="settings-page">
+                                <h2>Belege &amp; KI-Erkennung</h2>
+                                <p class="text-muted">Belege schickst du als Foto oder PDF an den Telegram-Bot oder lädst sie unter „Ausgaben“ hoch. Betrag, Datum, Händler und Kategorie werden erkannt, du bestätigst, und die Ausgabe zählt in der Finanz-Auswertung.</p>
+
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <h4 style="margin-top:0">Erkennung</h4>
+                                    <p class="text-muted" style="font-size:.88rem">Ohne KI liest die Texterkennung auf deinem Server den Beleg (kostenlos, nichts verlässt den Server). Mit KI geht das Foto an die Claude API von Anthropic und wird deutlich genauer, auch bei zerknitterten Bons, Handschrift und Rechnungen mit vielen Positionen. Kosten: je nach Modell etwa 0,1 bis 3 Cent pro Beleg.</p>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-ai-enabled"> KI-Erkennung benutzen (Claude)</label>
+                                    <div class="form-row" style="margin-top:.75rem">
+                                        <div class="form-group">
+                                            <label for="rc-ai-key">API-Schlüssel</label>
+                                            <input type="password" id="rc-ai-key" autocomplete="off" placeholder="sk-ant-…">
+                                            <small class="text-muted">Bekommst du unter console.anthropic.com → API Keys.</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="rc-ai-model">Modell</label>
+                                            <select id="rc-ai-model"></select>
+                                        </div>
+                                    </div>
+                                    <div class="btn-group"><button type="button" class="btn btn-outline" id="btn-rc-test-ai">KI testen</button></div>
+                                    <label class="checkbox-label" style="margin-top:1rem"><input type="checkbox" id="rc-ask-bot"> Fotos im Telegram-Bot automatisch als Beleg erkennen (sonst nur mit /beleg oder Bildunterschrift „Beleg“)</label>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h4 style="margin-top:0">Ablegen in Paperless</h4>
+                                    <p class="text-muted" style="font-size:.88rem" id="rc-pl-state">Zugang zu Paperless trägst du unter „Paperless NGX“ ein.</p>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-enabled"> Belege nach dem Speichern automatisch an Paperless schicken</label>
+                                    <div class="form-group" style="margin-top:.75rem">
+                                        <label for="rc-up-tags">Tags <small>(Namen, mit Komma getrennt)</small></label>
+                                        <input type="text" id="rc-up-tags" placeholder="Ferienwohnung, Ausgabe">
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group"><label for="rc-up-doctype">Dokumenttyp</label><input type="text" id="rc-up-doctype" placeholder="Beleg"></div>
+                                        <div class="form-group"><label for="rc-up-field">Benutzerfeld für den Betrag</label><input type="text" id="rc-up-field" placeholder="Betrag"></div>
+                                    </div>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-corr"> Händler als Korrespondent eintragen</label>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-cattag"> Kategorie zusätzlich als Tag</label>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-create"> Fehlende Tags, Korrespondenten und Dokumenttyp in Paperless anlegen</label>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h4 style="margin-top:0">Aus Paperless übernehmen</h4>
+                                    <p class="text-muted" style="font-size:.88rem">Dokumente, die in Paperless dieses Tag haben, werden als Ausgaben angelegt (jedes nur einmal). Der Betrag kommt aus dem Benutzerfeld oder aus dem Text, den Paperless erkannt hat; der Korrespondent wird zum Händler.</p>
+                                    <div class="form-row">
+                                        <div class="form-group"><label for="rc-im-tag">Tag (Name oder ID)</label><input type="text" id="rc-im-tag" placeholder="z. B. Ausgabe Ferienwohnung"></div>
+                                        <div class="form-group"><label for="rc-im-field">Benutzerfeld für den Betrag</label><input type="text" id="rc-im-field" placeholder="Betrag"></div>
+                                    </div>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-im-auto"> Jede Stunde automatisch übernehmen (mit Meldung, wenn etwas Neues dazukommt)</label>
+                                </div>
+                                <p class="text-muted" id="rc-msg" style="font-size:.88rem; margin-top:1rem"></p>
+                                <div class="btn-group" style="margin-top: .5rem;">
+                                    <button type="button" class="btn btn-primary" id="btn-rc-save">Speichern</button>
+                                    <button type="button" class="btn btn-outline" id="btn-rc-test-pl">Paperless prüfen</button>
+                                </div>
+                            </section>
+
                             <!-- PAPERLESS -->
                             <section id="settings-paperless" class="settings-page">
                                 <h2>Paperless NGX</h2>
@@ -2028,16 +2392,7 @@
                                         <label for="pl-tags">Tag IDs (kommagetrennt)</label>
                                         <input type="text" id="pl-tags" placeholder="z.B. 3,7,12">
                                     </div>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="s-pl-expense-tag">Expense Tag ID (Paperless)</label>
-                                            <input type="number" id="s-pl-expense-tag" placeholder="z.B. 12">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="s-pl-amount-field">Custom Field ID für Betrag</label>
-                                            <input type="number" id="s-pl-amount-field" placeholder="z.B. 1">
-                                        </div>
-                                    </div>
+                                    <p class="text-muted" style="font-size:.88rem; margin-top:.5rem">Belege ablegen und Ausgaben aus Paperless übernehmen stellst du unter <a href="#" class="nav-jump" data-jump="settings-receipts">Belege &amp; KI-Erkennung</a> ein.</p>
                                     <div class="btn-group" style="margin-top: 1rem;">
                                         <button type="button" id="btn-paperless-test" class="btn btn-outline"
                                             style="flex:1">Paperless testen</button>
@@ -2334,6 +2689,198 @@
                             </section>
 
                             <!-- SYSTEM -->
+                            <section id="settings-tvbox" class="settings-page">
+                                <h2>TV-Box (Welcome-Screen)</h2>
+                                <p class="text-muted">Neue Versionen der TV-App baut GitHub automatisch. Erst wenn du sie hier freigibst, lädt die Box das Update selbst herunter und installiert es (sie fragt etwa alle 3 Stunden und nach jedem Einschalten nach).</p>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="info-row"><span>Auf der Box installiert:</span> <strong id="tvbox-device">–</strong></div>
+                                    <div class="info-row"><span>Freigegeben:</span> <strong id="tvbox-approved">–</strong></div>
+                                    <div class="info-row"><span>Neueste Version auf GitHub:</span> <strong id="tvbox-latest">–</strong></div>
+                                    <p class="text-muted" id="tvbox-hint" style="font-size:.85rem; margin-top:.75rem"></p>
+                                    <div class="btn-group" style="margin-top: 1rem;">
+                                        <button type="button" id="btn-tvbox-approve" class="btn btn-primary" disabled>Update freigeben</button>
+                                        <button type="button" id="btn-tvbox-refresh" class="btn btn-ghost">Neu laden</button>
+                                    </div>
+                                </div>
+
+                                <h3 style="margin-top: 2rem;">Fernsteuerung</h3>
+                                <p class="text-muted">Die Welcome-Seite zeigt nur die gekoppelte Box (und dir als angemeldetem Gastgeber die Vorschau). Eine neue Box zeigt beim Start einen 6-stelligen Kopplungs-Code auf dem Fernseher: hier eingeben, dann sind Box und Server verbunden. Einstellungen und Befehle übernimmt die Box danach innerhalb von etwa einer Minute.</p>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <div class="info-row"><span>Gekoppelte Box:</span> <strong id="tvbox-paired">–</strong></div>
+                                    <div id="tvbox-pending" class="info-row" style="display:none"><span>Wartet auf Kopplung:</span> <strong id="tvbox-pending-text">–</strong></div>
+                                    <div class="form-group" style="margin-top: 1rem;">
+                                        <label for="tvbox-pair-code" id="tvbox-pair-label">Kopplungs-Code vom Fernseher</label>
+                                        <input type="text" id="tvbox-pair-code" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="z.B. 482 913">
+                                    </div>
+                                    <div class="btn-group">
+                                        <button type="button" id="btn-tvbox-pair" class="btn btn-primary">Box koppeln</button>
+                                        <button type="button" id="btn-tvbox-preview" class="btn btn-outline">Welcome-Seite ansehen</button>
+                                        <button type="button" id="btn-tvbox-unpair" class="btn btn-ghost btn-danger btn-sm" style="display:none">Kopplung aufheben</button>
+                                    </div>
+                                </div>
+
+                                <div id="tvbox-remote" style="display:none">
+                                    <div class="card" style="margin-top: 1rem;">
+                                        <h4 style="margin-top:0">Status</h4>
+                                        <div class="info-row"><span>Verbindung:</span> <strong id="tvbox-live-online">–</strong></div>
+                                        <div class="info-row"><span>Kiosk-Modus:</span> <strong id="tvbox-live-kiosk">–</strong></div>
+                                        <div class="info-row"><span>Gerade sichtbar:</span> <strong id="tvbox-live-screen">–</strong></div>
+                                        <div class="info-row"><span>Letzter Tastendruck:</span> <strong id="tvbox-live-idle">–</strong></div>
+                                        <div class="info-row"><span>Gerät:</span> <strong id="tvbox-live-device">–</strong></div>
+                                    </div>
+
+                                    <div class="card" style="margin-top: 1rem;">
+                                        <h4 style="margin-top:0">Einstellungen</h4>
+                                        <div class="form-group">
+                                            <label for="tvbox-cfg-kiosk">Kiosk-Modus</label>
+                                            <select id="tvbox-cfg-kiosk">
+                                                <option value="1">An: Gäste bleiben im Welcome-Screen</option>
+                                                <option value="0">Aus: Box frei bedienbar (z.B. für Wartung)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="tvbox-cfg-idle">Zurück zum Welcome-Screen nach … Stunden ohne Tastendruck (0 = nie)</label>
+                                            <input type="number" id="tvbox-cfg-idle" min="0" max="48" step="0.5">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="tvbox-cfg-pin">Neue Admin-PIN der Box (leer lassen = unverändert)</label>
+                                            <input type="password" id="tvbox-cfg-pin" inputmode="numeric" autocomplete="new-password" placeholder="4 bis 10 Ziffern">
+                                        </div>
+                                        <p class="text-muted" id="tvbox-cfg-state" style="font-size:.85rem"></p>
+                                        <button type="button" id="btn-tvbox-cfg-save" class="btn btn-primary">Auf die Box schicken</button>
+                                    </div>
+
+                                    <div class="card" style="margin-top: 1rem;">
+                                        <h4 style="margin-top:0">Befehle</h4>
+                                        <div class="btn-group" style="flex-wrap: wrap;">
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="show_welcome">Welcome-Screen zeigen</button>
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="reload">Seite neu laden</button>
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="update_check">Jetzt nach Update suchen</button>
+                                            <button type="button" class="btn btn-outline" data-tvbox-cmd="open_settings">Android-Einstellungen öffnen</button>
+                                            <button type="button" class="btn btn-ghost btn-danger" data-tvbox-cmd="reboot">Box neu starten</button>
+                                        </div>
+                                        <p class="text-muted" id="tvbox-cmd-state" style="font-size:.85rem; margin-top:.75rem"></p>
+                                    </div>
+
+                                    <div class="card" style="margin-top: 1rem;" id="tvbox-rc-card">
+                                        <h4 style="margin-top:0">Fernwartung (Live-Bild &amp; Steuerung)</h4>
+                                        <p class="text-muted" style="font-size:.9rem">Zeigt den Fernseher live im Browser, du steuerst ihn mit Maus und Tastatur (ws-scrcpy). Die Box verbindet sich dafür von sich aus mit dem Server, an der FRITZ!Box musst du nichts freigeben. Nur Benutzer mit dem Recht „Einstellungen &amp; Integrationen: Bearbeiten“ können die Seite öffnen.</p>
+                                        <div class="form-group">
+                                            <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                                <input type="checkbox" id="tvbox-rc-enabled"> Fernwartung erlauben
+                                            </label>
+                                        </div>
+                                        <div class="info-row"><span>Server (ws-scrcpy):</span> <strong id="tvbox-rc-scrcpy">–</strong></div>
+                                        <div class="info-row"><span>Verbindung der Box:</span> <strong id="tvbox-rc-tunnel">–</strong></div>
+                                        <div class="info-row"><span>ADB über Netzwerk auf der Box:</span> <strong id="tvbox-rc-adblocal">–</strong></div>
+                                        <div class="info-row"><span>ADB-Freigabe:</span> <strong id="tvbox-rc-adb">–</strong></div>
+                                        <p class="text-muted" id="tvbox-rc-hint" style="font-size:.85rem; margin-top:.75rem"></p>
+                                        <div class="btn-group" style="flex-wrap: wrap;">
+                                            <button type="button" id="btn-tvbox-rc-open" class="btn btn-primary">Fernwartung öffnen</button>
+                                            <button type="button" id="btn-tvbox-rc-reconnect" class="btn btn-outline">Neu verbinden</button>
+                                            <button type="button" id="btn-tvbox-rc-refresh" class="btn btn-ghost">Status aktualisieren</button>
+                                        </div>
+                                        <details style="margin-top:1rem">
+                                            <summary style="cursor:pointer">Einmalig einrichten</summary>
+                                            <ol style="font-size:.9rem; padding-left:1.2rem; margin:.5rem 0 0">
+                                                <li>Im Ferienwohnung-Container auf dem Proxmox (<code>pct enter &lt;ID&gt;</code>):<br><code>curl -fsSLO https://raw.githubusercontent.com/germanbeast/RentalInvoice/main/tools/tv-fernwartung.sh &amp;&amp; bash tv-fernwartung.sh</code></li>
+                                                <li>Am PC <code>TV-Box-Fernwartung.bat</code> ausführen (schaltet ADB über Netzwerk auf der Box ein). Das ist auch nach jedem Neustart der Box nötig, falls die Box es nicht dauerhaft speichert.</li>
+                                                <li>Hier „Fernwartung erlauben“ anhaken. Innerhalb einer Minute verbindet sich die Box.</li>
+                                                <li>Beim ersten Mal fragt der Fernseher „USB-Debugging zulassen?“. Haken bei „Immer von diesem Computer zulassen“ setzen und OK drücken.</li>
+                                                <li>„Fernwartung öffnen“, dann beim Gerät <code>127.0.0.1:15555</code> auf „H264 Converter“ klicken.</li>
+                                            </ol>
+                                        </details>
+                                    </div>
+                                </div>
+
+                                <h3 style="margin-top: 2rem;">Abreisetag &amp; Handtücher</h3>
+                                <p class="text-muted">Am Abreisetag zeigt der Fernseher bis eine halbe Stunde nach dem Check-out „Danke, &lt;Name&gt;“, die Check-out-Zeit und deine Hinweise, in der Sprache des Gastes. Die vorgegebenen Hinweise werden automatisch übersetzt, eigene erscheinen so, wie du sie schreibst. Der Knopf „Neue Handtücher“ sitzt dezent rechts unten. Nach einer Rückfrage auf dem Fernseher bekommst du eine Nachricht per Telegram (höchstens alle 30 Minuten pro Buchung).</p>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="tvguest-farewell"> Abschiedsgruß am Abreisetag zeigen
+                                        </label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tvguest-hints">Hinweise zum Check-out (einer pro Zeile, höchstens 8)</label>
+                                        <textarea id="tvguest-hints" rows="7"></textarea>
+                                        <button type="button" id="btn-tvguest-defaults" class="btn btn-ghost btn-sm" style="margin-top:.4rem">Vorgaben wiederherstellen</button>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tvguest-message">Eigener Abschiedstext (leer = „Schön, dass Sie bei uns waren …“, übersetzt)</label>
+                                        <input type="text" id="tvguest-message" maxlength="200">
+                                    </div>
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="tvguest-towels"> Knopf „Neue Handtücher“ auf dem Fernseher zeigen
+                                        </label>
+                                    </div>
+                                    <button type="button" id="btn-tvguest-save" class="btn btn-primary">Speichern</button>
+                                    <h4 style="margin-top:1.5rem">Letzte Handtuch-Anfragen</h4>
+                                    <ul id="tvguest-requests" class="text-muted" style="margin:0; padding-left:1.1rem; font-size:.9rem"></ul>
+                                </div>
+                            </section>
+
+                            <section id="settings-printer" class="settings-page">
+                                <h2>Drucker</h2>
+                                <p class="text-muted">Bei jeder neuen Buchung kommt automatisch ein Buchungsblatt aus deinem Drucker (Gast, Zeitraum, Personen, Kontakt, Preis, Türcode). Der Server kann den Drucker in der Wohnung nicht direkt erreichen, deshalb druckt die gekoppelte TV-Box im Hintergrund: Sie holt neue Aufträge jede Minute ab und schickt sie übers WLAN an den Drucker. Der Fernseher zeigt davon nichts. Ist die Box aus, wird gedruckt, sobald sie wieder läuft. Buchungen von Booking.com und Airbnb werden erst gedruckt, wenn du per Telegram den Namen oder den Buchungs-Screenshot geschickt hast. Nach jedem Druck bekommst du eine Telegram-Nachricht, ist der Drucker aus, versucht die Box es etwa 9 Stunden lang weiter.</p>
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="printer-enabled"> Neue Buchungen automatisch ausdrucken
+                                        </label>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="printer-host">IP-Adresse des Druckers</label>
+                                            <input type="text" id="printer-host" placeholder="z.B. 192.168.178.40" autocomplete="off">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="printer-mode">Verbindung</label>
+                                            <select id="printer-mode">
+                                                <option value="auto">Automatisch (IPP, sonst Port 9100)</option>
+                                                <option value="ipp">Nur IPP / AirPrint (Port 631)</option>
+                                                <option value="raw">Nur direkt (Port 9100)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="printer-found" class="info-row" style="display:none; flex-wrap:wrap; gap:.5rem"></div>
+                                    <details style="margin: .5rem 0 1rem">
+                                        <summary class="text-muted" style="cursor:pointer">Erweitert</summary>
+                                        <div class="form-row" style="margin-top:.75rem">
+                                            <div class="form-group">
+                                                <label for="printer-port">Port</label>
+                                                <input type="number" id="printer-port" min="1" max="65535" placeholder="631">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="printer-path">IPP-Pfad</label>
+                                                <input type="text" id="printer-path" placeholder="ipp/print">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="printer-copies">Anzahl Blätter</label>
+                                                <input type="number" id="printer-copies" min="1" max="5" placeholder="1">
+                                            </div>
+                                        </div>
+                                    </details>
+                                    <div class="form-group">
+                                        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                            <input type="checkbox" id="printer-manual"> Auch Buchungen drucken, die ich selbst im Admin eintrage
+                                        </label>
+                                    </div>
+                                    <p class="text-muted" id="printer-box-state" style="font-size:.85rem"></p>
+                                    <div class="btn-group" style="flex-wrap: wrap;">
+                                        <button type="button" id="btn-printer-save" class="btn btn-primary">Speichern</button>
+                                        <button type="button" id="btn-printer-test" class="btn btn-outline">Testseite drucken</button>
+                                        <button type="button" id="btn-printer-preview" class="btn btn-ghost">Muster-Blatt ansehen</button>
+                                    </div>
+                                    <p class="text-muted" style="font-size:.85rem; margin-top:.75rem">Die IP findest du am Drucker-Display (bei Utax/Kyocera meist unter „Status“ oder „Systemmenü → Netzwerk“) oder in der FRITZ!Box unter Heimnetz → Netzwerk. Tipp: In der FRITZ!Box „Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“ anhaken.</p>
+                                </div>
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h4 style="margin-top:0">Letzte Druckaufträge</h4>
+                                    <div id="printer-jobs" class="text-muted">–</div>
+                                </div>
+                            </section>
+
                             <section id="settings-system" class="settings-page">
                                 <h2>System & Update</h2>
                                 <div class="card" style="margin-top: 1.5rem;">
@@ -2415,12 +2962,108 @@
                         <label for="nb-note">Notiz <small>(optional)</small></label>
                         <input type="text" id="nb-note" maxlength="300" placeholder="z. B. Preis, Absprachen">
                     </div>
+                    <div class="form-group">
+                        <label for="nb-voucher">Gutscheincode <small>(optional, wird für diese Buchung eingelöst)</small></label>
+                        <input type="text" id="nb-voucher" maxlength="24" placeholder="GS-……" autocapitalize="characters" spellcheck="false">
+                        <small class="nb-voucher-info" id="nb-voucher-info" hidden></small>
+                    </div>
                     <label class="nb-check"><input type="checkbox" id="nb-pin" checked> Türcode (Nuki) für den Zeitraum anlegen</label>
                     <div class="nb-msg" id="nb-msg" hidden></div>
                     <div class="nb-actions">
                         <span class="nb-nights" id="nb-nights"></span>
                         <button type="button" class="btn btn-outline" id="btn-cancel-new-booking">Abbrechen</button>
                         <button type="submit" class="btn btn-primary" id="btn-save-new-booking">Buchung speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="modal-voucher" style="display:none;">
+            <div class="modal nb-modal" role="dialog" aria-labelledby="vc-title">
+                <div class="modal-header">
+                    <h3 id="vc-title">Neuer Gutschein</h3>
+                    <button type="button" id="btn-close-voucher" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                    </button>
+                </div>
+                <form class="modal-body nb-form" id="vc-form" novalidate autocomplete="off">
+                    <div class="form-group">
+                        <label>Art</label>
+                        <div class="seg vc-kind" id="vc-kind" role="radiogroup">
+                            <button type="button" data-kind="nights" class="active">Gratisnächte</button>
+                            <button type="button" data-kind="amount">Betrag (€)</button>
+                            <button type="button" data-kind="percent">Rabatt (%)</button>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="vc-value" id="vc-value-label">Anzahl Nächte</label><input type="number" id="vc-value" min="1" step="1" value="2" required></div>
+                        <div class="form-group"><label for="vc-min">Mindestaufenthalt <small>(Nächte, optional)</small></label><input type="number" id="vc-min" min="0" max="60" step="1" placeholder="keiner"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vc-guest">Für Gast <small>(optional)</small></label>
+                        <input type="text" id="vc-guest" list="vc-guest-list" maxlength="80" placeholder="Name aus der Gästeliste">
+                        <datalist id="vc-guest-list"></datalist>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="vc-from">Einlösbar ab</label><input type="date" id="vc-from"></div>
+                        <div class="form-group"><label for="vc-until">Einlösbar bis</label><input type="date" id="vc-until"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vc-dedication">Text auf dem Gutschein <small>(optional, sieht der Gast)</small></label>
+                        <textarea id="vc-dedication" rows="2" maxlength="600" placeholder="z. B. Danke, dass Sie unsere Wohnung so schön hinterlassen haben!"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="vc-note">Interne Notiz <small>(optional)</small></label><input type="text" id="vc-note" maxlength="300" placeholder="z. B. Entschädigung Heizungsausfall"></div>
+                        <div class="form-group" id="vc-code-wrap"><label for="vc-code">Eigener Code <small>(leer = automatisch)</small></label><input type="text" id="vc-code" maxlength="20" placeholder="GS-……" autocapitalize="characters" spellcheck="false"></div>
+                    </div>
+                    <div class="nb-msg" id="vc-msg" hidden></div>
+                    <div class="nb-actions">
+                        <button type="button" class="btn btn-outline" id="btn-cancel-voucher">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-voucher">Gutschein anlegen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="modal-expense" style="display:none;">
+            <div class="modal nb-modal ex-modal" role="dialog" aria-labelledby="ex-title">
+                <div class="modal-header">
+                    <h3 id="ex-title">Neue Ausgabe</h3>
+                    <button type="button" id="btn-close-expense" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                    </button>
+                </div>
+                <form class="modal-body nb-form" id="ex-form" novalidate autocomplete="off">
+                    <div class="ex-file" id="ex-file-box">
+                        <input type="file" id="ex-file" accept="image/*,application/pdf" hidden>
+                        <div class="ex-preview" id="ex-preview"></div>
+                        <div class="ex-file-text">
+                            <strong id="ex-file-name">Beleg (Foto oder PDF)</strong>
+                            <span class="review-hint" id="ex-file-hint">Wird automatisch ausgelesen. Ohne Beleg einfach die Felder ausfüllen.</span>
+                        </div>
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-ex-file">Datei wählen</button>
+                    </div>
+                    <div class="nb-msg ex-scan-msg" id="ex-scan-msg" hidden></div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="ex-vendor">Händler</label><input type="text" id="ex-vendor" maxlength="80" placeholder="z. B. OBI"></div>
+                        <div class="form-group"><label for="ex-date">Datum</label><input type="date" id="ex-date" required></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="ex-amount">Betrag (€, brutto)</label><input type="text" id="ex-amount" inputmode="decimal" placeholder="0,00" required></div>
+                        <div class="form-group"><label for="ex-cat">Kategorie</label><select id="ex-cat"></select></div>
+                    </div>
+                    <div class="form-group"><label for="ex-desc">Beschreibung <small>(optional)</small></label><input type="text" id="ex-desc" maxlength="300" placeholder="z. B. Duschkopf und Silikon"></div>
+                    <div class="form-row ex-row3">
+                        <div class="form-group"><label for="ex-vat-rate">MwSt-Satz</label><select id="ex-vat-rate"><option value="">–</option><option value="19">19 %</option><option value="7">7 %</option><option value="0">0 %</option></select></div>
+                        <div class="form-group"><label for="ex-vat">Vorsteuer (€)</label><input type="text" id="ex-vat" inputmode="decimal" placeholder="–"></div>
+                        <div class="form-group"><label for="ex-pay">Zahlart</label><select id="ex-pay"><option value="">–</option><option>Bar</option><option>EC-Karte</option><option>Kreditkarte</option><option>PayPal</option><option>Überweisung</option><option>Lastschrift</option></select></div>
+                    </div>
+                    <div class="form-group"><label for="ex-invno">Beleg-/Rechnungsnummer <small>(optional)</small></label><input type="text" id="ex-invno" maxlength="60"></div>
+                    <label class="checkbox-label" id="ex-pl-wrap" hidden><input type="checkbox" id="ex-pl"> Beleg in Paperless ablegen</label>
+                    <div class="nb-msg" id="ex-msg" hidden></div>
+                    <div class="nb-actions">
+                        <button type="button" class="btn btn-outline" id="btn-cancel-expense">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-expense">Speichern</button>
                     </div>
                 </form>
             </div>
@@ -2487,6 +3130,23 @@
             </div>
         </div>
 
+        <div class="modal-overlay" id="modal-addr-check" style="display:none;">
+            <div class="modal modal-wide">
+                <div class="modal-header">
+                    <h3>Anschriften prüfen</h3>
+                    <button type="button" id="btn-close-addr-check" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="ac-intro">Bis Version 1.50.0 konnte beim Erstellen einer Rechnung aus einer Buchung die Anschrift der vorherigen Rechnung stehen bleiben. Hier stehen Rechnungen und Gäste, deren Anschrift wahrscheinlich zu einer anderen Person gehört. Bitte jeweils prüfen: <b>Vorschlag übernehmen</b>, selbst korrigieren oder <b>ist richtig</b>.</p>
+                    <div id="addr-check-body"><p class="ac-empty">Wird geprüft …</p></div>
+                </div>
+            </div>
+        </div>
+
         <div class="modal-overlay" id="modal-guests" style="display:none;">
             <div class="modal modal-wide">
                 <div class="modal-header">
@@ -2530,6 +3190,7 @@
                             <div class="guest-detail-header">
                                 <button type="button" id="btn-back-to-list" class="btn btn-ghost btn-sm">←
                                     Zurück</button>
+                                <button type="button" id="btn-guest-voucher" class="btn btn-outline btn-sm">🎁 Gutschein schenken</button>
                                 <button type="button" id="btn-delete-guest" class="btn btn-ghost btn-danger btn-sm">Gast
                                     löschen</button>
                             </div>
@@ -2552,7 +3213,7 @@
                                     </div>
                                     <div class="form-group">
                                         <label for="guest-edit-address">Adresse</label>
-                                        <input type="text" id="guest-edit-address" placeholder="Adresse">
+                                        <textarea id="guest-edit-address" rows="3" placeholder="Straße Nr.&#10;PLZ Ort&#10;Land"></textarea>
                                     </div>
                                 </div>
                                 <div class="form-group">
@@ -2635,7 +3296,7 @@
         </form>
     </dialog>
 
-    <script defer src="app.js?v=4.0"></script>
+    <script defer src="app.js?v=4.1"></script>
 </body>
 
 </html>

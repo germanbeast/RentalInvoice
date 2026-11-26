@@ -13,6 +13,7 @@
 
 const path = require('path');
 const crypto = require('crypto');
+const guestLang = require('./guest-lang');
 
 const SITE_DIR = path.join(__dirname, 'guest-site');
 const OPENINGS_PER_HOUR = 3;
@@ -124,7 +125,7 @@ function createEmergencyDoor({ express, rateLimit, db, botLogic, qrcode, notify,
         }
         // Shown with the logout link, also when the door cannot be opened right now
         const b = c.booking || guestBooking(req.session && req.session.guest);
-        if (b) out.code = b.guest_code;
+        if (b) { out.code = b.guest_code; out.lang = guestLang.forBooking(b).lang; }
         res.json(out);
     });
 

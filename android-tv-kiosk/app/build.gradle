@@ -10,11 +10,29 @@ android {
         applicationId "com.beckhome.tvwelcome"
         minSdk 21
         targetSdk 34
-        versionCode 2
-        versionName "1.1"
+        versionCode 16
+        versionName "1.12"
+    }
+
+    // Fester Signierschlüssel aus GitHub-Secrets (TV_KEYSTORE_B64/TV_KEYSTORE_PASSWORD, siehe Workflow).
+    // Nur damit kann sich die App selbst aktualisieren: Android nimmt ein Update nur mit
+    // demselben Schlüssel an. Ohne die Variablen wird mit dem zufälligen Debug-Schlüssel gebaut.
+    def ks = System.getenv('KIOSK_KEYSTORE')
+    signingConfigs {
+        kiosk {
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('KIOSK_KEYSTORE_PASSWORD')
+                keyAlias 'kiosk'
+                keyPassword System.getenv('KIOSK_KEYSTORE_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (ks) signingConfig signingConfigs.kiosk
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -30,4 +48,6 @@ android {
 dependencies {
     implementation 'androidx.leanback:leanback:1.0.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    // WebSocket für die Fernwartung (AdbTunnel)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
