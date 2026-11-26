@@ -204,7 +204,8 @@ const BOT_COMMANDS = {
     nachricht: ['messages', 'view'], guestlink: ['messages', 'edit'],
     review: ['finance', 'view'],
     beleg: ['finance', 'edit'],
-    wlan: ['website', 'edit']
+    wlan: ['website', 'edit'],
+    server: ['settings', 'view']
 };
 
 function canBot(perms, command) {
