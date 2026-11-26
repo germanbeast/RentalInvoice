@@ -133,6 +133,22 @@ function createPaperlessHttpsAgent() {
 db.init();
 vouchers.ensureSchema();
 
+// Ausgaben mit Belegen (Telegram-Foto, Upload, Paperless), siehe receipts.js
+const receipts = require('./receipts')({
+    db, axios,
+    paperlessAgent: () => createPaperlessHttpsAgent(),
+    notify: (msg) => sendToAllRecipients(msg.replace(/<[^>]+>/g, ''), { type: 'expenses' })
+});
+receipts.ensureSchema();
+const receiptUpload = multer({
+    dest: require('os').tmpdir(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (/^(image\/(jpeg|png|webp|heic|heif|gif|tiff|bmp)|application\/pdf)$/i.test(file.mimetype)) return cb(null, true);
+        cb(new Error('Nur Fotos (JPG, PNG, WebP, HEIC) und PDFs erlaubt'));
+    }
+});
+
 // =======================
 // 1b. WhatsApp Web Client
 // =======================
@@ -449,7 +465,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false, wifi: () => { try { return guestWifi; } catch (e) { return null; } } }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false, wifi: () => { try { return guestWifi; } catch (e) { return null; } }, receipts: () => receipts }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -521,6 +537,7 @@ function pushAllowed(username, type) {
     if (t.startsWith('nuki')) return permissions.can(perms, 'door');
     if (t.startsWith('guest_chat')) return permissions.can(perms, 'messages');
     if (t === 'invoice' || t.startsWith('invoice_')) return permissions.can(perms, 'invoices');
+    if (t === 'expenses') return permissions.can(perms, 'finance');
     return permissions.can(perms, 'calendar');
 }
 
@@ -3365,93 +3382,9 @@ app.post('/api/migrate', apiLimiter, (req, res) => {
 // =======================
 // 12. EXPENSES API
 // =======================
-app.get('/api/expenses', apiLimiter, (req, res) => {
-    try {
-        const expenses = db.getAllExpenses();
-        res.json({ success: true, expenses });
-    } catch (e) {
-        console.error('Expenses GET Error:', e.message);
-        res.status(500).json({ error: 'Ausgaben konnten nicht geladen werden' });
-    }
-});
-
-app.post('/api/expenses', apiLimiter, (req, res) => {
-    try {
-        const expense = db.createExpense(req.body);
-        res.json({ success: true, message: 'Ausgabe gespeichert', expense });
-    } catch (e) {
-        console.error('Expense POST Error:', e.message);
-        res.status(500).json({ error: 'Ausgabe konnte nicht gespeichert werden' });
-    }
-});
-
-app.delete('/api/expenses/:id', apiLimiter, (req, res) => {
-    try {
-        db.deleteExpense(parseInt(req.params.id));
-        res.json({ success: true, message: 'Ausgabe gelöscht' });
-    } catch (e) {
-        console.error('Expense DELETE Error:', e.message);
-        res.status(500).json({ error: 'Ausgabe konnte nicht gelöscht werden' });
-    }
-});
-
-app.post('/api/expenses/sync', apiLimiter, async (req, res) => {
-    try {
-        const allSettings = db.getAllSettings();
-        const pl = allSettings.paperless || {};
-        const tag = allSettings.paperless_expense_tag || 'BeckhomeInvoice';
-        const amountFieldName = allSettings.paperless_amount_field || 'Betrag';
-
-        if (!pl.url || !pl.token) {
-            return res.status(400).json({ error: 'Paperless-Zugangsdaten nicht konfiguriert' });
-        }
-
-        // 1. Get Tag ID from Paperless
-        const tagsRes = await axios.get(`${pl.url}/api/tags/?name__icontains=${encodeURIComponent(tag)}`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-        const tagObj = tagsRes.data.results.find(t => t.name.toLowerCase() === tag.toLowerCase());
-        if (!tagObj) return res.json({ success: true, message: `Tag "${tag}" nicht in Paperless gefunden.`, count: 0 });
-
-        // 2. Search documents with this tag
-        const docsRes = await axios.get(`${pl.url}/api/documents/?tags__id__all=${tagObj.id}`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-
-        // 3. Get Custom Fields definitions to find the right ID
-        const fieldsRes = await axios.get(`${pl.url}/api/custom_fields/`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-        const amountFieldDef = fieldsRes.data.results.find(f => f.name.toLowerCase() === amountFieldName.toLowerCase());
-
-        let count = 0;
-        for (const doc of docsRes.data.results) {
-            // Check if already synced
-            if (db.getExpenseByPaperlessId(doc.id)) continue;
-
-            let amount = 0;
-            if (amountFieldDef && doc.custom_fields) {
-                const fieldVal = doc.custom_fields.find(cf => cf.field === amountFieldDef.id);
-                if (fieldVal && fieldVal.value) amount = parseFloat(fieldVal.value);
-            }
-
-            db.createExpense({
-                date: doc.created ? doc.created.split('T')[0] : (doc.added ? doc.added.split('T')[0] : new Date().toISOString().split('T')[0]),
-                amount: amount,
-                category: 'Paperless',
-                description: doc.title,
-                source: 'paperless',
-                paperless_id: doc.id
-            });
-            count++;
-        }
-
-        res.json({ success: true, message: `${count} neue Ausgaben synchronisiert`, count });
-    } catch (e) {
-        console.error('Expense Sync Error:', e.message);
-        res.status(500).json({ error: 'Synchronisierung fehlgeschlagen' });
-    }
-});
+// Ausgaben (Liste, Belege, Paperless): receipts.js
+receipts.registerRoutes(app, { apiLimiter, multerUpload: receiptUpload, permissions });
+receipts.startAutoImport();
 
 // =======================
 // 13. STATS API
@@ -3603,6 +3536,21 @@ app.get('/api/finance/export-csv.zip', apiLimiter, (req, res) => {
         res.send(xlsxWriter.zip(files));
     } catch (e) {
         console.error('Finanz-CSV-ZIP Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
+    }
+});
+// Belege (Fotos/PDFs) der Ausgaben eines Zeitraums als ZIP, Dateiname Datum_Händler_Betrag
+app.get('/api/finance/receipts.zip', apiLimiter, (req, res) => {
+    try {
+        const r = financeReport.report(req.query);
+        const files = receipts.receiptFilesBetween(r.from, r.to);
+        if (!files.length) return res.status(404).json({ success: false, error: 'Keine Belegdateien im Zeitraum' });
+        files.push({ name: `Ausgaben_${financeReport.fileBase(r)}.csv`, data: financeReport.csvOf(r, 'expenses') });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="Belege_${financeReport.fileBase(r)}.zip"`);
+        res.send(xlsxWriter.zip(files));
+    } catch (e) {
+        console.error('Beleg-ZIP Fehler:', e.message);
         res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
     }
 });

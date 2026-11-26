@@ -1,6 +1,6 @@
 {
   "name": "ferienwohnung-rechnung",
-  "version": "1.58.0",
+  "version": "1.59.0",
   "description": "",
   "main": "app.js",
   "scripts": {
@@ -36,6 +36,8 @@
     "tesseract.js": "^7.0.0",
     "web-push": "^3.6.7",
     "whatsapp-web.js": "^1.34.6",
-    "ws": "^8.23.0"
+    "ws": "^8.23.0",
+    "@anthropic-ai/sdk": "^1.14.0",
+    "pdf-parse": "^2.4.5"
   }
 }
