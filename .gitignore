@@ -31,3 +31,8 @@ uploads/site/
 uploads/site-video/
 .ocr-data/
 uploads/receipts/
+
+# Datensicherungen (verschlüsselt) und entpackte Wiederherstellungen
+backups/
+restore-*/
+pre-restore-*/
