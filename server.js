@@ -133,6 +133,22 @@ function createPaperlessHttpsAgent() {
 db.init();
 vouchers.ensureSchema();
 
+// Ausgaben mit Belegen (Telegram-Foto, Upload, Paperless), siehe receipts.js
+const receipts = require('./receipts')({
+    db, axios,
+    paperlessAgent: () => createPaperlessHttpsAgent(),
+    notify: (msg) => sendToAllRecipients(msg.replace(/<[^>]+>/g, ''), { type: 'expenses' })
+});
+receipts.ensureSchema();
+const receiptUpload = multer({
+    dest: require('os').tmpdir(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (/^(image\/(jpeg|png|webp|heic|heif|gif|tiff|bmp)|application\/pdf)$/i.test(file.mimetype)) return cb(null, true);
+        cb(new Error('Nur Fotos (JPG, PNG, WebP, HEIC) und PDFs erlaubt'));
+    }
+});
+
 // =======================
 // 1b. WhatsApp Web Client
 // =======================
@@ -449,7 +465,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false, wifi: () => { try { return guestWifi; } catch (e) { return null; } } }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false, wifi: () => { try { return guestWifi; } catch (e) { return null; } }, receipts: () => receipts }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -521,6 +537,7 @@ function pushAllowed(username, type) {
     if (t.startsWith('nuki')) return permissions.can(perms, 'door');
     if (t.startsWith('guest_chat')) return permissions.can(perms, 'messages');
     if (t === 'invoice' || t.startsWith('invoice_')) return permissions.can(perms, 'invoices');
+    if (t === 'expenses') return permissions.can(perms, 'finance');
     return permissions.can(perms, 'calendar');
 }
 
@@ -1145,7 +1162,7 @@ if (!process.env.SESSION_SECRET) {
 // otherwise it ends after 8 hours without activity (rolling: every request extends it).
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
-app.use(session({
+const sessionMiddleware = session({
     secret: sessionSecret,
     name: '__sid',
     store: require('./session-store')(session, db),
@@ -1159,7 +1176,8 @@ app.use(session({
         sameSite: 'strict',
         maxAge: SESSION_MS
     }
-}));
+});
+app.use(sessionMiddleware);
 
 function startUserSession(req, user, remember) {
     req.session.user = user;
@@ -1265,6 +1283,13 @@ function tvboxViewAllowed(req) {
     return !!(req.session && req.session.user) || tvboxDeviceAuthorized(req);
 }
 
+// Fernwartung: ws-scrcpy over an ADB tunnel the box opens itself (see tv-remote.js, tools/tv-fernwartung.sh)
+const tvRemote = require('./tv-remote')({
+    db, permissions, sessionMiddleware,
+    deviceAuthorized: (req) => tvboxDeviceAuthorized(req),
+    isAdminHost: (req) => { const g = guestDomain(); return !g || requestHost(req) !== g.host; }
+});
+
 function tvboxConfig() {
     return { ...TVBOX_DEFAULT_CONFIG, ...(db.getSetting('tvbox_config') || {}) };
 }
@@ -1302,6 +1327,7 @@ app.post('/api/tv-box/sync', (req, res) => {
                 port: parseInt(x && x.port, 10) || 631, path: clip(x && x.path, 100)
             })).filter(x => x.host),
             printError: clip(b.printError, 200),
+            adbLocal: b.adbLocal === undefined ? null : !!b.adbLocal, // port 5555 open on the box (Fernwartung)
             lastSeen: now
         };
         res.set('Cache-Control', 'no-store');
@@ -1331,6 +1357,7 @@ app.post('/api/tv-box/sync', (req, res) => {
             paired: true,
             config: { version: cfg.version || 0, kiosk: cfg.kiosk !== false, idleHours: cfg.idleHours, adminPin: cfg.adminPin || '' },
             welcome: (() => { try { return welcomeData(); } catch (e) { return null; } })(), // offline copy on the box
+            remote: tvRemote.syncInfo(), // Fernwartung: tunnel to the box's ADB (tv-remote.js)
             command: cmd && cmd.seq > status.ackSeq && now - cmd.createdAt < 24 * 60 * 60 * 1000 ? { seq: cmd.seq, type: cmd.type } : null,
             print: (() => { try { return printJobs.forBox(); } catch (e) { console.error('Druckaufträge:', e.message); return null; } })()
         });
@@ -1453,7 +1480,16 @@ const guestWifi = require('./wifi')({
     telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
     berlinToday: () => berlinToday(),
     addDays: (ymd, n) => addDays(ymd, n),
-    formatDateDE: (d) => formatDateDE(d)
+    formatDateDE: (d) => formatDateDE(d),
+    // Start page after the WLAN login: towel button and check-out hints like on the TV (tv-guest.js)
+    home: {
+        towels: () => tvGuest.getConfig().towels,
+        departure: () => { const c = tvGuest.getConfig(); return c.farewell ? { hints: c.hints, message: c.message } : null; },
+        requestTowels: (b) => {
+            const g = b.guest_id ? db.getGuestById(b.guest_id) : null;
+            return tvGuest.requestTowels({ id: b.id, name: g && !require('./bot-logic').isPlaceholderGuestName(g.name) ? g.name : '', checkin: b.checkin, checkout: b.checkout }, { source: 'wlan' });
+        }
+    }
 });
 // Background video of the apartment (muted loop, slightly blurred) for the guest pages and the TV, see site-video.js.
 // Served before the guest-domain rewrite, so the TV box gets it on the guest host too.
@@ -1797,11 +1833,19 @@ app.get('/api/me', (req, res) => {
     if (req.session && req.session.user && req.user) {
         res.json({
             authenticated: true,
-            user: { id: req.user.id, username: req.user.username, role: req.user.role, permissions: req.user.permissions }
+            user: { id: req.user.id, username: req.user.username, role: req.user.role, permissions: req.user.permissions, theme: req.user.theme || 'auto' }
         });
     } else {
         res.json({ authenticated: false });
     }
+});
+
+// Darstellung (Hell/Dunkel/Automatisch) des angemeldeten Benutzers
+app.put('/api/me/theme', (req, res) => {
+    if (!req.user) return res.status(401).json({ success: false });
+    const theme = String((req.body && req.body.theme) || '');
+    if (!db.setUserTheme(req.user.id, theme)) return res.status(400).json({ success: false, error: 'Ungültige Darstellung' });
+    res.json({ success: true, theme });
 });
 
 // Version Info
@@ -2640,6 +2684,9 @@ app.put('/api/settings/tvbox/config', apiLimiter, (req, res) => {
     res.json({ success: true, ...tvboxRemoteState() });
 });
 
+// Fernwartung (ws-scrcpy): on/off, status, and the page itself under /tv-fernwartung/ (right: settings, edit)
+tvRemote.registerAdminRoutes(app, { limiter: apiLimiter });
+
 app.post('/api/settings/tvbox/command', apiLimiter, (req, res) => {
     const type = String((req.body || {}).type || '');
     if (!TVBOX_COMMANDS.includes(type)) return res.status(400).json({ error: 'Unbekannter Befehl' });
@@ -3335,93 +3382,9 @@ app.post('/api/migrate', apiLimiter, (req, res) => {
 // =======================
 // 12. EXPENSES API
 // =======================
-app.get('/api/expenses', apiLimiter, (req, res) => {
-    try {
-        const expenses = db.getAllExpenses();
-        res.json({ success: true, expenses });
-    } catch (e) {
-        console.error('Expenses GET Error:', e.message);
-        res.status(500).json({ error: 'Ausgaben konnten nicht geladen werden' });
-    }
-});
-
-app.post('/api/expenses', apiLimiter, (req, res) => {
-    try {
-        const expense = db.createExpense(req.body);
-        res.json({ success: true, message: 'Ausgabe gespeichert', expense });
-    } catch (e) {
-        console.error('Expense POST Error:', e.message);
-        res.status(500).json({ error: 'Ausgabe konnte nicht gespeichert werden' });
-    }
-});
-
-app.delete('/api/expenses/:id', apiLimiter, (req, res) => {
-    try {
-        db.deleteExpense(parseInt(req.params.id));
-        res.json({ success: true, message: 'Ausgabe gelöscht' });
-    } catch (e) {
-        console.error('Expense DELETE Error:', e.message);
-        res.status(500).json({ error: 'Ausgabe konnte nicht gelöscht werden' });
-    }
-});
-
-app.post('/api/expenses/sync', apiLimiter, async (req, res) => {
-    try {
-        const allSettings = db.getAllSettings();
-        const pl = allSettings.paperless || {};
-        const tag = allSettings.paperless_expense_tag || 'BeckhomeInvoice';
-        const amountFieldName = allSettings.paperless_amount_field || 'Betrag';
-
-        if (!pl.url || !pl.token) {
-            return res.status(400).json({ error: 'Paperless-Zugangsdaten nicht konfiguriert' });
-        }
-
-        // 1. Get Tag ID from Paperless
-        const tagsRes = await axios.get(`${pl.url}/api/tags/?name__icontains=${encodeURIComponent(tag)}`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-        const tagObj = tagsRes.data.results.find(t => t.name.toLowerCase() === tag.toLowerCase());
-        if (!tagObj) return res.json({ success: true, message: `Tag "${tag}" nicht in Paperless gefunden.`, count: 0 });
-
-        // 2. Search documents with this tag
-        const docsRes = await axios.get(`${pl.url}/api/documents/?tags__id__all=${tagObj.id}`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-
-        // 3. Get Custom Fields definitions to find the right ID
-        const fieldsRes = await axios.get(`${pl.url}/api/custom_fields/`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-        const amountFieldDef = fieldsRes.data.results.find(f => f.name.toLowerCase() === amountFieldName.toLowerCase());
-
-        let count = 0;
-        for (const doc of docsRes.data.results) {
-            // Check if already synced
-            if (db.getExpenseByPaperlessId(doc.id)) continue;
-
-            let amount = 0;
-            if (amountFieldDef && doc.custom_fields) {
-                const fieldVal = doc.custom_fields.find(cf => cf.field === amountFieldDef.id);
-                if (fieldVal && fieldVal.value) amount = parseFloat(fieldVal.value);
-            }
-
-            db.createExpense({
-                date: doc.created ? doc.created.split('T')[0] : (doc.added ? doc.added.split('T')[0] : new Date().toISOString().split('T')[0]),
-                amount: amount,
-                category: 'Paperless',
-                description: doc.title,
-                source: 'paperless',
-                paperless_id: doc.id
-            });
-            count++;
-        }
-
-        res.json({ success: true, message: `${count} neue Ausgaben synchronisiert`, count });
-    } catch (e) {
-        console.error('Expense Sync Error:', e.message);
-        res.status(500).json({ error: 'Synchronisierung fehlgeschlagen' });
-    }
-});
+// Ausgaben (Liste, Belege, Paperless): receipts.js
+receipts.registerRoutes(app, { apiLimiter, multerUpload: receiptUpload, permissions });
+receipts.startAutoImport();
 
 // =======================
 // 13. STATS API
@@ -3573,6 +3536,21 @@ app.get('/api/finance/export-csv.zip', apiLimiter, (req, res) => {
         res.send(xlsxWriter.zip(files));
     } catch (e) {
         console.error('Finanz-CSV-ZIP Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
+    }
+});
+// Belege (Fotos/PDFs) der Ausgaben eines Zeitraums als ZIP, Dateiname Datum_Händler_Betrag
+app.get('/api/finance/receipts.zip', apiLimiter, (req, res) => {
+    try {
+        const r = financeReport.report(req.query);
+        const files = receipts.receiptFilesBetween(r.from, r.to);
+        if (!files.length) return res.status(404).json({ success: false, error: 'Keine Belegdateien im Zeitraum' });
+        files.push({ name: `Ausgaben_${financeReport.fileBase(r)}.csv`, data: financeReport.csvOf(r, 'expenses') });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="Belege_${financeReport.fileBase(r)}.zip"`);
+        res.send(xlsxWriter.zip(files));
+    } catch (e) {
+        console.error('Beleg-ZIP Fehler:', e.message);
         res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
     }
 });
@@ -4404,7 +4382,7 @@ app.use((err, req, res, next) => {
 // =======================
 // LISTEN_HOST=127.0.0.1 in .env: reachable only through the tunnel/proxy on this machine, port 3000 closed to the outside
 const LISTEN_HOST = process.env.LISTEN_HOST || undefined;
-app.listen(PORT, LISTEN_HOST, () => {
+const httpServer = app.listen(PORT, LISTEN_HOST, () => {
     console.log(`🔒 Server (Hardened + SQLite) running on http://${LISTEN_HOST || 'localhost'}:${PORT}`);
     console.log(`   Static files: ${PUBLIC_DIR}`);
 
@@ -4412,6 +4390,8 @@ app.listen(PORT, LISTEN_HOST, () => {
     initWhatsApp();
     initTelegram();
 });
+// WebSockets: ADB tunnel of the TV box and the ws-scrcpy page (TV-Fernwartung, tv-remote.js)
+httpServer.on('upgrade', tvRemote.handleUpgrade);
 
 // Graceful shutdown
 // WhatsApp's Chromium is closed too, otherwise it keeps the profile locked for the next start

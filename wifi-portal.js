@@ -71,7 +71,11 @@ function berlinEpoch(ymd, hhmm) {
     return guess - (asBerlin - guess);
 }
 
-function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, chatButton, telegram, berlinToday, formatDateDE }) {
+/**
+ * home (optional, from tv-guest.js): { towels: () => bool, departure: () => { hints, message } | null,
+ *   requestTowels: booking => Promise<{ ok, already }> } for the start page after the login.
+ */
+function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, chatButton, telegram, berlinToday, formatDateDE, home = null }) {
     const sql = () => db.getDb();
     sql().exec(`
         CREATE TABLE IF NOT EXISTS wifi_portal_devices (
@@ -499,7 +503,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         const rhid = enqueue(f.fas, minutes, `booking=${b.id}`);
         rememberDevice({ bookingId: b.id, kind: 'guest', mac: f.mac, fas: f.fas, ua, until: acc.until });
         db.logNotification('guest_wifi', `WLAN-Anmeldung (${how}) für ${guestName(b) || 'Gast'} ${formatDateDE(b.checkin)} – ${formatDateDE(b.checkout)}`, 'sent');
-        return { success: true, wait: rhid, name: firstName(guestName(b)), until: new Date(acc.until).toISOString(), checkout: b.checkout, welcome: welcomeFor(b), lang: guestLang.forBooking(b).lang };
+        return { success: true, wait: rhid, name: firstName(guestName(b)), until: new Date(acc.until).toISOString(), checkout: b.checkout, welcome: welcomeFor(b), lang: guestLang.forBooking(b).lang, session: { kind: 'guest', id: b.id } };
     }
 
     /** Lets a device in with an extra code (same device limit as a booking). */
@@ -512,21 +516,91 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
         }
         const rhid = enqueue(f.fas, Math.max(15, (until - Date.now()) / 60000), 'code');
         rememberDevice({ bookingId: null, kind: 'code', mac: f.mac, fas: f.fas, ua, until, codeId: x.id });
-        return { success: true, wait: rhid, name: '', until: new Date(until).toISOString() };
+        return { success: true, wait: rhid, name: '', until: new Date(until).toISOString(), welcome: welcomeFor(null), session: { kind: 'code', id: x.id } };
     }
 
-    /** What the page shows after the login: check-out, house rules, contact (the live tips come from api/live). */
+    /**
+     * Tip of the day for the start page: one of the excursion tips (Webseite → Ausflugstipps), a new one
+     * every day (offset by the booking, so two stays do not see the same order). Without tips: a section of
+     * the guest folder. null when the host has neither.
+     */
+    function tipOfDay(seed = 0) {
+        const site = getSite();
+        const day = Math.floor(Date.parse(`${berlinToday()}T12:00:00Z`) / 864e5) || 0;
+        const pick = list => list[((day + Number(seed || 0)) % list.length + list.length) % list.length];
+        const url = u => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '')) ? String(u) : '');
+        const tips = (Array.isArray(site.tips) ? site.tips : []).filter(t => t && String(t.name || '').trim());
+        if (tips.length) {
+            const t = pick(tips);
+            return { kind: 'tip', title: String(t.name).slice(0, 120), distance: String(t.distance || '').slice(0, 40), text: String(t.text || '').slice(0, 600), url: url(t.url), count: tips.length };
+        }
+        const guide = String(site.guide || '').split(/\n\s*\n/).map(block => {
+            const lines = block.trim().split('\n');
+            return { title: (lines.shift() || '').replace(/^#+\s*/, '').trim(), text: lines.join('\n').trim() };
+        }).filter(g => g.title && g.text);
+        if (guide.length) {
+            const g = pick(guide);
+            return { kind: 'guide', title: g.title.slice(0, 120), text: g.text.slice(0, 600), url: '', count: guide.length };
+        }
+        return null;
+    }
+
+    /**
+     * What the start page shows after the login: check-out, house rules, contact, tip of the day, towel button,
+     * check-out hints on departure day (weather, opening hours and events come from api/live).
+     * b = null for the host's own code and extra codes (no stay, no towels).
+     */
     function welcomeFor(b) {
         const site = getSite();
         const v = db.getAllSettings().vermieter || {};
         let chat = null;
         try { chat = chatButton ? chatButton(b) : null; } catch (e) { chat = null; }
+        const departureDay = !!(b && b.checkout === berlinToday());
+        let departure = null;
+        try { departure = departureDay && home ? home.departure() : null; } catch (e) { departure = null; }
+        let towels = false;
+        try { towels = !!(b && !departureDay && home && home.towels()); } catch (e) { towels = false; }
         return {
-            checkout: b.checkout, checkoutTime: site.checkout_time || '',
+            checkout: b ? b.checkout : '', checkoutTime: site.checkout_time || '',
             rules: String(site.house_rules || '').slice(0, 3000),
             whatsapp: chat && chat.url ? chat.url : '',
-            phone: site.show_contact !== false ? String(v.telefon || '') : ''
+            phone: site.show_contact !== false ? String(v.telefon || '') : '',
+            tip: tipOfDay(b ? b.id : 0),
+            towels,
+            departure
         };
+    }
+
+    /** The login is kept in the session, so the start page still knows the stay when it is opened again. */
+    function keepLogin(req, r) {
+        if (!r || !r.success || !r.session || !req.session) return r;
+        req.session.wlan = { kind: r.session.kind, id: r.session.id || null, until: r.until };
+        const { session, ...rest } = r;
+        return rest;
+    }
+
+    /** Start page data for this browser: WLAN login of this session, else the "Meine Buchung" login. */
+    function homeFor(req) {
+        const w = req.session && req.session.wlan;
+        if (w && Date.parse(w.until) > Date.now()) {
+            if (w.kind === 'guest') {
+                const b = sql().prepare('SELECT * FROM bookings WHERE id = ?').get(w.id);
+                if (b && bookingAccess(b).ok) {
+                    return { booking: b, info: { name: firstName(guestName(b)), until: w.until, checkout: b.checkout, welcome: welcomeFor(b), lang: guestLang.forBooking(b).lang } };
+                }
+            } else if (w.kind === 'owner') {
+                return { booking: null, info: { name: '', owner: true, until: w.until, welcome: welcomeFor(null) } };
+            } else if (w.kind === 'code') {
+                const x = sql().prepare('SELECT * FROM wifi_portal_codes WHERE id = ? AND valid_until > ?').get(w.id, new Date().toISOString());
+                if (x) return { booking: null, info: { name: '', until: w.until, welcome: welcomeFor(null) } };
+            }
+        }
+        const sb = sessionBooking(req);
+        if (sb) {
+            const acc = bookingAccess(sb);
+            return { booking: sb, info: { name: firstName(guestName(sb)), until: new Date(acc.until).toISOString(), checkout: sb.checkout, welcome: welcomeFor(sb), lang: guestLang.forBooking(sb).lang } };
+        }
+        return null;
     }
 
     function refusal(acc) {
@@ -599,7 +673,11 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
             res.set('Cache-Control', 'no-store');
             const base = { success: true, site: siteInfo(), enabled: active() };
             if (req.body && req.body.preview) return res.json({ ...base, preview: true });
-            if (req.body && req.body.status) return res.json({ ...base, online: true });
+            // Already online (openNDS status page) or reopened: the start page of this stay, if the session knows it
+            if (req.body && req.body.status) {
+                const h = active() ? homeFor(req) : null;
+                return res.json({ ...base, online: true, home: h ? h.info : null });
+            }
             const f = readFas(req.body && req.body.fas);
             if (!f) return res.json({ ...base, invalid: true });
             const ua = String(req.get('user-agent') || '').slice(0, 200);
@@ -607,15 +685,15 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
             if (known && known.owner) {
                 const rhid = enqueue(f.fas, Math.max(15, (Date.parse(known.row.until) - Date.now()) / 60000), 'owner');
                 rememberDevice({ bookingId: null, kind: 'owner', mac: f.mac, fas: f.fas, ua, until: Date.parse(known.row.until) });
-                return res.json({ ...base, auto: true, wait: rhid, name: '' });
+                return res.json(keepLogin(req, { ...base, auto: true, wait: rhid, name: '', owner: true, until: known.row.until, welcome: welcomeFor(null), session: { kind: 'owner' } }));
             }
             if (known && known.extra) {
                 const r = admitExtra(known.extra, f, ua);
-                if (r.success) return res.json({ ...base, auto: true, ...r });
+                if (r.success) return res.json(keepLogin(req, { ...base, auto: true, ...r }));
             }
             if (known && known.booking) {
                 const r = admitBooking(known.booking, f, ua, 'Gerät bekannt');
-                if (r.success) return res.json({ ...base, auto: true, ...r });
+                if (r.success) return res.json(keepLogin(req, { ...base, auto: true, ...r }));
             }
             const sb = active() ? sessionBooking(req) : null;
             res.json({ ...base, session: sb ? { name: firstName(guestName(sb)) || 'Gast', lang: guestLang.forBooking(sb).lang } : null });
@@ -628,7 +706,8 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
                 const site = getSite();
                 const sample = { checkout: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10), checkoutTime: site.checkout_time || '', rules: String(site.house_rules || ''),
                     whatsapp: (chatButton && (() => { try { const c = chatButton(null); return c && c.url; } catch (e) { return ''; } })()) || '',
-                    phone: site.show_contact !== false ? String((db.getAllSettings().vermieter || {}).telefon || '') : '' };
+                    phone: site.show_contact !== false ? String((db.getAllSettings().vermieter || {}).telefon || '') : '',
+                    tip: tipOfDay(0), towels: !!(home && (() => { try { return home.towels(); } catch (e) { return false; } })()), departure: null };
                 return res.json(code.length === 6 ? { success: true, preview: true, name: 'Anna', until: new Date(Date.now() + 3 * 864e5).toISOString(), welcome: sample }
                     : refusal({ reason: 'code' }));
             }
@@ -639,7 +718,7 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
             if (req.body.useSession) {
                 const sb = sessionBooking(req);
                 if (!sb) return res.json({ success: false, error: 'Bitte den Zugangscode eingeben.' });
-                return res.json(admitBooking(sb, f, ua, 'Meine Buchung'));
+                return res.json(keepLogin(req, admitBooking(sb, f, ua, 'Meine Buchung')));
             }
             const gw = sha256(f.fas.gatewayname);
             if (tooManyFailures(f.mac, gw)) return res.status(429).json({ success: false, error: 'Zu viele falsche Versuche. Bitte warten Sie 15 Minuten oder rufen Sie uns an.' });
@@ -650,17 +729,43 @@ function createWifiPortal({ db, getConfig, getSite, guestBooking, guestName, cha
                 const rhid = enqueue(f.fas, OWNER_SESSION_MIN, 'owner');
                 rememberDevice({ bookingId: null, kind: 'owner', mac: f.mac, fas: f.fas, ua, until });
                 db.logNotification('guest_wifi', 'WLAN-Anmeldung mit dem Gastgeber-Code', 'sent');
-                return res.json({ success: true, wait: rhid, name: '', owner: true, until: new Date(until).toISOString() });
+                return res.json(keepLogin(req, { success: true, wait: rhid, name: '', owner: true, until: new Date(until).toISOString(), welcome: welcomeFor(null), session: { kind: 'owner' } }));
             }
             const x = extraByCode(code);
             if (x) {
                 const r = admitExtra(x, f, ua);
                 if (r.success) db.logNotification('guest_wifi', `WLAN-Anmeldung mit Code ${x.code}${x.note ? ` (${x.note})` : ''}`, 'sent');
-                return res.json(r);
+                return res.json(keepLogin(req, r));
             }
             const b = bookingByCode(code);
             if (!b) { noteFailure(f.mac, gw); return res.json(refusal({ reason: 'code' })); }
-            res.json(admitBooking(b, f, ua, 'Code'));
+            res.json(keepLogin(req, admitBooking(b, f, ua, 'Code')));
+        });
+
+        // Start page after the login, opened again (reload, openNDS status page)
+        router.post('/api/wlan/home', pageLimiter, (req, res) => {
+            res.set('Cache-Control', 'no-store');
+            const h = active() ? homeFor(req) : null;
+            res.json({ success: true, home: h ? h.info : null });
+        });
+
+        // "Neue Handtücher" on the start page (same message and 30-minute limit as the TV button, tv-guest.js)
+        const towelLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false, message: { success: false } });
+        router.post('/api/wlan/towels', towelLimiter, async (req, res) => {
+            res.set('Cache-Control', 'no-store');
+            if (!req.is('application/json')) return res.status(415).json({ success: false });
+            // Preview (public page): nothing is sent
+            if (req.body && req.body.preview) return res.json({ success: true, preview: true, already: false });
+            const h = active() ? homeFor(req) : null;
+            if (!h || !h.booking || !h.info.welcome.towels || !home) return res.status(403).json({ success: false });
+            try {
+                const r = await home.requestTowels(h.booking);
+                if (!r || !r.ok) return res.status(404).json({ success: false });
+                res.json({ success: true, already: !!r.already });
+            } catch (e) {
+                console.error('WLAN-Handtücher:', e.message);
+                res.status(500).json({ success: false });
+            }
         });
 
         // Waiting page: has the router picked up the login?

@@ -704,6 +704,8 @@
     // =======================
     async function saveAllSettings() {
         if (!canDo('settings', 'edit')) return; // the server would refuse it anyway
+        // "Belege & KI" hat eigene Felder: mit speichern, wenn die Seite geöffnet war
+        if (receiptSettingsLoaded) apiJson('/api/receipts/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(receiptSettingsBody()) }).catch(() => { });
         try {
             // First, load existing settings from server to preserve values not shown in UI
             const existing = await fetch('/api/settings');
@@ -747,8 +749,6 @@
                 },
                 booking_ical: $('#booking-ical-url').value || '',
                 airbnb_ical: ($('#airbnb-ical-url')?.value || '').trim(),
-                paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
-                paperless_amount_field: $('#s-pl-amount-field')?.value || '',
                 nuki: {
                     token: $('#nuki-token').value || '',
                     lockId: $('#nuki-lock-id').value || ''
@@ -852,8 +852,6 @@
                 if (typeof url === 'string') $('#booking-ical-url').value = url;
             }
             if (typeof s.airbnb_ical === 'string' && $('#airbnb-ical-url')) $('#airbnb-ical-url').value = s.airbnb_ical;
-            if (s.paperless_expense_tag) $('#s-pl-expense-tag').value = s.paperless_expense_tag;
-            if (s.paperless_amount_field) $('#s-pl-amount-field').value = s.paperless_amount_field;
             // Notifications
             const container = $('#wa-phones-container');
             container.innerHTML = '';
@@ -2594,6 +2592,89 @@
         try { localStorage.setItem('navCollapsed', on ? '1' : '0'); } catch (e) { /* ignore */ }
     });
 
+    // ---- Darstellung: Hell / Dunkel / Automatisch (je Benutzer gespeichert, Gerät merkt sich die letzte Wahl)
+    const THEME_KEY = 'adminTheme';
+    const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    let themePref = 'auto';
+    try { themePref = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) { /* ignore */ }
+
+    function isDarkTheme() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+
+    function applyTheme(pref) {
+        themePref = ['light', 'dark', 'auto'].includes(pref) ? pref : 'auto';
+        const dark = themePref === 'dark' || (themePref === 'auto' && !!(darkQuery && darkQuery.matches));
+        const changed = isDarkTheme() !== dark;
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        try { localStorage.setItem(THEME_KEY, themePref); } catch (e) { /* ignore */ }
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#161c25' : '#ffffff');
+        document.querySelectorAll('#theme-menu [data-theme-pref]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.themePref === themePref)));
+        if (changed) restyleCharts();
+    }
+
+    /** Farben für Chart.js aus den CSS-Variablen (hell oder dunkel) */
+    function chartColors() {
+        const cs = getComputedStyle(document.documentElement);
+        const v = (n, f) => (cs.getPropertyValue(n) || '').trim() || f;
+        return { text: v('--chart-text', '#6b7385'), grid: v('--chart-grid', '#e4e7ee'), bar: v('--chart-bar', '#2b62e3'), bar2: v('--chart-bar-2', '#c4b8a5') };
+    }
+    window.chartColors = chartColors;
+
+    function setChartDefaults() {
+        if (!window.Chart) return;
+        const c = chartColors();
+        Chart.defaults.color = c.text;
+        Chart.defaults.borderColor = c.grid;
+    }
+
+    // Bereits gezeichnete Diagramme an die neue Darstellung anpassen
+    function restyleCharts() {
+        if (!window.Chart) return;
+        setChartDefaults();
+        const c = chartColors();
+        [window.myRevenueChart, window.myReviewRevenueChart, window.myReviewChart].forEach(ch => {
+            if (!ch) return;
+            Object.values(ch.options.scales || {}).forEach(sc => {
+                if (sc.ticks) sc.ticks.color = c.text;
+                if (sc.grid) sc.grid.color = c.grid;
+                if (sc.border) sc.border.color = c.grid;
+                if (sc.title) sc.title.color = c.text;
+            });
+            if (ch.options.plugins && ch.options.plugins.legend && ch.options.plugins.legend.labels) ch.options.plugins.legend.labels.color = c.text;
+            ch.data.datasets.forEach((ds, i) => { ds.backgroundColor = i === 0 ? c.bar : c.bar2; });
+            ch.update('none');
+        });
+    }
+
+    applyTheme(themePref);
+    if (darkQuery) {
+        const onSystemChange = () => { if (themePref === 'auto') applyTheme('auto'); };
+        if (darkQuery.addEventListener) darkQuery.addEventListener('change', onSystemChange);
+        else if (darkQuery.addListener) darkQuery.addListener(onSystemChange);
+    }
+
+    (function initThemeSwitch() {
+        const btn = $('#theme-btn');
+        const menu = $('#theme-menu');
+        if (!btn || !menu) return;
+        const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = menu.hidden;
+            menu.hidden = !open;
+            btn.setAttribute('aria-expanded', String(open));
+        });
+        menu.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-theme-pref]');
+            if (!b) return;
+            applyTheme(b.dataset.themePref);
+            close();
+            fetch('/api/me/theme', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: themePref }) }).catch(() => { });
+        });
+        document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.theme-switch')) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) close(); });
+    })();
+
     // ---- Benutzername oben rechts
     async function loadTopbarUser() {
         try {
@@ -2602,6 +2683,8 @@
             const name = typeof u === 'string' ? u : (u && (u.username || u.name)) || '';
             const el = $('#topbar-user');
             if (el) el.textContent = name;
+            // Darstellung des Benutzers übernehmen (z. B. auf einem neuen Gerät)
+            if (u && typeof u === 'object' && u.theme && u.theme !== themePref) applyTheme(u.theme);
         } catch (e) { /* ignore */ }
     }
 
@@ -3843,8 +3926,7 @@
         if (window.myRevenueChart) window.myRevenueChart.destroy();
         // Schrift und Linien wie im restlichen Design
         Chart.defaults.font.family = "'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif";
-        Chart.defaults.color = '#675e52';
-        Chart.defaults.borderColor = '#e4dccf';
+        setChartDefaults();
         window.myRevenueChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -3857,13 +3939,13 @@
                     {
                         label: 'Umsatz',
                         data: revValues,
-                        backgroundColor: '#2b62e3',
+                        backgroundColor: chartColors().bar,
                         borderRadius: 1
                     },
                     {
                         label: 'Ausgaben',
                         data: expValues,
-                        backgroundColor: '#c4b8a5',
+                        backgroundColor: chartColors().bar2,
                         borderRadius: 1
                     }
                 ]
@@ -3961,8 +4043,9 @@
         const canvas = $('#reviewRevenueChart');
         if (!canvas || typeof Chart === 'undefined') return;
         if (window.myReviewRevenueChart) window.myReviewRevenueChart.destroy();
-        const datasets = [{ label: String(r.year), data: r.revenueByMonth, backgroundColor: '#2b62e3', borderRadius: 1 }];
-        if (r.previous && r.previous.revenueByMonth) datasets.push({ label: String(r.year - 1), data: r.previous.revenueByMonth, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        const datasets = [{ label: String(r.year), data: r.revenueByMonth, backgroundColor: chartColors().bar, borderRadius: 1 }];
+        if (r.previous && r.previous.revenueByMonth) datasets.push({ label: String(r.year - 1), data: r.previous.revenueByMonth, backgroundColor: chartColors().bar2, borderRadius: 1 });
+        setChartDefaults();
         window.myReviewRevenueChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: { labels: MONTHS_SHORT, datasets },
@@ -4038,8 +4121,9 @@
         const canvas = $('#reviewMonthsChart');
         if (!canvas || typeof Chart === 'undefined') return;
         if (window.myReviewChart) window.myReviewChart.destroy();
-        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: '#2b62e3', borderRadius: 1 }];
-        if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: chartColors().bar, borderRadius: 1 }];
+        if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: chartColors().bar2, borderRadius: 1 });
+        setChartDefaults();
         window.myReviewChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: { labels: MONTHS_SHORT, datasets },
@@ -4234,6 +4318,9 @@
             ? `${t.staysWithoutInvoice} von ${t.stays} Aufenthalten im Zeitraum haben keine Rechnung hier (z. B. Booking.com/Airbnb, die über das Portal abrechnen). Sie stehen im Export im Blatt „Belegung“.`
             : (t.stays ? `Alle ${t.stays} Aufenthalte im Zeitraum haben eine Rechnung.` : '');
         $('#fin-pdfs').disabled = !t.invoices;
+        const nReceipts = (r.expenses || []).filter(e => e.receipt === 'ja').length;
+        const rz = $('#fin-receipts');
+        if (rz) { rz.hidden = !nReceipts; rz.textContent = `Alle Belege als ZIP (${nReceipts})`; }
     }
 
     if (viewFinance) {
@@ -4289,58 +4376,233 @@
     // =======================
     // Expenses Module
     // =======================
+    // Ausgaben & Belege (Telegram-Fotos, Uploads, Paperless)
+    const ex = { rows: [], years: [], categories: [], year: String(new Date().getFullYear()), category: '', q: '', paperlessReady: false, paperlessUrl: null, editing: null, file: null, scan: null, poll: null };
+    const exMoney = n => formatCurrency(Number(n) || 0);
+    const exNum = v => {
+        const t = String(v == null ? '' : v).replace(/[€\s]/g, '');
+        if (!t) return null;
+        const n = parseFloat(/,\d{1,2}$/.test(t) ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, ''));
+        return Number.isFinite(n) ? n : null;
+    };
+    const exFmtNum = n => n == null || n === '' ? '' : Number(n).toFixed(2).replace('.', ',');
+
     async function loadExpenses() {
-        try {
-            const res = await fetch('/api/expenses');
-            const data = await res.json();
-            if (data.success) {
-                renderExpensesList(data.expenses);
-            }
-        } catch (e) {
-            console.error('Expenses load error:', e);
-        }
+        const qs = new URLSearchParams();
+        if (ex.year) qs.set('year', ex.year);
+        if (ex.category) qs.set('category', ex.category);
+        if (ex.q) qs.set('q', ex.q);
+        const d = await apiJson('/api/expenses?' + qs).catch(() => null);
+        if (!d || !d.success) { $('#expenses-list').innerHTML = '<tr class="ex-empty-row"><td colspan="6" class="ex-empty">Ausgaben konnten nicht geladen werden.</td></tr>'; return; }
+        ex.rows = d.expenses; ex.years = d.years || []; ex.categories = d.categories || [];
+        ex.paperlessReady = !!d.paperlessReady; ex.paperlessUrl = d.paperlessUrl;
+        renderExpenseFilters();
+        renderExpensesList();
+        // Paperless-Status von gerade hochgeladenen Belegen nachladen
+        clearTimeout(ex.poll);
+        if (ex.rows.some(r => r.paperless_status === 'pending') && currentView === 'expenses') ex.poll = setTimeout(loadExpenses, 5000);
     }
 
-    function renderExpensesList(expenses) {
-        const list = $('#expenses-list');
-        list.innerHTML = '';
+    function renderExpenseFilters() {
+        const yNow = String(new Date().getFullYear());
+        const years = [...new Set([yNow, ...ex.years])].sort().reverse();
+        $('#ex-year').innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('') + '<option value="">Alle Jahre</option>';
+        $('#ex-year').value = ex.year;
+        const cats = [...new Set([...ex.categories, ...ex.rows.map(r => r.category).filter(Boolean)])];
+        $('#ex-category').innerHTML = '<option value="">Alle Kategorien</option>' + cats.map(c => `<option>${escapeHtml(c)}</option>`).join('');
+        $('#ex-category').value = ex.category;
+        $('#btn-sync-paperless').hidden = !ex.paperlessReady || !canDo('finance', 'edit');
+        $('#btn-new-expense').hidden = !canDo('finance', 'edit');
+    }
 
-        if (expenses.length === 0) {
-            list.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Keine Ausgaben vorhanden.</td></tr>';
+    function renderExpensesList() {
+        const list = $('#expenses-list');
+        const rows = ex.rows;
+        const sum = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const vat = rows.reduce((s, r) => s + (Number(r.vat_amount) || 0), 0);
+        const withFile = rows.filter(r => r.hasReceipt).length;
+        const byCat = {};
+        rows.forEach(r => { const c = r.category || 'Ohne Kategorie'; byCat[c] = (byCat[c] || 0) + (Number(r.amount) || 0); });
+        const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+        const tile = (label, value, sub) => `<div class="card stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${sub ? `<div class="review-sub">${sub}</div>` : ''}</div>`;
+        $('#ex-kpis').innerHTML = [
+            tile(ex.year ? `Ausgaben ${ex.year}` : 'Ausgaben gesamt', exMoney(sum), `${rows.length} Ausgabe${rows.length === 1 ? '' : 'n'}${ex.category || ex.q ? ' (gefiltert)' : ''}`),
+            tile('Mit Beleg', `${withFile} / ${rows.length}`, rows.length && withFile < rows.length ? `${rows.length - withFile} ohne Foto/PDF` : 'alle belegt'),
+            tile('Vorsteuer', exMoney(vat), 'soweit auf den Belegen erkannt'),
+            tile('Größte Kategorie', top ? escapeHtml(top[0]) : '–', top ? exMoney(top[1]) : '').replace('class="stat-value"', 'class="stat-value ex-kpi-text"')
+        ].join('');
+        if (!rows.length) {
+            list.innerHTML = `<tr class="ex-empty-row"><td colspan="6" class="ex-empty">${ex.q || ex.category ? 'Keine Ausgaben in dieser Auswahl.' : 'Noch keine Ausgaben in diesem Zeitraum. Schick ein Foto vom Kassenbon an den Telegram-Bot oder lege oben eine Ausgabe an.'}</td></tr>`;
             return;
         }
+        const edit = canDo('finance', 'edit');
+        const icoEdit = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>';
+        const icoDel = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+        list.innerHTML = rows.map(r => {
+            const who = r.vendor || r.description || 'Ausgabe';
+            const sub = [r.vendor && r.description ? r.description : '', r.payment_method, r.invoice_number ? `Nr. ${r.invoice_number}` : '', r.sourceLabel].filter(Boolean).map(escapeHtml).join(' · ');
+            const chips = [];
+            if (r.receipt_mime || r.paperless_id) chips.push(`<a class="ex-chip file" href="/api/expenses/${r.id}/receipt" target="_blank" rel="noopener" title="${escapeHtml(r.receipt_name || 'Beleg ansehen')}">📎 ${r.receipt_mime && /pdf/.test(r.receipt_mime) ? 'PDF' : r.receipt_mime ? 'Foto' : 'Beleg'}</a>`);
+            if (r.paperless_id) {
+                chips.push(ex.paperlessUrl ? `<a class="ex-chip pl-done" href="${escapeHtml(ex.paperlessUrl)}/documents/${r.paperless_id}/details" target="_blank" rel="noopener" title="In Paperless öffnen">✓ Paperless</a>` : '<span class="ex-chip pl-done">✓ Paperless</span>');
+            } else if (r.paperless_status === 'pending') {
+                chips.push('<span class="ex-chip pl-pending">Paperless …</span>');
+            } else if (r.paperless_status === 'error' && r.receipt_mime) {
+                chips.push(`<button type="button" class="ex-chip pl-error" data-ex="pl" title="${escapeHtml(r.paperless_error || '')} – nochmal versuchen">⚠ Paperless</button>`);
+            } else if (r.receipt_mime && ex.paperlessReady && edit) {
+                chips.push(`<button type="button" class="ex-chip pl-send" data-ex="pl" title="Beleg an Paperless schicken">→ Paperless</button>`);
+            }
+            if (!chips.length) chips.push('<span class="ex-chip none">kein Beleg</span>');
+            return `<tr data-id="${r.id}">
+                <td class="ex-c-date">${fmtDEfull(r.date)}</td>
+                <td class="ex-c-who"><div class="ex-who">${escapeHtml(who)}</div>${sub ? `<div class="ex-sub">${sub}</div>` : ''}</td>
+                <td class="ex-c-cat"><span class="ex-cat">${escapeHtml(r.category || 'Ohne Kategorie')}</span></td>
+                <td class="ex-c-rec"><div class="ex-receipt">${chips.join('')}</div></td>
+                <td class="ex-c-amount text-right expense-amount">${exMoney(r.amount)}</td>
+                <td class="ex-c-act">${edit ? `<div class="ex-actions"><button type="button" data-ex="edit" title="Bearbeiten">${icoEdit}</button><button type="button" class="del" data-ex="del" title="Löschen">${icoDel}</button></div>` : ''}</td>
+            </tr>`;
+        }).join('');
+    }
 
-        expenses.forEach(ex => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${formatDate(ex.date)}</td>
-                <td>${escapeHtml(ex.description || '—')}</td>
-                <td>${escapeHtml(ex.category || '—')}</td>
-                <td><span class="source-badge source-${ex.source}">${ex.source === 'paperless' ? 'Paperless' : 'Manuell'}</span></td>
-                <td class="text-right expense-amount negative">${formatCurrency(ex.amount)}</td>
-                <td class="text-right">
-                    <button class="btn btn-ghost btn-danger btn-sm btn-delete-expense" data-id="${ex.id}" title="Löschen">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    </button>
-                </td>
-            `;
-            list.appendChild(tr);
+    function exSetFile(file) {
+        ex.file = file || null;
+        const prev = $('#ex-preview');
+        prev.style.backgroundImage = '';
+        prev.textContent = '';
+        if (!file) return;
+        $('#ex-file-name').textContent = file.name || 'Beleg';
+        if (/^image\//.test(file.type)) prev.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
+        else prev.textContent = '📄';
+    }
+
+    function exFill(d) {
+        if (!d) return;
+        if (d.vendor) $('#ex-vendor').value = d.vendor;
+        if (d.date) $('#ex-date').value = d.date;
+        if (d.amount != null) $('#ex-amount').value = exFmtNum(d.amount);
+        if (d.category) $('#ex-cat').value = d.category;
+        if (d.description) $('#ex-desc').value = d.description;
+        if (d.vat_rate != null) $('#ex-vat-rate').value = String(d.vat_rate);
+        if (d.vat_amount != null) $('#ex-vat').value = exFmtNum(d.vat_amount);
+        if (d.payment_method) $('#ex-pay').value = d.payment_method;
+        if (d.invoice_number) $('#ex-invno').value = d.invoice_number;
+    }
+
+    async function exScan(file) {
+        exSetFile(file);
+        const msg = $('#ex-scan-msg');
+        msg.hidden = false; msg.className = 'nb-msg ex-scan-msg busy';
+        msg.textContent = 'Beleg wird gelesen …';
+        $('#ex-file-hint').textContent = file.size < 1048576 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1048576).toFixed(1).replace('.', ',')} MB`;
+        const fd = new FormData();
+        fd.append('receipt', file);
+        const d = await apiJson('/api/expenses/scan', { method: 'POST', body: fd }).catch(() => null);
+        if (ex.file !== file) return;
+        if (!d || !d.success) { msg.className = 'nb-msg ex-scan-msg'; msg.textContent = (d && d.error) || 'Der Beleg konnte nicht gelesen werden. Bitte die Felder selbst ausfüllen.'; return; }
+        ex.scan = d;
+        exFill(d.result);
+        const found = ['vendor', 'date', 'amount', 'category'].filter(k => d.result && d.result[k] != null).length;
+        msg.className = 'nb-msg ex-scan-msg ' + (found >= 3 ? 'ok' : '');
+        msg.textContent = `${d.engine === 'ki' ? 'KI' : 'Texterkennung'}: ${found} von 4 Angaben erkannt. Bitte kurz prüfen.` + (d.aiError ? ` (KI nicht erreichbar: ${d.aiError})` : '');
+    }
+
+    function openExpenseModal(row) {
+        ex.editing = row || null; ex.file = null; ex.scan = null;
+        $('#ex-form').reset();
+        exSetFile(null);
+        $('#ex-file-name').textContent = row && (row.receipt_mime || row.paperless_id) ? (row.receipt_name || 'Beleg vorhanden') : 'Beleg (Foto oder PDF)';
+        $('#ex-file-hint').textContent = row ? (row.receipt_mime ? 'Neue Datei wählen, um den Beleg zu ersetzen.' : 'Foto oder PDF nachreichen.') : 'Wird automatisch ausgelesen. Ohne Beleg einfach die Felder ausfüllen.';
+        $('#btn-ex-file').textContent = row && row.receipt_mime ? 'Ersetzen' : 'Datei wählen';
+        $('#ex-scan-msg').hidden = true; $('#ex-msg').hidden = true;
+        $('#ex-cat').innerHTML = ex.categories.map(c => `<option>${escapeHtml(c)}</option>`).join('');
+        if (row && row.category && !ex.categories.includes(row.category)) $('#ex-cat').insertAdjacentHTML('afterbegin', `<option>${escapeHtml(row.category)}</option>`);
+        $('#ex-title').textContent = row ? 'Ausgabe bearbeiten' : 'Neue Ausgabe';
+        $('#ex-date').value = row ? row.date : berlinYmd();
+        $('#ex-cat').value = row && row.category ? row.category : 'Sonstiges';
+        if (row) exFill(row);
+        $('#ex-pl-wrap').hidden = !ex.paperlessReady || (row && row.paperless_id);
+        $('#ex-pl').checked = true;
+        $('#modal-expense').style.display = 'flex';
+        if (row && row.receipt_mime && /^image\//.test(row.receipt_mime)) $('#ex-preview').style.backgroundImage = `url(/api/expenses/${row.id}/receipt)`;
+        else if (row && (row.receipt_mime || row.paperless_id)) $('#ex-preview').textContent = '📄';
+    }
+    const closeExpenseModal = () => { $('#modal-expense').style.display = 'none'; ex.file = null; };
+
+    if ($('#modal-expense')) {
+        $('#btn-new-expense').addEventListener('click', () => openExpenseModal(null));
+        $('#btn-close-expense').addEventListener('click', closeExpenseModal);
+        $('#btn-cancel-expense').addEventListener('click', closeExpenseModal);
+        $('#modal-expense').addEventListener('click', e => { if (e.target.id === 'modal-expense') closeExpenseModal(); });
+        $('#btn-ex-file').addEventListener('click', () => $('#ex-file').click());
+        $('#ex-file').addEventListener('change', e => { const f = e.target.files[0]; if (f) exScan(f); e.target.value = ''; });
+        $('#ex-vat-rate').addEventListener('change', () => {
+            const a = exNum($('#ex-amount').value), r = parseFloat($('#ex-vat-rate').value);
+            if (a != null && Number.isFinite(r)) $('#ex-vat').value = exFmtNum(Math.round((a - a / (1 + r / 100)) * 100) / 100);
+        });
+        // Datei auf das Formular oder die Hinweisfläche ziehen
+        const dropOn = (el, onFile) => {
+            ['dragenter', 'dragover'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.add('drag'); }));
+            ['dragleave', 'drop'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.remove('drag'); }));
+            el.addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) onFile(f); });
+        };
+        dropOn($('#ex-file-box'), f => exScan(f));
+        dropOn($('#ex-drop'), f => { if (!canDo('finance', 'edit')) return; openExpenseModal(null); exScan(f); });
+        $('#ex-drop').addEventListener('click', () => { if (canDo('finance', 'edit')) { openExpenseModal(null); $('#ex-file').click(); } });
+
+        $('#ex-year').addEventListener('change', e => { ex.year = e.target.value; loadExpenses(); });
+        $('#ex-category').addEventListener('change', e => { ex.category = e.target.value; loadExpenses(); });
+        let exT = null;
+        $('#ex-search').addEventListener('input', e => { clearTimeout(exT); exT = setTimeout(() => { ex.q = e.target.value.trim(); loadExpenses(); }, 250); });
+
+        $('#ex-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const msg = $('#ex-msg');
+            const amount = exNum($('#ex-amount').value);
+            if (amount == null || amount < 0) { msg.hidden = false; msg.textContent = 'Bitte einen Betrag eingeben.'; return; }
+            if (!$('#ex-date').value) { msg.hidden = false; msg.textContent = 'Bitte ein Datum eingeben.'; return; }
+            const fd = new FormData();
+            const fields = {
+                date: $('#ex-date').value, amount: String(amount), vendor: $('#ex-vendor').value, category: $('#ex-cat').value,
+                description: $('#ex-desc').value, vat_rate: $('#ex-vat-rate').value, vat_amount: exNum($('#ex-vat').value) ?? '',
+                payment_method: $('#ex-pay').value, invoice_number: $('#ex-invno').value
+            };
+            Object.entries(fields).forEach(([k, v]) => fd.append(k, v == null ? '' : v));
+            if (ex.file) fd.append('receipt', ex.file);
+            if (ex.scan) { fd.append('engine', ex.scan.engine || ''); fd.append('ocr_text', ex.scan.text || ''); }
+            if (!$('#ex-pl-wrap').hidden) fd.append('paperless', $('#ex-pl').checked ? 'true' : 'false');
+            const btn = $('#btn-save-expense');
+            btn.disabled = true;
+            const editing = ex.editing;
+            const d = await apiJson(editing ? `/api/expenses/${editing.id}` : '/api/expenses', { method: editing ? 'PUT' : 'POST', body: fd }).catch(() => null);
+            btn.disabled = false;
+            if (!d || !d.success) { msg.hidden = false; msg.textContent = (d && d.error) || 'Speichern fehlgeschlagen'; return; }
+            closeExpenseModal();
+            // Bearbeitet mit neuem Beleg: auf Wunsch gleich an Paperless
+            if (editing && fd.get('receipt') && fd.get('paperless') === 'true') apiJson(`/api/expenses/${editing.id}/paperless`, { method: 'POST' }).then(() => loadExpenses()).catch(() => { });
+            showToast(d.paperless === 'pending' ? 'Ausgabe gespeichert, Beleg geht an Paperless' : 'Ausgabe gespeichert', 'success');
+            if (!editing && d.expense && ex.year && d.expense.date.slice(0, 4) !== ex.year) ex.year = d.expense.date.slice(0, 4);
+            loadExpenses();
         });
 
-        // Delete event listeners
-        $$('.btn-delete-expense').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                if (!confirm('Ausgabe wirklich löschen?')) return;
-                const id = btn.dataset.id;
-                try {
-                    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-                    const d = await res.json();
-                    if (d.success) {
-                        showToast('Ausgabe gelöscht');
-                        loadExpenses();
-                    }
-                } catch (e) { console.error(e); }
-            });
+        $('#expenses-list').addEventListener('click', async e => {
+            const b = e.target.closest('[data-ex]');
+            if (!b) return;
+            const id = b.closest('tr').dataset.id;
+            const row = ex.rows.find(r => String(r.id) === id);
+            if (!row) return;
+            if (b.dataset.ex === 'edit') return openExpenseModal(row);
+            if (b.dataset.ex === 'del') {
+                if (!confirm(`Ausgabe „${row.vendor || row.description || 'Ausgabe'}“ über ${exMoney(row.amount)} löschen?${row.receipt_mime ? ' Die Belegdatei wird mit gelöscht (in Paperless bleibt sie).' : ''}`)) return;
+                const d = await apiJson(`/api/expenses/${row.id}`, { method: 'DELETE' }).catch(() => null);
+                if (d && d.success) { showToast('Ausgabe gelöscht'); loadExpenses(); } else showToast((d && d.error) || 'Löschen fehlgeschlagen', 'error');
+                return;
+            }
+            if (b.dataset.ex === 'pl') {
+                b.disabled = true; b.textContent = 'Paperless …';
+                const d = await apiJson(`/api/expenses/${row.id}/paperless`, { method: 'POST' }).catch(() => null);
+                showToast(d && d.success ? d.message : (d && d.error) || 'Paperless nicht erreichbar', d && d.success ? 'success' : 'error', 6000);
+                loadExpenses();
+            }
         });
     }
 
@@ -4348,20 +4610,13 @@
         const btn = $('#btn-sync-paperless');
         const originalText = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<span class="update-spinner" style="width:14px; height:14px; border-width:2px;"></span> Sync läuft...';
-
+        btn.innerHTML = '<span class="update-spinner" style="width:14px; height:14px; border-width:2px;"></span> Übernahme läuft …';
         try {
-            const res = await fetch('/api/expenses/sync', { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                showToast(data.message);
-                loadExpenses();
-            } else {
-                showToast(data.error || 'Sync fehlgeschlagen', 'error');
-            }
+            const data = await apiJson('/api/expenses/sync', { method: 'POST' });
+            if (data.success) { showToast(data.message, 'success', 6000); loadExpenses(); }
+            else showToast(data.error || 'Übernahme fehlgeschlagen', 'error', 6000);
         } catch (e) {
-            console.error('Sync error:', e);
-            showToast('Server-Fehler beim Sync', 'error');
+            showToast('Server-Fehler bei der Übernahme', 'error');
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
@@ -4369,6 +4624,64 @@
     }
 
     btnSyncPaperless.addEventListener('click', syncPaperlessExpenses);
+
+    // Einstellungen → Belege & KI-Erkennung
+    var receiptSettingsLoaded = false;
+    async function loadReceiptSettings() {
+        const d = await apiJson('/api/receipts/settings').catch(() => null);
+        if (!d || !d.success) { $('#rc-msg').textContent = (d && d.error) || 'Einstellungen konnten nicht geladen werden.'; return; }
+        const c = d.settings;
+        $('#rc-ai-model').innerHTML = c.models.map(m => `<option value="${m.id}">${escapeHtml(m.label)}</option>`).join('');
+        $('#rc-ai-enabled').checked = !!c.ai.enabled;
+        $('#rc-ai-key').value = c.ai.apiKey || '';
+        $('#rc-ai-model').value = c.ai.model;
+        $('#rc-ask-bot').checked = !!c.askInBot;
+        $('#rc-up-enabled').checked = !!c.upload.enabled;
+        $('#rc-up-tags').value = c.upload.tags || '';
+        $('#rc-up-doctype').value = c.upload.docType || '';
+        $('#rc-up-field').value = c.upload.amountField || '';
+        $('#rc-up-corr').checked = !!c.upload.correspondent;
+        $('#rc-up-cattag').checked = !!c.upload.categoryTag;
+        $('#rc-up-create').checked = !!c.upload.createMissing;
+        $('#rc-im-tag').value = c.import.tag || '';
+        $('#rc-im-field').value = c.import.amountField || '';
+        $('#rc-im-auto').checked = !!c.import.auto;
+        $('#rc-pl-state').textContent = c.paperlessReady ? 'Paperless ist verbunden (Zugang unter „Paperless NGX“).' : 'Paperless ist noch nicht eingerichtet: Adresse und Token unter „Paperless NGX“ eintragen.';
+        $('#rc-msg').textContent = '';
+        receiptSettingsLoaded = true;
+    }
+    const receiptSettingsBody = () => ({
+        ai: { enabled: $('#rc-ai-enabled').checked, apiKey: $('#rc-ai-key').value.trim(), model: $('#rc-ai-model').value },
+        askInBot: $('#rc-ask-bot').checked,
+        upload: { enabled: $('#rc-up-enabled').checked, tags: $('#rc-up-tags').value, docType: $('#rc-up-doctype').value, amountField: $('#rc-up-field').value,
+            correspondent: $('#rc-up-corr').checked, categoryTag: $('#rc-up-cattag').checked, createMissing: $('#rc-up-create').checked },
+        import: { tag: $('#rc-im-tag').value, amountField: $('#rc-im-field').value, auto: $('#rc-im-auto').checked }
+    });
+    document.addEventListener('click', e => {
+        const j = e.target.closest('.nav-jump');
+        if (!j) return;
+        e.preventDefault();
+        const item = document.querySelector(`.nav-item[data-target="${j.dataset.jump}"]`);
+        if (item) item.click();
+    });
+    if ($('#settings-receipts')) {
+        $('#btn-rc-save').addEventListener('click', async () => {
+            const d = await apiJson('/api/receipts/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(receiptSettingsBody()) }).catch(() => null);
+            $('#rc-msg').textContent = d && d.success ? '✓ Gespeichert.' : (d && d.error) || 'Speichern fehlgeschlagen';
+            if (d && d.success) showToast('Belege & KI gespeichert', 'success');
+        });
+        $('#btn-rc-test-ai').addEventListener('click', async () => {
+            $('#rc-msg').textContent = 'Teste die KI …';
+            const d = await apiJson('/api/receipts/test-ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: $('#rc-ai-key').value.trim(), model: $('#rc-ai-model').value }) }).catch(() => null);
+            $('#rc-msg').textContent = d && d.success ? `✓ ${d.message}` : `✗ ${(d && d.error) || 'Test fehlgeschlagen'}`;
+        });
+        $('#btn-rc-test-pl').addEventListener('click', async () => {
+            $('#rc-msg').textContent = 'Prüfe Paperless (gespeicherte Einstellungen) …';
+            const d = await apiJson('/api/receipts/test-paperless', { method: 'POST' }).catch(() => null);
+            $('#rc-msg').innerHTML = d && d.success ? '✓ Paperless erreichbar.<br>' + d.lines.map(escapeHtml).join('<br>') : `✗ ${escapeHtml((d && d.error) || 'Paperless nicht erreichbar')}`;
+        });
+    }
+
 
 
     // =======================
@@ -4620,6 +4933,7 @@
                 if (targetId === 'settings-users') loadUsers();
                 if (targetId === 'settings-tvbox') { loadTvbox(); loadTvGuest(); }
                 if (targetId === 'settings-printer') loadPrinter();
+                if (targetId === 'settings-receipts') loadReceiptSettings();
 
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {
@@ -5791,7 +6105,9 @@
         else if (newer) hint.textContent = 'Eine neue Version ist da. Nach der Freigabe installiert die Box sie beim nächsten Nachfragen.';
         else if (d.device && d.approved && d.device.versionCode < d.approved.versionCode) hint.textContent = 'Freigegeben, die Box hat das Update aber noch nicht installiert.';
         else hint.textContent = 'Alles aktuell.';
+        window.__tvboxLive = d.live || null;
         renderTvboxRemote(d);
+        loadTvboxRc();
     }
 
     const TVBOX_CMD_LABELS = {
@@ -5879,6 +6195,46 @@
     }));
     if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
 
+    // TV-Box Fernwartung (ws-scrcpy über den ADB-Tunnel der Box, tv-remote.js)
+    function renderTvboxRc(d) {
+        if (!d || !d.success) return;
+        const live = window.__tvboxLive || null;
+        $('#tvbox-rc-enabled').checked = !!d.enabled;
+        $('#tvbox-rc-scrcpy').textContent = d.scrcpy ? 'läuft' : 'nicht eingerichtet (Skript unten, Schritt 1)';
+        $('#tvbox-rc-tunnel').textContent = !d.enabled ? 'aus' : d.tunnel
+            ? `verbunden seit ${new Date(d.tunnel.since).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+            : 'wartet auf die Box (bis zu 1 Minute, braucht TV-App 1.12)';
+        const local = d.tunnel && d.tunnel.adbLocal != null ? d.tunnel.adbLocal : live ? live.adbLocal : null;
+        $('#tvbox-rc-adblocal').textContent = local == null ? '–' : local ? 'an (Port 5555)' : 'aus → TV-Box-Fernwartung.bat am PC ausführen';
+        const st = d.adb && d.adb.state;
+        $('#tvbox-rc-adb').textContent = !d.tunnel ? '–' : st === 'device' ? 'erteilt, bereit'
+            : st === 'unauthorized' ? 'wartet: am Fernseher „USB-Debugging zulassen?“ mit „Immer“ bestätigen'
+            : st === 'kein adb' ? 'adb fehlt auf dem Server (Skript unten, Schritt 1)'
+            : st === 'offline' || st === 'host' ? 'Box antwortet nicht, „Neu verbinden“ versuchen'
+            : (st || '–') + (d.adb && d.adb.error ? ` (${d.adb.error})` : '');
+        let hint = '';
+        if (!d.scrcpy) hint = 'ws-scrcpy läuft auf dem Server noch nicht. Einmal das Skript im Container ausführen (siehe „Einmalig einrichten“).';
+        else if (d.enabled && d.tunnel && st === 'device') hint = 'Alles bereit. „Fernwartung öffnen“ und beim Gerät auf „H264 Converter“ klicken.';
+        else if (d.enabled && d.tunnel && local === false) hint = 'Die Box ist verbunden, aber ADB über Netzwerk ist aus (z. B. nach einem Neustart). Am PC TV-Box-Fernwartung.bat ausführen.';
+        $('#tvbox-rc-hint').textContent = hint;
+        $('#btn-tvbox-rc-open').disabled = !d.scrcpy;
+        $('#btn-tvbox-rc-reconnect').style.display = d.tunnel ? '' : 'none';
+    }
+    async function loadTvboxRc() {
+        if (!$('#tvbox-rc-card')) return;
+        renderTvboxRc(await apiJson('/api/settings/tvbox/remote').catch(() => null));
+    }
+    if ($('#tvbox-rc-enabled')) $('#tvbox-rc-enabled').addEventListener('change', async (e) => {
+        const d = await tvboxPost('/api/settings/tvbox/remote', { enabled: e.target.checked }, 'PUT');
+        if (d) { renderTvboxRc(d); showToast(e.target.checked ? 'Fernwartung erlaubt, die Box verbindet sich innerhalb einer Minute' : 'Fernwartung ausgeschaltet', 'success'); }
+    });
+    if ($('#btn-tvbox-rc-open')) $('#btn-tvbox-rc-open').addEventListener('click', () => window.open('/tv-fernwartung/', '_blank', 'noopener'));
+    if ($('#btn-tvbox-rc-refresh')) $('#btn-tvbox-rc-refresh').addEventListener('click', loadTvboxRc);
+    if ($('#btn-tvbox-rc-reconnect')) $('#btn-tvbox-rc-reconnect').addEventListener('click', async () => {
+        const d = await tvboxPost('/api/settings/tvbox/remote/reconnect');
+        if (d) renderTvboxRc(d);
+    });
+
     // TV: farewell on departure day + towel button (tv-guest.js)
     let tvGuestDefaults = [];
     async function loadTvGuest() {
@@ -5892,7 +6248,7 @@
         const fmt = ts => new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         const list = $('#tvguest-requests');
         list.innerHTML = (d.requests || []).length
-            ? d.requests.map(r => `<li>${escapeHtml(fmt(r.at))} Uhr: ${escapeHtml(r.name || 'Gast')}${r.stay ? ' (' + escapeHtml(r.stay) + ')' : ''}${r.preview ? ' · Test aus der Vorschau' : ''}${r.sent ? '' : ' · Nachricht nicht zugestellt'}</li>`).join('')
+            ? d.requests.map(r => `<li>${escapeHtml(fmt(r.at))} Uhr: ${escapeHtml(r.name || 'Gast')}${r.stay ? ' (' + escapeHtml(r.stay) + ')' : ''}${r.source === 'wlan' ? ' · über die WLAN-Seite' : ''}${r.preview ? ' · Test aus der Vorschau' : ''}${r.sent ? '' : ' · Nachricht nicht zugestellt'}</li>`).join('')
             : '<li style="list-style:none; margin-left:-1.1rem">Noch keine Anfragen.</li>';
     }
     if ($('#btn-tvguest-defaults')) $('#btn-tvguest-defaults').addEventListener('click', () => { $('#tvguest-hints').value = tvGuestDefaults.join('\n'); });

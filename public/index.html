@@ -18,7 +18,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=5.3">
+    <script>
+        // Hell/Dunkel vor dem ersten Zeichnen setzen, damit nichts aufblitzt (Wahl je Gerät gemerkt, nach dem Login vom Benutzer übernommen)
+        (function () {
+            var t = 'auto';
+            try { t = localStorage.getItem('adminTheme') || 'auto'; } catch (e) { }
+            var dark = t === 'dark' || (t !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        })();
+    </script>
+    <link rel="stylesheet" href="styles.css?v=5.4">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 </head>
 
@@ -173,6 +182,27 @@
                     <input type="search" id="topbar-search" placeholder="Gast oder Zeitraum suchen" autocomplete="off">
                 </label>
                 <div class="topbar-right">
+                    <div class="theme-switch">
+                        <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="true" aria-expanded="false" title="Darstellung" aria-label="Darstellung: Hell, Dunkel oder Automatisch">
+                            <svg class="ti-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                            <svg class="ti-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+                        </button>
+                        <div class="theme-menu" id="theme-menu" role="menu" hidden>
+                            <button type="button" role="menuitemradio" data-theme-pref="light" aria-checked="false">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                                Hell<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>
+                            </button>
+                            <button type="button" role="menuitemradio" data-theme-pref="dark" aria-checked="false">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+                                Dunkel<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>
+                            </button>
+                            <button type="button" role="menuitemradio" data-theme-pref="auto" aria-checked="false">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                                Automatisch<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <span class="topbar-sep"></span>
                     <span class="topbar-lang">DE</span>
                     <span class="topbar-sep"></span>
                     <svg class="topbar-user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
@@ -415,6 +445,7 @@
                         <a class="pill pill-primary fin-dl" href="#" data-href="/api/finance/export.xlsx">Excel (.xlsx) mit allen Tabellen</a>
                         <a class="pill fin-dl" href="#" data-href="/api/finance/export-csv.zip">Alle Tabellen als CSV (ZIP)</a>
                         <button type="button" class="pill" id="fin-pdfs">Alle Rechnungen als PDF (ZIP)</button>
+                        <a class="pill fin-dl" id="fin-receipts" href="#" data-href="/api/finance/receipts.zip" hidden>Alle Belege als ZIP</a>
                     </div>
                     <div class="fin-export-csv">
                         <span class="review-hint">Einzelne CSV:</span>
@@ -455,18 +486,26 @@
             <!-- VIEW: EXPENSES -->
             <div id="view-expenses" class="content-view" style="display:none;">
                 <div class="content-header">
-                    <div class="content-breadcrumb">
-                        <h2>Ausgaben-Verwaltung</h2>
-                    </div>
+                    <div class="content-breadcrumb"><h2>Ausgaben</h2></div>
                     <div class="content-actions">
-                        <button type="button" id="btn-sync-paperless" class="btn btn-primary btn-sm">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path
-                                    d="M21.5 2v6h-6M2.5 22v-6h6M2 12c0-4.4 3.6-8 8-8 3.3 0 6.2 2 7.4 4.9M22 12c0 4.4-3.6 8-8 8-3.3 0-6.2-2-7.4-4.9" />
-                            </svg>
-                            Paperless Sync
+                        <button type="button" id="btn-sync-paperless" class="btn btn-outline btn-sm" hidden title="Dokumente mit dem Übernahme-Tag aus Paperless als Ausgaben anlegen">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 12c0-4.4 3.6-8 8-8 3.3 0 6.2 2 7.4 4.9M22 12c0 4.4-3.6 8-8 8-3.3 0-6.2-2-7.4-4.9" /></svg>
+                            Aus Paperless übernehmen
                         </button>
+                        <button type="button" id="btn-new-expense" class="btn btn-primary btn-sm">+ Neue Ausgabe</button>
+                    </div>
+                </div>
+                <div class="review-kpis ex-kpis" id="ex-kpis"></div>
+                <div class="bookings-toolbar ex-toolbar">
+                    <select id="ex-year" aria-label="Jahr"></select>
+                    <select id="ex-category" aria-label="Kategorie"></select>
+                    <input type="search" id="ex-search" placeholder="Suchen (Händler, Beschreibung, Beleg-Nr.)">
+                </div>
+                <div class="card ex-drop" id="ex-drop">
+                    <div class="ex-drop-icon">📸</div>
+                    <div>
+                        <strong>Beleg einfach per Telegram schicken</strong>
+                        <div class="review-hint">Foto vom Kassenbon oder PDF an den Bot: Betrag, Datum, Händler und Kategorie werden erkannt, du bestätigst, fertig. Hier kannst du Belege auch hochladen oder auf diese Fläche ziehen.</div>
                     </div>
                 </div>
                 <div class="card">
@@ -475,16 +514,14 @@
                             <thead>
                                 <tr>
                                     <th>Datum</th>
-                                    <th>Beschreibung</th>
+                                    <th>Händler / Beschreibung</th>
                                     <th>Kategorie</th>
-                                    <th>Quelle</th>
+                                    <th>Beleg</th>
                                     <th class="text-right">Betrag</th>
-                                    <th class="text-right">Aktion</th>
+                                    <th class="text-right"></th>
                                 </tr>
                             </thead>
-                            <tbody id="expenses-list">
-                                <!-- Expenses list filled by JS -->
-                            </tbody>
+                            <tbody id="expenses-list"></tbody>
                         </table>
                     </div>
                 </div>
@@ -1890,6 +1927,7 @@
                             <div class="nav-section">ADVANCED SETTINGS</div>
                             <a href="#" class="nav-item" data-target="settings-nuki">Nuki Smart Lock <i class="status-dot" data-status="nuki"></i></a>
                             <a href="#" class="nav-item" data-target="settings-paperless">Paperless NGX</a>
+                            <a href="#" class="nav-item" data-target="settings-receipts">Belege &amp; KI-Erkennung</a>
                             <a href="#" class="nav-item" data-target="settings-booking">Booking.com &amp; Airbnb <i class="status-dot" data-status="calendars"></i></a>
                             <a href="#" class="nav-item" data-target="settings-whatsapp">WhatsApp Web</a>
                             <a href="#" class="nav-item" data-target="settings-chat">Gäste-Chat, SMS &amp; E-Mail</a>
@@ -2271,6 +2309,63 @@
                                 </div>
                             </section>
 
+                            <!-- BELEGE & KI -->
+                            <section id="settings-receipts" class="settings-page">
+                                <h2>Belege &amp; KI-Erkennung</h2>
+                                <p class="text-muted">Belege schickst du als Foto oder PDF an den Telegram-Bot oder lädst sie unter „Ausgaben“ hoch. Betrag, Datum, Händler und Kategorie werden erkannt, du bestätigst, und die Ausgabe zählt in der Finanz-Auswertung.</p>
+
+                                <div class="card" style="margin-top: 1.5rem;">
+                                    <h4 style="margin-top:0">Erkennung</h4>
+                                    <p class="text-muted" style="font-size:.88rem">Ohne KI liest die Texterkennung auf deinem Server den Beleg (kostenlos, nichts verlässt den Server). Mit KI geht das Foto an die Claude API von Anthropic und wird deutlich genauer, auch bei zerknitterten Bons, Handschrift und Rechnungen mit vielen Positionen. Kosten: je nach Modell etwa 0,1 bis 3 Cent pro Beleg.</p>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-ai-enabled"> KI-Erkennung benutzen (Claude)</label>
+                                    <div class="form-row" style="margin-top:.75rem">
+                                        <div class="form-group">
+                                            <label for="rc-ai-key">API-Schlüssel</label>
+                                            <input type="password" id="rc-ai-key" autocomplete="off" placeholder="sk-ant-…">
+                                            <small class="text-muted">Bekommst du unter console.anthropic.com → API Keys.</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="rc-ai-model">Modell</label>
+                                            <select id="rc-ai-model"></select>
+                                        </div>
+                                    </div>
+                                    <div class="btn-group"><button type="button" class="btn btn-outline" id="btn-rc-test-ai">KI testen</button></div>
+                                    <label class="checkbox-label" style="margin-top:1rem"><input type="checkbox" id="rc-ask-bot"> Fotos im Telegram-Bot automatisch als Beleg erkennen (sonst nur mit /beleg oder Bildunterschrift „Beleg“)</label>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h4 style="margin-top:0">Ablegen in Paperless</h4>
+                                    <p class="text-muted" style="font-size:.88rem" id="rc-pl-state">Zugang zu Paperless trägst du unter „Paperless NGX“ ein.</p>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-enabled"> Belege nach dem Speichern automatisch an Paperless schicken</label>
+                                    <div class="form-group" style="margin-top:.75rem">
+                                        <label for="rc-up-tags">Tags <small>(Namen, mit Komma getrennt)</small></label>
+                                        <input type="text" id="rc-up-tags" placeholder="Ferienwohnung, Ausgabe">
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group"><label for="rc-up-doctype">Dokumenttyp</label><input type="text" id="rc-up-doctype" placeholder="Beleg"></div>
+                                        <div class="form-group"><label for="rc-up-field">Benutzerfeld für den Betrag</label><input type="text" id="rc-up-field" placeholder="Betrag"></div>
+                                    </div>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-corr"> Händler als Korrespondent eintragen</label>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-cattag"> Kategorie zusätzlich als Tag</label>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-up-create"> Fehlende Tags, Korrespondenten und Dokumenttyp in Paperless anlegen</label>
+                                </div>
+
+                                <div class="card" style="margin-top: 1rem;">
+                                    <h4 style="margin-top:0">Aus Paperless übernehmen</h4>
+                                    <p class="text-muted" style="font-size:.88rem">Dokumente, die in Paperless dieses Tag haben, werden als Ausgaben angelegt (jedes nur einmal). Der Betrag kommt aus dem Benutzerfeld oder aus dem Text, den Paperless erkannt hat; der Korrespondent wird zum Händler.</p>
+                                    <div class="form-row">
+                                        <div class="form-group"><label for="rc-im-tag">Tag (Name oder ID)</label><input type="text" id="rc-im-tag" placeholder="z. B. Ausgabe Ferienwohnung"></div>
+                                        <div class="form-group"><label for="rc-im-field">Benutzerfeld für den Betrag</label><input type="text" id="rc-im-field" placeholder="Betrag"></div>
+                                    </div>
+                                    <label class="checkbox-label"><input type="checkbox" id="rc-im-auto"> Jede Stunde automatisch übernehmen (mit Meldung, wenn etwas Neues dazukommt)</label>
+                                </div>
+                                <p class="text-muted" id="rc-msg" style="font-size:.88rem; margin-top:1rem"></p>
+                                <div class="btn-group" style="margin-top: .5rem;">
+                                    <button type="button" class="btn btn-primary" id="btn-rc-save">Speichern</button>
+                                    <button type="button" class="btn btn-outline" id="btn-rc-test-pl">Paperless prüfen</button>
+                                </div>
+                            </section>
+
                             <!-- PAPERLESS -->
                             <section id="settings-paperless" class="settings-page">
                                 <h2>Paperless NGX</h2>
@@ -2297,16 +2392,7 @@
                                         <label for="pl-tags">Tag IDs (kommagetrennt)</label>
                                         <input type="text" id="pl-tags" placeholder="z.B. 3,7,12">
                                     </div>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="s-pl-expense-tag">Expense Tag ID (Paperless)</label>
-                                            <input type="number" id="s-pl-expense-tag" placeholder="z.B. 12">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="s-pl-amount-field">Custom Field ID für Betrag</label>
-                                            <input type="number" id="s-pl-amount-field" placeholder="z.B. 1">
-                                        </div>
-                                    </div>
+                                    <p class="text-muted" style="font-size:.88rem; margin-top:.5rem">Belege ablegen und Ausgaben aus Paperless übernehmen stellst du unter <a href="#" class="nav-jump" data-jump="settings-receipts">Belege &amp; KI-Erkennung</a> ein.</p>
                                     <div class="btn-group" style="margin-top: 1rem;">
                                         <button type="button" id="btn-paperless-test" class="btn btn-outline"
                                             style="flex:1">Paperless testen</button>
@@ -2670,6 +2756,36 @@
                                         </div>
                                         <p class="text-muted" id="tvbox-cmd-state" style="font-size:.85rem; margin-top:.75rem"></p>
                                     </div>
+
+                                    <div class="card" style="margin-top: 1rem;" id="tvbox-rc-card">
+                                        <h4 style="margin-top:0">Fernwartung (Live-Bild &amp; Steuerung)</h4>
+                                        <p class="text-muted" style="font-size:.9rem">Zeigt den Fernseher live im Browser, du steuerst ihn mit Maus und Tastatur (ws-scrcpy). Die Box verbindet sich dafür von sich aus mit dem Server, an der FRITZ!Box musst du nichts freigeben. Nur Benutzer mit dem Recht „Einstellungen &amp; Integrationen: Bearbeiten“ können die Seite öffnen.</p>
+                                        <div class="form-group">
+                                            <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer;">
+                                                <input type="checkbox" id="tvbox-rc-enabled"> Fernwartung erlauben
+                                            </label>
+                                        </div>
+                                        <div class="info-row"><span>Server (ws-scrcpy):</span> <strong id="tvbox-rc-scrcpy">–</strong></div>
+                                        <div class="info-row"><span>Verbindung der Box:</span> <strong id="tvbox-rc-tunnel">–</strong></div>
+                                        <div class="info-row"><span>ADB über Netzwerk auf der Box:</span> <strong id="tvbox-rc-adblocal">–</strong></div>
+                                        <div class="info-row"><span>ADB-Freigabe:</span> <strong id="tvbox-rc-adb">–</strong></div>
+                                        <p class="text-muted" id="tvbox-rc-hint" style="font-size:.85rem; margin-top:.75rem"></p>
+                                        <div class="btn-group" style="flex-wrap: wrap;">
+                                            <button type="button" id="btn-tvbox-rc-open" class="btn btn-primary">Fernwartung öffnen</button>
+                                            <button type="button" id="btn-tvbox-rc-reconnect" class="btn btn-outline">Neu verbinden</button>
+                                            <button type="button" id="btn-tvbox-rc-refresh" class="btn btn-ghost">Status aktualisieren</button>
+                                        </div>
+                                        <details style="margin-top:1rem">
+                                            <summary style="cursor:pointer">Einmalig einrichten</summary>
+                                            <ol style="font-size:.9rem; padding-left:1.2rem; margin:.5rem 0 0">
+                                                <li>Im Ferienwohnung-Container auf dem Proxmox (<code>pct enter &lt;ID&gt;</code>):<br><code>curl -fsSLO https://raw.githubusercontent.com/germanbeast/RentalInvoice/main/tools/tv-fernwartung.sh &amp;&amp; bash tv-fernwartung.sh</code></li>
+                                                <li>Am PC <code>TV-Box-Fernwartung.bat</code> ausführen (schaltet ADB über Netzwerk auf der Box ein). Das ist auch nach jedem Neustart der Box nötig, falls die Box es nicht dauerhaft speichert.</li>
+                                                <li>Hier „Fernwartung erlauben“ anhaken. Innerhalb einer Minute verbindet sich die Box.</li>
+                                                <li>Beim ersten Mal fragt der Fernseher „USB-Debugging zulassen?“. Haken bei „Immer von diesem Computer zulassen“ setzen und OK drücken.</li>
+                                                <li>„Fernwartung öffnen“, dann beim Gerät <code>127.0.0.1:15555</code> auf „H264 Converter“ klicken.</li>
+                                            </ol>
+                                        </details>
+                                    </div>
                                 </div>
 
                                 <h3 style="margin-top: 2rem;">Abreisetag &amp; Handtücher</h3>
@@ -2904,6 +3020,50 @@
             </div>
         </div>
 
+        <div class="modal-overlay" id="modal-expense" style="display:none;">
+            <div class="modal nb-modal ex-modal" role="dialog" aria-labelledby="ex-title">
+                <div class="modal-header">
+                    <h3 id="ex-title">Neue Ausgabe</h3>
+                    <button type="button" id="btn-close-expense" class="btn btn-ghost btn-icon" title="Schließen">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                    </button>
+                </div>
+                <form class="modal-body nb-form" id="ex-form" novalidate autocomplete="off">
+                    <div class="ex-file" id="ex-file-box">
+                        <input type="file" id="ex-file" accept="image/*,application/pdf" hidden>
+                        <div class="ex-preview" id="ex-preview"></div>
+                        <div class="ex-file-text">
+                            <strong id="ex-file-name">Beleg (Foto oder PDF)</strong>
+                            <span class="review-hint" id="ex-file-hint">Wird automatisch ausgelesen. Ohne Beleg einfach die Felder ausfüllen.</span>
+                        </div>
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-ex-file">Datei wählen</button>
+                    </div>
+                    <div class="nb-msg ex-scan-msg" id="ex-scan-msg" hidden></div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="ex-vendor">Händler</label><input type="text" id="ex-vendor" maxlength="80" placeholder="z. B. OBI"></div>
+                        <div class="form-group"><label for="ex-date">Datum</label><input type="date" id="ex-date" required></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="ex-amount">Betrag (€, brutto)</label><input type="text" id="ex-amount" inputmode="decimal" placeholder="0,00" required></div>
+                        <div class="form-group"><label for="ex-cat">Kategorie</label><select id="ex-cat"></select></div>
+                    </div>
+                    <div class="form-group"><label for="ex-desc">Beschreibung <small>(optional)</small></label><input type="text" id="ex-desc" maxlength="300" placeholder="z. B. Duschkopf und Silikon"></div>
+                    <div class="form-row ex-row3">
+                        <div class="form-group"><label for="ex-vat-rate">MwSt-Satz</label><select id="ex-vat-rate"><option value="">–</option><option value="19">19 %</option><option value="7">7 %</option><option value="0">0 %</option></select></div>
+                        <div class="form-group"><label for="ex-vat">Vorsteuer (€)</label><input type="text" id="ex-vat" inputmode="decimal" placeholder="–"></div>
+                        <div class="form-group"><label for="ex-pay">Zahlart</label><select id="ex-pay"><option value="">–</option><option>Bar</option><option>EC-Karte</option><option>Kreditkarte</option><option>PayPal</option><option>Überweisung</option><option>Lastschrift</option></select></div>
+                    </div>
+                    <div class="form-group"><label for="ex-invno">Beleg-/Rechnungsnummer <small>(optional)</small></label><input type="text" id="ex-invno" maxlength="60"></div>
+                    <label class="checkbox-label" id="ex-pl-wrap" hidden><input type="checkbox" id="ex-pl"> Beleg in Paperless ablegen</label>
+                    <div class="nb-msg" id="ex-msg" hidden></div>
+                    <div class="nb-actions">
+                        <button type="button" class="btn btn-outline" id="btn-cancel-expense">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-expense">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div class="modal-overlay" id="modal-user" style="display:none;">
             <div class="modal nb-modal user-modal" role="dialog" aria-labelledby="us-title">
                 <div class="modal-header">
@@ -3131,7 +3291,7 @@
         </form>
     </dialog>
 
-    <script defer src="app.js?v=4.0"></script>
+    <script defer src="app.js?v=4.1"></script>
 </body>
 
 </html>

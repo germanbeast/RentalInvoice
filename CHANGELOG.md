@@ -5,11 +5,47 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.55.2] - 2026-11-23
+## [1.59.1] - 2026-11-26
 
 ### Behoben
 - `geo-check.js`: Fehler bei Nominatim (403/429/Zeitüberschreitung) brachen den ganzen Abgleich ab → jetzt Ersatz über Photon (photon.komoot.io), Nominatim wird nach einem Fehler 10 Minuten übersprungen; Gesamtbudget 12 s statt 15-s-Race mit bis zu 5 Anfragen à 6 s
 - Fehlermeldung im Bot nennt den Grund (`reasonOf`), Log `[Geo]` mit Statuscode und Antwortanfang
+
+## [1.59.0] - 2026-11-25
+
+### Neu
+- Belege per Telegram: Foto oder PDF an den Bot schicken (`tg-receipts.js`). Texterkennung auf dem Server (`receipt-scan.js`: tesseract für Fotos, `pdf-parse` für PDFs, eingescannte PDFs als Bild der ersten Seite) erkennt Händler, Datum, Endbetrag, MwSt, Zahlart, Beleg-Nr. und Kategorie; Rückfrage mit Knöpfen (Speichern, Betrag/Datum/Händler/Kategorie/Beschreibung ändern, Paperless an/aus, Verwerfen). Fotos ohne Bildunterschrift werden automatisch als Beleg oder Anschrift-Screenshot erkannt (`looksLikeReceipt`), Bildunterschrift „Beleg“ erzwingt Beleg. `/beleg` (auch `/beleg 12,50 REWE Putzmittel` ohne Foto), `/ausgaben` (Monat, Jahr, Kategorien, letzte Belege), Hauptmenü-Knöpfe. Bot-Recht `beleg` = Finanzen bearbeiten
+- Optional KI-Erkennung über die Claude API (`@anthropic-ai/sdk`, strukturierte Ausgabe als JSON-Schema, Modell wählbar, Standard `claude-opus-5-5`, Server-Fallback bei Ablehnung). Fällt die KI aus, wird die Texterkennung benutzt
+- Ausgaben-Tabelle erweitert (Migration in `receipts.js`): Händler, MwSt-Satz, Vorsteuer, Zahlart, Beleg-Nr., Belegdatei (`uploads/receipts/`, nur über `/api/expenses/:id/receipt`), erkannter Text, Paperless-Status
+- Paperless-ngx: Beleg hochladen mit Titel, Datum, Korrespondent = Händler, Dokumenttyp, Tags (Namen, fehlende werden angelegt), Kategorie als Tag, Betrag ins Benutzerfeld (monetary/float/string); Aufgabe wird abgefragt bis zur Dokument-ID, Duplikate werden verknüpft. Übernahme aus Paperless (Tag als Name oder ID, alle Seiten, Betrag aus Benutzerfeld oder OCR-Text, Korrespondent als Händler), optional stündlich automatisch mit Meldung
+- Admin „Ausgaben“ neu: Kennzahlen, Filter Jahr/Kategorie/Suche, Beleg-Chips (Foto/PDF, Paperless ✓/⚠/→), Dialog „Neue Ausgabe“ mit Datei-Upload und sofortiger Erkennung, Drag & Drop, Bearbeiten, Handy-Ansicht, Dunkelmodus
+- Einstellungen → „Belege & KI-Erkennung“ (`/api/receipts/settings`, Recht Einstellungen; API-Schlüssel wird nie zurückgegeben), KI-Test, Paperless-Prüfung
+- Finanz-Auswertung: Blatt „Ausgaben“ mit Händler, Beleg-Nr., Zahlart, MwSt-Satz, Vorsteuer, Beleg; Übersicht mit „darin Vorsteuer“; neuer Export „Alle Belege als ZIP“ (`/api/finance/receipts.zip`, Dateien `Datum_Händler_Betrag`, mit CSV)
+
+## [1.58.0] - 2026-11-24
+
+### Neu
+- TV-Box Fernwartung (`tv-remote.js`): ws-scrcpy (Live-Bild + Steuerung) über einen ADB-Tunnel, den die Box selbst aufbaut. TV-App 1.12 (`AdbTunnel.java`, OkHttp) öffnet bei `remote.adbTunnel` aus `/api/tv-box/sync` eine WebSocket-Verbindung zu `/api/tv-box/adb-tunnel` (Header `x-tvbox-auth`) und leitet sie an `127.0.0.1:5555` der Box weiter; der Server bietet sie als `127.0.0.1:15555` an (`TV_ADB_PORT`) und führt `adb connect` aus
+- ws-scrcpy läuft als PM2-Prozess `ws-scrcpy` nur auf `127.0.0.1:8000` (`WS_SCRCPY_URL`) und ist nur über den Admin erreichbar: `/tv-fernwartung/` (HTTP) und WebSockets `/?action=…`, beide mit Admin-Sitzung, Recht „Einstellungen: Bearbeiten“, gleicher Origin, nicht auf dem Gast-Host
+- `GET/PUT /api/settings/tvbox/remote`, `POST /api/settings/tvbox/remote/reconnect`; Sync meldet `adbLocal`
+- `tools/tv-fernwartung.sh`: installiert adb, baut ws-scrcpy v0.8.1 (auf 127.0.0.1 gepatcht) nach `/opt/ws-scrcpy`, PM2 als App-Benutzer, Prüfung (`status`)
+- `TV-Box-Fernwartung.bat` (neu) und optionaler Schritt in `TV-Box-einrichten.bat`: `setprop persist.adb.tcp.port 5555` (falls erlaubt) + `adb tcpip 5555`
+- Abhängigkeit `ws`
+
+## [1.57.0] - 2026-11-23
+
+### Neu
+- Admin: Dunkelmodus mit Umschalter Hell / Dunkel / Automatisch oben rechts (`<html data-theme>`, Skript im `<head>` gegen Aufblitzen). Wahl je Benutzer in `users.theme` (Migration), `PUT /api/me/theme`, `/api/me` liefert `theme`; das Gerät merkt sich die letzte Wahl in `localStorage.adminTheme`
+- `styles.css`: feste Hellfarben im App-Look durch Variablen ersetzt (hell unverändert), Block „DUNKELMODUS“ nur `@media screen`; Diagramme lesen `--chart-*`, Leaflet-Kacheln werden abgedunkelt
+
+## [1.56.0] - 2026-11-23
+
+### Neu
+- WLAN-Startseite nach der Anmeldung (`guest-site/wlan.js`, `wifi-portal.js`): Wetterkarte mit 3-Tage-Vorschau (aus `api/live`), „Tipp des Tages“ (`tipOfDay`: Ausflugstipps `site.tips` täglich rotierend, versetzt um die Buchungs-ID; Fallback Abschnitt der Gästemappe), Handtuch-Karte, Abreise-Karte am Abreisetag (Hinweise aus `tv_guest`), danach „Jetzt geöffnet?“ und Veranstaltungen
+- `POST /gast/api/wlan/towels` (JSON, 5/min): Buchung aus der WLAN-Sitzung oder „Meine Buchung“, ruft `tvGuest.requestTowels(…, { source: 'wlan' })` (gleiche 30-Minuten-Sperre wie der TV). Vorschau sendet nichts. Kein Handtuch-Knopf am Abreisetag
+- Die Anmeldung wird in der Sitzung gemerkt (`req.session.wlan`), `POST /gast/api/wlan/home` und `hello` mit `status` liefern die Startseite erneut
+- Admin: Handtuch-Anfragen von der WLAN-Seite sind im Protokoll markiert
+- Gastgeber- und Zusatz-Codes bekommen ebenfalls `welcome` (Wetter, Tipp, Kontakt)
 
 ## [1.55.1] - 2026-11-23
 

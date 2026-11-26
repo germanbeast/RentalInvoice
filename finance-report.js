@@ -19,6 +19,7 @@ const CLEANING = /reinigung|cleaning|endreinig|putz/i;
 const STAY = /nacht|nächte|übernacht|aufenthalt|miete|logis|unterkunft|ferienwohnung|apartment|wohnung/i;
 const category = desc => KURTAXE.test(desc) ? 'Kurtaxe' : CLEANING.test(desc) ? 'Reinigung' : STAY.test(desc) ? 'Übernachtung' : 'Sonstiges';
 
+const EXPENSE_SOURCES = { paperless: 'Paperless', local: 'Manuell', telegram: 'Telegram', upload: 'Hochgeladen' };
 const SOURCES = { 'Booking.com': 'Booking.com', Airbnb: 'Airbnb', Direkt: 'Direkt (Webseite)', manual: 'Manuell' };
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
@@ -128,10 +129,15 @@ function createFinanceReport({ db }) {
         }
 
         const expenses = sql().prepare(`
-            SELECT date, description, category, source, amount FROM expenses WHERE date >= ? AND date <= ? ORDER BY date, id
+            SELECT date, description, category, source, amount, vendor, vat_rate, vat_amount, payment_method, invoice_number, receipt_file, paperless_id
+            FROM expenses WHERE date >= ? AND date <= ? ORDER BY date, id
         `).all(from, to).map(e => ({
-            date: e.date, description: e.description || '', category: e.category || 'Ohne Kategorie',
-            source: e.source === 'paperless' ? 'Paperless' : (e.source === 'local' || !e.source ? 'Manuell' : e.source), amount: r2(e.amount)
+            date: e.date, vendor: e.vendor || '', description: e.description || '', category: e.category || 'Ohne Kategorie',
+            payment: e.payment_method || '', invoiceNo: e.invoice_number || '',
+            vatRate: e.vat_rate === null || e.vat_rate === undefined ? '' : `${String(e.vat_rate).replace('.', ',')} %`,
+            vat: e.vat_amount === null || e.vat_amount === undefined ? null : r2(e.vat_amount),
+            receipt: e.receipt_file ? 'ja' : (e.paperless_id ? `Paperless #${e.paperless_id}` : 'nein'),
+            source: EXPENSE_SOURCES[e.source] || (e.source || 'Manuell'), amount: r2(e.amount)
         }));
 
         const bookings = sql().prepare(`
@@ -189,7 +195,7 @@ function createFinanceReport({ db }) {
             invoices: invoices.length, netto: sum(invoices, 'netto'), ust: sum(invoices, 'ust'), brutto: sum(invoices, 'brutto'),
             stay: sum(invoices, 'stay'), cleaning: sum(invoices, 'cleaning'), kurtaxe: sum(invoices, 'kurtaxe'), other: sum(invoices, 'other'),
             paid: sum(invoices.filter(i => i.paid === 'ja'), 'brutto'), open: sum(invoices, 'open'),
-            expenses: sum(expenses, 'amount'), expenseCount: expenses.length,
+            expenses: sum(expenses, 'amount'), expenseCount: expenses.length, expenseVat: sum(expenses, 'vat'),
             nights: invoices.reduce((s, i) => s + (i.nights || 0), 0),
             stays: stays.length, staysWithoutInvoice: stays.filter(s => !s.invoice).length
         };
@@ -301,13 +307,19 @@ function createFinanceReport({ db }) {
             name: 'Ausgaben', file: 'Ausgaben',
             columns: [
                 { header: 'Datum', key: 'date', type: 'date' },
-                { header: 'Beschreibung', key: 'description', type: 'text', width: 44 },
+                { header: 'Händler', key: 'vendor', type: 'text', width: 26 },
+                { header: 'Beschreibung', key: 'description', type: 'text', width: 40 },
                 { header: 'Kategorie', key: 'category', type: 'text' },
+                { header: 'Beleg-Nr.', key: 'invoiceNo', type: 'text' },
+                { header: 'Zahlart', key: 'payment', type: 'text' },
+                { header: 'MwSt-Satz', key: 'vatRate', type: 'text' },
+                { header: 'Vorsteuer', key: 'vat', type: 'money' },
+                { header: 'Beleg', key: 'receipt', type: 'text' },
                 { header: 'Quelle', key: 'source', type: 'text' },
                 { header: 'Betrag', key: 'amount', type: 'money' }
             ],
             rows: r => r.expenses,
-            totals: r => ({ date: null, description: 'Summe', amount: r.totals.expenses })
+            totals: r => ({ date: null, vendor: 'Summe', vat: r.totals.expenseVat, amount: r.totals.expenses })
         },
         categories: {
             name: 'Ausgaben nach Kategorie', file: 'Ausgaben-Kategorien',
@@ -349,6 +361,7 @@ function createFinanceReport({ db }) {
             ['Bezahlt (brutto)', null, t.paid],
             ['Offen (brutto)', null, t.open],
             ['Ausgaben', t.expenseCount, t.expenses],
+            ['  darin Vorsteuer (soweit auf den Belegen erkannt)', null, t.expenseVat],
             ['Ergebnis (Einnahmen brutto − Ausgaben)', null, t.result],
             ['Ergebnis (Einnahmen netto − Ausgaben)', null, t.resultNet],
             ['Abgerechnete Nächte', t.nights, null],
