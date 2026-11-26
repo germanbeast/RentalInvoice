@@ -15,9 +15,16 @@ git reset -q --hard origin/main
 echo "📦 Installiere Abhängigkeiten..."
 npm install --no-audit --no-fund
 
+# Für das Hintergrund-Video (Admin → Webseite → Bilder) braucht der Server ffmpeg
+if ! command -v ffmpeg >/dev/null 2>&1; then
+    echo "ℹ️ ffmpeg fehlt (für das Hintergrund-Video). Einmalig installieren mit: sudo apt install -y ffmpeg"
+fi
+
 echo "🔄 Starte App neu..."
 if command -v pm2 >/dev/null 2>&1; then
     pm2 restart invoice-app || pm2 start server.js --name invoice-app
+    # Server-Wächter (eigener Prozess, meldet App-/Tunnel-Ausfälle per Telegram)
+    pm2 restart beckhome-watchdog 2>/dev/null || pm2 start watchdog.js --name beckhome-watchdog
     pm2 save >/dev/null
 else
     echo "⚠️ PM2 nicht gefunden. Bitte den Server selbst neu starten."

@@ -9,7 +9,8 @@ const AREAS = [
     { key: 'calendar', label: 'Kalender & Startseite', hint: 'Belegungskalender, heutige An-/Abreisen, Kalender-Abgleich' },
     { key: 'bookings', label: 'Buchungen, Gäste & Anfragen', hint: 'Buchungsliste, Buchungen eintragen/löschen, Gästeliste, Anfragen der Webseite' },
     { key: 'invoices', label: 'Rechnungen', hint: 'Rechnungen erstellen, ansehen, versenden' },
-    { key: 'finance', label: 'Finanzen & Exporte', hint: 'Umsätze, Auslastung & Jahresrückblick, Ausgaben, Erbverwaltung, Excel/CSV/ZIP' },
+    { key: 'vouchers', label: 'Gutscheine', hint: 'Gutscheine anlegen, drucken, entwerten (einlösen geht auch mit Rechnungen/Buchungen)' },
+    { key: 'finance', label: 'Finanzen & Exporte', hint: 'Umsätze, Auslastung & Jahresrückblick, Ausgaben & Belege (auch per Telegram), Erbverwaltung, Excel/CSV/ZIP' },
     { key: 'door', label: 'Türcodes & Notfall-Öffnen', hint: 'Nuki-Codes ansehen/anlegen/löschen, Notfall-Öffnen' },
     { key: 'messages', label: 'Gast-Nachrichten & Chat', hint: 'Gast-Nachricht/Link, WhatsApp/SMS-Postfach' },
     { key: 'meldescheine', label: 'Meldescheine', hint: 'Online-Meldescheine ansehen, drucken, exportieren' },
@@ -28,7 +29,7 @@ const ROLES = {
     manager: {
         label: 'Manager',
         permissions: {
-            calendar: 'edit', bookings: 'edit', invoices: 'edit', finance: 'view', door: 'edit',
+            calendar: 'edit', bookings: 'edit', invoices: 'edit', vouchers: 'edit', finance: 'view', door: 'edit',
             messages: 'edit', meldescheine: 'edit', website: 'edit', settings: 'none', users: 'none'
         }
     },
@@ -75,7 +76,7 @@ function within(wanted, granter) {
 // ---------------------------------------------------------------------------
 const R = (methods, pattern, area, level) => ({ methods, pattern, area, level });
 const RULES = [
-    R('*', /^\/api\/(me|version|changelog|health|logout)$/, 'any'),
+    R('*', /^\/api\/(me|me\/theme|version|changelog|health|logout)$/, 'any'),
     R('*', /^\/api\/push\/(key|subscribe|unsubscribe|test)$/, 'any'),
     R('*', /^\/api\/push\/devices(\/|$)/, 'settings'),
 
@@ -101,6 +102,7 @@ const RULES = [
 
     // Messages to guests
     R('*', /^\/api\/site\/guest-message(\/|$)/, 'messages'),
+    R('*', /^\/api\/site\/arrival\/send(\/|$)/, 'messages'),
     R('*', /^\/api\/chat\/(settings|sms|mail)(\/|$)/, 'settings'),
     R('PUT', /^\/api\/chat\/thread\/[^/]+\/read$/, 'messages', 'view'), // opening a chat marks it read
     R('*', /^\/api\/chat(\/|$)/, 'messages'),
@@ -114,7 +116,12 @@ const RULES = [
     R('GET', /^\/api\/branding(\/|$)/, 'invoices', 'view'),
     R('*', /^\/api\/branding(\/|$)/, 'settings'),
 
+    // Vouchers (/api/vouchers/check also allows invoices/bookings edit, checked in vouchers.js)
+    R('GET', /^\/api\/vouchers\/check$/, 'any'),
+    R('*', /^\/api\/vouchers(\/|$)/, 'vouchers'),
+
     // Finance
+    R('*', /^\/api\/receipts\/(settings|test-ai|test-paperless)$/, 'settings'),
     R('*', /^\/api\/(finance|expenses|estate|stats|review)(\/|$)/, 'finance'),
     R('*', /^\/uploads\/estate\//, 'finance'), // other /uploads paths (certificates …): full rights only
 
@@ -160,7 +167,7 @@ function createGuard(db) {
             return req.session.destroy(() => res.status(401).json({ error: 'Benutzer existiert nicht mehr' }));
         }
         const perms = forUser(user);
-        req.user = { id: user.id, username: user.username, role: user.role, permissions: perms };
+        req.user = { id: user.id, username: user.username, role: user.role, permissions: perms, theme: user.theme || 'auto' };
         if (!su.id || su.username !== user.username || su.role !== user.role) {
             req.session.user = { id: user.id, username: user.username, role: user.role };
         }
@@ -182,7 +189,7 @@ function createGuard(db) {
 function redactBooking(row, perms) {
     const r = { ...row };
     if (!can(perms, 'door')) { r.pin = null; }
-    if (!can(perms, 'bookings')) { r.guestEmail = null; r.guestId = null; }
+    if (!can(perms, 'bookings')) { r.guestEmail = null; r.guestId = null; r.guestPhone = null; r.guestAddress = null; }
     if (!can(perms, 'messages') && !can(perms, 'bookings')) r.guestCode = null;
     if (!can(perms, 'meldescheine')) r.meldescheinId = null;
     return r;
@@ -191,11 +198,14 @@ function redactBooking(row, perms) {
 // Telegram/WhatsApp bot commands -> required right
 const BOT_COMMANDS = {
     status: ['calendar', 'view'], anreisen: ['calendar', 'view'], sync: ['calendar', 'edit'],
-    namen: ['bookings', 'edit'],
+    namen: ['bookings', 'edit'], adresse: ['bookings', 'edit'],
     offen: ['invoices', 'view'], rechnung: ['invoices', 'edit'],
     codes: ['door', 'view'], pin: ['door', 'edit'], lock: ['door', 'edit'], lockstatus: ['door', 'view'],
     nachricht: ['messages', 'view'], guestlink: ['messages', 'edit'],
-    review: ['finance', 'view']
+    review: ['finance', 'view'],
+    beleg: ['finance', 'edit'],
+    wlan: ['website', 'edit'],
+    server: ['settings', 'view']
 };
 
 function canBot(perms, command) {

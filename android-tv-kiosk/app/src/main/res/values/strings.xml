@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="key_watch_name">Welcome-Screen Ruhe-Erkennung</string>
+    <string name="key_watch_desc">Erkennt, wann zuletzt eine Taste der Fernbedienung gedrückt wurde, damit die Box nach 4 Stunden Ruhe zum Welcome-Screen zurückkehrt. Tasten werden nicht gespeichert oder verändert.</string>
+</resources>

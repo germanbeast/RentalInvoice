@@ -1,6 +1,13 @@
 const db = require('./db');
 const botLogic = require('./bot-logic');
 const permissions = require('./permissions');
+const LANG_LABEL = { de: '🇩🇪 Deutsch', en: '🇬🇧 Englisch', nl: '🇳🇱 Niederländisch', pl: '🇵🇱 Polnisch' };
+const addressParser = require('./address-parser');
+const addressCheck = require('./address-check');
+const ocr = require('./screenshot-ocr');
+const geoCheck = require('./geo-check');
+const os = require('os');
+const path = require('path');
 
 /** Rights of a Telegram chat: a linked user account gets its own rights; an ID that was only approved
  *  under Einstellungen → Telegram (no user linked) keeps full access as before. */
@@ -10,19 +17,24 @@ function botPerms(chatId) {
 }
 const DENIED = '⛔ <b>Keine Berechtigung</b>\nDein Benutzer darf das nicht. Rechte vergibt der Inhaber in der Benutzerverwaltung.';
 const CMD_RIGHT = { status: 'offen', offen: 'offen', sync: 'sync', namen: 'namen', codes: 'codes', 'türcodes': 'codes', tuercodes: 'codes',
-    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin' };
+    anreisen: 'anreisen', nachricht: 'nachricht', rechnung: 'rechnung', pin: 'pin', adresse: 'adresse', anschrift: 'adresse',
+    beleg: 'beleg', quittung: 'beleg', ausgabe: 'beleg', ausgaben: 'review' };
 function callbackRight(data) {
     if (data === 'open') return 'offen';
     if (data === 'arrivals') return 'anreisen';
     if (data === 'codes') return 'codes';
     if (data === 'sync' || data.startsWith('ovl:')) return 'sync';
     if (data === 'names' || data.startsWith('nm:')) return 'namen';
+    if (data === 'adr' || data.startsWith('adr:') || data.startsWith('ab:') || ['aok', 'aname', 'aback'].includes(data) || data.startsWith('ageo:')) return 'adresse';
     if (data === 'lock:status') return 'lockstatus';
     if (data.startsWith('lock:')) return 'lock';
     if (data === 'gm' || data.startsWith('gm:')) return 'nachricht';
     if (data.startsWith('gl:')) return 'guestlink';
+    if (data === 'wl' || data.startsWith('wl:')) return 'wlan';
     if (data.startsWith('inv:') || data === 'new:invoice') return 'rechnung';
     if (data === 'new:pin') return 'pin';
+    if (data === 'rc:list') return 'review';
+    if (data.startsWith('rc:')) return 'beleg';
     return null;
 }
 const fs = require('fs');
@@ -101,6 +113,8 @@ function mainMenuKeyboard() {
         [btn('🔐 Türcodes', 'codes'), btn('📅 Anreisen', 'arrivals')],
         [btn('✉️ Gästenachricht', 'gm'), btn('📋 Offene Rechnungen', 'open')],
         [btn('🔄 Kalender abfragen', 'sync'), btn('🚪 Schloss', 'lock:status')],
+        [btn('📇 Anschrift einfügen', 'adr'), btn('📶 WLAN-Codes', 'wl')],
+        [btn('📸 Beleg erfassen', 'rc:new'), btn('💶 Ausgaben', 'rc:list')],
         [btn('❓ Hilfe', 'help')]
     ]);
 }
@@ -178,18 +192,29 @@ async function showHelp(bot, chatId) {
         '• <code>/status</code> – offene Rechnungen\n' +
         '• <code>/codes</code> – Türcodes live aus Nuki anzeigen\n' +
         '• <code>/namen</code> – Gastnamen zu Buchungen nachtragen\n' +
+        '• <code>/adresse</code> – Anschrift eines Gastes einfügen (Format egal)\n' +
         '• <code>/sync</code> – Booking.com &amp; Airbnb jetzt abfragen\n' +
         '• <code>/anreisen</code> – kommende Buchungen\n' +
         '• <code>/nachricht</code> – fertige Nachricht für den Gast (zum Kopieren)\n' +
         '• <code>/schloss</code> – Schloss-Status und Batterie\n' +
         '• <code>/zu</code> – Tür abschließen\n' +
         '• <code>/jahr</code> – Jahresrückblick (z. B. <code>/jahr 2025</code>)\n' +
+        '• <code>/server</code> – Server-Status (App, Tunnel, Speicher)\n' +
+        '• <code>/beleg</code> – Beleg erfassen (Foto/PDF schicken, oder <code>/beleg 12,50 REWE Putzmittel</code>)\n' +
+        '• <code>/ausgaben</code> – Ausgaben im Monat und Jahr\n' +
+        '• <code>/wlan</code> – WLAN-Codes für Besucher (z. B. <code>/wlan 3</code> = 3 Tage, <code>/wlan 4h Handwerker</code>)\n' +
         '• <code>/auf</code> – Tür aufschließen/öffnen (mit Rückfrage)\n' +
         '• <code>/menu</code> – Hauptmenü\n\n' +
         '<b>Schnell starten</b>\n' +
         'Du kannst gleich alles in eine Nachricht schreiben, z.B.\n' +
         '<code>Rechnung Max Mustermann\nMusterstr. 1\n12345 Musterstadt\n15.03. - 20.03.2026</code>\n' +
         'Der Bot übernimmt, was er erkennt, und fragt nur nach dem Rest.\n\n' +
+        '<b>Anschrift einfach reinkopieren</b>\n' +
+        'Eine Anschrift ohne Datum (z. B. aus Booking.com kopiert) erkennt der Bot von selbst: Name, Straße, PLZ, Ort, Land, Telefon, E-Mail. ' +
+        'Du wählst nur noch die Buchung und bestätigst. Das klappt auch mit einem 📷 Screenshot, der nach dem Speichern aus dem Chat gelöscht wird.\n\n' +
+        '<b>Belege</b>\n' +
+        'Schick einfach ein 📸 Foto vom Kassenbon oder eine Rechnung als PDF. Der Bot erkennt Betrag, Datum, Händler und Kategorie, ' +
+        'du bestätigst, und die Ausgabe landet in der Finanz-Auswertung (und auf Wunsch in Paperless).\n\n' +
         '<b>Jederzeit möglich</b>\n' +
         '• ⬅️ <b>Zurück</b> (oder „zurück“) – einen Schritt zurück\n' +
         '• ❌ <b>Abbrechen</b> (oder „abbrechen“) – Vorgang beenden\n' +
@@ -314,7 +339,7 @@ async function executeGuestName(bot, chatId, session) {
                 : `⚠️ Der Türcode konnte in Nuki nicht umbenannt werden: ${esc(short(r.nukiError, 120))}\n(Der Code selbst funktioniert weiterhin.)\n`;
         }
         const left = (() => { try { return bookingsNeedingName().length; } catch (e) { return 0; } })();
-        const rows = [[btn('🧾 Rechnung erstellen', `inv:${session.bookingId}`)]];
+        const rows = [[btn('🧾 Rechnung erstellen', `inv:${session.bookingId}`), btn('📇 Anschrift', `adr:${session.bookingId}`)]];
         if (left > 0) rows.push([btn(`👤 Weitere Namen offen (${left})`, 'names')]);
         rows.push([btn('🔐 Türcodes', 'codes'), btn('🏠 Hauptmenü', 'menu')]);
         await send(bot, chatId, text, keyboard(rows));
@@ -348,13 +373,25 @@ async function startInvoiceFromBooking(bot, chatId, bookingId) {
     if (!b || !b.guest_name || botLogic.isPlaceholderGuestName(b.guest_name)) {
         return send(bot, chatId, '⚠️ Bitte zuerst den Gastnamen eintragen.', keyboard([[btn('👤 Namen eintragen', `nm:${bookingId}`), btn('🏠 Hauptmenü', 'menu')]]));
     }
-    const prefill = { gName: b.guest_name, arrival: b.checkin, departure: b.checkout };
-    if (b.guest_address) prefill.gAdresse = b.guest_address;
+    // Everything from THIS booking's guest (Meldeschein as fallback for the address); the invoice stays tied to it
+    const g = addressCheck.bookingGuest(b.id) || {};
+    const prefill = { gName: b.guest_name, arrival: b.checkin, departure: b.checkout, bookingId: b.id, gAdresse: '' };
+    if (g.address) { const clean = tidyAddress(g.address); if (clean) prefill.gAdresse = clean; }
     if (b.guest_email) prefill.gEmail = b.guest_email;
     return startFlow(bot, chatId, 'invoice', '', prefill);
 }
 
 let hooks = {};
+
+// Belege per Foto/PDF (siehe tg-receipts.js)
+const tgReceipts = require('./tg-receipts')({
+    send, btn, keyboard, esc, fmtDate, fmtMoney, short, sessions, touch, menuOnlyKeyboard,
+    receipts: () => {
+        const r = hooks.receipts && hooks.receipts();
+        if (!r) throw new Error('Belege sind gerade nicht verfügbar');
+        return r;
+    }
+});
 
 async function runSync(bot, chatId) {
     if (!hooks.syncCalendars) {
@@ -418,6 +455,67 @@ async function showLockStatus(bot, chatId, intro) {
     if (lock.doorsensorBatteryCritical) text += '🪫 Türsensor-Batterie fast leer\n';
     text += `Gast im Haus: ${hooks.isOccupied && hooks.isOccupied() ? 'ja' : 'nein'}`;
     return send(bot, chatId, text, lockKeyboard());
+}
+
+// ---------------------------------------------------------------------------
+// WLAN-Codes (eigener Router mit Anmeldeseite): zusätzliche Codes für Besucher, Handwerker usw.
+// ---------------------------------------------------------------------------
+function wifiPortal() {
+    const w = hooks.wifi ? hooks.wifi() : null;
+    if (!w) return { error: 'WLAN ist gerade nicht verfügbar.' };
+    if (w.getConfig().mode !== 'portal') return { error: 'WLAN-Codes gibt es nur mit dem eigenen WLAN-Router mit Anmeldeseite (Admin → Webseite → WLAN).' };
+    return { w, portal: w.portal };
+}
+
+function fmtUntil(iso) {
+    return new Date(iso).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+}
+
+/** "/wlan 3", "/wlan 4h Handwerker", "2 tage" -> { hours, note } or null */
+function parseWifiArg(arg) {
+    const m = String(arg || '').trim().match(/^(\d{1,3})\s*(h|std\.?|stunden?|t|d|tage?|w|wochen?)?\b\s*(.*)$/i);
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    const u = (m[2] || 't').toLowerCase();
+    const hours = /^(h|std|stunde)/.test(u) ? n : /^w/.test(u) ? n * 7 * 24 : n * 24;
+    if (!n || hours > 60 * 24) return null;
+    return { hours, note: m[3].trim() };
+}
+
+async function showWifiCodes(bot, chatId, intro) {
+    const { w, portal, error } = wifiPortal();
+    if (error) return send(bot, chatId, `📶 ${esc(error)}`, menuOnlyKeyboard());
+    let text = (intro ? `${intro}\n\n` : '') + `<b>📶 WLAN-Codes</b> · WLAN „${esc(w.getConfig().portal.ssid)}“\n`;
+    try {
+        const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+        const b = db.getDb().prepare('SELECT b.*, g.name AS guest_name FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id WHERE b.checkin <= ? AND b.checkout >= ? ORDER BY (b.checkout = ?) ASC, b.checkin ASC LIMIT 1').get(today, today, today);
+        if (b) text += `\nGast jetzt: ${esc(b.guest_name || 'Gast')} – Code <code>${esc(w.ensureCode(b.id))}</code> (bis ${fmtDate(b.checkout)})\n`;
+    } catch (e) { /* ohne Gast */ }
+    const codes = portal.listExtraCodes();
+    text += codes.length ? '\n<b>Zusätzliche Codes</b>\n' + codes.map(c => `• <code>${esc(c.code)}</code>${c.note ? ` ${esc(c.note)}` : ''} – bis ${esc(fmtUntil(c.valid_until))}${c.devices ? ` · ${c.devices} Gerät${c.devices === 1 ? '' : 'e'}` : ''}`).join('\n') + '\n'
+        : '\nKeine zusätzlichen Codes aktiv.\n';
+    text += '\nNeuen Code erzeugen (gilt ab sofort). Mit Notiz: z. B. <code>/wlan 4h Handwerker</code>';
+    const rows = [
+        [btn('4 Stunden', 'wl:new:4'), btn('1 Tag', 'wl:new:24')],
+        [btn('3 Tage', 'wl:new:72'), btn('1 Woche', 'wl:new:168')]
+    ];
+    for (const c of codes.slice(0, 8)) rows.push([btn(`🗑 ${c.code} löschen${c.note ? ` (${short(c.note, 16)})` : ''}`, `wl:del:${c.id}`)]);
+    rows.push([btn('🏠 Hauptmenü', 'menu')]);
+    return send(bot, chatId, text, keyboard(rows));
+}
+
+async function createWifiCode(bot, chatId, hours, note, who) {
+    const { w, portal, error } = wifiPortal();
+    if (error) return send(bot, chatId, `📶 ${esc(error)}`, menuOnlyKeyboard());
+    let x;
+    try { x = portal.createExtraCode({ hours, note, by: who }); } catch (e) { return send(bot, chatId, `❌ ${esc(e.message)}`, menuOnlyKeyboard()); }
+    const c = w.getConfig().portal;
+    const text = `✅ <b>Neuer WLAN-Code</b>${x.note ? ` (${esc(x.note)})` : ''}\n\n` +
+        `WLAN: <b>${esc(c.ssid)}</b>${c.wpa ? `\nKennwort: <code>${esc(c.wpa)}</code>` : ''}\n` +
+        `Code: <code>${esc(x.code)}</code>\n` +
+        `Gültig bis ${esc(fmtUntil(x.valid_until))}, für bis zu ${c.max_devices} Geräte.\n\n` +
+        '<i>Mit dem WLAN verbinden, auf der Anmeldeseite den Code eingeben.</i>';
+    return send(bot, chatId, text, keyboard([[btn('📶 Alle WLAN-Codes', 'wl')], [btn('🏠 Hauptmenü', 'menu')]]));
 }
 
 async function showYearReview(bot, chatId, year) {
@@ -514,15 +612,16 @@ async function showGuestMessageList(bot, chatId) {
     return send(bot, chatId, '<b>✉️ Gästenachricht</b>\nFür welche Buchung?', keyboard(kb));
 }
 
-async function showGuestMessage(bot, chatId, bookingId, lang = 'de') {
+async function showGuestMessage(bot, chatId, bookingId, langWanted) {
     const api = guestMessageApi();
     if (!api) return send(bot, chatId, '❌ Die Gästenachricht ist nicht verfügbar.', menuOnlyKeyboard());
-    const m = api.compose(bookingId, lang);
+    const m = api.compose(bookingId, langWanted);
     if (!m) return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard());
+    const lang = m.lang || 'de';
 
     const b = m.booking;
     const who = m.name ? esc(short(m.name, 30)) : 'Gast';
-    let text = `✉️ <b>Gästenachricht${lang === 'en' ? ' (English)' : ''}: ${who}</b> · ${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)}\n` +
+    let text = `✉️ <b>Gästenachricht${lang !== 'de' ? ` (${LANG_LABEL[lang]})` : ''}: ${who}</b> · ${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)}\n` +
         'Tippe auf den Text, um ihn zu kopieren, und füge ihn bei Booking.com oder Airbnb ein.\n';
     if (m.link) text += `<i>Der Link gilt bis ${fmtDate(m.linkUntil)}.</i>\n`;
     m.warnings.forEach(w => { text += `⚠️ ${esc(w)}\n`; });
@@ -531,7 +630,7 @@ async function showGuestMessage(bot, chatId, bookingId, lang = 'de') {
     const rows = [];
     const first = [];
     if (m.link) first.push({ text: '📋 Nur Link kopieren', copy_text: { text: m.link } });
-    first.push(lang === 'en' ? btn('🇩🇪 Deutsch', `gm:${b.id}`) : btn('🇬🇧 English', `gm:en:${b.id}`));
+    first.push(lang !== 'de' ? btn('🇩🇪 Deutsch', `gm:de:${b.id}`) : btn('🇬🇧 English', `gm:en:${b.id}`));
     rows.push(first);
     if (m.link) rows.push([btn('🔁 Neuer Link', `gl:new?:${b.id}`), btn('🔒 Link sperren', `gl:off:${b.id}`)]);
     if (!m.name) rows.push([btn('👤 Namen eintragen', `nm:${b.id}`)]);
@@ -562,6 +661,484 @@ async function blockGuestLink(bot, chatId, bookingId) {
         '🔒 <b>Link gesperrt.</b>\nDer Gast kommt damit nicht mehr in „Meine Buchung“ und nicht mehr zum Notfall-Öffnen. ' +
         'Anmelden mit Buchungscode und Anreisedatum geht weiterhin.',
         keyboard([[btn('🔁 Neuen Link erstellen', `gm:${bookingId}`), btn('🏠 Hauptmenü', 'menu')]]));
+}
+
+// ---------------------------------------------------------------------------
+// Anschrift einfügen: unformatierten Text erkennen und beim Gast einer Buchung speichern
+// ---------------------------------------------------------------------------
+const ADDRESS_PAGE = 6;
+
+function berlinToday() {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+}
+
+function addDays(ymd, n) {
+    const d = new Date(`${ymd}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+}
+
+/** Lower-case words of a name without accents, for comparing "Müller" with "MUELLER" or "Muller". */
+function nameWords(name) {
+    return String(name || '').toLowerCase()
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .split(/[^a-z]+/).filter(w => w.length >= 2 && !['von', 'van', 'der', 'den', 'de', 'zu', 'familie', 'family', 'herr', 'frau'].includes(w));
+}
+
+/** 2 = same name, 1 = same last name (or one word in common), 0 = no match */
+function nameScore(a, b) {
+    const x = nameWords(a), y = nameWords(b);
+    if (!x.length || !y.length) return 0;
+    if (x.join(' ') === y.join(' ')) return 2;
+    if (x[x.length - 1] === y[y.length - 1]) return 1;
+    return x.some(w => w.length >= 4 && y.includes(w)) ? 1 : 0;
+}
+
+/**
+ * Bookings to choose from: the last 60 days up to everything ahead. Order: name matches,
+ * then the current stay, then the next arrivals, then the most recent past stays.
+ */
+function addressCandidates(parsedName) {
+    const today = berlinToday();
+    const rows = db.getDb().prepare(`
+        SELECT b.id, b.summary, b.checkin, b.checkout, b.guest_id, g.name AS guest_name, g.address AS guest_address
+        FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
+        WHERE b.checkout >= ?
+        ORDER BY b.checkin ASC
+    `).all(addDays(today, -60));
+    const rank = r => {
+        const real = r.guest_name && !botLogic.isPlaceholderGuestName(r.guest_name) ? r.guest_name : '';
+        const score = parsedName && real ? nameScore(parsedName, real) : 0;
+        const current = r.checkin <= today && r.checkout >= today;
+        const upcoming = r.checkin > today;
+        return { r, score, group: score ? 0 : current ? 1 : upcoming ? 2 : 3 };
+    };
+    return rows.map(rank).sort((a, b) => {
+        if (a.group !== b.group) return a.group - b.group;
+        if (a.score !== b.score) return b.score - a.score;
+        if (a.group === 3) return b.r.checkout.localeCompare(a.r.checkout); // past: newest first
+        return a.r.checkin.localeCompare(b.r.checkin);
+    }).map(x => ({ ...x.r, match: x.score }));
+}
+
+function bookingLabel(b) {
+    const name = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '❓ ohne Namen';
+    return `${fmtDate(b.checkin).slice(0, 6)}–${fmtDate(b.checkout).slice(0, 6)} · ${name}`;
+}
+
+function addressFieldsText(p) {
+    const line = (icon, label, value) => value ? `${icon} <b>${label}:</b> ${esc(value)}\n` : '';
+    let t = '';
+    t += line('👤', 'Name', p.name);
+    t += line('🏢', 'Firma', p.company);
+    t += line('🏠', 'Straße', p.street);
+    t += line('🔢', 'Hausnummer', p.houseNumber);
+    t += line('➕', 'Zusatz', p.extra);
+    t += line('📮', 'PLZ', p.zip);
+    t += line('🏙', 'Ort', p.city);
+    if (p.state) t += line('🗺', 'Bundesstaat', p.state);
+    t += line('🌍', 'Land', p.country);
+    t += line('📞', 'Telefon', p.phone);
+    t += line('✉️', 'E-Mail', p.email);
+    if (p.unknown && p.unknown.length) t += `❔ <b>Nicht zugeordnet:</b> ${esc(p.unknown.join(' · '))}\n`;
+    return t || '—\n';
+}
+
+/** True when a message without command should go to "Anschrift einfügen" instead of the invoice dialog. */
+function isAddressText(body) {
+    if (/^\/?(rechnung|pin)\b/i.test(body)) return false;
+    const dates = botLogic.parseDates(body.replace(/\n/g, ' '));
+    if (dates.matched) return false;
+    if (addressParser.looksLikeAddress(body)) return true;
+    // Contact data only (Booking.com shows no street): name + phone or e-mail in several lines
+    const p = addressParser.parseAddress(body);
+    return body.includes('\n') && Boolean(p.name && (p.phone || p.email) && !p.unknown.length);
+}
+
+async function startAddressFlow(bot, chatId, bookingId, silent) {
+    const old = sessions.get(chatId);
+    if (old && old.lastMsgId) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: old.lastMsgId }).catch(() => { });
+    const session = { flow: 'address', step: 'await', bookingId: bookingId || null, fixedBooking: !!bookingId, parsed: null, raw: '', page: 0, replaceName: false, data: {}, updatedAt: Date.now(), lastMsgId: null, busy: false };
+    sessions.set(chatId, session);
+    if (silent) return session;
+    let intro = '';
+    if (bookingId) {
+        const b = getBookingRow(bookingId);
+        if (!b) { sessions.delete(chatId); return send(bot, chatId, '⚠️ Diese Buchung existiert nicht mehr.', menuOnlyKeyboard()); }
+        intro = `Buchung: <b>${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}</b>${b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? ` · ${esc(b.guest_name)}` : ''}\n\n`;
+    }
+    return send(bot, chatId,
+        '📇 <b>Anschrift einfügen</b>\n\n' + intro +
+        'Schick mir die Anschrift einfach so, wie du sie hast, z. B. aus Booking.com kopiert. Format egal, eine oder mehrere Zeilen:\n' +
+        '<code>Max Mustermann\nMusterstr. 12a\n12345 Musterstadt\n+49 170 1234567\nmax@example.de</code>\n\n' +
+        'Oder schick einfach einen 📷 <b>Screenshot</b> (z. B. aus der Booking.com-App). Er wird nach dem Speichern wieder gelöscht.\n\n' +
+        'Ich erkenne Name, Straße, Hausnummer, PLZ, Ort, Land, Telefon und E-Mail.',
+        keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
+}
+
+/** Parses the text, then asks for the booking (or goes straight to the summary when it is known). */
+async function handleAddressText(bot, chatId, session, body, fromScreenshot) {
+    touch(session);
+    const p = addressParser.parseAddress(body);
+    if (fromScreenshot) {
+        preferKnownGuestName(p, body);
+        p.unknown = []; // headings and buttons of the app, not worth showing
+    }
+    if (!p.street && !p.zip && !p.city && !p.phone && !p.email) {
+        return send(bot, chatId,
+            fromScreenshot
+                ? '🤔 Auf dem Screenshot habe ich keine Anschrift gefunden.\nAm besten so zuschneiden, dass Name und Adresse gut lesbar sind, oder die Anschrift als Text schicken.'
+                : '🤔 Darin habe ich keine Anschrift gefunden.\nBitte mindestens Straße oder PLZ und Ort mitschicken, gern mehrzeilig.',
+            keyboard([[btn('❌ Abbrechen', 'cancel')]]), session);
+    }
+    if (!fromScreenshot) session.photoMsgId = null;
+    session.original = { ...p };
+    session.geo = null;
+    session.geoOff = false;
+    await runGeoCheck(bot, chatId, session, p);
+    session.parsed = p;
+    session.raw = body;
+    session.page = 0;
+    session.replaceName = false;
+    if (session.bookingId) return showAddressConfirm(bot, chatId, session);
+    return showAddressBookings(bot, chatId, session);
+}
+
+/** Looks the address up on OpenStreetMap and fills/corrects what is safe (see geo-check.js). Never blocks saving. */
+async function runGeoCheck(bot, chatId, session, p) {
+    if (!p.street && !p.city && !p.zip) return;
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    try {
+        const r = await Promise.race([geoCheck.check(p), new Promise(res => setTimeout(() => res('timeout'), 25000))]);
+        if (r === 'timeout' || !r) { session.geo = r === 'timeout' ? { error: true, reason: 'Kartendienst antwortet nicht rechtzeitig' } : null; return; }
+        if (r.error) { console.warn('[TG] Kartenabgleich nicht möglich:', r.reason); session.geo = r; return; }
+        session.geo = r;
+        if (r.changes && Object.keys(r.changes).length) {
+            Object.assign(p, r.changes);
+            p.address = addressParser.formatAddress(p);
+        }
+    } catch (e) {
+        console.warn('[TG] Kartenabgleich nicht möglich:', e.message);
+        session.geo = { error: true, reason: geoCheck.reasonOf(e) };
+    }
+}
+
+function geoText(session) {
+    const g = session.geo;
+    if (session.geoOff) return '🗺 <i>Ohne Kartenabgleich (so wie erkannt).</i>\n';
+    if (!g) return '';
+    if (g.error) return `🗺 <i>Kartenabgleich gerade nicht möglich${g.reason ? ` (${esc(g.reason)})` : ''}. Die Anschrift bleibt so wie erkannt.</i>\n`;
+    if (g.ambiguous) return '🗺 Diese Straße gibt es in mehreren Orten. Bitte PLZ oder Ort mitschicken.\n';
+    if (!g.found) return '🗺 Auf der Karte (OpenStreetMap) nicht gefunden, bitte kurz prüfen.\n';
+    let t = g.fills.length ? `🗺 Mit OpenStreetMap abgeglichen, von der Karte übernommen: ${esc(g.fills.join(', '))}.\n` : '🗺 Auf der Karte (OpenStreetMap) gefunden ✓\n';
+    if (g.suggest) {
+        const parts = [];
+        if (g.suggest.street) parts.push(`Straße „${esc(g.suggest.street)}“`);
+        if (g.suggest.zip) parts.push(`PLZ ${esc(g.suggest.zip)}`);
+        if (g.suggest.city) parts.push(`Ort „${esc(g.suggest.city)}“`);
+        t += `⚠️ Laut Karte eher: ${parts.join(', ')}.\n`;
+    }
+    return t;
+}
+
+function geoButtons(session) {
+    const g = session.geo;
+    const rows = [];
+    if (!g || g.error || session.geoOff) {
+        if (session.geoOff) rows.push([btn('🗺 Kartenabgleich wieder an', 'ageo:on')]);
+        return rows;
+    }
+    if (g.suggest) rows.push([btn('🗺 Werte von der Karte übernehmen', 'ageo:map')]);
+    if (g.changes && Object.keys(g.changes).length) rows.push([btn('↩️ Ohne Kartenabgleich', 'ageo:off')]);
+    return rows;
+}
+
+/** Buttons under the summary: map values, original values, or back to the map result. */
+async function applyGeoChoice(bot, chatId, session, choice) {
+    const p = session.parsed;
+    const g = session.geo || {};
+    if (choice === 'off') {
+        session.parsed = { ...session.original, name: p.name };
+        session.geoOff = true;
+    } else if (choice === 'on') {
+        session.parsed = { ...session.original, name: p.name, ...(g.changes || {}) };
+        session.geoOff = false;
+    } else if (choice === 'map' && g.suggest) {
+        Object.assign(p, g.suggest, g.changes || {});
+        g.changes = { ...(g.changes || {}), ...g.suggest };
+        g.fills = [...new Set([...(g.fills || []), ...Object.keys(g.suggest).map(k => ({ street: 'Straße', zip: 'PLZ', city: 'Ort' }[k]))])];
+        g.suggest = null;
+    }
+    session.parsed.address = addressParser.formatAddress(session.parsed);
+    return session.step === 'confirm' ? showAddressConfirm(bot, chatId, session) : showAddressBookings(bot, chatId, session);
+}
+
+async function showAddressBookings(bot, chatId, session) {
+    session.step = 'pick';
+    touch(session);
+    const p = session.parsed;
+    let list = [];
+    try { list = addressCandidates(p.name); } catch (e) { console.error('[TG] Buchungen für Anschrift:', e.message); }
+    const shown = list.slice(session.page * ADDRESS_PAGE, (session.page + 1) * ADDRESS_PAGE);
+    let text = '📇 <b>Anschrift erkannt</b>\n\n' + addressFieldsText(p) + geoText(session) + '\n';
+    if (!list.length) {
+        text += '⚠️ Es gibt keine aktuelle oder kürzliche Buchung, zu der ich das speichern kann.';
+        return send(bot, chatId, text, keyboard([[btn('🏠 Hauptmenü', 'menu')]]), session);
+    }
+    text += '<b>Zu welcher Buchung gehört das?</b>';
+    if (session.page === 0 && list[0].match) text += '\n⭐ = Name passt';
+    const rows = shown.map(b => [btn(`${b.match ? '⭐ ' : ''}${short(bookingLabel(b), 40)}`, `ab:${b.id}`)]);
+    const nav = [];
+    if (session.page > 0) nav.push(btn('⬅️ Vorherige', 'ab:prev'));
+    if (list.length > (session.page + 1) * ADDRESS_PAGE) nav.push(btn('Weitere ➡️', 'ab:next'));
+    if (nav.length) rows.push(nav);
+    rows.push(...geoButtons(session));
+    rows.push([btn('🧾 Stattdessen Rechnung erstellen', 'ab:inv')]);
+    rows.push([btn('❌ Abbrechen', 'cancel')]);
+    return send(bot, chatId, text, keyboard(rows), session);
+}
+
+async function showAddressConfirm(bot, chatId, session) {
+    session.step = 'confirm';
+    touch(session);
+    const b = getBookingRow(session.bookingId);
+    if (!b) {
+        session.bookingId = null;
+        session.fixedBooking = false;
+        return showAddressBookings(bot, chatId, session);
+    }
+    const p = session.parsed;
+    const current = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
+    const guest = b.guest_id ? db.getGuestById(b.guest_id) : null;
+    const differs = current && p.name && nameScore(current, p.name) < 2;
+
+    let text = `📇 <b>Anschrift speichern</b>\n\n📅 Buchung <b>${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}</b>\n\n`;
+    text += addressFieldsText(p) + geoText(session);
+    text += '\n<b>So steht es dann beim Gast:</b>\n';
+    const name = (!current || (differs && session.replaceName)) ? p.name : current;
+    text += `<code>${esc([name || '❓', p.address].filter(Boolean).join('\n'))}</code>\n`;
+    if (p.phone) text += `📞 ${esc(p.phone)}\n`;
+    if (p.email) text += `✉️ ${esc(p.email)}\n`;
+
+    const notes = [];
+    if (!current && !p.name) notes.push('⚠️ <b>Kein Name erkannt</b> und die Buchung hat noch keinen. Bitte die Anschrift mit dem Namen in der ersten Zeile erneut schicken.');
+    if (differs) notes.push(session.replaceName
+        ? `👤 Der Gastname wird von „${esc(current)}“ auf „${esc(p.name)}“ geändert (auch im Türcode).`
+        : `👤 In der Buchung steht „${esc(current)}“. Der Name bleibt so, außer du tippst auf „Name übernehmen“.`);
+    if (guest && guest.address && p.address && guest.address.trim() !== p.address.trim()) {
+        notes.push(`ℹ️ Bisherige Adresse wird ersetzt: ${esc(guest.address.replace(/\n/g, ', '))}`);
+    }
+    if (!current && p.name) notes.push(`👤 Die Buchung bekommt den Namen „${esc(p.name)}“ (auch im Türcode).`);
+    if (notes.length) text += '\n' + notes.join('\n');
+
+    const rows = [];
+    if (current || p.name) rows.push([btn('✅ Speichern', 'aok')]);
+    rows.push(...geoButtons(session));
+    if (differs) rows.push([btn(session.replaceName ? `↩️ Name „${short(current, 18)}“ behalten` : `👤 Name „${short(p.name, 18)}“ übernehmen`, 'aname')]);
+    rows.push(session.fixedBooking ? [btn('❌ Abbrechen', 'cancel')] : [btn('⬅️ Andere Buchung', 'aback'), btn('❌ Abbrechen', 'cancel')]);
+    return send(bot, chatId, text, keyboard(rows), session);
+}
+
+async function executeAddress(bot, chatId, session, q) {
+    if (session.busy) return;
+    session.busy = true;
+    touch(session);
+    try {
+        const p = session.parsed;
+        const b = getBookingRow(session.bookingId);
+        if (!b) throw new Error('Die Buchung existiert nicht mehr.');
+        const current = b.guest_name && !botLogic.isPlaceholderGuestName(b.guest_name) ? b.guest_name : '';
+        const differs = current && p.name && nameScore(current, p.name) < 2;
+        let guestId = b.guest_id;
+        let nukiNote = '';
+        if (!current || (differs && session.replaceName)) {
+            if (!p.name) throw new Error('Kein Name erkannt.');
+            await setProgress(bot, q, session, chatId, '⏳ <b>Wird gespeichert …</b>');
+            const r = await botLogic.applyGuestName(b.id, p.name);
+            guestId = r.guestId;
+            if (r.booking.nuki_auth_id && !r.nukiRenamed) nukiNote = `\n⚠️ Der Türcode konnte in Nuki nicht umbenannt werden: ${esc(short(r.nukiError || '', 100))}`;
+        }
+        const g = db.getGuestById(guestId);
+        if (!g) throw new Error('Gast nicht gefunden.');
+        db.updateGuest(g.id, {
+            ...g,
+            address: p.address || g.address,
+            phone: p.phone || g.phone,
+            email: p.email || g.email
+        });
+        sessions.delete(chatId);
+        if (q && q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+        console.log(`📇 Anschrift für Gast ${g.id} (Buchung ${b.id}) per Telegram gespeichert`);
+        botLogic.guestDataSaved(b.id); // e.g. the automatic print waits for these details
+        let photoNote = '';
+        if (session.photoMsgId) {
+            const ok = await bot.deleteMessage(chatId, session.photoMsgId).then(() => true).catch(() => false);
+            photoNote = ok ? '\n🗑 Der Screenshot wurde aus dem Chat gelöscht.' : '\nℹ️ Den Screenshot konnte ich nicht löschen (nach 48 Std. geht das nicht mehr), bitte selbst entfernen.';
+        }
+        const saved = db.getGuestById(g.id);
+        const text = `✅ <b>Gespeichert bei ${esc(saved.name)}</b>\n📅 ${fmtDate(b.checkin)} – ${fmtDate(b.checkout)}\n\n` +
+            `<code>${esc([saved.name, saved.address].filter(Boolean).join('\n'))}</code>` +
+            (saved.phone ? `\n📞 ${esc(saved.phone)}` : '') + (saved.email ? `\n✉️ ${esc(saved.email)}` : '') + nukiNote + photoNote +
+            '\n\nDie Anschrift steht jetzt in der Gästeliste und wird bei der nächsten Rechnung automatisch eingesetzt.';
+        return send(bot, chatId, text, keyboard([[btn('🧾 Rechnung erstellen', `inv:${b.id}`)], [btn('📇 Weitere Anschrift', 'adr'), btn('🏠 Hauptmenü', 'menu')]]));
+    } catch (e) {
+        console.error('[TG] Anschrift speichern:', e);
+        session.busy = false;
+        return send(bot, chatId, `❌ <b>Fehler:</b> ${esc(e.message)}`, keyboard([[btn('🔁 Erneut versuchen', 'aok')], [btn('❌ Abbrechen', 'cancel')]]), session);
+    }
+}
+
+/** Text while the address dialog is open: a new address replaces the old one, anything else shows the step again. */
+async function handleAddressInput(bot, chatId, session, body) {
+    if (session.step === 'await') return handleAddressText(bot, chatId, session, body);
+    const p = addressParser.parseAddress(body);
+    if (p.street || p.zip || p.phone || p.email) return handleAddressText(bot, chatId, session, body);
+    return session.step === 'confirm' ? showAddressConfirm(bot, chatId, session) : showAddressBookings(bot, chatId, session);
+}
+
+async function addressBack(bot, chatId, session) {
+    if (session.step === 'confirm' && !session.fixedBooking) {
+        session.bookingId = null;
+        return showAddressBookings(bot, chatId, session);
+    }
+    return cancelSession(bot, chatId, session, false);
+}
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function isImageDocument(msg) {
+    return Boolean(msg.document && /^image\/(png|jpe?g|webp|bmp|tiff?)$/i.test(msg.document.mime_type || ''));
+}
+
+/** Screenshots: the guest name of a booking that shows up in the text beats a guessed name (OCR adds noise lines). */
+function preferKnownGuestName(p, text) {
+    try {
+        const names = [...new Set(addressCandidates(null).map(b => b.guest_name).filter(n => n && !botLogic.isPlaceholderGuestName(n)))];
+        const lines = String(text).split('\n');
+        const hit = names.find(n => lines.some(l => nameScore(l, n) === 2));
+        if (hit && nameScore(p.name, hit) < 2) p.name = hit;
+    } catch (e) { /* best-effort */ }
+}
+
+function receiptAutoDetect() {
+    try { return hooks.receipts ? hooks.receipts().getConfig().askInBot !== false : false; } catch (e) { return false; }
+}
+
+function isPdfDocument(msg) {
+    return Boolean(msg.document && (/pdf/i.test(msg.document.mime_type || '') || /\.pdf$/i.test(msg.document.file_name || '')));
+}
+
+/**
+ * Photo, image file or PDF sent to the bot. Two uses:
+ *  - Beleg (Kassenbon/Rechnung): PDFs always, photos with a caption like "Beleg", during /beleg, or when the text
+ *    on the photo looks like a receipt -> tg-receipts.js (asks before saving)
+ *  - Anschrift-Screenshot: read the text on it (on this server, see screenshot-ocr.js) and continue like a pasted
+ *    address. The image is only kept in a temp file during recognition; after saving, the photo message is deleted.
+ */
+async function processPhoto(bot, msg) {
+    const chatId = msg.chat.id;
+    if (!db.isTelegramIdAuthorized(chatId)) {
+        return send(bot, chatId, '⛔ <b>Zugriff verweigert</b>\n\nBitte sende <code>/register</code>, um eine Zugangsanfrage zu stellen.');
+    }
+    const perms = botPerms(chatId);
+    const canReceipt = permissions.canBot(perms, 'beleg');
+    const canAddress = permissions.canBot(perms, 'adresse');
+    if (!canReceipt && !canAddress) return send(bot, chatId, DENIED);
+    const file = msg.photo ? msg.photo[msg.photo.length - 1] : msg.document;
+    if (!file) return;
+
+    let session = getActiveSession(chatId);
+    const active = session && session !== 'expired' ? session : null;
+    if (active && active.busy) return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
+
+    const pdf = isPdfDocument(msg);
+    const caption = (msg.caption || '').trim();
+    let mode = null;
+    if (pdf) mode = 'receipt';
+    else if (active && active.flow === 'receipt') mode = 'receipt';
+    else if (active && active.flow === 'address') mode = 'address';
+    else if (/\b(beleg|quittung|kassenbon|bon|ausgabe|einkauf|rechnung)\b/i.test(caption)) mode = 'receipt';
+    else if (/\b(adresse|anschrift|gast|gastdaten)\b/i.test(caption)) mode = 'address';
+    if (!canAddress && mode !== 'receipt') mode = 'receipt';
+    if (mode === 'receipt' && !canReceipt) {
+        if (pdf || !canAddress) return send(bot, chatId, DENIED);
+        mode = 'address';
+    }
+    const limit = mode === 'address' ? MAX_IMAGE_BYTES : 20 * 1024 * 1024;
+    if (file.file_size && file.file_size > limit) {
+        return send(bot, chatId, `⚠️ Die Datei ist zu groß (max. ${Math.round(limit / 1048576)} MB). Bitte als normales Foto schicken.`);
+    }
+    console.log(`[TG] ${pdf ? 'PDF' : 'Bild'} von [${chatId}] (${mode || 'erkennen'})`);
+    const who = msg.from && (msg.from.username || msg.from.first_name);
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), tgReceipts.TMP_PREFIX));
+    let filePath;
+    try {
+        filePath = await bot.downloadFile(file.file_id, tmpDir);
+    } catch (e) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        console.error('[TG] Datei laden fehlgeschlagen:', e.message);
+        return send(bot, chatId, `❌ Die Datei konnte nicht von Telegram geladen werden: ${esc(short(e.message, 120))}`);
+    }
+    const mime = msg.document ? (msg.document.mime_type || (pdf ? 'application/pdf' : 'image/jpeg')) : 'image/jpeg';
+    const name = msg.document && msg.document.file_name ? msg.document.file_name : path.basename(filePath);
+
+    if (mode === 'receipt') {
+        return tgReceipts.fromFile(bot, chatId, { filePath, mime, name, tmpDir }, who);
+    }
+
+    // Text lesen, dann entscheiden (Beleg oder Anschrift)
+    if (active && active.flow === 'address') active.busy = true;
+    const waitMsg = await send(bot, chatId, '🔍 <b>Ich lese das Bild …</b>\nDas dauert ein paar Sekunden.');
+    bot.sendChatAction(chatId, 'typing').catch(() => { });
+    let text = '';
+    let raw = '';
+    try {
+        const r = await ocr.recognize(filePath);
+        text = r.text;
+        raw = r.raw || r.text;
+    } catch (e) {
+        console.error('[TG] Texterkennung fehlgeschlagen:', e.message);
+        if (active && active.flow === 'address') active.busy = false;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        if (waitMsg) bot.deleteMessage(chatId, waitMsg.message_id).catch(() => { });
+        return send(bot, chatId, `❌ <b>Das Bild konnte nicht gelesen werden.</b>\n${esc(short(e.message, 160))}\n\nDu kannst die Anschrift auch als Text schicken.`, menuOnlyKeyboard());
+    }
+    if (waitMsg) bot.deleteMessage(chatId, waitMsg.message_id).catch(() => { });
+
+    if (mode === null && canReceipt && receiptAutoDetect() && require('./receipt-scan').looksLikeReceipt(raw)) {
+        if (active && active.flow === 'address') active.busy = false;
+        return tgReceipts.fromFile(bot, chatId, { filePath, mime, name, tmpDir, text: raw }, who);
+    }
+    // The image is not kept on the server
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    session = getActiveSession(chatId);
+    if (!session || session === 'expired' || session.flow !== 'address') {
+        if (session && session !== 'expired') await cancelSession(bot, chatId, session, true);
+        session = await startAddressFlow(bot, chatId, null, true);
+    } else if (session.step !== 'await' && !session.fixedBooking) {
+        session.bookingId = null;
+    }
+    session.busy = false;
+    session.photoMsgId = msg.message_id;
+    const cap = caption ? `${caption}\n` : '';
+    return handleAddressText(bot, chatId, session, cap + text, true);
+}
+
+/**
+ * Invoice dialog: only the real address goes into the invoice, never the rest of a pasted text
+ * (Booking.com copies carry the listing title, adults, language …). Recognized street + town -> clean block.
+ * Otherwise a short typed address stays as typed; a longer text that is no address returns '' so the bot asks.
+ */
+function tidyAddress(text, { strict = false } = {}) {
+    const typed = String(text || '').split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+    if (!typed) return '';
+    const p = addressParser.parseAddress(typed);
+    if (p.street && (p.zip || p.city || p.country)) return p.address;
+    if (strict) return '';
+    return typed.split('\n').length <= 4 ? typed : '';
 }
 
 // ---------------------------------------------------------------------------
@@ -764,7 +1341,11 @@ function applyInput(session, step, textRaw) {
             if (text.length < 5 || text.length > 300) {
                 return { ok: false, error: '⚠️ Die Adresse wirkt zu kurz. Bitte Straße, PLZ und Ort angeben.' };
             }
-            d.gAdresse = text.split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+            const clean = tidyAddress(text);
+            if (!clean) return { ok: false, error: '⚠️ Darin habe ich keine Anschrift gefunden. Bitte Straße mit Hausnummer, PLZ und Ort schicken.' };
+            d.gAdresse = clean;
+            const parsed = addressParser.parseAddress(text);
+            if (parsed.email && d.gEmail === undefined) d.gEmail = parsed.email;
             return { ok: true };
         }
         case 'email': {
@@ -802,6 +1383,7 @@ function applyInput(session, step, textRaw) {
 // Navigation: Zurück / Abbrechen
 // ---------------------------------------------------------------------------
 async function cancelSession(bot, chatId, session, silent) {
+    if (session && session.flow === 'receipt') tgReceipts.cleanup(session);
     if (session && session.lastMsgId) {
         bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: session.lastMsgId }).catch(() => { });
     }
@@ -851,6 +1433,15 @@ async function startFlow(bot, chatId, flowName, initialText, prefill) {
         departure: parsed.departure || ''
     };
     if (flowName === 'invoice' && parsed.gEmail) data.gEmail = parsed.gEmail;
+    if (flowName === 'invoice' && initialText) {
+        // Address from the whole text (labels like "Adresse" / "Land/Region" are understood), dates are already out
+        const m = botLogic.parseDates(initialText.replace(/\n/g, ' ')).matched;
+        const flatIdx = m ? initialText.replace(/\n/g, ' ').indexOf(m) : -1;
+        const work = flatIdx >= 0 ? initialText.slice(0, flatIdx) + '\n' + initialText.slice(flatIdx + m.length) : initialText;
+        const addr = addressParser.parseAddress(work);
+        data.gAdresse = addr.street && (addr.zip || addr.city || addr.country) ? addr.address : tidyAddress(data.gAdresse, { strict: data.gAdresse.split('\n').length > 4 });
+        if (!data.gEmail && addr.email) data.gEmail = addr.email;
+    }
     if (prefill) Object.assign(data, prefill);
 
     const session = { flow: flowName, step: null, data, updatedAt: Date.now(), lastMsgId: null, sequential: false, editing: false, busy: false };
@@ -897,6 +1488,9 @@ async function executeSession(bot, chatId, session, q) {
             bot.sendChatAction(chatId, 'upload_document').catch(() => { });
 
             const invoiceData = await botLogic.finalizeInvoiceData(data);
+            if (data.bookingId) invoiceData.bookingId = data.bookingId;
+            try { await addressCheck.bindInvoiceGuest(invoiceData); }
+            catch (e) { console.warn('[TG] Rechnung: Gast der Buchung nicht zuordenbar:', e.message); }
             db.saveInvoice(invoiceData);
             const { filePath } = await botLogic.generateInvoicePdf(invoiceData);
             try {
@@ -960,7 +1554,7 @@ async function createOrReusePin(data) {
 // ---------------------------------------------------------------------------
 // Befehlserkennung
 // ---------------------------------------------------------------------------
-const COMMAND_RE = /^\/?(rechnung|pin|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
+const COMMAND_RE = /^\/?(rechnung|pin|adresse|anschrift|beleg|quittung|ausgabe|ausgaben|sync|namen|codes|türcodes|tuercodes|status|offen|anreisen|nachricht|hilfe|help|start|menü|menu|register|abbrechen|zurück|zurueck)(?:@\w+)?(?=$|[\s:,.-])[:\s,.-]*/i;
 
 /** Erkennt NUR Wörter am Textanfang (kein includes() mehr -> "Pinar Müller" löst keinen PIN-Befehl aus). */
 function detectCommand(body) {
@@ -974,6 +1568,7 @@ function detectCommand(body) {
 // ---------------------------------------------------------------------------
 async function processMessage(bot, msg) {
     const chatId = msg.chat.id;
+    if (!msg.text && (msg.photo || isImageDocument(msg) || isPdfDocument(msg))) return processPhoto(bot, msg);
     const body = msg.text ? msg.text.trim() : '';
     if (!body) return;
 
@@ -1015,7 +1610,10 @@ async function processMessage(bot, msg) {
     // --- Globale Navigation (in jedem Schritt) ---
     if (active) {
         if (CANCEL_WORDS.has(lower)) return cancelSession(bot, chatId, active, false);
-        if (BACK_WORDS.has(lower)) return goBack(bot, chatId, active);
+        if (BACK_WORDS.has(lower)) {
+            if (active.flow === 'receipt') return tgReceipts.handleCallback(bot, chatId, active, 'rc:back');
+            return active.flow === 'address' ? addressBack(bot, chatId, active) : goBack(bot, chatId, active);
+        }
         if (MENU_WORDS.has(lower)) return cancelSession(bot, chatId, active, false);
     } else if (BACK_WORDS.has(lower) || CANCEL_WORDS.has(lower) || MENU_WORDS.has(lower)) {
         return showMenu(bot, chatId);
@@ -1032,12 +1630,30 @@ async function processMessage(bot, msg) {
         return showLockStatus(bot, chatId);
     }
 
+    // Server-Status (Server-Wächter): /server
+    if (/^\/(server|serverstatus)(?:@\w+)?$/i.test(body)) {
+        if (!allowed('server')) return send(bot, chatId, DENIED);
+        if (active) await cancelSession(bot, chatId, active, true);
+        return send(bot, chatId, hooks.serverText ? hooks.serverText() : 'Server-Status ist gerade nicht verfügbar.', menuOnlyKeyboard());
+    }
+
     // Jahresrückblick: /jahr oder /jahr 2025 (ohne Jahr: laufendes Jahr, im Januar das Vorjahr)
     const yearCmd = body.match(/^\/(jahr|rueckblick|rückblick)(?:@\w+)?(?:\s+(\d{4}))?$/i);
     if (yearCmd) {
         if (!allowed('review')) return send(bot, chatId, DENIED);
         if (active) await cancelSession(bot, chatId, active, true);
         return showYearReview(bot, chatId, yearCmd[2] ? parseInt(yearCmd[2], 10) : null);
+    }
+
+    // WLAN-Codes: /wlan, /wlan 3, /wlan 4h Handwerker
+    const wifiCmd = body.match(/^\/(wlan|wifi)(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+    if (wifiCmd) {
+        if (!allowed('wlan')) return send(bot, chatId, DENIED);
+        if (active) await cancelSession(bot, chatId, active, true);
+        if (!wifiCmd[2]) return showWifiCodes(bot, chatId);
+        const a = parseWifiArg(wifiCmd[2]);
+        if (!a) return showWifiCodes(bot, chatId, '🤔 Dauer nicht erkannt. Beispiele: <code>/wlan 3</code> (3 Tage), <code>/wlan 4h</code>, <code>/wlan 1w Eltern</code>');
+        return createWifiCode(bot, chatId, a.hours, a.note, msg.from && (msg.from.username || msg.from.first_name));
     }
 
     let cmd = detectCommand(body);
@@ -1083,17 +1699,44 @@ async function processMessage(bot, msg) {
                 return startFlow(bot, chatId, 'invoice', cmd.rest);
             case 'pin':
                 return startFlow(bot, chatId, 'pin', cmd.rest);
+            case 'beleg':
+            case 'quittung':
+            case 'ausgabe':
+                if (active) await cancelSession(bot, chatId, active, true);
+                return cmd.rest ? tgReceipts.fromText(bot, chatId, cmd.rest) : tgReceipts.askForPhoto(bot, chatId);
+            case 'ausgaben':
+                return tgReceipts.showExpenses(bot, chatId);
+            case 'adresse':
+            case 'anschrift': {
+                if (active) await cancelSession(bot, chatId, active, true);
+                if (!cmd.rest) return startAddressFlow(bot, chatId, null);
+                await startAddressFlow(bot, chatId, null, true);
+                return handleAddressText(bot, chatId, sessions.get(chatId), cmd.rest);
+            }
             default:
                 break;
         }
     }
 
     // --- Antwort in laufendem Dialog ---
+    if (active && !active.busy && active.flow === 'receipt') {
+        return tgReceipts.handleInput(bot, chatId, active, body);
+    }
+    if (active && !active.busy && active.flow === 'address') {
+        return handleAddressInput(bot, chatId, active, body);
+    }
     if (active && !active.busy) {
         return handleStepInput(bot, chatId, active, body);
     }
     if (active && active.busy) {
         return send(bot, chatId, '⏳ Einen Moment bitte – ich bin noch am Arbeiten.');
+    }
+
+    // --- Freitext ohne Befehl: eingefügte Anschrift (ohne Datum) -> beim Gast speichern ---
+    if (isAddressText(body)) {
+        if (!allowed('adresse')) return send(bot, chatId, DENIED);
+        await startAddressFlow(bot, chatId, null, true);
+        return handleAddressText(bot, chatId, sessions.get(chatId), body);
     }
 
     // --- Freitext ohne Befehl: Buchungstext erkennen (mehrzeilig oder mit Datum) ---
@@ -1160,7 +1803,8 @@ async function processCallback(bot, q) {
     const active = session && session !== 'expired' ? session : null;
 
     // Alte Buttons, die nicht mehr zu einer Session passen
-    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit'].includes(data) || data.startsWith('ef:');
+    const needsSession = ['keep', 'skip', 'back', 'cancel', 'ok', 'edit', 'aok', 'aname', 'aback'].includes(data) || data.startsWith('ef:') || data.startsWith('ab:') || data.startsWith('ageo:')
+        || (data.startsWith('rc:') && data !== 'rc:new' && data !== 'rc:list');
     if (needsSession && !active) {
         await answer(session === 'expired' ? '⏱ Abgelaufen' : 'Vorgang nicht mehr aktiv');
         // Buttons der alten Nachricht entfernen
@@ -1223,8 +1867,8 @@ async function processCallback(bot, q) {
                 return runLockAction(bot, chatId, data === 'lock:auf!' ? 'unlock' : 'unlatch', who);
             case data === 'gm':
                 return showGuestMessageList(bot, chatId);
-            case data.startsWith('gm:en:'):
-                return showGuestMessage(bot, chatId, parseInt(data.slice(6), 10), 'en');
+            case /^gm:(de|en|nl|pl):/.test(data):
+                return showGuestMessage(bot, chatId, parseInt(data.slice(6), 10), data.slice(3, 5));
             case data.startsWith('gm:'):
                 return showGuestMessage(bot, chatId, parseInt(data.slice(3), 10));
             case data.startsWith('gl:new?:'):
@@ -1236,6 +1880,52 @@ async function processCallback(bot, q) {
                 return blockGuestLink(bot, chatId, parseInt(data.slice(7), 10));
             case data.startsWith('nm:'):
                 return startNameFlow(bot, chatId, parseInt(data.slice(3), 10));
+            case data === 'adr':
+                return startAddressFlow(bot, chatId, null);
+            case data.startsWith('adr:'):
+                return startAddressFlow(bot, chatId, parseInt(data.slice(4), 10));
+            case data.startsWith('ab:'): {
+                if (active.flow !== 'address' || !active.parsed) return;
+                const arg = data.slice(3);
+                if (arg === 'next') { active.page++; return showAddressBookings(bot, chatId, active); }
+                if (arg === 'prev') { active.page = Math.max(0, active.page - 1); return showAddressBookings(bot, chatId, active); }
+                if (arg === 'inv') {
+                    if (!permissions.canBot(botPerms(chatId), 'rechnung')) return send(bot, chatId, DENIED);
+                    const raw = active.raw;
+                    await cancelSession(bot, chatId, active, true);
+                    return startFlow(bot, chatId, 'invoice', raw);
+                }
+                active.bookingId = parseInt(arg, 10);
+                active.replaceName = false;
+                return showAddressConfirm(bot, chatId, active);
+            }
+            case data.startsWith('ageo:'):
+                if (active.flow !== 'address' || !active.parsed) return;
+                return applyGeoChoice(bot, chatId, active, data.slice(5));
+            case data === 'aname':
+                if (active.flow !== 'address' || active.step !== 'confirm') return;
+                active.replaceName = !active.replaceName;
+                return showAddressConfirm(bot, chatId, active);
+            case data === 'aback':
+                if (active.flow !== 'address') return;
+                return addressBack(bot, chatId, active);
+            case data === 'aok':
+                if (active.flow !== 'address' || active.step !== 'confirm') return;
+                return executeAddress(bot, chatId, active, q);
+            case data.startsWith('rc:'):
+                if (data === 'rc:new' && active) await cancelSession(bot, chatId, active, true);
+                return tgReceipts.handleCallback(bot, chatId, data === 'rc:new' || data === 'rc:list' ? null : active, data, who);
+            case data === 'wl':
+                return showWifiCodes(bot, chatId);
+            case data.startsWith('wl:new:'):
+                return createWifiCode(bot, chatId, parseInt(data.slice(7), 10), '', who);
+            case data.startsWith('wl:del:'): {
+                const { portal, error } = wifiPortal();
+                if (error) return send(bot, chatId, `📶 ${esc(error)}`, menuOnlyKeyboard());
+                const row = portal.deleteExtraCode(parseInt(data.slice(7), 10));
+                if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
+                return showWifiCodes(bot, chatId, row ? `🗑 Code <code>${esc(row.code)}</code> gelöscht. Angemeldete Geräte fliegen in spätestens 2 Minuten raus.` : 'Dieser Code war schon gelöscht.');
+            }
             case data.startsWith('ovl:'): {
                 const n = hooks.ackOverlap ? hooks.ackOverlap(data.slice(4)) : 0;
                 if (q.message) bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: q.message.message_id }).catch(() => { });
@@ -1251,7 +1941,7 @@ async function processCallback(bot, q) {
             case data === 'cancel':
                 return cancelSession(bot, chatId, active, false);
             case data === 'back':
-                return goBack(bot, chatId, active);
+                return active.flow === 'address' ? addressBack(bot, chatId, active) : goBack(bot, chatId, active);
 
             case data === 'keep': {
                 if (!isFilled(active.step, active.data)) return;
@@ -1309,6 +1999,7 @@ async function setup(bot, options = {}) {
             { command: 'rechnung', description: 'Neue Rechnung erstellen' },
             { command: 'pin', description: 'Nur Tür-Code erstellen' },
             { command: 'namen', description: 'Gastnamen nachtragen' },
+            { command: 'adresse', description: 'Anschrift eines Gastes einfügen' },
             { command: 'sync', description: 'Kalender jetzt abfragen' },
             { command: 'codes', description: 'Angelegte Türcodes anzeigen' },
             { command: 'status', description: 'Offene Rechnungen anzeigen' },
@@ -1317,6 +2008,10 @@ async function setup(bot, options = {}) {
             { command: 'schloss', description: 'Schloss-Status und Batterie' },
             { command: 'zu', description: 'Tür abschließen' },
             { command: 'jahr', description: 'Jahresrückblick mit Statistik' },
+            { command: 'server', description: 'Server-Status (App, Tunnel, Speicher)' },
+            { command: 'wlan', description: 'WLAN-Codes für Besucher erzeugen' },
+            { command: 'beleg', description: 'Beleg erfassen (Foto oder PDF)' },
+            { command: 'ausgaben', description: 'Ausgaben im Monat und Jahr' },
             { command: 'auf', description: 'Tür aufschließen (mit Rückfrage)' },
             { command: 'abbrechen', description: 'Aktuellen Vorgang abbrechen' },
             { command: 'hilfe', description: 'Hilfe anzeigen' }
@@ -1332,5 +2027,5 @@ module.exports = {
     setup,
     showGuestMessage,
     // für Tests
-    _internal: { sessions, detectCommand, applyInput, FLOWS }
+    _internal: { parseWifiArg, sessions, detectCommand, applyInput, FLOWS, isAddressText, addressCandidates, nameScore }
 };

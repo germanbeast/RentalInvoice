@@ -3,6 +3,7 @@
    =========================== */
 
 const permissions = require('./permissions');
+const serverWatch = require('./server-watch');
 const { exec } = require('child_process');
 const express = require('express');
 const puppeteer = require('puppeteer');
@@ -23,8 +24,11 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const multer = require('multer');
 const db = require('./db');
+const addressCheck = require('./address-check');
+const vouchers = require('./vouchers');
 const waCommands = require('./wa-commands');
 const tgCommands = require('./tg-commands');
+const guestLang = require('./guest-lang');
 const TelegramBot = require('node-telegram-bot-api');
 const packageJson = require('./package.json');
 const { renderEstateReportHtml } = require('./estate-report-template');
@@ -128,6 +132,23 @@ function createPaperlessHttpsAgent() {
 // 1. DATABASE INIT
 // =======================
 db.init();
+vouchers.ensureSchema();
+
+// Ausgaben mit Belegen (Telegram-Foto, Upload, Paperless), siehe receipts.js
+const receipts = require('./receipts')({
+    db, axios,
+    paperlessAgent: () => createPaperlessHttpsAgent(),
+    notify: (msg) => sendToAllRecipients(msg.replace(/<[^>]+>/g, ''), { type: 'expenses' })
+});
+receipts.ensureSchema();
+const receiptUpload = multer({
+    dest: require('os').tmpdir(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (/^(image\/(jpeg|png|webp|heic|heif|gif|tiff|bmp)|application\/pdf)$/i.test(file.mimetype)) return cb(null, true);
+        cb(new Error('Nur Fotos (JPG, PNG, WebP, HEIC) und PDFs erlaubt'));
+    }
+});
 
 // =======================
 // 1b. WhatsApp Web Client
@@ -445,7 +466,7 @@ async function initTelegram() {
         });
 
         // Inline-Buttons (callback_query) + "/"-Befehlsmenü registrieren
-        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
+        tgCommands.setup(tgBot, { syncCalendars: () => runIcalSync({ manual: true }), isOccupied: () => bookingMonitor.isOccupied(), ackOverlap: (k) => bookingMonitor.ackOverlap(k), yearText: (y) => yearReview.text(y), serverText: () => serverWatch.text(), guestMessage: () => guestMessage, guestChatReply: (bot, msg) => guestChat ? guestChat.handleTelegramReply(bot, msg) : false, wifi: () => { try { return guestWifi; } catch (e) { return null; } }, receipts: () => receipts }).catch(e => console.error('❌ Fehler in tgCommands.setup:', e));
 
         tgBot.on('polling_error', (error) => {
             if (error.code === 'ETELEGRAM' && error.message.includes('401')) {
@@ -517,6 +538,7 @@ function pushAllowed(username, type) {
     if (t.startsWith('nuki')) return permissions.can(perms, 'door');
     if (t.startsWith('guest_chat')) return permissions.can(perms, 'messages');
     if (t === 'invoice' || t.startsWith('invoice_')) return permissions.can(perms, 'invoices');
+    if (t === 'expenses') return permissions.can(perms, 'finance');
     return permissions.can(perms, 'calendar');
 }
 
@@ -697,11 +719,14 @@ async function pollIcalFeed(feed, todayYmd, adjusted) {
                 console.warn('⚠️ Auto-Nuki PIN fehlgeschlagen:', ne.message);
             }
 
-            const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}`;
+            // the booking sheet waits until name / screenshot are in, so it prints with the right data
+            const printWaits = !!printJobs.queueBooking(result.id, 'portal');
+            const printMsg = printWaits ? '\n🖨️ Ausdruck folgt, sobald du den Namen oder den Buchungs-Screenshot schickst.' : '';
+            const msg = `🏠 *Neue Buchung (${feed.source})!*\n${summary}\n📅 ${formatDateDE(checkin)} – ${formatDateDE(checkout)}${pinMsg}${printMsg}`;
             // Calendars rarely contain the guest name -> offer to add it right from the Telegram message
             const tgKeyboard = needsName
                 ? { inline_keyboard: [[{ text: '👤 Namen eintragen', callback_data: `nm:${result.id}` }]] }
-                : undefined;
+                : printWaits ? { inline_keyboard: [[{ text: '📇 Anschrift / Screenshot', callback_data: `adr:${result.id}` }]] } : undefined;
             const sent = await sendToAllRecipients(msg, { tgKeyboard, type: 'new_booking' });
             db.logNotification('new_booking', msg, sent ? 'sent' : 'failed');
             await sendGuestMessageToTelegram(result.id);
@@ -937,7 +962,34 @@ cron.schedule('*/10 * * * *', async () => {
 });
 setTimeout(runNukiCleanup, 90 * 1000);
 
-// Job 1d: daily encrypted backup (time + targets under Einstellungen -> Datensicherung, see BACKUP.md)
+// Running under PM2 without the watchdog (e.g. updated from the admin's update button, which does not run
+// update.sh): start it once. WATCHDOG_AUTOSTART=0 in .env turns this off.
+if (process.env.pm_id !== undefined && process.env.WATCHDOG_AUTOSTART !== '0') {
+    setTimeout(() => {
+        exec('pm2 jlist', { timeout: 20000, cwd: __dirname, maxBuffer: 20 * 1024 * 1024 }, (err, stdout) => {
+            if (err) return; // pm2 not callable from here
+            let list;
+            try { const t = String(stdout); list = JSON.parse(t.slice(t.indexOf('['))); } catch (e) { return; }
+            if (!Array.isArray(list) || list.some(p => p && p.name === 'beckhome-watchdog')) return;
+            const script = path.join(__dirname, 'watchdog.js');
+            exec(`pm2 start "${script}" --name beckhome-watchdog --cwd "${__dirname}" && pm2 save`, { timeout: 30000, cwd: __dirname }, (e2, out, errOut) => {
+                if (e2) console.warn('⚠️ Server-Wächter konnte nicht gestartet werden:', String(errOut || e2.message).trim());
+                else console.log('🛡️ Server-Wächter in PM2 gestartet (beckhome-watchdog)');
+            });
+        });
+    }, 60 * 1000);
+}
+
+// Job 1d: is the server watchdog (own PM2 process, reports app/tunnel outages) still running? - every 10 minutes
+cron.schedule('*/10 * * * *', () => {
+    serverWatch.check(async (msg, type) => {
+        const sent = await sendToAllRecipients(msg, { type });
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    }, { get: () => db.getSetting('watchdog_alert'), set: v => db.setSetting('watchdog_alert', v) })
+        .catch(e => console.error('\u274c Server-Wächter-Prüfung Fehler:', e.message));
+});
+
+// Job 1e: daily encrypted backup (time + targets under Einstellungen -> Datensicherung, see BACKUP.md)
 const backup = require('./backup');
 backup.init({
     db,
@@ -1107,7 +1159,10 @@ const globalLimiter = rateLimit({
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'Zu viele Anfragen. Bitte warten.' }
+    message: { error: 'Zu viele Anfragen. Bitte warten.' },
+    // The guest Wi-Fi router (openNDS authmon) polls /wlan about once a second from the house's shared IP;
+    // those requests are checked by gateway hash / HMAC in wifi-portal.js and must never get a 429.
+    skip: (req) => /^\/(gast\/)?wlan\.?$/.test(req.path)
 });
 app.use(globalLimiter);
 
@@ -1143,7 +1198,7 @@ if (!process.env.SESSION_SECRET) {
 // otherwise it ends after 8 hours without activity (rolling: every request extends it).
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
-app.use(session({
+const sessionMiddleware = session({
     secret: sessionSecret,
     name: '__sid',
     store: require('./session-store')(session, db),
@@ -1157,7 +1212,8 @@ app.use(session({
         sameSite: 'strict',
         maxAge: SESSION_MS
     }
-}));
+});
+app.use(sessionMiddleware);
 
 function startUserSession(req, user, remember) {
     req.session.user = user;
@@ -1198,36 +1254,239 @@ function ensureAuthenticated(req, res, next) {
 // 6. PUBLIC STATIC FILES (NO AUTH REQUIRED)
 // =======================
 // Serve welcome.html without authentication for TV Kiosk mode
+// Only for the paired TV box (cookie from the app) or a logged-in admin (preview in Settings → TV-Box).
 app.get('/welcome.html', (req, res) => {
-    const filePath = path.join(PUBLIC_DIR, 'welcome.html');
-    res.sendFile(filePath);
+    res.set('Cache-Control', 'no-store');
+    if (!tvboxViewAllowed(req)) {
+        return res.status(403).type('html').send('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+            + '<title>Nur für die TV-Box</title><body style="font-family:sans-serif;padding:2rem;max-width:32rem;margin:auto">'
+            + '<h1>Nur für die TV-Box</h1><p>Diese Seite zeigt nur die gekoppelte TV-Box in der Ferienwohnung. '
+            + 'Als Gastgeber siehst du die Vorschau im Admin unter Einstellungen → TV-Box.</p></body>');
+    }
+    res.sendFile(path.join(PUBLIC_DIR, 'welcome.html'));
 });
 
-// Public, minimal data for the TV welcome screen (no secrets: no WLAN, no codes, no invoices).
-// Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
-app.get('/api/welcome', (req, res) => {
+// TV-Box app self-update. The box asks here which app version the host has approved
+// (Settings → TV-Box) and reports its own version. Public like /api/welcome: no secrets,
+// only version numbers and the public GitHub download link.
+app.get('/api/tv-app', (req, res) => {
     try {
-        const s = db.getAllSettings();
-        const today = berlinToday();
-        const mode = ['first', 'full', 'none'].includes(s.welcome_name_mode) ? s.welcome_name_mode : 'first';
-        const current = loadBookingRows()
-            .filter(r => r.checkin <= today && r.checkout >= today && r.state !== 'past')
-            .sort((a, b) => (a.checkout === today) - (b.checkout === today) || a.checkin.localeCompare(b.checkin))[0];
-        let name = '';
-        if (current && current.name && mode !== 'none') {
-            const parts = current.name.trim().split(/\s+/);
-            name = mode === 'full' ? current.name : parts[0];
+        const v = parseInt(req.query.v, 10);
+        if (Number.isFinite(v) && v > 0) {
+            const prev = db.getSetting('tvbox_device') || {};
+            const now = Date.now();
+            // Write at most every 10 minutes or when the version changes
+            if (prev.versionCode !== v || !prev.lastSeen || now - prev.lastSeen > 10 * 60 * 1000) {
+                db.setSetting('tvbox_device', {
+                    versionCode: v,
+                    versionName: String(req.query.n || '').slice(0, 20),
+                    lastSeen: now
+                });
+            }
         }
+        const approved = db.getSetting('tvbox_approved');
         res.set('Cache-Control', 'no-store');
-        res.json({
-            success: true, today,
-            guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
-            phone: (s.vermieter && s.vermieter.telefon) || ''
-        });
+        res.json({ success: true, approved: approved && approved.versionCode ? approved : null });
     } catch (e) {
         res.status(500).json({ success: false });
     }
 });
+
+// TV-Box remote control. The box calls this every minute with its own random device id + key
+// (generated on the box). Only after the host paired it in Settings → TV-Box does it get the
+// configuration (PIN, kiosk on/off, idle time) and remote commands. Unknown boxes are only
+// listed as "waiting for pairing".
+const TVBOX_COMMANDS = ['show_welcome', 'reload', 'open_settings', 'reboot', 'update_check'];
+const TVBOX_DEFAULT_CONFIG = { kiosk: true, idleHours: 4, adminPin: '' };
+let tvboxLive = null; // last status report (in memory, the DB copy is written at most every 10 min)
+// Boxes waiting for pairing: deviceId -> { keyHash, code, model, ip, versionName, firstSeen, lastSeen }.
+// In memory only: an unpaired box asks every few seconds, so after a restart it is back at once.
+const tvboxPending = new Map();
+
+/** Request comes from the paired TV box (cookie "tvbox_auth" = deviceId.key, set by the app). */
+function tvboxDeviceAuthorized(req) {
+    const paired = db.getSetting('tvbox_paired');
+    const raw = String((req.cookies && req.cookies.tvbox_auth) || req.get('x-tvbox-auth') || '');
+    const dot = raw.lastIndexOf('.');
+    if (!paired || !paired.keyHash || dot < 1) return false;
+    const id = raw.slice(0, dot), key = raw.slice(dot + 1);
+    if (id !== paired.deviceId || !/^[a-f0-9]{64}$/.test(key)) return false;
+    const h = crypto.createHash('sha256').update(key).digest();
+    return crypto.timingSafeEqual(h, Buffer.from(paired.keyHash, 'hex'));
+}
+/** Welcome screen: only the paired box, or a logged-in admin (preview). */
+function tvboxViewAllowed(req) {
+    return !!(req.session && req.session.user) || tvboxDeviceAuthorized(req);
+}
+
+// Fernwartung: ws-scrcpy over an ADB tunnel the box opens itself (see tv-remote.js, tools/tv-fernwartung.sh)
+const tvRemote = require('./tv-remote')({
+    db, permissions, sessionMiddleware,
+    deviceAuthorized: (req) => tvboxDeviceAuthorized(req),
+    isAdminHost: (req) => { const g = guestDomain(); return !g || requestHost(req) !== g.host; }
+});
+
+function tvboxConfig() {
+    return { ...TVBOX_DEFAULT_CONFIG, ...(db.getSetting('tvbox_config') || {}) };
+}
+
+app.post('/api/tv-box/sync', (req, res) => {
+    try {
+        const b = req.body || {};
+        const id = String(b.deviceId || '');
+        const key = String(b.key || '');
+        if (!/^[a-f0-9-]{16,64}$/.test(id) || !/^[a-f0-9]{64}$/.test(key)) {
+            return res.status(400).json({ success: false });
+        }
+        const keyHash = crypto.createHash('sha256').update(key).digest('hex');
+        const paired = db.getSetting('tvbox_paired');
+        const now = Date.now();
+        const clip = (v, n) => String(v == null ? '' : v).slice(0, n);
+        const status = {
+            deviceId: id,
+            versionCode: parseInt(b.versionCode, 10) || 0,
+            versionName: clip(b.versionName, 20),
+            model: clip(b.model, 60),
+            android: clip(b.android, 20),
+            ip: clip(b.ip, 45),
+            kioskActive: !!b.kioskActive,
+            deviceOwner: !!b.deviceOwner,
+            keyWatch: !!b.keyWatch,
+            onWelcome: !!b.onWelcome,
+            screenOn: b.screenOn !== false,
+            idleMinutes: Math.max(0, parseInt(b.idleMinutes, 10) || 0),
+            ackSeq: parseInt(b.ackSeq, 10) || 0,
+            configVersion: parseInt(b.configVersion, 10) || 0,
+            // network printers the box found in the WLAN (IPP/AirPrint via mDNS), for Settings → Drucker
+            printers: (Array.isArray(b.printers) ? b.printers : []).slice(0, 10).map(x => ({
+                name: clip(x && x.name, 80), host: clip(x && x.host, 64),
+                port: parseInt(x && x.port, 10) || 631, path: clip(x && x.path, 100)
+            })).filter(x => x.host),
+            printError: clip(b.printError, 200),
+            adbLocal: b.adbLocal === undefined ? null : !!b.adbLocal, // port 5555 open on the box (Fernwartung)
+            lastSeen: now
+        };
+        res.set('Cache-Control', 'no-store');
+
+        const isPaired = paired && paired.deviceId === id
+            && crypto.timingSafeEqual(Buffer.from(paired.keyHash, 'hex'), Buffer.from(keyHash, 'hex'));
+        if (!isPaired) {
+            const code = String(b.pairCode || '');
+            for (const [k, v] of tvboxPending) if (now - v.lastSeen > 15 * 60 * 1000) tvboxPending.delete(k);
+            if (/^[0-9]{6}$/.test(code) && (tvboxPending.has(id) || tvboxPending.size < 20)) {
+                const prev = tvboxPending.get(id);
+                tvboxPending.set(id, { deviceId: id, keyHash, code, model: status.model, ip: status.ip,
+                    versionName: status.versionName, firstSeen: prev && prev.keyHash === keyHash ? prev.firstSeen : now, lastSeen: now });
+            }
+            return res.json({ success: true, paired: false });
+        }
+
+        tvboxLive = status;
+        const prevDev = db.getSetting('tvbox_device') || {};
+        if (prevDev.versionCode !== status.versionCode || !prevDev.lastSeen || now - prevDev.lastSeen > 10 * 60 * 1000) {
+            db.setSetting('tvbox_device', { versionCode: status.versionCode, versionName: status.versionName, lastSeen: now });
+        }
+        const cfg = tvboxConfig();
+        const cmd = db.getSetting('tvbox_command');
+        res.json({
+            success: true,
+            paired: true,
+            config: { version: cfg.version || 0, kiosk: cfg.kiosk !== false, idleHours: cfg.idleHours, adminPin: cfg.adminPin || '' },
+            welcome: (() => { try { return welcomeData(); } catch (e) { return null; } })(), // offline copy on the box
+            remote: tvRemote.syncInfo(), // Fernwartung: tunnel to the box's ADB (tv-remote.js)
+            command: cmd && cmd.seq > status.ackSeq && now - cmd.createdAt < 24 * 60 * 60 * 1000 ? { seq: cmd.seq, type: cmd.type } : null,
+            print: (() => { try { return printJobs.forBox(); } catch (e) { console.error('Druckaufträge:', e.message); return null; } })()
+        });
+    } catch (e) {
+        console.error('TV-Box sync:', e.message);
+        res.status(500).json({ success: false });
+    }
+});
+
+// Automatic printing of new bookings: the paired box fetches the sheet as PDF and prints it in the
+// apartment's network (see print-jobs.js). Public paths, checked with the box's own key.
+const printJobs = require('./print-jobs')({
+    db, puppeteer,
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg);
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+    },
+    isPlaceholderName: (n) => require('./bot-logic').isPlaceholderGuestName(n),
+    nightsBetween: (a, b) => nightsBetween(a, b),
+    formatDateDE: (d) => formatDateDE(d),
+    wifiFor: (bookingId) => guestWifi.printView(bookingId)
+});
+printJobs.registerBoxRoutes(app, { authorized: tvboxDeviceAuthorized, limiter: apiLimiter });
+// Portal bookings print once the name / Telegram screenshot is in (applyGuestName, address dialog)
+require('./bot-logic').onGuestData((bookingId) => printJobs.releaseBooking(bookingId));
+cron.schedule('*/15 * * * *', () => {
+    printJobs.checkStale().catch(e => console.error('Druck-Prüfung:', e.message));
+});
+
+// Farewell on departure day + towel button on the TV, see tv-guest.js
+const tvGuest = require('./tv-guest')({
+    notify: async (msg, type) => {
+        const sent = await sendToAllRecipients(msg, { type });
+        db.logNotification(type, msg, sent ? 'sent' : 'failed');
+        return sent;
+    },
+    berlinToday: () => berlinToday(),
+    formatDateDE: (d) => formatDateDE(d)
+});
+
+// Public, minimal data for the TV welcome screen (no door codes, no invoices). The guest WLAN only while a guest stays
+// and only when "Auf dem Fernseher zeigen" is on (Webseite → WLAN): with the FRITZ!Box it is that guest's own password.
+// Name mode via setting welcome_name_mode: 'first' (default) | 'full' | 'none'
+function welcomeData() {
+    const s = db.getAllSettings();
+    const today = berlinToday();
+    const mode = ['first', 'full', 'none'].includes(s.welcome_name_mode) ? s.welcome_name_mode : 'first';
+    const current = tvGuest.pickCurrent(loadBookingRows(), s.site && s.site.checkout_time);
+    let name = '';
+    if (current && current.name && mode !== 'none') {
+        const parts = current.name.trim().split(/\s+/);
+        name = mode === 'full' ? current.name : parts[0];
+    }
+    return {
+        ...tvGuest.welcomeExtras(current), // farewell on departure day, towel button (tv-guest.js)
+        success: true, today,
+        guest: current ? { name, checkin: current.checkin, checkout: current.checkout, departureToday: current.checkout === today } : null,
+        phone: (s.vermieter && s.vermieter.telefon) || '',
+        checkinTime: (s.site && s.site.checkin_time) || '', checkoutTime: (s.site && s.site.checkout_time) || '',
+        title: (s.site && s.site.title) || '',
+        wifi: current ? guestWifi.tvView() : null,
+        lang: current ? guestLang.langOrDe(current) : 'de',
+        video: siteVideo.publicInfo('tv')
+    };
+}
+
+app.get('/api/welcome', (req, res) => {
+    if (!tvboxViewAllowed(req)) return res.status(403).json({ success: false, error: 'Nur für die TV-Box' });
+    try {
+        res.set('Cache-Control', 'no-store');
+        res.json(welcomeData());
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
+// "Neue Handtücher" on the TV (see tv-guest.js): paired box or admin preview, at most every 30 min per booking
+const towelLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
+tvGuest.registerRoutes(app, {
+    allowed: tvboxViewAllowed,
+    isAdmin: req => !!(req.session && req.session.user) && !tvboxDeviceAuthorized(req),
+    current: () => { const s = db.getAllSettings(); return tvGuest.pickCurrent(loadBookingRows(), s.site && s.site.checkout_time); },
+    limiter: towelLimiter
+});
+
+// Live tips (weather, events, opening hours) for the TV welcome screen and "Meine Buchung", see local-live.js.
+// Registered before the guest-domain rewrite, so /api/live also answers on the guest host (TV box, root mode).
+const localLive = require('./local-live')({ db, axios, ical: require('node-ical') });
+const liveLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+app.get('/api/live', liveLimiter, localLive.publicHandler);
+app.get('/gast/api/live', liveLimiter, localLive.publicHandler);
+app.get('/live-icons.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'live-icons.js')); });
+app.get('/guest-i18n.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'i18n.js')); });
 
 // Web app (PWA) files: browsers and the OS fetch them without the session cookie
 app.get('/sw.js', (req, res) => {
@@ -1245,8 +1504,38 @@ app.use('/styles.css', express.static(path.join(PUBLIC_DIR, 'styles.css')));
 app.use('/app.js', express.static(path.join(PUBLIC_DIR, 'app.js')));
 
 let guestChat = null; // created below, the guest pages ask it for the WhatsApp button
+let arrivalGuide = null; // created below, "Meine Buchung" asks it for the tab Ankunft
+// WLAN für Gäste: own password per booking via the FRITZ!Box, or the fixed one from Webseite → Inhalte (see wifi.js)
+let guestPortalRef = null;
+const guestWifi = require('./wifi')({
+    db, axios, qrcode,
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortalRef.getSite(),
+    guestBooking: (sess) => guestPortalRef.guestBooking(sess),
+    chatButton: (booking) => guestChat ? guestChat.guestButton(booking) : null,
+    telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
+    berlinToday: () => berlinToday(),
+    addDays: (ymd, n) => addDays(ymd, n),
+    formatDateDE: (d) => formatDateDE(d),
+    // Start page after the WLAN login: towel button and check-out hints like on the TV (tv-guest.js)
+    home: {
+        towels: () => tvGuest.getConfig().towels,
+        departure: () => { const c = tvGuest.getConfig(); return c.farewell ? { hints: c.hints, message: c.message } : null; },
+        requestTowels: (b) => {
+            const g = b.guest_id ? db.getGuestById(b.guest_id) : null;
+            return tvGuest.requestTowels({ id: b.id, name: g && !require('./bot-logic').isPlaceholderGuestName(g.name) ? g.name : '', checkin: b.checkin, checkout: b.checkout }, { source: 'wlan' });
+        }
+    }
+});
+// Background video of the apartment (muted loop, slightly blurred) for the guest pages and the TV, see site-video.js.
+// Served before the guest-domain rewrite, so the TV box gets it on the guest host too.
+const siteVideo = require('./site-video')({ db, express });
+app.get('/hintergrund-video/:file', siteVideo.serveFile);
+app.get('/bg-video.js', (req, res) => { res.set('Cache-Control', 'public, max-age=3600'); res.sendFile(path.join(__dirname, 'guest-site', 'bg-video.js')); });
+
 // Public guest website (description, availability, booking requests, guest login + status)
 const guestPortal = require('./guest-portal')({
+    videoFor: (where) => siteVideo.publicInfo(where),
     express, rateLimit, db, nodemailer, multer,
     botLogic: require('./bot-logic'),
     notify: async (msg, type) => {
@@ -1254,13 +1543,19 @@ const guestPortal = require('./guest-portal')({
         db.logNotification(type, msg, sent ? 'sent' : 'failed');
     },
     chatButton: (booking) => guestChat ? guestChat.guestButton(booking) : null,
+    arrivalFor: (booking, pin) => arrivalGuide ? arrivalGuide.guestView(booking, pin) : null,
+    wifiFor: (booking) => guestWifi.guestView(booking),
     createNukiPin: (arrival, departure, name) => createNukiPin(arrival, departure, name),
     deleteNukiPin: (authId) => deleteNukiPin(authId),
+    onNewBooking: (bookingId) => printJobs.queueBooking(bookingId, 'direct'),
     berlinToday: () => berlinToday(),
     addDays: (ymd, n) => addDays(ymd, n),
     nightsBetween: (a, b) => nightsBetween(a, b),
     formatDateDE: (d) => formatDateDE(d)
 });
+
+guestPortalRef = guestPortal;
+guestWifi.startScheduler();
 
 // Emergency door opening for guests (QR code at the door, see emergency-door.js)
 const emergencyDoor = require('./emergency-door')({
@@ -1345,6 +1640,7 @@ app.use((req, res, next) => {
     if (!g || requestHost(req) !== g.host) return next();
     const p = req.path;
     const qs = req.url.slice(req.path.length);
+    if (p === '/api/health') return next(); // server watchdog checks the domain through the tunnel
     if (!g.root) {
         if (req.method === 'GET' && (p === '/' || p === '/index.html')) return res.redirect(302, '/gast/');
         return next();
@@ -1357,7 +1653,25 @@ app.use((req, res, next) => {
 });
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
+// Anfahrts-Assistent: route, parking, door code and how to open the house door on the arrival day (see arrival-guide.js)
+arrivalGuide = require('./arrival-guide')({
+    express, rateLimit, db, multer, push, guestMessage, emergencyDoor, guestChat,
+    wifiFor: (booking) => guestWifi.arrivalView(booking),
+    botLogic: require('./bot-logic'),
+    getSite: () => guestPortal.getSite(),
+    guestBooking: (sess) => guestPortal.guestBooking(sess),
+    telegram: { bot: () => tgBot, ids: () => telegramIds(db.getAllSettings()) },
+    berlinToday: () => berlinToday(),
+    formatDateDE: (d) => formatDateDE(d)
+});
+arrivalGuide.startScheduler();
+
+// Login page of the guest WLAN (own router with openNDS, see wifi-portal.js): /wlan on the guest host
+const wifiRouter = express.Router();
+guestWifi.registerPublicRoutes(wifiRouter, { rateLimit });
+app.use('/gast', wifiRouter);
 app.use('/gast', guestChat.router);
+app.use('/gast', arrivalGuide.router);
 app.use('/gast', guestMessage.router);
 app.use('/gast', meldeschein.router);
 app.use('/gast', emergencyDoor.router);
@@ -1380,8 +1694,16 @@ app.use(express.static(PUBLIC_DIR, {
 // =======================
 // 6b. HEALTH CHECK
 // =======================
+// Also used by the server watchdog (watchdog.js): locally and through the Cloudflare Tunnel. Touches the database,
+// so a broken/locked database counts as "down" too.
 app.get('/api/health', (req, res) => {
-    res.json({ ok: true });
+    res.set('Cache-Control', 'no-store');
+    try {
+        db.getSetting('__health__');
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(503).json({ ok: false });
+    }
 });
 
 // =======================
@@ -1556,11 +1878,19 @@ app.get('/api/me', (req, res) => {
     if (req.session && req.session.user && req.user) {
         res.json({
             authenticated: true,
-            user: { id: req.user.id, username: req.user.username, role: req.user.role, permissions: req.user.permissions }
+            user: { id: req.user.id, username: req.user.username, role: req.user.role, permissions: req.user.permissions, theme: req.user.theme || 'auto' }
         });
     } else {
         res.json({ authenticated: false });
     }
+});
+
+// Darstellung (Hell/Dunkel/Automatisch) des angemeldeten Benutzers
+app.put('/api/me/theme', (req, res) => {
+    if (!req.user) return res.status(401).json({ success: false });
+    const theme = String((req.body && req.body.theme) || '');
+    if (!db.setUserTheme(req.user.id, theme)) return res.status(400).json({ success: false, error: 'Ungültige Darstellung' });
+    res.json({ success: true, theme });
 });
 
 // Version Info
@@ -1740,10 +2070,13 @@ function nightsBetween(a, b) {
 
 function loadBookingRows() {
     guestPortal.ensureGuestCodes();
+    guestLang.migrate();
     const rows = db.getDb().prepare(`
         SELECT b.id, b.uid, b.summary, b.checkin, b.checkout, b.source, b.nuki_pin, b.nuki_auth_id, b.guest_code,
-               b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email,
-               (SELECT id FROM guest_registrations r WHERE r.booking_id = b.id) AS meldeschein_id
+               b.arrived_at, b.guest_id, g.name AS guest_name, g.email AS guest_email, g.phone AS guest_phone, g.address AS guest_address,
+               b.guest_lang, b.guest_lang_pick,
+               (SELECT id FROM guest_registrations r WHERE r.booking_id = b.id) AS meldeschein_id,
+               (SELECT code FROM vouchers v WHERE v.booking_id = b.id AND v.status = 'redeemed' ORDER BY v.id LIMIT 1) AS voucher_code
         FROM bookings b LEFT JOIN guests g ON g.id = b.guest_id
         WHERE b.checkin IS NOT NULL AND b.checkout IS NOT NULL
         ORDER BY b.checkin DESC
@@ -1763,17 +2096,27 @@ function loadBookingRows() {
             checkin: r.checkin, checkout: r.checkout, nights: nightsBetween(r.checkin, r.checkout),
             hasCode: !!(r.nuki_auth_id || r.nuki_pin), pin: r.nuki_pin || null,
             arrivedAt: r.arrived_at || null, guestId: r.guest_id || null, guestEmail: r.guest_email || null, state,
-            guestCode: r.guest_code || null, meldescheinId: r.meldeschein_id || null,
-            manualEntry: String(r.uid).startsWith('direct-manual-')
+            guestCode: r.guest_code || null, meldescheinId: r.meldeschein_id || null, voucherCode: r.voucher_code || null,
+            manualEntry: String(r.uid).startsWith('direct-manual-'),
+            guestPhone: r.guest_phone || null, guestAddress: r.guest_address || null,
+            lang: r.guest_lang || '', langPick: r.guest_lang_pick || ''
         };
     });
 }
 
 // Guest website admin: settings, photos, booking requests
 guestPortal.registerAdminRoutes(app, apiLimiter);
+siteVideo.registerAdminRoutes(app, apiLimiter);
 guestChat.registerAdminRoutes(app, apiLimiter);
 emergencyDoor.registerAdminRoutes(app, apiLimiter);
 meldeschein.registerAdminRoutes(app, apiLimiter);
+vouchers.registerAdminRoutes(app, apiLimiter, { getSite: () => guestPortal.getSite(), permissions });
+localLive.registerAdminRoutes(app, apiLimiter);
+arrivalGuide.registerAdminRoutes(app, apiLimiter);
+printJobs.registerAdminRoutes(app, apiLimiter, {
+    boxPrinters: () => (tvboxLive ? { printers: tvboxLive.printers || [], error: tvboxLive.printError || '', lastSeen: tvboxLive.lastSeen } : null)
+});
+guestWifi.registerAdminRoutes(app, apiLimiter);
 
 app.get('/api/bookings', apiLimiter, (req, res) => {
     try {
@@ -1853,6 +2196,13 @@ app.post('/api/bookings', apiLimiter, async (req, res) => {
             return res.status(409).json({ success: false, conflict: true, error: `Zeitraum überschneidet sich mit ${clash.source || 'einer Buchung'} ${formatDateDE(clash.checkin)} – ${formatDateDE(clash.checkout)}.` });
         }
 
+        // Optional voucher: checked before anything is saved, redeemed for the new booking
+        let voucher = null;
+        if (String(b.voucherCode || '').trim()) {
+            voucher = vouchers.check(b.voucherCode, { checkin, checkout });
+            if (!voucher.ok) return res.status(400).json({ success: false, error: `Gutschein: ${voucher.error}` });
+        }
+
         const guest = db.findOrCreateGuest(name, email || null, null);
         if (phone && !guest.phone) db.updateGuest(guest.id, { ...guest, phone });
         const note = String(b.note || '').trim().substring(0, 1000);
@@ -1861,6 +2211,7 @@ app.post('/api/bookings', apiLimiter, async (req, res) => {
             VALUES (?, ?, ?, ?, ?, 'Direkt', ?)
         `).run(`direct-manual-${Date.now()}`, `Direkt: ${name}`, checkin, checkout, note || 'Im Admin eingetragen', guest.id);
         const bookingId = Number(ins.lastInsertRowid);
+        if (voucher) vouchers.redeem(voucher.voucher.id, { bookingId, checkin, checkout, value: voucher.discount, via: 'Buchung eingetragen', guestId: guest.id });
 
         let pin = null, pinError = null;
         if (b.createPin) {
@@ -1869,7 +2220,8 @@ app.post('/api/bookings', apiLimiter, async (req, res) => {
                 if (n && n.success) { db.updateBookingNukiData(bookingId, n.pin, n.authId); pin = n.pin; }
             } catch (e) { pinError = e.message; }
         }
-        res.json({ success: true, bookingId, pin, pinError });
+        printJobs.queueBooking(bookingId, 'manual');
+        res.json({ success: true, bookingId, pin, pinError, voucher: voucher ? { code: voucher.voucher.code, label: voucher.label, discount: voucher.discount } : null });
     } catch (e) {
         console.error('Manual booking Error:', e.message);
         res.status(500).json({ success: false, error: 'Buchung konnte nicht gespeichert werden' });
@@ -1887,6 +2239,7 @@ app.delete('/api/bookings/:id', apiLimiter, async (req, res) => {
             try { await deleteNukiPin(row.nuki_auth_id); } catch (e) { console.warn('Nuki PIN Löschen fehlgeschlagen:', e.message); }
         }
         db.getDb().prepare('DELETE FROM bookings WHERE id = ?').run(id);
+        vouchers.releaseBooking(id);
         res.json({ success: true });
     } catch (e) {
         console.error('Booking delete Error:', e.message);
@@ -1938,6 +2291,21 @@ app.put('/api/bookings/:id/guest', apiLimiter, async (req, res) => {
         console.error('Booking guest name Error:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
+});
+
+// Language of the guest pages, TV and guest messages: '' = automatic (guest's choice or guessed from the guest data)
+app.get('/api/bookings/:id/lang', apiLimiter, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const b = db.getDb().prepare('SELECT id FROM bookings WHERE id = ?').get(id);
+    if (!b) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+    res.json({ success: true, ...guestLang.forBooking(b) });
+});
+app.put('/api/bookings/:id/lang', apiLimiter, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const lang = String((req.body && req.body.lang) || '');
+    if (lang && !guestLang.LANGS.includes(lang)) return res.status(400).json({ success: false, error: 'Unbekannte Sprache' });
+    if (!guestLang.setHost(id, lang)) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+    res.json({ success: true, ...guestLang.forBooking({ id }) });
 });
 
 // Door code of a booking: show the live entry from Nuki and change it by hand (name, valid from/until)
@@ -2060,6 +2428,10 @@ app.get('/api/overview', apiLimiter, (req, res) => {
             inHouse: inHouse.map(redact), events: events.slice(0, 12).map(e => ({ ...e, booking: redact(e.booking) })),
             namesMissing: active.filter(r => r.needsName && r.source !== 'manual').length,
             openInvoices: permissions.can(perms, 'invoices') ? { count: open.length, total: openTotal } : null,
+            addressIssues: permissions.can(perms, 'invoices', 'edit') ? (() => {
+                try { const r = addressCheck.audit(); return r.invoices.length + (permissions.can(perms, 'bookings', 'edit') ? r.guests.length : 0); }
+                catch (e) { return 0; }
+            })() : 0,
             warnings, sync
         });
     } catch (e) {
@@ -2080,7 +2452,7 @@ let nukiStatusCache = { at: 0, value: null };
 app.get('/api/status', apiLimiter, async (req, res) => {
     try {
         const s = db.getAllSettings();
-        const result = { telegram: { configured: !!s.tg_token, running: !!tgBot } };
+        const result = { telegram: { configured: !!s.tg_token, running: !!tgBot }, watchdog: serverWatch.status() };
 
         const nuki = s.nuki;
         if (!nuki || !nuki.token || !nuki.lockId) {
@@ -2118,7 +2490,8 @@ app.get('/api/status', apiLimiter, async (req, res) => {
 // the mask back unchanged when it was not edited. Server-only settings are neither sent nor accepted.
 const SECRET_MASK = '••••••••';
 const SECRET_SETTINGS = [['paperless', 'token'], ['smtp', 'pass'], ['nuki', 'token'], ['tg_token']];
-const SERVER_ONLY_SETTINGS = ['backup', 'backup_state', 'push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state'];
+const SERVER_ONLY_SETTINGS = ['watchdog_alert', 'backup', 'backup_state', 'push_vapid', 'emergency_door', 'site_ical_token', 'nuki_delete_requests', 'guest_chat', 'guest_chat_mail_state',
+    'tvbox_paired', 'tvbox_config', 'tvbox_command', 'guest_wifi', 'guest_wifi_state'];
 
 function secretPath(settings, [key, field]) {
     const holder = field ? settings[key] : settings;
@@ -2261,7 +2634,9 @@ app.put('/api/settings', apiLimiter, (req, res) => {
         if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
             return res.status(400).json({ error: 'Ungültige Einstellungen' });
         }
-        db.setAllSettings(unmaskSettings(settings));
+        const toSave = unmaskSettings(settings);
+        for (const k of Object.keys(toSave)) if (k.startsWith('tvbox_')) delete toSave[k]; // own endpoints
+        db.setAllSettings(toSave);
 
         // Re-init Telegram if token changed
         if (settings.tg_token) {
@@ -2280,6 +2655,139 @@ app.put('/api/settings', apiLimiter, (req, res) => {
     } catch (e) {
         console.error('Settings PUT Error:', e.message);
         res.status(500).json({ error: 'Einstellungen konnten nicht gespeichert werden' });
+    }
+});
+
+// TV-Box app: newest build on GitHub (release "tvbox", see .github/workflows/tv-kiosk-apk.yml),
+// the version the host approved and the version the box last reported.
+const TVBOX_RELEASE_API = 'https://api.github.com/repos/germanbeast/RentalInvoice/releases/tags/tvbox';
+
+function httpsJson(url, redirects = 3) {
+    return new Promise((resolve, reject) => {
+        const req = https.get(url, { headers: { 'User-Agent': 'beckhome-rentalinvoice', 'Accept': 'application/json' }, timeout: 10000 }, r => {
+            if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && redirects > 0) {
+                r.resume();
+                return resolve(httpsJson(new URL(r.headers.location, url).toString(), redirects - 1));
+            }
+            let body = '';
+            r.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+            r.on('end', () => {
+                if (r.statusCode !== 200) return reject(new Error('HTTP ' + r.statusCode));
+                try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+            });
+        });
+        req.on('timeout', () => req.destroy(new Error('Zeitüberschreitung')));
+        req.on('error', reject);
+    });
+}
+
+async function tvboxLatest() {
+    const rel = await httpsJson(TVBOX_RELEASE_API);
+    const assets = rel.assets || [];
+    const apk = assets.find(a => a.name === 'beckhome-tv.apk');
+    const ver = assets.find(a => a.name === 'version.json');
+    if (!apk || !ver) throw new Error('Release unvollständig');
+    const info = await httpsJson(ver.browser_download_url);
+    return {
+        versionCode: parseInt(info.versionCode, 10) || 0,
+        versionName: String(info.versionName || ''),
+        sha256: String(info.sha256 || ''),
+        url: apk.browser_download_url,
+        published: apk.updated_at || rel.published_at || null
+    };
+}
+
+tvGuest.registerAdminRoutes(app, apiLimiter); // Abreisetag & Handtücher (Settings → TV-Box)
+
+app.get('/api/settings/tvbox', apiLimiter, async (req, res) => {
+    let latest = null, error = null;
+    try { latest = await tvboxLatest(); } catch (e) { error = 'GitHub nicht erreichbar: ' + e.message; }
+    res.json({
+        success: true, latest, error,
+        approved: db.getSetting('tvbox_approved') || null,
+        device: db.getSetting('tvbox_device') || null,
+        ...tvboxRemoteState()
+    });
+});
+
+function tvboxRemoteState() {
+    const paired = db.getSetting('tvbox_paired');
+    const strip = o => o ? { deviceId: o.deviceId, model: o.model, ip: o.ip, versionName: o.versionName,
+        firstSeen: o.firstSeen, lastSeen: o.lastSeen, pairedAt: o.pairedAt } : null;
+    return {
+        paired: strip(paired),
+        pending: [...tvboxPending.values()].filter(p => !paired || p.deviceId !== paired.deviceId).map(strip),
+        live: tvboxLive && paired && tvboxLive.deviceId === paired.deviceId ? tvboxLive : null,
+        config: (({ adminPin, ...rest }) => ({ ...rest, adminPin: adminPin ? true : '' }))(tvboxConfig()), // PIN stays on the server
+        command: db.getSetting('tvbox_command') || null,
+        commands: TVBOX_COMMANDS
+    };
+}
+
+app.post('/api/settings/tvbox/pair', apiLimiter, (req, res) => {
+    // The 6-digit code is shown on the TV; only whoever sees the TV can pair it
+    const code = String((req.body || {}).code || '').replace(/\s+/g, '');
+    const pending = /^[0-9]{6}$/.test(code) ? [...tvboxPending.values()].find(p => p.code === code) : null;
+    if (!pending) {
+        return res.status(400).json({ error: 'Kein Fernseher zeigt diesen Code. Bitte den Code vom Bildschirm der Box abtippen.' });
+    }
+    const { code: _c, ...rest } = pending;
+    db.setSetting('tvbox_paired', { ...rest, pairedAt: Date.now() });
+    tvboxPending.delete(pending.deviceId);
+    tvboxLive = null;
+    res.json({ success: true, ...tvboxRemoteState() });
+});
+
+app.post('/api/settings/tvbox/unpair', apiLimiter, (req, res) => {
+    db.setSetting('tvbox_paired', null);
+    tvboxLive = null;
+    res.json({ success: true, ...tvboxRemoteState() });
+});
+
+app.put('/api/settings/tvbox/config', apiLimiter, (req, res) => {
+    const b = req.body || {};
+    const cur = tvboxConfig();
+    const next = { ...cur };
+    if (b.kiosk !== undefined) next.kiosk = !!b.kiosk;
+    if (b.idleHours !== undefined) {
+        const h = Number(b.idleHours);
+        if (!Number.isFinite(h) || h < 0 || h > 48) return res.status(400).json({ error: 'Ruhezeit: 0 bis 48 Stunden (0 = aus).' });
+        next.idleHours = Math.round(h * 2) / 2;
+    }
+    if (b.adminPin !== undefined && b.adminPin !== '') {
+        const pin = String(b.adminPin).trim();
+        if (!/^[0-9]{4,10}$/.test(pin)) return res.status(400).json({ error: 'Die PIN muss 4 bis 10 Ziffern haben.' });
+        next.adminPin = pin;
+    }
+    next.version = (cur.version || 0) + 1;
+    next.updatedAt = Date.now();
+    db.setSetting('tvbox_config', next);
+    res.json({ success: true, ...tvboxRemoteState() });
+});
+
+// Fernwartung (ws-scrcpy): on/off, status, and the page itself under /tv-fernwartung/ (right: settings, edit)
+tvRemote.registerAdminRoutes(app, { limiter: apiLimiter });
+
+app.post('/api/settings/tvbox/command', apiLimiter, (req, res) => {
+    const type = String((req.body || {}).type || '');
+    if (!TVBOX_COMMANDS.includes(type)) return res.status(400).json({ error: 'Unbekannter Befehl' });
+    const prev = db.getSetting('tvbox_command') || {};
+    const cmd = { seq: Math.max(Date.now(), (prev.seq || 0) + 1), type, createdAt: Date.now() };
+    db.setSetting('tvbox_command', cmd);
+    res.json({ success: true, command: cmd });
+});
+
+app.post('/api/settings/tvbox/approve', apiLimiter, async (req, res) => {
+    try {
+        const latest = await tvboxLatest();
+        if (!latest.versionCode || !/^[0-9a-f]{64}$/.test(latest.sha256)) {
+            return res.status(400).json({ error: 'Die Version auf GitHub hat keine gültige Prüfsumme.' });
+        }
+        const approved = { ...latest, approvedAt: Date.now() };
+        db.setSetting('tvbox_approved', approved);
+        res.json({ success: true, approved });
+    } catch (e) {
+        res.status(502).json({ error: 'GitHub nicht erreichbar: ' + e.message });
     }
 });
 
@@ -2753,15 +3261,93 @@ app.get('/api/invoices/guest/:guestId', apiLimiter, (req, res) => {
     }
 });
 
-app.post('/api/invoices', apiLimiter, (req, res) => {
+// Start data for "Rechnung erstellen" at a booking: always the guest of THIS booking (fresh from the database),
+// plus the next free invoice number when the number in the form is already used.
+app.get('/api/invoices/prefill/:bookingId', apiLimiter, (req, res) => {
+    try {
+        const g = addressCheck.bookingGuest(parseInt(req.params.bookingId, 10));
+        if (!g) return res.status(404).json({ success: false, error: 'Buchung nicht gefunden' });
+        const current = String(req.query.current || '').trim();
+        const numberTaken = !current || !!db.getDb().prepare('SELECT 1 FROM invoices WHERE invoice_number = ?').get(current);
+        res.json({ success: true, ...g, numberTaken, nextNumber: db.getNextInvoiceNumber() });
+    } catch (e) {
+        console.error('Invoice prefill Error:', e.message);
+        res.status(500).json({ success: false, error: 'Gastdaten konnten nicht geladen werden' });
+    }
+});
+
+// Check of saved invoices/guests for another guest's address (see address-check.js)
+app.get('/api/invoices/address-check', apiLimiter, (req, res) => {
+    try {
+        const r = addressCheck.audit();
+        const canGuests = permissions.can(req.user.permissions, 'bookings', 'edit');
+        res.json({ success: true, invoices: r.invoices, guests: canGuests ? r.guests : [], canGuests });
+    } catch (e) {
+        console.error('Address check Error:', e.message);
+        res.status(500).json({ success: false, error: 'Prüfung fehlgeschlagen' });
+    }
+});
+
+app.post('/api/invoices/address-check/ack', apiLimiter, (req, res) => {
+    const key = String((req.body && req.body.key) || '');
+    if (!/^(inv|guest):\d+:/.test(key)) return res.status(400).json({ success: false, error: 'Ungültig' });
+    addressCheck.acknowledge(key);
+    res.json({ success: true });
+});
+
+app.post('/api/invoices/:id/address', apiLimiter, (req, res) => {
+    const address = String((req.body && req.body.address) || '').trim().slice(0, 400);
+    if (address.length < 5) return res.status(400).json({ success: false, error: 'Bitte eine vollständige Anschrift angeben.' });
+    const ok = addressCheck.fixInvoiceAddress(parseInt(req.params.id, 10), address);
+    if (!ok) return res.status(404).json({ success: false, error: 'Rechnung nicht gefunden' });
+    console.log(`🧾 Anschrift von Rechnung ${req.params.id} korrigiert (${req.user.username})`);
+    res.json({ success: true });
+});
+
+app.post('/api/guests/:id/address', apiLimiter, (req, res) => {
+    const address = String((req.body && req.body.address) || '').trim().slice(0, 400);
+    const g = db.getGuestById(parseInt(req.params.id, 10));
+    if (!g) return res.status(404).json({ success: false, error: 'Gast nicht gefunden' });
+    db.updateGuest(g.id, { ...g, address: address || null });
+    res.json({ success: true });
+});
+
+app.post('/api/invoices', apiLimiter, async (req, res) => {
     try {
         const data = req.body;
         if (!data.rNummer && !data.invoice_number) {
             return res.status(400).json({ error: 'Rechnungsnummer ist erforderlich' });
         }
+        // Tie the invoice to the guest of its booking (or the guest picked in the form)
+        try { await addressCheck.bindInvoiceGuest(data); }
+        catch (e) { console.warn('Rechnung: Gast der Buchung nicht zuordenbar:', e.message); }
+        // Voucher redeemed in the invoice form ("Gutschein einlösen")
+        let voucherWarning = null, redeemVoucher = null;
+        if (data.voucherCode) {
+            const arrival = data.aAnreise || data.arrival || null;
+            const departure = data.aAbreise || data.departure || null;
+            const known = vouchers.getByCode(data.voucherCode);
+            const sameInvoice = known && known.invoice_id && db.getDb().prepare('SELECT 1 FROM invoices WHERE id = ? AND invoice_number = ?').get(known.invoice_id, data.rNummer || data.invoice_number);
+            const c = sameInvoice ? { ok: true, voucher: known } : vouchers.check(data.voucherCode, { checkin: arrival, checkout: departure });
+            if (!c.ok) { voucherWarning = c.error; delete data.voucherCode; }
+            else {
+                data.voucherCode = c.voucher.code;
+                redeemVoucher = c.voucher;
+            }
+        }
         const result = db.saveInvoice(data);
+        if (redeemVoucher) {
+            const line = (data.positions || []).filter(p => String(p.desc || '').startsWith(`Gutschein ${redeemVoucher.code}`));
+            const net = -line.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.price) || 0), 0);
+            const gross = data.kleinunternehmer ? net : net * (1 + (Number(data.mwstSatz) || 0) / 100);
+            const stay = data.bookingId ? { id: data.bookingId } : db.getDb().prepare('SELECT id FROM bookings WHERE checkin = ? AND checkout = ? LIMIT 1').get(data.aAnreise || null, data.aAbreise || null);
+            vouchers.redeem(redeemVoucher.id, {
+                invoiceId: result.id, bookingId: stay ? stay.id : null, checkin: data.aAnreise || null, checkout: data.aAbreise || null,
+                value: gross > 0 ? Math.round(gross * 100) / 100 : null, via: 'Rechnung'
+            });
+        }
         const message = result.updated ? 'Rechnung aktualisiert' : 'Rechnung archiviert';
-        res.json({ success: true, message, id: result.id });
+        res.json({ success: true, message, id: result.id, voucherWarning });
     } catch (e) {
         console.error('Invoice POST Error:', e.message);
         res.status(500).json({ error: 'Rechnung konnte nicht gespeichert werden' });
@@ -2877,93 +3463,9 @@ app.post('/api/migrate', apiLimiter, (req, res) => {
 // =======================
 // 12. EXPENSES API
 // =======================
-app.get('/api/expenses', apiLimiter, (req, res) => {
-    try {
-        const expenses = db.getAllExpenses();
-        res.json({ success: true, expenses });
-    } catch (e) {
-        console.error('Expenses GET Error:', e.message);
-        res.status(500).json({ error: 'Ausgaben konnten nicht geladen werden' });
-    }
-});
-
-app.post('/api/expenses', apiLimiter, (req, res) => {
-    try {
-        const expense = db.createExpense(req.body);
-        res.json({ success: true, message: 'Ausgabe gespeichert', expense });
-    } catch (e) {
-        console.error('Expense POST Error:', e.message);
-        res.status(500).json({ error: 'Ausgabe konnte nicht gespeichert werden' });
-    }
-});
-
-app.delete('/api/expenses/:id', apiLimiter, (req, res) => {
-    try {
-        db.deleteExpense(parseInt(req.params.id));
-        res.json({ success: true, message: 'Ausgabe gelöscht' });
-    } catch (e) {
-        console.error('Expense DELETE Error:', e.message);
-        res.status(500).json({ error: 'Ausgabe konnte nicht gelöscht werden' });
-    }
-});
-
-app.post('/api/expenses/sync', apiLimiter, async (req, res) => {
-    try {
-        const allSettings = db.getAllSettings();
-        const pl = allSettings.paperless || {};
-        const tag = allSettings.paperless_expense_tag || 'BeckhomeInvoice';
-        const amountFieldName = allSettings.paperless_amount_field || 'Betrag';
-
-        if (!pl.url || !pl.token) {
-            return res.status(400).json({ error: 'Paperless-Zugangsdaten nicht konfiguriert' });
-        }
-
-        // 1. Get Tag ID from Paperless
-        const tagsRes = await axios.get(`${pl.url}/api/tags/?name__icontains=${encodeURIComponent(tag)}`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-        const tagObj = tagsRes.data.results.find(t => t.name.toLowerCase() === tag.toLowerCase());
-        if (!tagObj) return res.json({ success: true, message: `Tag "${tag}" nicht in Paperless gefunden.`, count: 0 });
-
-        // 2. Search documents with this tag
-        const docsRes = await axios.get(`${pl.url}/api/documents/?tags__id__all=${tagObj.id}`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-
-        // 3. Get Custom Fields definitions to find the right ID
-        const fieldsRes = await axios.get(`${pl.url}/api/custom_fields/`, {
-            headers: { 'Authorization': `Token ${pl.token}` }
-        });
-        const amountFieldDef = fieldsRes.data.results.find(f => f.name.toLowerCase() === amountFieldName.toLowerCase());
-
-        let count = 0;
-        for (const doc of docsRes.data.results) {
-            // Check if already synced
-            if (db.getExpenseByPaperlessId(doc.id)) continue;
-
-            let amount = 0;
-            if (amountFieldDef && doc.custom_fields) {
-                const fieldVal = doc.custom_fields.find(cf => cf.field === amountFieldDef.id);
-                if (fieldVal && fieldVal.value) amount = parseFloat(fieldVal.value);
-            }
-
-            db.createExpense({
-                date: doc.created ? doc.created.split('T')[0] : (doc.added ? doc.added.split('T')[0] : new Date().toISOString().split('T')[0]),
-                amount: amount,
-                category: 'Paperless',
-                description: doc.title,
-                source: 'paperless',
-                paperless_id: doc.id
-            });
-            count++;
-        }
-
-        res.json({ success: true, message: `${count} neue Ausgaben synchronisiert`, count });
-    } catch (e) {
-        console.error('Expense Sync Error:', e.message);
-        res.status(500).json({ error: 'Synchronisierung fehlgeschlagen' });
-    }
-});
+// Ausgaben (Liste, Belege, Paperless): receipts.js
+receipts.registerRoutes(app, { apiLimiter, multerUpload: receiptUpload, permissions });
+receipts.startAutoImport();
 
 // =======================
 // 13. STATS API
@@ -3115,6 +3617,21 @@ app.get('/api/finance/export-csv.zip', apiLimiter, (req, res) => {
         res.send(xlsxWriter.zip(files));
     } catch (e) {
         console.error('Finanz-CSV-ZIP Fehler:', e.message);
+        res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
+    }
+});
+// Belege (Fotos/PDFs) der Ausgaben eines Zeitraums als ZIP, Dateiname Datum_Händler_Betrag
+app.get('/api/finance/receipts.zip', apiLimiter, (req, res) => {
+    try {
+        const r = financeReport.report(req.query);
+        const files = receipts.receiptFilesBetween(r.from, r.to);
+        if (!files.length) return res.status(404).json({ success: false, error: 'Keine Belegdateien im Zeitraum' });
+        files.push({ name: `Ausgaben_${financeReport.fileBase(r)}.csv`, data: financeReport.csvOf(r, 'expenses') });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="Belege_${financeReport.fileBase(r)}.zip"`);
+        res.send(xlsxWriter.zip(files));
+    } catch (e) {
+        console.error('Beleg-ZIP Fehler:', e.message);
         res.status(500).json({ success: false, error: 'Export fehlgeschlagen' });
     }
 });
@@ -3802,6 +4319,9 @@ app.post('/api/update', apiLimiter, (req, res) => {
             console.warn('NPM Install Warning:', e.detail);
         }
 
+        // New watchdog code too (it runs as its own PM2 process)
+        if (process.env.pm_id !== undefined) await tryRun('pm2 restart beckhome-watchdog', { timeout: 20000 });
+
         res.json({ success: true, status: 'updated', message: 'Update erfolgreich. Server startet neu...' });
         setTimeout(() => {
             console.log('🔄 Starte Server neu...');
@@ -3946,7 +4466,7 @@ app.use((err, req, res, next) => {
 // =======================
 // LISTEN_HOST=127.0.0.1 in .env: reachable only through the tunnel/proxy on this machine, port 3000 closed to the outside
 const LISTEN_HOST = process.env.LISTEN_HOST || undefined;
-app.listen(PORT, LISTEN_HOST, () => {
+const httpServer = app.listen(PORT, LISTEN_HOST, () => {
     console.log(`🔒 Server (Hardened + SQLite) running on http://${LISTEN_HOST || 'localhost'}:${PORT}`);
     console.log(`   Static files: ${PUBLIC_DIR}`);
 
@@ -3954,6 +4474,8 @@ app.listen(PORT, LISTEN_HOST, () => {
     initWhatsApp();
     initTelegram();
 });
+// WebSockets: ADB tunnel of the TV box and the ws-scrcpy page (TV-Fernwartung, tv-remote.js)
+httpServer.on('upgrade', tvRemote.handleUpgrade);
 
 // Graceful shutdown
 // WhatsApp's Chromium is closed too, otherwise it keeps the profile locked for the next start

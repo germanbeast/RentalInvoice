@@ -216,6 +216,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .quote .q-row { display: flex; justify-content: space-between; gap: 1rem; padding: .15rem 0; }
 .quote .q-total { font-weight: 600; border-top: 1px solid var(--line); margin-top: .5rem; padding-top: .55rem; }
 .quote.q-error { background: var(--bad-soft); color: var(--bad); }
+.quote .q-voucher { color: var(--ok, #2f6b4f); }
+.voucher-msg { margin: -.6rem 0 1rem; font-size: .88rem; color: var(--ok, #2f6b4f); }
+.voucher-msg.bad { color: var(--bad); }
 
 /* ---------- Meine Buchung (eigene Seite) ---------- */
 .account { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100svh; }
@@ -446,3 +449,15 @@ dialog[open] { animation: rise .35s var(--ease); }
 .wa-fab:hover { background: #18773f; }
 @media (max-width: 560px) { .wa-fab span { display: none; } .wa-fab { padding: .8rem; } }
 @media print { .wa-fab { display: none; } }
+
+/* ---------- Sprachumschalter (Gäste-Seiten) ---------- */
+.lang-pick { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 3px; background: var(--card, #fff); flex: none; }
+.lang-pick button { min-width: 34px; min-height: 30px; padding: 0 .45rem; border: 0; border-radius: 2px; background: transparent; color: var(--ink-soft, var(--ink)); font: 600 .74rem/1 var(--sans); letter-spacing: .08em; cursor: pointer; }
+.lang-pick button:hover { background: var(--paper-2); color: var(--ink); }
+.lang-pick button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.lang-pick button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lang-pick-login { margin-bottom: 1.4rem; }
+.lang-pick-menu { margin: 0 0 1.2rem; }
+.gapp-bar .lang-pick-hero { margin-left: auto; }
+@media (max-width: 520px) { .gapp-bar .lang-pick-hero { display: none; } }
+.masthead .lang-pick { background: transparent; }

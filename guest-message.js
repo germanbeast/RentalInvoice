@@ -13,6 +13,7 @@
  */
 
 const crypto = require('crypto');
+const guestLang = require('./guest-lang');
 
 const LINK_GRACE_DAYS = 1;
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -86,13 +87,43 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
             departure: (d, t) => `📅 Departure: ${d}${t ? ` by ${t}` : ''}`,
             pin: p => `🔑 Your door code: ${p}\n(works from your arrival at the keypad by the door)`,
             portal: 'All details for your stay (arrival, Wi-Fi, house rules) are in your personal guest portal, no login needed:',
-            meldeschein: '📝 Please fill in the short registration form for yourself and everyone travelling with you before you arrive (tab “Gäste”), it takes two minutes.',
+            meldeschein: '📝 Please fill in the short registration form for yourself and everyone travelling with you before you arrive (tab “Guests”), it takes two minutes.',
             emergency: 'If the keypad ever fails, you can also open the door here during your stay:',
             private: 'Please do not share these links, they belong to your booking only.',
             code: c => `Your booking code (in case you are asked for it): ${c}`,
             contact: p => (p ? `If you have any questions, just message us here or call ${p}.` : 'If you have any questions, just message us here.'),
             bye: 'See you soon and safe travels!',
             locale: 'en-GB'
+        },
+        nl: {
+            hello: n => (n ? `Hallo ${n},` : 'Hallo,'),
+            thanks: t => `hartelijk dank voor je boeking bij ${t}! We kijken ernaar uit je te verwelkomen.`,
+            arrival: (d, t) => `📅 Aankomst: ${d}${t ? ` vanaf ${t} uur` : ''}`,
+            departure: (d, t) => `📅 Vertrek: ${d}${t ? ` tot ${t} uur` : ''}`,
+            pin: p => `🔑 Je deurcode: ${p}\n(werkt vanaf je aankomst op het toetsenbord bij de deur)`,
+            portal: 'Alle informatie over je verblijf (aankomst, wifi, huisregels) vind je in je persoonlijke gastenportaal, zonder inloggen:',
+            meldeschein: '📝 Vul daar vóór aankomst even het registratieformulier in voor jezelf en alle medereizigers (tabblad „Gasten”), dat duurt twee minuten.',
+            emergency: 'Mocht het toetsenbord een keer niet werken, dan kun je de deur tijdens je verblijf ook hier openen:',
+            private: 'Deel de links alsjeblieft niet, ze horen alleen bij jouw boeking.',
+            code: c => `Je boekingscode (voor het geval ernaar gevraagd wordt): ${c}`,
+            contact: p => (p ? `Bij vragen kun je ons altijd hier bereiken of bellen op ${p}.` : 'Bij vragen kun je ons altijd hier bereiken.'),
+            bye: 'Tot snel en een goede reis!',
+            locale: 'nl-NL'
+        },
+        pl: {
+            hello: n => (n ? `Dzień dobry ${n},` : 'Dzień dobry,'),
+            thanks: t => `dziękujemy za rezerwację w ${t}! Cieszymy się na Twój przyjazd.`,
+            arrival: (d, t) => `📅 Przyjazd: ${d}${t ? ` od godz. ${t}` : ''}`,
+            departure: (d, t) => `📅 Wyjazd: ${d}${t ? ` do godz. ${t}` : ''}`,
+            pin: p => `🔑 Twój kod do drzwi: ${p}\n(działa od przyjazdu na klawiaturze przy drzwiach)`,
+            portal: 'Wszystkie informacje o pobycie (przyjazd, Wi-Fi, regulamin domu) znajdziesz w swoim portalu gościa, bez logowania:',
+            meldeschein: '📝 Przed przyjazdem wypełnij tam krótką kartę meldunkową dla siebie i wszystkich współpodróżnych (zakładka „Goście”), zajmie to dwie minuty.',
+            emergency: 'Gdyby klawiatura kiedyś nie działała, w czasie pobytu możesz otworzyć drzwi także tutaj:',
+            private: 'Prosimy nie udostępniać tych linków, należą tylko do Twojej rezerwacji.',
+            code: c => `Twój kod rezerwacji (gdyby ktoś o niego zapytał): ${c}`,
+            contact: p => (p ? `W razie pytań napisz do nas tutaj lub zadzwoń: ${p}.` : 'W razie pytań napisz do nas tutaj.'),
+            bye: 'Do zobaczenia i szerokiej drogi!',
+            locale: 'pl-PL'
         }
     };
 
@@ -115,11 +146,13 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
      * Returns null when the booking does not exist, otherwise
      * { text, link, emergencyLink, name, booking, warnings: [] } (warnings are for the host, not the guest).
      */
-    function compose(bookingId, lang = 'de') {
-        const L = TEXT[lang] || TEXT.de;
+    /** lang: 'de' | 'en' | 'nl' | 'pl', without: the guest's language (Admin, guest's choice or guessed), else German */
+    function compose(bookingId, lang) {
         ensureGuestCodes();
         let b = sql().prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
         if (!b) return null;
+        if (!TEXT[lang]) lang = guestLang.langOrDe(b);
+        const L = TEXT[lang];
 
         const site = getSite();
         const settings = db.getAllSettings();
@@ -160,7 +193,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
         if (sign) lines.push(sign);
 
         b = sql().prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
-        return { text: lines.join('\n'), link, emergencyLink, name, booking: b, linkUntil: linkUntil(b), warnings };
+        return { text: lines.join('\n'), link, emergencyLink, name, booking: b, linkUntil: linkUntil(b), warnings, lang };
     }
 
     /** Current and upcoming bookings for the selection list in Telegram. */
@@ -227,6 +260,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
                     'Dieser Link ist abgelaufen oder wurde gesperrt. Sie können sich mit Ihrem Buchungscode und dem Anreisedatum anmelden.');
             }
             let dest = `${req.baseUrl}/meine-buchung`;
+            if (target === 'ankunft') dest += '?tab=ankunft';
             if (target === 'notfall') {
                 const c = emergencyDoor.getConfig();
                 if (c.enabled) dest = `${req.baseUrl}/notfall?k=${encodeURIComponent(c.key)}`;
@@ -244,6 +278,7 @@ function createGuestMessage({ express, rateLimit, db, botLogic, getSite, ensureG
 
     router.get('/b/:token', linkLimiter, openLink('portal'));
     router.get('/b/:token/notfall', linkLimiter, openLink('notfall'));
+    router.get('/b/:token/ankunft', linkLimiter, openLink('ankunft'));
 
     return { router, compose, ensureLink, revokeLink, upcoming, LINK_GRACE_DAYS };
 }

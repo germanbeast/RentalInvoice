@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <meta name="robots" content="noindex">
+    <meta name="referrer" content="no-referrer">
+    <title>Gäste-WLAN</title>
+    <!-- Fonts are in the router's walled garden, so they load before the login too -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="site.css">
+    <style>
+        body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+        .wl { width: min(100% - 2 * var(--gutter), 520px); margin: 0 auto; padding: calc(64px + clamp(1.6rem, 8vh, 5rem)) 0 3rem; flex: 1 0 auto; }
+        .wl-kicker { display: flex; align-items: center; gap: .55rem; font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: .7rem; }
+        .wl-kicker svg { width: 18px; height: 18px; }
+        .wl h1 { font-size: clamp(2.6rem, 10vw, 4rem); margin-bottom: 1rem; }
+        .wl h1 em { font-style: italic; }
+        .wl-lead { color: var(--ink-soft); margin-bottom: 1.6rem; }
+        .wl-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: clamp(18px, 5vw, 28px); }
+        .wl-code { font: 500 1.9rem/1 var(--sans); letter-spacing: .32em; text-align: center; padding: .9rem .5rem .9rem .82rem; font-variant-numeric: tabular-nums; }
+        .wl-code::placeholder { letter-spacing: .32em; color: var(--line); }
+        .wl-code.long { letter-spacing: .14em; padding-left: .64rem; }
+        .wl-go { width: 100%; padding: 1.15rem 1rem; font-size: 1.05rem; }
+        .wl-or { display: flex; align-items: center; gap: .8rem; margin: 1.2rem 0; color: var(--muted); font-size: .82rem; letter-spacing: .1em; text-transform: uppercase; }
+        .wl-or::before, .wl-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+        .wl-where { margin: 1.1rem 0 0; font-size: .9rem; color: var(--ink-soft); }
+        .wl-where li { margin-bottom: .25rem; }
+        .wl-where ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+        .wl-wait { text-align: center; padding: 1.4rem 0 .6rem; }
+        .wl-spin { width: 46px; height: 46px; margin: 0 auto 1.1rem; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: wlspin .9s linear infinite; }
+        @keyframes wlspin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .wl-spin { animation-duration: 3s; } }
+        .wl-ok { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--ok-soft); color: var(--ok); margin-bottom: 1.2rem; }
+        .wl-ok svg { width: 30px; height: 30px; stroke-width: 2; }
+        .wl-facts { display: grid; grid-template-columns: 1fr 1fr; border-block: 1px solid var(--line); margin: 1.4rem 0; }
+        .wl-facts div { padding: .8rem 0; min-width: 0; }
+        .wl-facts div + div { padding-left: 1rem; border-left: 1px solid var(--line); }
+        .wl-facts span { display: block; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+        .wl-facts strong { font: 400 1.3rem/1.25 var(--serif); overflow-wrap: anywhere; }
+        .wl-actions { display: grid; gap: .6rem; }
+        .wl-msg { background: var(--warn-soft); color: var(--warn); padding: .9rem 1rem; border-radius: 2px; margin-bottom: 1rem; font-size: .95rem; }
+        .wl-terms { margin-top: 1.4rem; font-size: .82rem; color: var(--muted); }
+        .wl-terms summary { cursor: pointer; color: var(--ink-soft); }
+        .wl-terms ul { margin: .6rem 0 0; padding-left: 1.1rem; }
+        .wl-contact { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .92rem; color: var(--ink-soft); }
+        .wl-contact a { font-weight: 600; color: var(--ink); }
+        .wl-facts.three { grid-template-columns: 1fr 1fr 1fr; }
+        @media (max-width: 480px) { .wl-facts.three { grid-template-columns: 1fr 1fr; } .wl-facts.three div:nth-child(3) { grid-column: 1 / -1; padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } }
+        .wl-talk { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .6rem; margin-bottom: 1.4rem; }
+        .wl-talk .btn { padding: .95rem 1rem; }
+        .wl-talk svg { width: 19px; height: 19px; }
+        .wl-live { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: clamp(16px, 4vw, 24px); margin-bottom: 1.4rem; }
+        .wl-live-kicker { display: block; font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .7rem; }
+        .wl-live h3 { font-size: 1.35rem; margin: 1.1rem 0 .4rem; }
+        .wl-live-wx { display: flex; gap: .9rem; align-items: center; }
+        .wl-live-wx svg.wx { width: 44px; height: 44px; stroke-width: 1.4; flex: none; }
+        .wl-live-wx strong { font: 400 1.9rem/1 var(--serif); }
+        .wl-live-wx small { display: block; color: var(--ink-soft); font-size: .88rem; margin-top: .2rem; }
+        .wl-live-list { list-style: none; margin: 0; padding: 0; }
+        .wl-live-list li { display: flex; justify-content: space-between; gap: .8rem; padding: .55rem 0; border-top: 1px solid var(--line); font-size: .95rem; }
+        .wl-live-list li:first-child { border-top: 0; }
+        .wl-live-list small { color: var(--muted); white-space: nowrap; }
+        .wl-live-list a { text-decoration: none; }
+        .wl-live-list em { font-style: normal; font-size: .85rem; white-space: nowrap; }
+        .wl-live-list em.open { color: var(--ok); } .wl-live-list em.soon { color: var(--warn); } .wl-live-list em.closed { color: var(--bad); }
+        .wl-more { display: inline-block; margin-top: .8rem; font-size: .9rem; color: var(--accent); }
+        .wl-rules { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: .9rem 1.1rem; margin-bottom: 1.4rem; }
+        .wl-rules summary { cursor: pointer; font: 400 1.35rem/1.2 var(--serif); }
+        .wl-rules .prose { margin-top: .7rem; font-size: .95rem; }
+        .wl-close { margin-top: 1.2rem; font-size: .88rem; color: var(--muted); text-align: center; }
+        /* Start page after the login */
+        .wl-panel { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: clamp(16px, 4vw, 24px); margin-bottom: 1.4rem; }
+        .wl-panel-kicker { display: flex; align-items: center; gap: .45rem; font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .7rem; }
+        .wl-panel-kicker svg { width: 16px; height: 16px; }
+        .wl-panel h2 { font-size: 1.6rem; margin: 0 0 .35rem; }
+        .wl-panel h3 { font-size: 1.2rem; margin: 1rem 0 .4rem; }
+        .wl-panel p { margin: 0 0 .5rem; color: var(--ink-soft); }
+        .wl-panel p:last-child { margin-bottom: 0; }
+        .wl-tip-dist { font-size: .88rem; color: var(--muted) !important; }
+        .wl-tip-text { white-space: pre-line; }
+        .wl-tip-next { font-size: .82rem; color: var(--muted) !important; margin-top: .8rem !important; }
+        .wl-dep { border-color: var(--accent); }
+        .wl-check { list-style: none; margin: 0; padding: 0; }
+        .wl-check li { position: relative; padding: .45rem 0 .45rem 1.6rem; border-top: 1px solid var(--line); font-size: .95rem; }
+        .wl-check li:first-child { border-top: 0; }
+        .wl-check li::before { content: ''; position: absolute; left: .1rem; top: .72rem; width: .8rem; height: .8rem; border: 1.5px solid var(--accent); border-radius: 2px; }
+        .wl-days { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); margin: 1rem 0 0; padding: .8rem 0 0; border-top: 1px solid var(--line); }
+        .wl-days li { display: flex; flex-direction: column; align-items: center; gap: .2rem; font-size: .9rem; }
+        .wl-days li + li { border-left: 1px solid var(--line); }
+        .wl-days span { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+        .wl-days svg.wx-s { width: 26px; height: 26px; stroke-width: 1.4; }
+        .wl-days small { color: var(--muted); }
+        .wl-towel-row { display: flex; gap: 1rem; align-items: flex-start; }
+        .wl-towel-row h2 { font-size: 1.35rem; }
+        .wl-towel-icon { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: var(--paper); border: 1px solid var(--line); color: var(--accent); }
+        .wl-towel-icon svg { width: 22px; height: 22px; stroke-width: 1.6; }
+        .wl-towel-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin-top: 1rem; }
+        .wl-towel-btns .btn { padding: .95rem 1rem; }
+        .wl-preview { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--ink); color: var(--paper); text-align: center; font-size: .82rem; padding: .55rem 1rem; letter-spacing: .02em; }
+        .masthead .brand { pointer-events: none; }
+        .masthead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    </style>
+</head>
+<body>
+    <header class="masthead solid">
+        <span class="brand" id="brand">Ferienwohnung</span>
+    </header>
+
+    <main class="wl" aria-live="polite">
+        <p class="wl-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16.1a5 5 0 0 1 7 0"/><path d="M12 19.6h.01"/></svg><span id="kicker">Gäste-WLAN</span></p>
+        <div id="box"><div class="wl-wait"><div class="wl-spin" aria-hidden="true"></div><p data-t>Einen Moment …</p></div></div>
+        <div class="wl-contact" id="contact" hidden></div>
+    </main>
+    <div class="wl-preview" id="preview" hidden>Vorschau der WLAN-Anmeldeseite · jeder 6-stellige Code wird angenommen</div>
+
+    <script src="live-icons.js"></script>
+    <script src="i18n.js"></script>
+    <script src="wlan.js"></script>
+</body>
+</html>

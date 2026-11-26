@@ -16,6 +16,8 @@ users.json.bak
 rental.db
 rental.db-wal
 rental.db-shm
+watchdog-state.json
+watchdog-state.json.tmp
 .wwebjs_auth/
 
 # Android build output (TV-Kiosk-App)
@@ -25,6 +27,10 @@ android-tv-kiosk/app/build/
 android-tv-kiosk/local.properties
 uploads/chat/
 .wwebjs_cache/
+uploads/site/
+uploads/site-video/
+.ocr-data/
+uploads/receipts/
 
 # Datensicherungen (verschlüsselt) und entpackte Wiederherstellungen
 backups/

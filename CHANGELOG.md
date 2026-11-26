@@ -5,13 +5,299 @@ Alle bedeutenden Änderungen an diesem Projekt werden in dieser Datei dokumentie
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.38.0] - 2026-11-01
+## [1.61.0] - 2026-11-26
 
 ### Neu
 - Automatische Datensicherung (`backup.js`): täglich zur eingestellten Uhrzeit ein konsistenter SQLite-Schnappschuss plus `.env`, `users.json`, `uploads/` (optional `.wwebjs_auth/`) als tar.gz, verschlüsselt mit AES-256-CBC/PBKDF2 im `openssl enc`-Format, mit `MANIFEST.json` (SHA-256 je Datei)
 - Ziele: lokal `backups/` (Rotation), S3-kompatibel (Cloudflare R2, Backblaze, Hetzner; eigene SigV4-Signatur ohne neue Abhängigkeit), WebDAV (Nextcloud, Hetzner Storage Box), Telegram-Datei; alte externe Sicherungen werden nach Anzahl gelöscht
 - Admin: Einstellungen → Datensicherung (nur Inhaber/Admin) mit Status, Verbindungstest, „Jetzt sichern“ und Download; Hinweis im Dashboard bei ausgeschalteter, fehlgeschlagener oder veralteter Sicherung; Fehlermeldung über alle Benachrichtigungswege
 - `backup-restore.js`: entschlüsselt, prüft Prüfsummen und spielt mit `--apply` zurück (alte Daten nach `pre-restore-*/`); Anleitung in `BACKUP.md`
+
+## [1.60.0] - 2026-11-26
+
+### Neu
+- Server-Wächter `watchdog.js` als eigener PM2-Prozess `beckhome-watchdog` (unabhängig von der App). Prüft jede Minute und meldet direkt über die Telegram-Bot-API an die Benachrichtigungs-IDs:
+  - App antwortet nicht auf `http://127.0.0.1:<PORT>/api/health` (3 Fehlversuche in Folge)
+  - Domain aus der „Öffentlichen Adresse“ über Cloudflare/Tunnel nicht erreichbar (5 Fehlversuche, mit Zustand des `cloudflared`-Dienstes)
+  - Festplatte unter 10 % oder 2 GB frei
+  - Server neu gestartet (mit letztem Lebenszeichen davor)
+  - Wiederherstellung wird gemeldet, Erinnerung alle 6 Stunden, nicht zugestellte Meldungen werden nachgeschickt
+- Optional `WATCHDOG_HEARTBEAT_URL` in der `.env` (z. B. healthchecks.io): Dead-Man-Switch für einen Totalausfall des Servers
+- App-seitig (`server-watch.js`): Warnung, wenn der Wächter länger als 10 Minuten nicht geprüft hat; Telegram-Befehl `/server` (Recht „Einstellungen ansehen“); Übersicht unter Einstellungen → Telegram Bot; `watchdog` in `/api/status`
+- `update.sh`, `setup.sh` und das Update im Admin starten bzw. aktualisieren den Wächter; läuft die App unter PM2 ohne Wächter, startet sie ihn einmal selbst (`WATCHDOG_AUTOSTART=0` schaltet das ab)
+- `node watchdog.js --test` zeigt das Prüfergebnis und schickt eine Testnachricht
+
+### Geändert
+- `/api/health` prüft die Datenbank mit, wird nicht mehr auf die Gäste-Webseite umgeleitet (auch auf der Domain erreichbar) und ist nicht cachebar
+
+## [1.59.1] - 2026-11-26
+
+### Behoben
+- `geo-check.js`: Fehler bei Nominatim (403/429/Zeitüberschreitung) brachen den ganzen Abgleich ab → jetzt Ersatz über Photon (photon.komoot.io), Nominatim wird nach einem Fehler 10 Minuten übersprungen; Gesamtbudget 12 s statt 15-s-Race mit bis zu 5 Anfragen à 6 s
+- Fehlermeldung im Bot nennt den Grund (`reasonOf`), Log `[Geo]` mit Statuscode und Antwortanfang
+
+## [1.59.0] - 2026-11-25
+
+### Neu
+- Belege per Telegram: Foto oder PDF an den Bot schicken (`tg-receipts.js`). Texterkennung auf dem Server (`receipt-scan.js`: tesseract für Fotos, `pdf-parse` für PDFs, eingescannte PDFs als Bild der ersten Seite) erkennt Händler, Datum, Endbetrag, MwSt, Zahlart, Beleg-Nr. und Kategorie; Rückfrage mit Knöpfen (Speichern, Betrag/Datum/Händler/Kategorie/Beschreibung ändern, Paperless an/aus, Verwerfen). Fotos ohne Bildunterschrift werden automatisch als Beleg oder Anschrift-Screenshot erkannt (`looksLikeReceipt`), Bildunterschrift „Beleg“ erzwingt Beleg. `/beleg` (auch `/beleg 12,50 REWE Putzmittel` ohne Foto), `/ausgaben` (Monat, Jahr, Kategorien, letzte Belege), Hauptmenü-Knöpfe. Bot-Recht `beleg` = Finanzen bearbeiten
+- Optional KI-Erkennung über die Claude API (`@anthropic-ai/sdk`, strukturierte Ausgabe als JSON-Schema, Modell wählbar, Standard `claude-opus-5-5`, Server-Fallback bei Ablehnung). Fällt die KI aus, wird die Texterkennung benutzt
+- Ausgaben-Tabelle erweitert (Migration in `receipts.js`): Händler, MwSt-Satz, Vorsteuer, Zahlart, Beleg-Nr., Belegdatei (`uploads/receipts/`, nur über `/api/expenses/:id/receipt`), erkannter Text, Paperless-Status
+- Paperless-ngx: Beleg hochladen mit Titel, Datum, Korrespondent = Händler, Dokumenttyp, Tags (Namen, fehlende werden angelegt), Kategorie als Tag, Betrag ins Benutzerfeld (monetary/float/string); Aufgabe wird abgefragt bis zur Dokument-ID, Duplikate werden verknüpft. Übernahme aus Paperless (Tag als Name oder ID, alle Seiten, Betrag aus Benutzerfeld oder OCR-Text, Korrespondent als Händler), optional stündlich automatisch mit Meldung
+- Admin „Ausgaben“ neu: Kennzahlen, Filter Jahr/Kategorie/Suche, Beleg-Chips (Foto/PDF, Paperless ✓/⚠/→), Dialog „Neue Ausgabe“ mit Datei-Upload und sofortiger Erkennung, Drag & Drop, Bearbeiten, Handy-Ansicht, Dunkelmodus
+- Einstellungen → „Belege & KI-Erkennung“ (`/api/receipts/settings`, Recht Einstellungen; API-Schlüssel wird nie zurückgegeben), KI-Test, Paperless-Prüfung
+- Finanz-Auswertung: Blatt „Ausgaben“ mit Händler, Beleg-Nr., Zahlart, MwSt-Satz, Vorsteuer, Beleg; Übersicht mit „darin Vorsteuer“; neuer Export „Alle Belege als ZIP“ (`/api/finance/receipts.zip`, Dateien `Datum_Händler_Betrag`, mit CSV)
+
+## [1.58.0] - 2026-11-24
+
+### Neu
+- TV-Box Fernwartung (`tv-remote.js`): ws-scrcpy (Live-Bild + Steuerung) über einen ADB-Tunnel, den die Box selbst aufbaut. TV-App 1.12 (`AdbTunnel.java`, OkHttp) öffnet bei `remote.adbTunnel` aus `/api/tv-box/sync` eine WebSocket-Verbindung zu `/api/tv-box/adb-tunnel` (Header `x-tvbox-auth`) und leitet sie an `127.0.0.1:5555` der Box weiter; der Server bietet sie als `127.0.0.1:15555` an (`TV_ADB_PORT`) und führt `adb connect` aus
+- ws-scrcpy läuft als PM2-Prozess `ws-scrcpy` nur auf `127.0.0.1:8000` (`WS_SCRCPY_URL`) und ist nur über den Admin erreichbar: `/tv-fernwartung/` (HTTP) und WebSockets `/?action=…`, beide mit Admin-Sitzung, Recht „Einstellungen: Bearbeiten“, gleicher Origin, nicht auf dem Gast-Host
+- `GET/PUT /api/settings/tvbox/remote`, `POST /api/settings/tvbox/remote/reconnect`; Sync meldet `adbLocal`
+- `tools/tv-fernwartung.sh`: installiert adb, baut ws-scrcpy v0.8.1 (auf 127.0.0.1 gepatcht) nach `/opt/ws-scrcpy`, PM2 als App-Benutzer, Prüfung (`status`)
+- `TV-Box-Fernwartung.bat` (neu) und optionaler Schritt in `TV-Box-einrichten.bat`: `setprop persist.adb.tcp.port 5555` (falls erlaubt) + `adb tcpip 5555`
+- Abhängigkeit `ws`
+
+## [1.57.0] - 2026-11-23
+
+### Neu
+- Admin: Dunkelmodus mit Umschalter Hell / Dunkel / Automatisch oben rechts (`<html data-theme>`, Skript im `<head>` gegen Aufblitzen). Wahl je Benutzer in `users.theme` (Migration), `PUT /api/me/theme`, `/api/me` liefert `theme`; das Gerät merkt sich die letzte Wahl in `localStorage.adminTheme`
+- `styles.css`: feste Hellfarben im App-Look durch Variablen ersetzt (hell unverändert), Block „DUNKELMODUS“ nur `@media screen`; Diagramme lesen `--chart-*`, Leaflet-Kacheln werden abgedunkelt
+
+## [1.56.0] - 2026-11-23
+
+### Neu
+- WLAN-Startseite nach der Anmeldung (`guest-site/wlan.js`, `wifi-portal.js`): Wetterkarte mit 3-Tage-Vorschau (aus `api/live`), „Tipp des Tages“ (`tipOfDay`: Ausflugstipps `site.tips` täglich rotierend, versetzt um die Buchungs-ID; Fallback Abschnitt der Gästemappe), Handtuch-Karte, Abreise-Karte am Abreisetag (Hinweise aus `tv_guest`), danach „Jetzt geöffnet?“ und Veranstaltungen
+- `POST /gast/api/wlan/towels` (JSON, 5/min): Buchung aus der WLAN-Sitzung oder „Meine Buchung“, ruft `tvGuest.requestTowels(…, { source: 'wlan' })` (gleiche 30-Minuten-Sperre wie der TV). Vorschau sendet nichts. Kein Handtuch-Knopf am Abreisetag
+- Die Anmeldung wird in der Sitzung gemerkt (`req.session.wlan`), `POST /gast/api/wlan/home` und `hello` mit `status` liefern die Startseite erneut
+- Admin: Handtuch-Anfragen von der WLAN-Seite sind im Protokoll markiert
+- Gastgeber- und Zusatz-Codes bekommen ebenfalls `welcome` (Wetter, Tipp, Kontakt)
+
+## [1.55.1] - 2026-11-23
+
+### Behoben
+- `setup.sh`: Startprüfung von openNDS wartet bis zu 90 s (alle 5 s `ndsctl status`) statt fest 12 s. `/etc/beckhome-wlan.conf` wird vor Schritt 6 geschrieben, damit das Selbst-Update auch dann eingerichtet ist
+
+## [1.55.0] - 2026-11-23
+
+### Neu
+- TV-Welcome-Screen am Abreisetag (`tv-guest.js`, `public/welcome.html`): „Danke, <Name>!“, Check-out-Zeit, Abschiedstext und eine Liste mit Hinweisen zum Check-out, in der Sprache des Gastes. Die vorgegebenen Hinweise sind in `guest-site/i18n.js` übersetzt, eigene erscheinen wie eingegeben. Einstellbar unter Einstellungen → TV-Box → „Abreisetag & Handtücher“ (Setting `tv_guest`)
+- Am Wechseltag zeigt der Fernseher den abreisenden Gast bis 30 Minuten nach der Check-out-Zeit (ohne Zeit bis 12:30), danach den neuen Gast (`tvGuest.pickCurrent`). Vorher stand der neue Gast schon morgens auf dem Bildschirm
+- Knopf „Neue Handtücher“ dezent rechts unten auf dem TV, nur während eines Aufenthalts. Rückfrage mit Fokus auf „Abbrechen“, danach `POST /api/tv-box/towels` (nur gekoppelte Box oder Admin-Vorschau, JSON) → Nachricht an alle Empfänger (Telegram, WhatsApp, Push, Typ `towels`) mit Gast und Aufenthalt. Höchstens eine Nachricht pro Buchung alle 30 Minuten, der Gast sieht eine Bestätigung. Die letzten Anfragen stehen im Admin (Setting `towel_requests`)
+
+## [1.54.0] - 2026-11-22
+
+### Neu
+- `site-video.js`: Hintergrund-Video der Wohnung. Upload in 8-MB-Stücken (`/api/site/video/start|chunk|finish`, bis 2 GB, Cloudflare-Limit 100 MB pro Anfrage), ffmpeg erzeugt Master (1280 px, ohne Ton, max. 60 s), unscharfe Fassung (960 px, `gblur` eingerechnet) und Standbild; neue Unschärfe wird aus dem Master gerechnet. Ohne ffmpeg: MP4/WebM bis 60 MB unverändert, Unschärfe per CSS. Einstellungen in `site_video` (Startseite, Meine Buchung, TV, Handys)
+- Öffentlich unter `/hintergrund-video/<datei>` (vor der Gäste-Domain-Umleitung, Range-Anfragen, nur aktuelle Dateien), Skript `guest-site/bg-video.js` (auch `/bg-video.js` für den TV): lädt erst bei Sichtbarkeit, pausiert außerhalb des Bildschirms, kein Video bei reduzierter Bewegung/Datensparmodus/2G/3G
+- `/gast/api/info` liefert `video.site`/`video.account`, `/api/welcome` liefert `video`; TV-Welcome mit abgedunkeltem Video-Hintergrund
+- TV-App 1.11: `setMediaPlaybackRequiresUserGesture(false)`
+- `setup.sh` installiert ffmpeg, `update.sh` weist darauf hin, wenn es fehlt
+
+## [1.53.0] - 2026-11-22
+
+### Neu
+- Selbst-Update des Routers: `setup.sh` trägt `SETUPURL`/`SETUPVER` (Hash ohne Zeitstempel) ein und schreibt `/etc/beckhome-wlan.conf`. `beckhome-wlan-sync` meldet `ver=`, der Server antwortet `setup=<version>` (und `now=1` nach „Jetzt aktualisieren“). Bei Abweichung lädt der Router das Skript und führt es aus, 3–5 Uhr Ortszeit, ohne angemeldete Gäste oder sofort auf Wunsch, je Version höchstens ein Versuch pro Tag. Admin zeigt den Stand (`update` in adminState, `POST /api/site/wifi/portal/update`)
+
+## [1.51.0] - 2026-11-22
+
+### Neu
+- Telegram `/wlan [Dauer] [Notiz]` und Menü-Knopf „📶 WLAN-Codes“: zusätzliche 6-stellige Zugangscodes (Tabelle `wifi_portal_codes`, Geräte mit `kind = 'code'` und `code_id`), gültig ab sofort, gleiches Geräte-Limit wie eine Buchung. Löschen meldet die Geräte ab. Recht: Webseite bearbeiten
+- Buchungsblatt (`print-jobs.js`): WLAN, WLAN-Kennwort und WLAN-Code über `wifi.printView()`
+
+### Behoben
+- „Vergessen“ im Admin meldet das Gerät auch am Router ab: Die Antwort auf die Router-Meldung alle 2 Minuten enthält `kick=<mac>,…`, `beckhome-wlan-sync` führt `ndsctl deauth` aus. Bestehende Router brauchen den Einrichtungsbefehl noch einmal
+
+## [1.50.6] - 2026-11-22
+
+### Behoben
+- `setup.sh` (`wifi-portal.js`): openNDS `authenticated_users` nur noch `allow all`. openNDS 10.3.1 mit nftables (OpenWrt 25.12) legt `block to 10.0.0.0/8` usw. ohne Adress-Bedingung an, die Kette `ndsAUT` verwirft dadurch jedes Paket freigeschalteter Geräte. Private Netze sperrt weiterhin die fw4-Regel `gaeste_privat`
+
+## [1.50.5] - 2026-11-22
+
+### Behoben
+- Begrüßungsseite (`guest-site/wlan.js`): Knopf „Weiter ins Internet“ führt zur `originurl` aus dem openNDS-`fas` (z. B. `http://captive.apple.com/hotspot-detect.html`, Rückfall genau diese). Erst dieser Seitenaufruf lässt das Captive-Network-Fenster von iOS die Freischaltung erkennen („Fertig“, WLAN-Symbol)
+
+## [1.50.4] - 2026-11-22
+
+### Behoben
+- Globaler Rate-Limiter (100/min pro IP) überspringt `/wlan` und `/wlan.`: openNDS-authmon pollt etwa sekündlich (`wget_request` → `GET faspath?auth_get=…`) von der gemeinsamen Hausadresse und bekam 429 (`failed with status 8`), dadurch keine Freischaltungen und kein Router-Kontakt. Die Anfragen sind per Gateway-Hash bzw. HMAC geprüft
+- Anmeldeseite: Hinweis unter der Begrüßung, dass das Captive-Portal-Fenster (iOS „Fertig“, Android zurück) von Hand geschlossen wird
+- Ursache von „status 8“ am echten Router war Cloudflare (403 für die openNDS-Kennung mit Anführungszeichen); behoben per Cloudflare-Einstellung, nicht im Code
+
+## [1.50.3] - 2026-11-22
+
+### Behoben
+- `/wlan` und `/wlan.` lesen jetzt auch `application/x-www-form-urlencoded` und `text/plain` (openNDS-authmon und libopennds posten so). Vorher gab es ohne JSON-Body ein 404, openNDS loggte `failed with status 8` und kein Router-Kontakt kam an. Ohne Parameter antworten die Pfade nie mit einem Fehler
+
+## [1.50.2] - 2026-11-20
+
+### Geändert
+- Admin Webseite → WLAN: Kurzanleitung für den Router auf den GL.iNet GL-A1300 (Slate Plus, ipq40xx) umgestellt, Flashen per GL.iNet-Menü (Local Upgrade, sysupgrade) statt Cudy-Übergangs-Firmware. Der Cudy WR3000 V2 (HiSilicon) hat kein OpenWrt
+
+### Behoben
+- `GET /wlan.` antwortet jetzt mit 200: openNDS 10.3.1 prüft beim Start die FAS-Erreichbarkeit mit `faspath` plus Punkt und meldete sonst `uclient-fetch … failed with status 8`
+- Anmeldeseite (`guest-site/wlan.js`): Eingabe auf 6 Ziffern gekürzt, der 8-stellige Gastgeber-Code war so nicht nutzbar. Jetzt 6 oder 8 Ziffern, engere Schrift ab der 7. Ziffer
+
+## [1.50.1] - 2026-11-18
+
+### Behoben
+- Admin „Rechnung erstellen“ an einer Buchung (`invoiceFromBooking`): setzte nur Felder mit Wert, die Anschrift gar nicht. Anschrift, E-Mail, Türcode und Gutschein der vorherigen Rechnung (Entwurf im Formular) blieben stehen. Jetzt `GET /api/invoices/prefill/:bookingId` (Gast der Buchung, Meldeschein als Rückfall), alle Gastfelder werden ersetzt, `bookingId`/`guestId` reisen mit der Rechnung
+- Speichern (`POST /api/invoices`, Telegram-Rechnung aus Buchung): `address-check.bindInvoiceGuest()` bindet die Rechnung an den Gast der Buchung (Platzhalter → `applyGuestName`) und aktualisiert nur dessen Anschrift
+- `db.findOrCreateGuest`: überschreibt keine gespeicherte Anschrift mehr (füllt nur leere); E-Mail-Treffer zählt nur bei passendem Namen
+- Bereits vergebene Rechnungsnummer wird beim Erstellen aus einer Buchung durch die nächste freie ersetzt (höhere aus lokalem Zähler und Server)
+- Meldeschein und Gast-Rechnung: vom Gast bestätigte Anschrift ersetzt die gespeicherte
+- Gäste-Dialog: Adresse als `textarea`
+
+### Neu
+- `address-check.js` + Dialog „Anschriften prüfen“ (Hinweis unter Start/Kalender): Rechnungen mit derselben Anschrift wie eine frühere Rechnung einer anderen Person oder abweichend vom Meldeschein; Gäste mit fremder Anschrift. `POST /api/invoices/:id/address` (alter Wert bleibt in `addressCorrections`), `POST /api/guests/:id/address`, `POST /api/invoices/address-check/ack`
+
+## [1.49.0] - 2026-11-17
+
+### Neu
+- `geo-check.js`: Abgleich der erkannten Anschrift mit OpenStreetMap Nominatim (strukturierte Suche mit Rückfallstufen, 1 Anfrage/s, Cache im Speicher, 15 s Zeitlimit). Ergänzt leere PLZ/Ort und korrigiert die Schreibweise des Orts; Widersprüche nur als Vorschlag (`ageo:map`), `ageo:off`/`ageo:on` schaltet zwischen erkannt und abgeglichen
+- `address-parser`: Land wird vor der Zuordnung gesucht (egal wo es steht); ohne PLZ ist das letzte namensartige Feld nach der Straße der Ort
+
+
+### Behoben
+- `address-parser`: Anzahl-Angaben („Erwachsener 1“, „2 Adults“) fallen weg; Beschriftungen ohne Doppelpunkt mitten im Text („Bevorzugte Sprache“, „Land/Region“) samt Wert; „37 Slowakei“ → Land + Restnummer; PLZ passt nicht zum Land → Hausnummer + Straße (`ZIP_FORMATS`); unbekannte „Beschriftung: Wert“-Zeilen werden ignoriert
+- Screenshots: Icons als Buchstaben („X“, „XI“, Flagge „ET“) werden entfernt; Länderwert mit Icon-Präfix wird erkannt; „Straße 3118“ mit PLZ, die nicht zum Land passt, wird als Straße + Hausnummer gelesen, die echte PLZ folgt separat; Beschriftung „Gesamtzahl der Gäste“
+- Straße + Land ohne Ort gilt als Anschrift (`looksLikeAddress`, Rechnungsdialog, Bereinigung gespeicherter Adressen)
+
+## [1.48.1] - 2026-11-17
+
+### Behoben
+- Rechnungsdialog (Telegram): Die Adresse wird aus dem ganzen eingefügten Text mit `address-parser` bestimmt (Datum vorher entfernt); nicht zuordenbare Zeilen (Wohnungsname, Erwachsene, Sprache) fallen weg. Längerer Text ohne erkennbare Anschrift wird nicht mehr übernommen, der Bot fragt nach. Gespeicherte Gast-Adressen werden beim Vorbefüllen bereinigt.
+- `address-parser`: Beschriftungen „Land/Region“, „Erwachsener“, „Bevorzugte Sprache“, „Unterkunft“ u. a.; ein Satz nach dem Namen wird nicht mehr als Firma gelesen; SK/CZ-PLZ mit Leerzeichen
+
+## [1.48.0] - 2026-11-17
+
+### Neu
+- Gäste-Seiten mehrsprachig (Deutsch, Englisch, Niederländisch, Polnisch): `guest-site/i18n.js` mit Wörterbuch (deutscher Text als Schlüssel), `T()` für eigene und `TX()` für Server-Texte (Fehler, Wetter, Öffnungszeiten); Sprachumschalter auf Meine Buchung (Login, Kopfleiste, Menü), WLAN-Anmeldeseite und Notfall-Öffnen; TV-Welcome lädt `/guest-i18n.js`
+- `guest-lang.js`: Sprache pro Buchung, Reihenfolge Admin (`bookings.guest_lang`) > Wahl des Gastes (`bookings.guest_lang_pick`, `POST /gast/api/me/lang`) > erkannt aus Meldeschein, Land der Anschrift (über `address-parser.js`), Telefonvorwahl, E-Mail-Domain; ohne Hinweis Browser-Sprache (Gästeseiten) bzw. Deutsch (TV, Nachrichten)
+- Admin: Sprache im Buchungs-Popup (`GET/PUT /api/bookings/:id/lang`), Telefon und Anschrift im Popup
+- Gästenachricht (`guest-message.js`) und Anreise-Nachricht (`arrival-guide.js`) auch auf Niederländisch und Polnisch, Standard ist die Sprache des Gastes
+- Meldeschein und Rechnungsformular auf Meine Buchung sind mit der gespeicherten Anschrift vorausgefüllt (`address-parser.splitAddress`); Länder werden in der Sprache des Gastes angezeigt, gespeichert bleibt der deutsche Name
+
+## [1.47.0] - 2026-11-17
+
+### Neu
+- `address-parser.js`: erkennt in unformatiertem Text Name, Firma, Straße/Hausnummer, Zusatz, PLZ, Ort, Bundesstaat, Land, Telefon, E-Mail; mit/ohne Beschriftungen (DE/EN/NL/PL), eine Zeile mit Kommas oder ganz ohne Trenner, Formate DE/AT/CH/NL/BE/PL/CZ/GB/US/FR u. a.
+- Land aus Text, PLZ-Präfix (D-, CH-), PLZ-Format, bekannten Städten oder Telefonvorwahl; Ausgabe im App-Format (Straße Nr. / PLZ Ort / Land außer Deutschland)
+- Telegram: eingefügte Anschrift ohne Datum startet „Anschrift einfügen“ (mit Datum bleibt es der Rechnungsdialog), `/adresse`, Menü-Knopf; Buchungsauswahl mit Namensabgleich, Zusammenfassung, Speichern in `guests.address/phone/email`, bei Platzhalter-Gast über `applyGuestName`
+- Recht `adresse` = Buchungen & Gäste bearbeiten
+- Screenshots: Foto oder Bilddatei an den Bot → Texterkennung mit `tesseract.js` auf dem Server (`screenshot-ocr.js`, Sprachdaten Deutsch/Englisch als npm-Pakete `@tesseract.js-data/deu|eng`, entpackt nach `.ocr-data/`), Statusleiste/App-Knöpfe werden herausgefiltert, bekannte Gastnamen haben Vorrang; Bild nur als temporäre Datei, nach dem Speichern wird die Foto-Nachricht per `deleteMessage` aus dem Chat entfernt
+
+## [1.46.0] - 2026-11-17
+
+### Neu
+- WLAN für Gäste (enthält PR #45): `wifi.js` mit den Modi „Festes Passwort“, „FRITZ!Box“ (eigenes Passwort pro Buchung über TR-064, `fritzbox.js`) und neu „Anmeldeseite“ (`wifi-portal.js`)
+- Anmeldeseite für einen eigenen Router mit OpenWrt + openNDS (Forward Authentication, `fas_secure_enabled 4`): `/wlan` (Gast-Host) zeigt `guest-site/wlan.html`, Login mit 6-stelligem Code pro Buchung (`bookings.wifi_code`), Gastgeber-Code, Wiedererkennung per MAC (`wifi_portal_devices`), Login über die „Meine Buchung“-Sitzung
+- Der authmon-Daemon des Routers holt die Freischaltungen über `/wlan?auth_get=…` ab (HMAC `authmac` von openNDS 11 wird geprüft, ohne authmac nur mit dem zufälligen Gateway-Namen)
+- `/wlan/setup.sh?k=…`: Einrichtungs-Skript für OpenWrt (opkg und apk): openNDS, dnsmasq-full, eigenes Gäste-Netz `br-gaeste` mit Firewall (kein Zugriff aufs Heimnetz), WLAN, openNDS-Konfiguration mit Walled Garden
+- Admin Webseite → WLAN: Router-Status, Einrichtungs-Befehl, Anleitung, Zugangscodes, angemeldete Geräte; Telegram, wenn der Router 15 Minuten schweigt
+- Begrüßungsseite nach dem Login (`guest-site/wlan.js`): Check-out, Hausregeln (`site.house_rules`), Live-Tipps aus `api/live`, WhatsApp-Knopf aus dem Gäste-Chat, Telefon
+- Router meldet alle 2 Minuten per Cron (`/usr/bin/beckhome-wlan-sync`, `send_to_fas_custom "stats1 …"`) die angemeldeten Geräte mit Datenvolumen aus `ndsctl json`; Server zählt Deltas in `wifi_portal_clients`, `wifi_portal_usage` (pro Tag) und `wifi_portal_devices.down_kb/up_kb`
+- Leerstand: Option `vacant_off`, die Antwort `ack wifi=on|off` schaltet die Gäste-WLANs am Router um (bei fehlender Antwort bleibt es an); manuelle Übersteuerung 24 Std. an/aus über `POST /api/site/wifi/portal/power`
+
+## [1.45.0] / TV-App 1.10 - 2026-11-11
+
+### Neu
+- Neue Buchungen automatisch ausdrucken (`print-jobs.js`): Jede neue Buchung aus dem Kalender-Abgleich, jede bestätigte Webseiten-Anfrage und (abschaltbar) jede im Admin eingetragene Buchung legt einen Druckauftrag an (Tabelle `print_jobs`)
+- Die gekoppelte TV-Box bekommt offene Aufträge in der Antwort von `/api/tv-box/sync` (`print`), lädt das Buchungsblatt als PDF von `/api/tv-box/print/:id/pdf` (nur mit Box-Schlüssel) und druckt es per IPP 1.1 (Port 631, `application/pdf`) oder direkt an Port 9100; Modus „Automatisch“ weicht auf 9100 aus, wenn IPP nicht erreichbar ist. Ergebnis an `/api/tv-box/print/:id/result`, unbeantwortete Aufträge werden nach 10 Minuten erneut ausgegeben (max. 4 Versuche)
+- TV-App 1.10 sucht alle 30 Minuten per mDNS nach IPP-Druckern und meldet sie, im Admin lassen sie sich mit einem Klick übernehmen
+- Einstellungen → Drucker mit Testseite, Muster-Blatt (PDF) und Auftragsliste; „Ausdrucken“ im Buchungs-Popup (`POST /api/bookings/:id/print`)
+- Telegram/WhatsApp-Hinweis bei endgültig fehlgeschlagenem Druck oder wenn ein Auftrag 2 Stunden offen bleibt
+
+## TV-App 1.9.2 - 2026-11-07
+
+### Behoben
+- Die TV-Box zeigte immer „Willkommen“ statt des Gastnamens: Die App hängte `?welcome=Willkommen` an die Welcome-Seite, und dieser Wert hatte Vorrang vor dem Namen aus der aktuellen Buchung. Jetzt kommt der Name vom Server, nur ein per adb gesetzter `guest_name` überschreibt ihn
+
+## TV-App 1.9.1 - 2026-11-07
+
+### Neu
+- Test-Update für die Selbst-Aktualisierung: Nach einem Update zeigt die Box kurz „App aktualisiert auf Version …“ an
+
+## [1.44.1] - 2026-11-07
+
+### Verbessert
+- TV-App 1.9: Bei Internet- oder Server-Ausfall keine Fehlerseite mehr. Eine geladene Welcome-Seite bleibt stehen; sonst zeigt die App einen Offline-Welcome-Screen im selben Look (zuletzt bekannter Gastname, Kontakt, Check-in/-out aus `POST /api/tv-box/sync` → `welcome`, Uhr, Knopf „Fernsehen schauen“). Im Hintergrund prüft sie alle 20 s `/api/health` und lädt die echte Seite erst, wenn der Server wieder antwortet. Auch 5xx (z.B. Cloudflare 502) und „Vor-Ort-Informationen“ ohne Netz landen dort
+
+## [1.44.0] - 2026-11-07
+
+### Sicherheit
+- `/welcome.html` und `/api/welcome` (Vorname und Daten des aktuellen Gastes) nur noch für die gekoppelte TV-Box (Cookie `tvbox_auth` = Geräte-Kennung + Schlüssel, serverseitig gegen den SHA-256-Hash geprüft) oder eine angemeldete Admin-Sitzung (Vorschau). Alle anderen bekommen 403
+- Kopplung nur noch per 6-stelligem Code, den die Box (TV-App 1.8) auf dem Fernseher zeigt; wartende Boxen liegen nur im Speicher
+
+### Neu
+- TV-App 1.8: Kopplungs-Bildschirm mit Code und Verbindungsstatus; ohne Netzwerk Knöpfe „WLAN einrichten“ und „Netzwerk / LAN-Einstellungen“ (vor der Kopplung frei, danach nur über die PIN). Alter Server ohne `/api/tv-box/sync` (404): Welcome-Seite wie bisher
+- Admin: Code-Eingabe statt „Diese Box koppeln“, Knopf „Welcome-Seite ansehen“
+
+## [1.43.0] - 2026-11-07
+
+### Neu
+- TV-Box-Fernsteuerung: Die Box (TV-App 1.7) meldet sich jede Minute bei `POST /api/tv-box/sync` mit eigener Zufalls-Kennung und Schlüssel. Nach dem Koppeln unter Einstellungen → TV-Box bekommt sie Kiosk an/aus, Ruhezeit und Admin-PIN (`PUT /api/settings/tvbox/config`) sowie Befehle (`POST /api/settings/tvbox/command`: Welcome-Screen, neu laden, Update suchen, Android-Einstellungen, Neustart als Geräte-Eigentümer). Der Admin zeigt den Live-Status. Ungekoppelte Boxen bekommen nichts außer „nicht gekoppelt“; die PIN verlässt den Server nur zur gekoppelten Box
+- TV-App 1.7: Nach 4 Stunden ohne Tastendruck kehrt die Box aus jeder App (z.B. Waipu) zum Welcome-Screen zurück. Eine Bedienungshilfe (`KeyWatchService`) merkt sich nur den Zeitpunkt des letzten Tastendrucks; `TV-Box-einrichten.bat` schaltet sie ein und erteilt `WRITE_SECURE_SETTINGS`, damit die App sie selbst wieder aktiviert. Ohne Bedienungshilfe zählen die 4 Stunden ab dem Verlassen des Welcome-Screens
+
+## [1.42.0] - 2026-11-06
+
+### Neu
+- TV-Box-Selbst-Update: Einstellungen → „TV-Box (Welcome-Screen)“ zeigt installierte, freigegebene und neueste App-Version (GitHub-Release `tvbox`, `version.json` mit SHA-256) und gibt Updates frei (`GET /api/settings/tvbox`, `POST /api/settings/tvbox/approve`). Die Box fragt öffentlich `GET /api/tv-app` (meldet dabei ihre Version), lädt die freigegebene APK, prüft die Prüfsumme und installiert sie (TV-App 1.6, im Kiosk-Modus ohne Rückfrage)
+- Workflow signiert mit festem Schlüssel aus den Secrets `TV_KEYSTORE_B64`/`TV_KEYSTORE_PASSWORD`; `tvbox_*`-Einstellungen werden vom allgemeinen Speichern nicht mehr überschrieben
+
+## [1.41.3] - 2026-11-06
+
+### Geändert
+- TV-Box-App 1.5: dauerhafter Wächter-Dienst erkennt Aus/Ein auf mehreren Wegen (Standby, Bildschirm aus, Bildschirmschoner, HDMI getrennt wenn nur der Fernseher ausgeht, Anzeige-Status alle 3 Sekunden) und holt den Welcome-Screen zurück. Das Einrichtungs-Skript lässt die Box per HDMI-CEC mit dem Fernseher schlafen
+
+## [1.41.2] - 2026-11-06
+
+### Geändert
+- TV-Box-App 1.4: Einstellungen/PIN nur noch über die Zurück-Taste (10 Sekunden halten), OK- und Menü-Taste öffnen sie nicht mehr. Nach Aus/Ein an der Fernbedienung (Bildschirm aus/an) erscheint immer der Welcome-Screen statt der zuletzt benutzten App
+
+## [1.41.1] - 2026-11-06
+
+### Geändert
+- TV-Welcome-Screen (`welcome.html`): nur noch zwei Knöpfe, „Fernsehen schauen“ (Waipu TV) und „Vor-Ort-Informationen“ (urlaub.saarland im Welcome-Fenster)
+- TV-Box-App 1.3 (`android-tv-kiosk`): PIN-Schutz für die App-Einstellungen mit WLAN-/Android-Einstellungen und „Kiosk beenden (bis zum Neustart)“, WLAN bleibt wach (WifiLock, `wifi_sleep_policy`), Apps werden auch unter abweichendem Paketnamen gefunden (z.B. Waipu), Zurück-Taste und 10-Minuten-Rückkehr von externen Seiten, Fehlergrund auf dem Offline-Bildschirm
+- `TV-Box-einrichten.bat`: fragt die PIN ab, versucht zuerst den echten Kiosk-Modus und schaltet den Startbildschirm nur ohne ihn ab; `TV-Box-zuruecksetzen.bat` geht auch per USB
+
+## [1.41.0] - 2026-11-02
+
+### Neu
+- Gutscheine (`vouchers.js`, Tabelle `vouchers`): Arten Gratisnächte / Betrag / Prozent, Code `GS-XXXXXX` oder eigener Code, optional Gast, einlösbar ab/bis (Datum der Einlösung), Mindestaufenthalt, interne Notiz, Text auf dem Gutschein. Einmalig einlösbar; Status offen / vorgemerkt / eingelöst / abgelaufen / entwertet
+- Admin-Seite „Gutscheine“ (Seitenleiste): Übersicht mit Kennzahlen, Filter, Anlegen/Bearbeiten, Drucken (`GET /api/vouchers/:id/print`, A5 quer), Text für den Gast mit Link `?gutschein=CODE#buchen`, Entwerten, Wieder aktivieren, von Hand einlösen
+- Webseite: Feld „Gutscheincode“ in der Buchungsanfrage, `/gast/api/quote` zeigt den Rabatt (max. 20 Code-Prüfungen pro 15 Min.); die Anfrage merkt den Gutschein vor (`booking_requests.voucher_code/voucher_discount`), Bestätigen löst ihn ein, Ablehnen/Stornieren gibt ihn frei
+- „Buchung eintragen“: optionaler Gutscheincode mit Live-Prüfung; Löschen der Buchung gibt den Gutschein wieder frei
+- Rechnungsformular: „Gutschein einlösen“ fügt eine Rabatt-Position hinzu (`GET /api/vouchers/check`), Speichern markiert den Gutschein als eingelöst. Rechnung aus einer Buchung mit Gutschein übernimmt ihn automatisch
+- `bot-logic.buildInvoiceData()` und die Gast-Rechnung auf „Meine Buchung“ ergänzen die Rabatt-Position eines für den Aufenthalt eingelösten Gutscheins
+- Rechte-Bereich `vouchers` („Gutscheine“, Manager: Bearbeiten); die Code-Prüfung ist auch mit Rechnungen- oder Buchungen-Bearbeiten erlaubt
+
+### Geändert
+- Einzelpreis einer Rechnungsposition darf negativ sein (Rabatte)
+- Kalender-Popup zeigt einen eingelösten Gutschein und bietet „Gutschein schenken“
+
+## [1.40.0] - 2026-11-02
+
+### Neu
+- Anfahrts-Assistent (`arrival-guide.js`, Setting `arrival_guide`): Texte und Fotos für Anfahrt, Parken, Haustür und Öffnungs-Schritte unter Webseite → Ankunft (Rechte-Bereich „Gäste-Webseite“, Senden: „Nachrichten“). Fotos als `uploads/site/arr-*`, für Gäste nur mit laufender Buchung über `/gast/api/me/ankunft/bild/:file`
+- Automatischer Versand am Anreisetag (alle 5 Min. geprüft, Uhrzeit einstellbar) über `guestChat.sendToBooking`: WhatsApp → SMS (kurzer Text ohne Emoji) → E-Mail; ohne Kanal oder nach 3 Versuchen (alle 15 Min.) Text per Telegram. Spalten `arrival_*` an `bookings`, verschobene Buchungen werden am neuen Tag erneut versendet
+- Sprache Englisch automatisch, wenn der Meldeschein eine andere Staatsangehörigkeit als DE/AT/CH nennt
+- Direktlink `/b/<token>/ankunft` öffnet „Meine Buchung“ im neuen Tab „Ankunft“
+- Admin-Endpunkte `GET/PUT /api/site/arrival`, `POST /api/site/arrival/photo`, `GET /api/site/arrival/preview/:id`, `POST /api/site/arrival/send/:id`; Push-Typ `arrival_guide`
+
+## [1.39.0] - 2026-11-02
+
+### Neu
+- Live-Tipps (`local-live.js`, Setting `site_live`): Wetter, Veranstaltungen und Öffnungszeiten auf dem TV-Welcome-Screen und in „Meine Buchung“ (Tab Umgebung). Öffentlich über `GET /api/live?for=tv|app[&from&to]` (auch `/gast/api/live`), vor dem Gast-Domain-Rewrite registriert
+- Wetter: Open-Meteo (ohne Schlüssel), Ort per Open-Meteo-Geocoding, 30 Min. Cache
+- Öffnungszeiten: Orte von Hand oder aus OpenStreetMap (Overpass, Umkreissuche im Admin); übernommene Orte holen ihre Zeiten täglich neu. `opening-hours.js` liest das OSM-Format (Wochentage, mehrere Zeiten, über Mitternacht, Monate, `PH` mit bundesweiten Feiertagen, `24/7`)
+- Veranstaltungen: eigene Termine, bis zu 5 iCal-Links (inkl. Wiederholungen) und optional Ticketmaster Discovery API (Schlüssel bleibt auf dem Server); 3 h Cache, Duplikate werden zusammengefasst
+- Admin: Webseite → Live-Tipps mit Ortssuche, OSM-Suche, Terminliste und Vorschau (Rechte-Bereich „Gäste-Webseite“)
+
+### Geändert
+- TV-Welcome-Screen neu im Boutique-Stil (dunkle Variante), feste 16:9-Aufteilung ohne Scrollen, Listen kürzen sich auf den verfügbaren Platz; Fokus auf der ersten App für die Fernbedienung
+- `/api/welcome` liefert zusätzlich Anreise-/Abreisezeit und Titel der Webseite
 
 ## [1.36.1] - 2026-11-01
 

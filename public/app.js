@@ -121,7 +121,7 @@
         'nav-dashboard': ['calendar'], 'nav-calendar': ['calendar'], 'nav-bookings': ['bookings'],
         'nav-invoice': ['invoices'], 'nav-guests': ['bookings'], 'nav-website': ['bookings', 'website'],
         'nav-occupancy': ['finance'], 'nav-finance': ['finance'], 'nav-expenses': ['finance'], 'nav-estate': ['finance'],
-        'nav-chat': ['messages'], 'nav-welcome': ['settings'], 'btn-settings': ['settings'], 'nav-users': ['users'],
+        'nav-chat': ['messages'], 'nav-vouchers': ['vouchers'], 'btn-guest-voucher': [['vouchers', 'edit']], 'btn-inv-voucher': [['vouchers', 'view'], ['invoices', 'edit']], 'nav-welcome': ['settings'], 'btn-settings': ['settings'], 'nav-users': ['users'],
         'btn-new-booking': [['bookings', 'edit']], 'cal-sync-btn': [['calendar', 'edit']]
     };
     const SETTINGS_PAGE_RIGHTS = { 'settings-users': 'users', 'settings-push': null, 'settings-backup': 'users' };
@@ -156,7 +156,7 @@
 
     /** First view the user may open (calendar for most, otherwise the first allowed one). */
     function allowedStartView(wanted) {
-        const area = { bookings: 'bookings', expenses: 'finance', invoice: 'invoices', dashboard: 'calendar', occupancy: 'finance', finance: 'finance', calendar: 'calendar', chat: 'messages' }[wanted];
+        const area = { bookings: 'bookings', expenses: 'finance', invoice: 'invoices', dashboard: 'calendar', occupancy: 'finance', finance: 'finance', calendar: 'calendar', chat: 'messages', vouchers: 'vouchers' }[wanted];
         if (wanted && area && canDo(area)) return wanted;
         const first = START_VIEWS.find(([, a]) => canDo(a));
         return first ? first[0] : null;
@@ -325,6 +325,9 @@
     // =======================
     let positions = [];
     let positionIdCounter = 0;
+    // Which booking/guest the invoice in the form belongs to. The server takes the guest from here,
+    // never from a name match, so another guest's address can't end up on (or be copied from) the invoice.
+    let invoiceLink = { bookingId: null, guestId: null };
 
     // Initial Auth Check
     checkAuth();
@@ -399,7 +402,7 @@
                     <input type="number" value="${pos.qty}" data-id="${pos.id}" data-field="qty" min="0" step="1" class="pos-input">
                 </td>
                 <td>
-                    <input type="number" value="${pos.price}" data-id="${pos.id}" data-field="price" min="0" step="0.01" class="pos-input">
+                    <input type="number" value="${pos.price}" data-id="${pos.id}" data-field="price" step="0.01" class="pos-input">
                 </td>
                 <td class="pos-total">${formatCurrency(total)}</td>
                 <td>
@@ -701,6 +704,8 @@
     // =======================
     async function saveAllSettings() {
         if (!canDo('settings', 'edit')) return; // the server would refuse it anyway
+        // "Belege & KI" hat eigene Felder: mit speichern, wenn die Seite geöffnet war
+        if (receiptSettingsLoaded) apiJson('/api/receipts/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(receiptSettingsBody()) }).catch(() => { });
         try {
             // First, load existing settings from server to preserve values not shown in UI
             const existing = await fetch('/api/settings');
@@ -744,8 +749,6 @@
                 },
                 booking_ical: $('#booking-ical-url').value || '',
                 airbnb_ical: ($('#airbnb-ical-url')?.value || '').trim(),
-                paperless_expense_tag: $('#s-pl-expense-tag')?.value || '',
-                paperless_amount_field: $('#s-pl-amount-field')?.value || '',
                 nuki: {
                     token: $('#nuki-token').value || '',
                     lockId: $('#nuki-lock-id').value || ''
@@ -849,8 +852,6 @@
                 if (typeof url === 'string') $('#booking-ical-url').value = url;
             }
             if (typeof s.airbnb_ical === 'string' && $('#airbnb-ical-url')) $('#airbnb-ical-url').value = s.airbnb_ical;
-            if (s.paperless_expense_tag) $('#s-pl-expense-tag').value = s.paperless_expense_tag;
-            if (s.paperless_amount_field) $('#s-pl-amount-field').value = s.paperless_amount_field;
             // Notifications
             const container = $('#wa-phones-container');
             container.innerHTML = '';
@@ -1408,6 +1409,9 @@
             zShowBank: $('#z-show-bank').checked,
             nukiPin: $('#nuki-pin-result').style.display !== 'none' ? $('#nuki-pin-code').textContent : null,
             positions: positions.map(p => ({ desc: p.desc, qty: p.qty, price: p.price })),
+            voucherCode: invoiceVoucherCode(),
+            bookingId: invoiceLink.bookingId || null,
+            guestId: invoiceLink.guestId || null,
             timestamp: Date.now()
         };
     }
@@ -1428,6 +1432,7 @@
         if (!raw) return false;
         try {
             const d = JSON.parse(raw);
+            invoiceLink = { bookingId: d.bookingId || null, guestId: d.guestId || null };
             if (d.gName) $('#g-name').value = d.gName;
             if (d.gAdresse) $('#g-adresse').value = d.gAdresse;
             if (d.gEmail) $('#g-email').value = d.gEmail;
@@ -1538,6 +1543,7 @@
             const data = await res.json();
             if (data.success) {
                 showToast(`Rechnung ${nummer} ${data.message}`, 'success');
+                if (data.voucherWarning) showToast(`Gutschein nicht eingelöst: ${data.voucherWarning}`, 'error', 7000);
                 await fetchArchive();
                 loadDashboard(); // Refresh stats after archiving
                 return true;
@@ -1589,8 +1595,8 @@
     });
 
     function switchView(viewId) {
-        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar, viewOccupancy, viewFinance, $('#view-chat')];
-        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar, navOccupancy, navFinance, $('#nav-chat')];
+        const views = [viewDashboard, viewInvoiceForm, viewExpenses, viewEstate, viewBookings, viewWebsite, viewCalendar, viewOccupancy, viewFinance, $('#view-chat'), $('#view-vouchers')];
+        const navItems = [navDashboard, navInvoice, navGuests, navExpenses, navEstate, navBookings, navWebsite, navCalendar, navOccupancy, navFinance, $('#nav-chat'), $('#nav-vouchers')];
 
         views.forEach(v => {
             if (v) v.style.display = 'none';
@@ -1641,6 +1647,10 @@
             viewFinance.style.display = 'flex';
             navFinance.classList.add('active');
             loadFinance();
+        } else if (viewId === 'vouchers' && $('#view-vouchers')) {
+            $('#view-vouchers').style.display = 'flex';
+            $('#nav-vouchers').classList.add('active');
+            loadVouchers();
         }
 
         startViewPolling(viewId);
@@ -1663,6 +1673,7 @@
     if (navOccupancy) navOccupancy.addEventListener('click', () => switchView('occupancy'));
     if (navFinance) navFinance.addEventListener('click', () => switchView('finance'));
     if ($('#nav-chat')) $('#nav-chat').addEventListener('click', () => switchView('chat'));
+    if ($('#nav-vouchers')) $('#nav-vouchers').addEventListener('click', () => switchView('vouchers'));
 
     if (navWelcome) {
         navWelcome.addEventListener('click', () => {
@@ -1711,6 +1722,7 @@
             const todo = [];
             if (d.namesMissing > 0) todo.push(`<div class="today-warn">❓ ${d.namesMissing} Buchung${d.namesMissing === 1 ? '' : 'en'} ohne Namen – <button class="today-link" data-goto="noname">jetzt eintragen</button></div>`);
             if (d.openInvoices && d.openInvoices.count > 0) todo.push(`<div>🧾 ${d.openInvoices.count} offene Rechnung${d.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(d.openInvoices.total)})</div>`);
+            if (d.addressIssues > 0) todo.push(`<div class="today-warn">📇 ${d.addressIssues} Anschrift${d.addressIssues === 1 ? '' : 'en'} vermutlich vertauscht – <button class="today-link" data-addrcheck="1">jetzt prüfen</button></div>`);
             d.warnings.forEach(w => {
                 const bad = w.type === 'overlap' || w.type === 'sync' || w.bad;
                 const icon = w.type === 'lock' ? '🔋' : w.type === 'backup' ? '💾' : '⚠️';
@@ -1718,6 +1730,7 @@
                 todo.push(`<div class="${bad ? 'today-bad' : 'today-warn'}">${icon} ${escapeHtml(w.text)}${ack}</div>`);
             });
             $('#today-todo').innerHTML = todo.length ? todo.join('') : '<div class="today-empty">✅ Alles erledigt – nichts offen.</div>';
+            $('#today-todo').querySelectorAll('[data-addrcheck]').forEach(b => b.addEventListener('click', () => openAddressCheck()));
             $('#today-todo').querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => {
                 bookingsFilter = 'noname';
                 switchView('bookings');
@@ -1896,14 +1909,72 @@
         input.addEventListener('blur', save);
     }
 
-    function invoiceFromBooking(b) {
+    /** Next invoice number: the higher of the local counter and the server (Telegram and guests number there too). */
+    function freshInvoiceNumber(serverNext) {
+        let nr = getNextRechnungsnr();
+        const num = x => parseInt(String(x || '').split('-')[1], 10) || 0;
+        const year = new Date().getFullYear();
+        if (serverNext && String(serverNext).startsWith(`${year}-`) && num(serverNext) > num(nr)) {
+            nr = serverNext;
+            localStorage.setItem(STORAGE_KEYS.rechnungsnr, JSON.stringify({ nr: num(serverNext), year }));
+        }
+        return nr;
+    }
+
+    /**
+     * New invoice for a booking. Everything guest-related is replaced (also with empty values), so nothing of the
+     * previous invoice in the form survives: name, e-mail, address, door code, voucher. The data comes fresh from the
+     * server for exactly this booking; the list entry is only the fallback.
+     */
+    async function invoiceFromBooking(b) {
         switchView('invoice');
-        const set = (sel, val) => { const el = $(sel); if (el && val) { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } };
-        set('#g-name', b.name);
-        set('#g-email', b.guestEmail);
-        set('#a-anreise', b.checkin);
-        set('#a-abreise', b.checkout);
-        if (!b.name) showToast('Bitte noch den Gastnamen eintragen', 'info');
+        let p = null;
+        try { p = await apiJson(`/api/invoices/prefill/${encodeURIComponent(b.id)}?current=${encodeURIComponent($('#r-nummer').value || '')}`); }
+        catch (e) { p = null; }
+        if (!p || !p.success) {
+            p = { name: b.name || '', email: b.guestEmail || '', address: b.guestAddress || '', checkin: b.checkin, checkout: b.checkout, guestId: b.guestId || null, numberTaken: false };
+        }
+        const put = (sel, val) => {
+            const el = $(sel);
+            if (!el) return;
+            el.value = val || '';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        put('#g-name', p.name);
+        put('#g-email', p.email);
+        put('#g-adresse', p.address);
+        put('#a-anreise', p.checkin || b.checkin);
+        put('#a-abreise', p.checkout || b.checkout);
+        if ($('#guest-autocomplete')) $('#guest-autocomplete').style.display = 'none';
+        invoiceLink = { bookingId: b.id, guestId: p.guestId || null };
+
+        // The number of an invoice that is already saved must not be reused (saving would overwrite it)
+        if (p.numberTaken || !$('#r-nummer').value) put('#r-nummer', freshInvoiceNumber(p.nextNumber));
+        put('#r-datum', new Date().toISOString().split('T')[0]);
+
+        // Door code of this booking, not of the previous invoice
+        if (b.pin) {
+            $('#nuki-pin-result').style.display = 'block';
+            $('#nuki-pin-code').textContent = b.pin;
+        } else {
+            $('#nuki-pin-result').style.display = 'none';
+            $('#nuki-pin-code').textContent = '——-';
+        }
+        // Voucher lines belong to the previous invoice; nights follow the new stay
+        const nights = calcNights(p.checkin || b.checkin, p.checkout || b.checkout);
+        positions = positions.filter(x => !/^Gutschein [A-Z0-9-]{4,}/.test(String(x.desc || '')));
+        positions.forEach(x => { if (/^Übernachtung/i.test(String(x.desc || '')) && nights > 0) x.qty = nights; });
+        renderPositions();
+        if ($('#inv-voucher-info')) $('#inv-voucher-info').hidden = true;
+        updateSummary();
+        updatePreview();
+        saveDraft();
+
+        if (!p.name) showToast('Bitte noch den Gastnamen eintragen', 'info');
+        else if (!p.address) showToast('Für diesen Gast ist noch keine Anschrift hinterlegt', 'info');
+        else if (p.addressSource === 'meldeschein') showToast('Anschrift aus dem Meldeschein übernommen', 'info');
+        if (b.voucherCode && !invoiceVoucherCode()) setTimeout(() => applyInvoiceVoucher(b.voucherCode, b.id), 300);
     }
 
     const bookingsListEl = $('#bookings-list');
@@ -2123,6 +2194,7 @@
         const list = [];
         if (o.namesMissing > 0) list.push(`<button type="button" class="alert warn" data-goto="noname">${o.namesMissing} Buchung${o.namesMissing === 1 ? '' : 'en'} ohne Namen – jetzt eintragen</button>`);
         if (calHome.requests.length) list.push(`<button type="button" class="alert info" data-goto="requests">${calHome.requests.length} offene Anfrage${calHome.requests.length === 1 ? '' : 'n'} von der Webseite</button>`);
+        if (o.addressIssues > 0) list.push(`<button type="button" class="alert warn" data-goto="addrcheck">${o.addressIssues} Anschrift${o.addressIssues === 1 ? '' : 'en'} vermutlich vertauscht – jetzt prüfen</button>`);
         if (o.openInvoices && o.openInvoices.count > 0) list.push(`<span class="alert">${o.openInvoices.count} offene Rechnung${o.openInvoices.count === 1 ? '' : 'en'} (${formatCurrency(o.openInvoices.total)})</span>`);
         (o.warnings || []).forEach(w => list.push(`<span class="alert ${w.type === 'overlap' || w.type === 'sync' ? 'bad' : 'warn'}">${escapeHtml(w.text)}</span>`));
         box.innerHTML = list.join('');
@@ -2161,7 +2233,12 @@
                 <dt>Türcode</dt><dd>${bk.hasCode ? (bk.pin ? `<code>${escapeHtml(bk.pin)}</code>` : 'angelegt') + (bk.arrivedAt ? ' · genutzt' : '') : 'kein Code'}</dd>
                 ${bk.guestCode ? `<dt>Gastcode</dt><dd><code>${escapeHtml(bk.guestCode)}</code></dd>` : ''}
                 ${bk.guestEmail ? `<dt>E-Mail</dt><dd>${escapeHtml(bk.guestEmail)}</dd>` : ''}
+                ${bk.guestPhone ? `<dt>Telefon</dt><dd>${escapeHtml(bk.guestPhone)}</dd>` : ''}
+                ${bk.guestAddress ? `<dt>Anschrift</dt><dd>${escapeHtml(bk.guestAddress).replace(/\n/g, ', ')}</dd>` : ''}
+                ${bk.state !== 'past' && canDo('bookings', 'edit') ? `<dt>Sprache</dt><dd><select class="pop-lang" data-pop-lang aria-label="Sprache der Gäste-App, des Fernsehers und der Gästenachrichten">
+                    <option value="">Automatisch</option>${Object.entries(GUEST_LANGS).map(([k, v]) => `<option value="${k}"${bk.lang === k ? ' selected' : ''}>${v}</option>`).join('')}</select></dd>` : ''}
                 <dt>Meldeschein</dt><dd>${bk.meldescheinId ? 'ausgefüllt ✓' : bk.state === 'past' ? '–' : 'fehlt noch'}</dd>
+                ${bk.voucherCode ? `<dt>Gutschein</dt><dd><code>${escapeHtml(bk.voucherCode)}</code> eingelöst</dd>` : ''}
             </dl>
             <div class="pop-actions">
                 <button type="button" class="pill" data-pop="name">${bk.needsName ? 'Namen eintragen' : 'Name ändern'}</button>
@@ -2170,12 +2247,30 @@
                 ${bk.state !== 'past' ? `<button type="button" class="pill" data-pop="doorcode">${bk.hasCode ? 'Türcode bearbeiten' : 'Türcode anlegen'}</button>` : ''}
                 ${bk.state !== 'past' && bk.guestCode ? '<button type="button" class="pill" data-pop="guestlink">Gastlink kopieren</button>' : ''}
                 <button type="button" class="pill" data-pop="chat">Nachricht</button>
+                ${bk.name && canDo('vouchers', 'edit') ? '<button type="button" class="pill" data-pop="voucher">Gutschein schenken</button>' : ''}
+                ${canDo('bookings', 'edit') ? '<button type="button" class="pill" data-pop="print">Ausdrucken</button>' : ''}
                 ${bk.manualEntry ? '<button type="button" class="pill pill-danger" data-pop="delete">Löschen</button>' : ''}
             </div>`;
         tlPop.dataset.bid = bk.id;
         delete tlPop.dataset.rid;
         placePop(anchor);
+        const langSel = tlPop.querySelector('[data-pop-lang]');
+        if (langSel) {
+            // What "Automatisch" means for this guest right now
+            apiJson(`/api/bookings/${bk.id}/lang`).then(d => {
+                if (!d || !d.success || !langSel.isConnected) return;
+                const auto = d.pick || d.auto;
+                langSel.options[0].textContent = auto ? `Automatisch · ${GUEST_LANGS[auto]}` : 'Automatisch · Browser';
+                langSel.title = auto ? (d.pick ? 'Vom Gast auf „Meine Buchung“ gewählt' : `Erkannt aus ${d.from}`) : 'Keine Angaben zum Gast: Meine Buchung nimmt die Sprache des Browsers, Fernseher und Nachrichten Deutsch';
+            }).catch(() => { });
+            langSel.addEventListener('change', async () => {
+                const d = await apiJson(`/api/bookings/${bk.id}/lang`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: langSel.value }) }).catch(() => null);
+                if (d && d.success) { bk.lang = langSel.value; showToast(langSel.value ? `Sprache: ${GUEST_LANGS[langSel.value]}` : 'Sprache wieder automatisch', 'success'); }
+                else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
+            });
+        }
     }
+    const GUEST_LANGS = { de: 'Deutsch', en: 'Englisch', nl: 'Niederländisch', pl: 'Polnisch' };
 
     function showRequestPop(rq, anchor) {
         tlPop.innerHTML = `
@@ -2185,6 +2280,7 @@
                 <dt>Dauer</dt><dd>${nightsTxt(rq.nights)}</dd>
                 <dt>Gäste</dt><dd>${rq.adults || 1} Erw.${rq.children ? ` · ${rq.children} Kinder` : ''}</dd>
                 ${rq.price_total ? `<dt>Preis</dt><dd>${formatCurrency(rq.price_total)}</dd>` : ''}
+                ${rq.voucher_code ? `<dt>Gutschein</dt><dd>${escapeHtml(rq.voucher_code)} (−${formatCurrency(rq.voucher_discount || 0)})</dd>` : ''}
                 ${rq.conflict ? `<dt>Achtung</dt><dd class="bad">überschneidet sich mit ${escapeHtml(rq.conflict.source)}</dd>` : ''}
             </dl>
             <div class="pop-actions"><button type="button" class="pill pill-primary" data-pop="request">Anfrage bearbeiten</button></div>`;
@@ -2205,6 +2301,7 @@
                 const g = goto.dataset.goto;
                 if (g === 'requests') return openRequests();
                 if (g === 'invoice') return switchView('invoice');
+                if (g === 'addrcheck') return openAddressCheck();
                 if (g === 'noname') { bookingsFilter = 'noname'; return switchView('bookings'); }
             }
             const bEl = e.target.closest('[data-bid]');
@@ -2237,6 +2334,13 @@
             if (act === 'chat') { hideTlPop(); return chatWithBooking(bk); }
             if (act === 'meldeschein') { hideTlPop(); return window.open(`/api/meldescheine/${bk.meldescheinId}/druck`, '_blank', 'noopener'); }
             if (act === 'doorcode') { hideTlPop(); return openDoorCode(bk); }
+            if (act === 'print') {
+                const d = await apiJson(`/api/bookings/${bk.id}/print`, { method: 'POST' }).catch(() => null);
+                if (d && d.success) showToast('Druckauftrag angelegt, die TV-Box druckt in etwa einer Minute', 'success');
+                else showToast((d && d.error) || 'Drucken hat nicht geklappt', 'error');
+                return;
+            }
+            if (act === 'voucher') { hideTlPop(); return openVoucherModal(null, { guestId: bk.guestId, guestName: bk.name }); }
             if (act === 'delete') {
                 if (!confirm(`Buchung von ${bk.name || 'diesem Gast'} (${fmtDEfull(bk.checkin)} – ${fmtDEfull(bk.checkout)}) löschen?${bk.hasCode ? ' Der Türcode wird ebenfalls gelöscht.' : ''}`)) return;
                 const d = await apiJson(`/api/bookings/${bk.id}`, { method: 'DELETE' }).catch(() => null);
@@ -2296,6 +2400,19 @@
         $('#nb-nights').textContent = n > 0 ? nightsTxt(n) : '';
     }
 
+    async function nbCheckVoucher() {
+        const info = $('#nb-voucher-info');
+        const code = $('#nb-voucher').value.trim();
+        if (!code) { info.hidden = true; return; }
+        const q = new URLSearchParams({ code, checkin: $('#nb-checkin').value, checkout: $('#nb-checkout').value });
+        const d = await apiJson(`/api/vouchers/check?${q}`).catch(() => null);
+        info.hidden = false;
+        info.classList.toggle('bad', !(d && d.success));
+        info.textContent = d && d.success
+            ? `✓ ${d.label}${d.voucher.guestName ? ` für ${d.voucher.guestName}` : ''}${d.discount ? ` · entspricht ${formatCurrency(d.discount)}` : ''}`
+            : `✗ ${(d && d.error) || 'Code konnte nicht geprüft werden'}`;
+    }
+
     function openNewBooking(day) {
         if (!modalNewBooking) return;
         hideTlPop();
@@ -2305,6 +2422,7 @@
         $('#nb-checkin').value = from;
         $('#nb-checkout').value = ymdAdd(from, 1);
         $('#nb-msg').hidden = true;
+        $('#nb-voucher-info').hidden = true;
         nbForce = false;
         $('#btn-save-new-booking').textContent = 'Buchung speichern';
         nbUpdateNights();
@@ -2323,7 +2441,10 @@
             nbForce = false;
             $('#btn-save-new-booking').textContent = 'Buchung speichern';
             nbUpdateNights();
+            nbCheckVoucher();
         }));
+        let nbVoucherTimer = null;
+        $('#nb-voucher').addEventListener('input', () => { clearTimeout(nbVoucherTimer); nbVoucherTimer = setTimeout(nbCheckVoucher, 450); });
         $('#nb-form').addEventListener('submit', async e => {
             e.preventDefault();
             const msg = $('#nb-msg');
@@ -2331,7 +2452,7 @@
             const body = {
                 name: $('#nb-name').value.trim(), email: $('#nb-email').value.trim(), phone: $('#nb-phone').value.trim(),
                 checkin: $('#nb-checkin').value, checkout: $('#nb-checkout').value, note: $('#nb-note').value.trim(),
-                createPin: $('#nb-pin').checked, force: nbForce
+                createPin: $('#nb-pin').checked, force: nbForce, voucherCode: $('#nb-voucher').value.trim()
             };
             btn.disabled = true;
             try {
@@ -2339,7 +2460,7 @@
                 const d = await res.json();
                 if (d.success) {
                     closeNewBooking();
-                    showToast(`Buchung gespeichert${d.pin ? ` – Türcode ${d.pin}` : ''}`, 'success', 5000);
+                    showToast(`Buchung gespeichert${d.pin ? ` – Türcode ${d.pin}` : ''}${d.voucher ? ` – Gutschein ${d.voucher.code} eingelöst` : ''}`, 'success', 5000);
                     if (d.pinError) showToast(`Türcode nicht angelegt: ${d.pinError}`, 'error', 6000);
                     tlStart = ymdAdd(body.checkin, -3);
                     if (currentView === 'calendar') loadCalendarHome(); else switchView('calendar');
@@ -2471,6 +2592,89 @@
         try { localStorage.setItem('navCollapsed', on ? '1' : '0'); } catch (e) { /* ignore */ }
     });
 
+    // ---- Darstellung: Hell / Dunkel / Automatisch (je Benutzer gespeichert, Gerät merkt sich die letzte Wahl)
+    const THEME_KEY = 'adminTheme';
+    const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    let themePref = 'auto';
+    try { themePref = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) { /* ignore */ }
+
+    function isDarkTheme() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+
+    function applyTheme(pref) {
+        themePref = ['light', 'dark', 'auto'].includes(pref) ? pref : 'auto';
+        const dark = themePref === 'dark' || (themePref === 'auto' && !!(darkQuery && darkQuery.matches));
+        const changed = isDarkTheme() !== dark;
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        try { localStorage.setItem(THEME_KEY, themePref); } catch (e) { /* ignore */ }
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#161c25' : '#ffffff');
+        document.querySelectorAll('#theme-menu [data-theme-pref]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.themePref === themePref)));
+        if (changed) restyleCharts();
+    }
+
+    /** Farben für Chart.js aus den CSS-Variablen (hell oder dunkel) */
+    function chartColors() {
+        const cs = getComputedStyle(document.documentElement);
+        const v = (n, f) => (cs.getPropertyValue(n) || '').trim() || f;
+        return { text: v('--chart-text', '#6b7385'), grid: v('--chart-grid', '#e4e7ee'), bar: v('--chart-bar', '#2b62e3'), bar2: v('--chart-bar-2', '#c4b8a5') };
+    }
+    window.chartColors = chartColors;
+
+    function setChartDefaults() {
+        if (!window.Chart) return;
+        const c = chartColors();
+        Chart.defaults.color = c.text;
+        Chart.defaults.borderColor = c.grid;
+    }
+
+    // Bereits gezeichnete Diagramme an die neue Darstellung anpassen
+    function restyleCharts() {
+        if (!window.Chart) return;
+        setChartDefaults();
+        const c = chartColors();
+        [window.myRevenueChart, window.myReviewRevenueChart, window.myReviewChart].forEach(ch => {
+            if (!ch) return;
+            Object.values(ch.options.scales || {}).forEach(sc => {
+                if (sc.ticks) sc.ticks.color = c.text;
+                if (sc.grid) sc.grid.color = c.grid;
+                if (sc.border) sc.border.color = c.grid;
+                if (sc.title) sc.title.color = c.text;
+            });
+            if (ch.options.plugins && ch.options.plugins.legend && ch.options.plugins.legend.labels) ch.options.plugins.legend.labels.color = c.text;
+            ch.data.datasets.forEach((ds, i) => { ds.backgroundColor = i === 0 ? c.bar : c.bar2; });
+            ch.update('none');
+        });
+    }
+
+    applyTheme(themePref);
+    if (darkQuery) {
+        const onSystemChange = () => { if (themePref === 'auto') applyTheme('auto'); };
+        if (darkQuery.addEventListener) darkQuery.addEventListener('change', onSystemChange);
+        else if (darkQuery.addListener) darkQuery.addListener(onSystemChange);
+    }
+
+    (function initThemeSwitch() {
+        const btn = $('#theme-btn');
+        const menu = $('#theme-menu');
+        if (!btn || !menu) return;
+        const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = menu.hidden;
+            menu.hidden = !open;
+            btn.setAttribute('aria-expanded', String(open));
+        });
+        menu.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-theme-pref]');
+            if (!b) return;
+            applyTheme(b.dataset.themePref);
+            close();
+            fetch('/api/me/theme', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: themePref }) }).catch(() => { });
+        });
+        document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.theme-switch')) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) close(); });
+    })();
+
     // ---- Benutzername oben rechts
     async function loadTopbarUser() {
         try {
@@ -2479,6 +2683,8 @@
             const name = typeof u === 'string' ? u : (u && (u.username || u.name)) || '';
             const el = $('#topbar-user');
             if (el) el.textContent = name;
+            // Darstellung des Benutzers übernehmen (z. B. auf einem neuen Gerät)
+            if (u && typeof u === 'object' && u.theme && u.theme !== themePref) applyTheme(u.theme);
         } catch (e) { /* ignore */ }
     }
 
@@ -2523,6 +2729,9 @@
         $$('#website-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         $$('#view-website .site-pane').forEach(p => { p.style.display = p.dataset.pane === tab ? 'flex' : 'none'; });
         if (tab === 'meldescheine') loadMeldescheine();
+        if (tab === 'live') loadLive();
+        if (tab === 'arrival') loadArrival();
+        if (tab === 'wifi') loadWifi();
     }
     $$('#website-tabs button').forEach(b => b.addEventListener('click', () => setSiteTab(b.dataset.tab)));
 
@@ -2535,6 +2744,7 @@
             if (!d.success) return;
             siteData = d.site;
             fillSiteForm(d);
+            loadSiteVideo();
         } catch (e) { showToast('Webseiten-Einstellungen konnten nicht geladen werden', 'error'); }
     }
 
@@ -2605,6 +2815,128 @@
             } catch (x) { showToast('Upload fehlgeschlagen', 'error'); }
         }
         e.target.value = '';
+    });
+
+    // Background video of the apartment (site-video.js): chunked upload, server converts it with ffmpeg
+    let siteVideo = null;
+    let siteVideoTimer = null;
+    const mb = n => `${(n / 1048576).toLocaleString('de-DE', { maximumFractionDigits: n < 10485760 ? 1 : 0 })} MB`;
+
+    function videoProgress(pct, text) {
+        const box = $('#site-video-progress');
+        box.hidden = pct == null;
+        if (pct == null) return;
+        $('#site-video-bar').style.width = `${Math.max(2, Math.min(100, pct))}%`;
+        $('#site-video-step').textContent = text || '';
+    }
+
+    function renderSiteVideo(d) {
+        siteVideo = d;
+        const v = d.video || {};
+        const job = d.job;
+        const busy = job && job.state === 'processing';
+        const prev = $('#site-video-preview');
+        const cur = prev.dataset.url || '';
+        if (v.url !== cur) {
+            prev.dataset.url = v.url || '';
+            prev.innerHTML = v.url
+                ? `<video src="${escapeHtml(v.url)}" ${v.posterUrl ? `poster="${escapeHtml(v.posterUrl)}"` : ''} muted loop autoplay playsinline style="${v.baked ? '' : `filter:blur(${Number(v.blur) || 0}px);transform:scale(1.08)`}"></video>`
+                + `<span class="site-video-meta">${[v.duration ? `${v.duration} s` : '', v.size ? mb(v.size) : ''].filter(Boolean).join(' · ')}</span>`
+                : '<div class="site-video-empty">Noch kein Video. Ohne Video zeigen die Seiten wie bisher das Titelbild.</div>';
+            const vid = prev.querySelector('video');
+            if (vid) { vid.muted = true; vid.play().catch(() => { }); }
+        }
+        $('#site-video-del').hidden = !v.url || busy;
+        $('#site-video-opts').hidden = !v.url;
+        $('#site-video-pick').style.display = busy ? 'none' : 'inline-block';
+        $('#site-video-pick').firstChild.textContent = v.url ? 'Anderes Video hochladen' : 'Video hochladen';
+        $('#site-video-blur').value = v.blur;
+        $('#site-video-blur-val').textContent = `(${Number(v.blur) ? v.blur : 'aus'})`;
+        $('#site-video-blur').disabled = !!busy;
+        $('#site-video-on-site').checked = !!v.on_site;
+        $('#site-video-on-account').checked = !!v.on_account;
+        $('#site-video-on-tv').checked = !!v.on_tv;
+        $('#site-video-phones').checked = !!v.phones;
+        clearTimeout(siteVideoTimer);
+        if (busy) {
+            const steps = { master: 'Video wird umgewandelt', blur: 'Unschärfe wird eingerechnet', poster: 'Standbild wird erstellt' };
+            videoProgress(job.progress || 1, `${steps[job.step] || 'Wird verarbeitet'} … ${job.progress || 0} %. Du kannst die Seite verlassen.`);
+            siteVideoTimer = setTimeout(loadSiteVideo, 1500);
+        } else if (job && job.state === 'error') {
+            videoProgress(null);
+            if (!renderSiteVideo.shownError || renderSiteVideo.shownError !== job.error) showToast(`Video: ${job.error}`, 'error', 8000);
+            renderSiteVideo.shownError = job.error;
+        } else {
+            videoProgress(null);
+            renderSiteVideo.shownError = '';
+        }
+        if (!d.ffmpeg) $('#site-video-step').textContent = 'Hinweis: Auf dem Server fehlt ffmpeg. Dann geht nur eine fertige MP4-Datei (max. ~50 MB), die Unschärfe macht der Browser.';
+    }
+
+    async function loadSiteVideo() {
+        try {
+            const d = await apiJson('/api/site/video');
+            if (d && d.success) renderSiteVideo(d);
+        } catch (e) { /* ignore */ }
+    }
+
+    async function uploadSiteVideo(file) {
+        const json = (url, body) => apiJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const start = await json('/api/site/video/start', { name: file.name, size: file.size });
+        if (!start || !start.success) { showToast((start && start.error) || 'Upload fehlgeschlagen', 'error'); return; }
+        $('#site-video-pick').style.display = 'none';
+        const size = start.chunkSize || 8388608;
+        let offset = 0;
+        try {
+            while (offset < file.size) {
+                const part = file.slice(offset, offset + size);
+                let res = null;
+                for (let attempt = 0; attempt < 4; attempt++) {
+                    try {
+                        res = await fetch(`/api/site/video/chunk/${start.id}?offset=${offset}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: part });
+                        if (res.ok || res.status === 409 || res.status === 404) break;
+                    } catch (e) { res = null; }
+                    await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+                }
+                const d = res ? await res.json().catch(() => null) : null;
+                if (res && res.status === 409 && d && typeof d.size === 'number') { offset = d.size; continue; }
+                if (!d || !d.success) throw new Error((d && d.error) || 'Verbindung unterbrochen');
+                offset = d.size;
+                videoProgress(offset / file.size * 100, `Hochladen … ${mb(offset)} von ${mb(file.size)}`);
+            }
+            const fin = await apiJson(`/api/site/video/finish/${start.id}`, { method: 'POST' });
+            if (!fin || !fin.success) throw new Error((fin && fin.error) || 'Upload fehlgeschlagen');
+            renderSiteVideo(fin);
+        } catch (e) {
+            showToast(`Video-Upload: ${e.message}`, 'error', 8000);
+            loadSiteVideo();
+        }
+    }
+
+    $('#site-video-input').addEventListener('change', e => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (file) uploadSiteVideo(file);
+    });
+
+    async function saveSiteVideo() {
+        const body = {
+            blur: Number($('#site-video-blur').value),
+            on_site: $('#site-video-on-site').checked, on_account: $('#site-video-on-account').checked,
+            on_tv: $('#site-video-on-tv').checked, phones: $('#site-video-phones').checked
+        };
+        const d = await apiJson('/api/site/video', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (d && d.success) { renderSiteVideo(d); showToast('Video-Einstellungen gespeichert', 'success'); }
+        else showToast((d && d.error) || 'Speichern fehlgeschlagen', 'error');
+    }
+    ['#site-video-on-site', '#site-video-on-account', '#site-video-on-tv', '#site-video-phones', '#site-video-blur'].forEach(sel => $(sel).addEventListener('change', saveSiteVideo));
+    $('#site-video-blur').addEventListener('input', e => { $('#site-video-blur-val').textContent = `(${Number(e.target.value) ? e.target.value : 'aus'})`; });
+
+    $('#site-video-del').addEventListener('click', async () => {
+        if (!confirm('Hintergrund-Video entfernen? Die Seiten zeigen dann wieder das Titelbild.')) return;
+        const d = await apiJson('/api/site/video', { method: 'DELETE' });
+        if (d && d.success) renderSiteVideo(d);
+        else showToast((d && d.error) || 'Aktion fehlgeschlagen', 'error');
     });
 
     // Floor plan, reviews, location and excursion tips
@@ -2763,6 +3095,628 @@
         if (await copyText($('#site-ical-url').value)) showToast('Kalender-Link kopiert', 'success');
     });
 
+    // ---- Live-Tipps (Wetter, Veranstaltungen, Öffnungszeiten), see local-live.js ----
+    let liveCfg = null;
+
+    function livePlaceRow(p = {}) {
+        return `<div class="list-item" data-kind="place"${p.osm ? ` data-osm="${escapeHtml(p.osm)}"` : ''}>
+            <div style="grid-column:span 2"><label>Name</label><input type="text" data-f="name" maxlength="100" value="${escapeHtml(p.name || '')}" placeholder="z. B. Bäckerei Schmidt"></div>
+            <div><label>Art</label><input type="text" data-f="kind" maxlength="40" value="${escapeHtml(p.kind || '')}" placeholder="z. B. Bäckerei"></div>
+            <div><label>Entfernung</label><input type="text" data-f="distance" maxlength="40" value="${escapeHtml(p.distance || '')}" placeholder="z. B. 400 m"></div>
+            <div class="li-wide"><label>Öffnungszeiten${p.osm ? ' <small>(aus OpenStreetMap, wird täglich aktualisiert)</small>' : ''}</label><input type="text" data-f="hours" maxlength="300" value="${escapeHtml(p.hours || '')}" placeholder="Mo-Fr 07:00-18:00; Sa 07:00-12:00; So off"></div>
+            <div class="li-wide"><label>Link <small>(optional)</small></label><input type="url" data-f="url" maxlength="500" value="${escapeHtml(p.url || '')}" placeholder="https://…"></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function liveEventRow(e = {}) {
+        return `<div class="list-item" data-kind="event">
+            <div style="grid-column:span 2"><label>Titel</label><input type="text" data-f="title" maxlength="120" value="${escapeHtml(e.title || '')}" placeholder="z. B. Weihnachtsmarkt"></div>
+            <div><label>Datum</label><input type="date" data-f="date" value="${escapeHtml(e.date || '')}"></div>
+            <div><label>bis <small>(optional)</small></label><input type="date" data-f="end" value="${escapeHtml(e.end || '')}"></div>
+            <div><label>Uhrzeit <small>(optional)</small></label><input type="time" data-f="time" value="${escapeHtml(e.time || '')}"></div>
+            <div><label>Ort</label><input type="text" data-f="place" maxlength="120" value="${escapeHtml(e.place || '')}" placeholder="z. B. Marktplatz"></div>
+            <div style="grid-column:span 2"><label>Link <small>(optional)</small></label><input type="url" data-f="url" maxlength="500" value="${escapeHtml(e.url || '')}" placeholder="https://…"></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function showLivePlace() {
+        const c = liveCfg || {};
+        $('#live-place-current').textContent = c.lat != null
+            ? `Gewählt: ${c.place || 'Ort'} (${String(c.lat).replace('.', ',')}, ${String(c.lon).replace('.', ',')})`
+            : 'Noch kein Ort gewählt: ohne Ort gibt es kein Wetter und keine Suche in OpenStreetMap.';
+    }
+
+    function fillLive(c) {
+        liveCfg = c;
+        $('#live-enabled').checked = !!c.enabled;
+        $('#live-show-tv').checked = c.show_tv !== false;
+        $('#live-show-app').checked = c.show_app !== false;
+        $('#live-weather').checked = c.weather !== false;
+        $('#live-place-q').value = c.place || '';
+        $('#live-events-days').value = c.events_days || 14;
+        $('#live-radius').value = c.radius_km || 25;
+        $('#live-tm-key').value = '';
+        $('#live-tm-key').placeholder = c.has_ticketmaster_key ? '•••••• gespeichert' : 'leer = ohne Ticketmaster';
+        $('#live-tm-clear').checked = false;
+        $('#live-tm-clear-wrap').hidden = !c.has_ticketmaster_key;
+        $('#live-ics').value = (c.ics_urls || []).join('\n');
+        $('#live-places').innerHTML = (c.places || []).map(livePlaceRow).join('');
+        $('#live-events').innerHTML = (c.events || []).map(liveEventRow).join('');
+        $('#live-place-results').innerHTML = '';
+        $('#live-osm-results').innerHTML = '';
+        showLivePlace();
+    }
+
+    const fmtLiveDate = ymd => new Date(ymd + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+
+    function renderLivePreview(p, st) {
+        const box = $('#live-preview');
+        const errs = (st && st.errors) || [];
+        const errHtml = errs.length ? `<div class="live-errors">${errs.map(e => `<div>⚠️ ${escapeHtml(e)}</div>`).join('')}</div>` : '';
+        if (!p || !p.enabled) { box.innerHTML = `<p class="text-muted" style="font-size:.85rem">Live-Tipps sind ausgeschaltet.</p>${errHtml}`; return; }
+        const w = p.weather;
+        const weather = w ? `<div><strong>${w.now.temp}°</strong> ${escapeHtml(w.now.label)} · gefühlt ${w.now.feels}° · ${w.days.slice(1, 4).map(d => `${fmtLiveDate(d.date).split(',')[0]} ${d.min}–${d.max}°`).join(' · ')}</div>`
+            : '<div class="text-muted">Kein Wetter (Ort fehlt oder Abruf fehlgeschlagen).</div>';
+        const places = p.places.length ? `<ul>${p.places.map(x => `<li><span class="live-dot ${x.open === true ? (x.soon ? 'soon' : 'open') : x.open === false ? 'closed' : ''}"></span><strong>${escapeHtml(x.name)}</strong> ${escapeHtml(x.state || x.hours || '')}${x.open == null && x.hours ? ' <small class="text-muted">(Format nicht erkannt, wird so angezeigt)</small>' : ''}</li>`).join('')}</ul>` : '<div class="text-muted">Keine Orte.</div>';
+        const events = p.events.length ? `<ul>${p.events.slice(0, 8).map(e => `<li>${fmtLiveDate(e.date)}${e.time ? ` ${escapeHtml(e.time)}` : ''} · <strong>${escapeHtml(e.title)}</strong>${e.place ? ` · ${escapeHtml(e.place)}` : ''}</li>`).join('')}</ul>${p.events.length > 8 ? `<div class="text-muted">… und ${p.events.length - 8} weitere</div>` : ''}` : '<div class="text-muted">Keine Termine in den nächsten Tagen.</div>';
+        box.innerHTML = `<div class="live-prev-sec"><div class="live-prev-h">Wetter ${escapeHtml(p.place || '')}</div>${weather}</div>
+            <div class="live-prev-sec"><div class="live-prev-h">Öffnungszeiten jetzt</div>${places}</div>
+            <div class="live-prev-sec"><div class="live-prev-h">Veranstaltungen</div>${events}</div>${errHtml}`;
+    }
+
+    async function loadLive() {
+        try {
+            const d = await apiJson('/api/site/live');
+            if (!d.success) return;
+            fillLive(d.config);
+            if (d.config.enabled) {
+                const pv = await apiJson('/api/site/live/preview');
+                if (pv.success) renderLivePreview(pv.preview, pv.status);
+            } else renderLivePreview(null, d.status);
+        } catch (e) { showToast('Live-Tipps konnten nicht geladen werden', 'error'); }
+    }
+
+    $('#live-place-search').addEventListener('click', async () => {
+        const q = $('#live-place-q').value.trim();
+        const box = $('#live-place-results');
+        if (q.length < 2) return showToast('Bitte einen Ort oder eine PLZ eingeben', 'error');
+        box.innerHTML = '<div class="text-muted">Suche …</div>';
+        try {
+            const d = await apiJson(`/api/site/live/geocode?q=${encodeURIComponent(q)}`);
+            if (!d.success) { box.innerHTML = `<div class="text-muted">${escapeHtml(d.error || 'Suche fehlgeschlagen')}</div>`; return; }
+            if (!d.results.length) { box.innerHTML = '<div class="text-muted">Nichts gefunden. Versuch es mit dem Ortsnamen ohne Straße.</div>'; return; }
+            box.innerHTML = d.results.map((r, i) => `<button type="button" class="live-result" data-i="${i}"><strong>${escapeHtml(r.name)}</strong> <span>${escapeHtml([r.postcode, r.region].filter(Boolean).join(' · '))}</span></button>`).join('');
+            box.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => {
+                const r = d.results[+b.dataset.i];
+                liveCfg = { ...(liveCfg || {}), place: r.name, lat: r.lat, lon: r.lon };
+                $('#live-place-q').value = r.name;
+                box.innerHTML = '';
+                showLivePlace();
+                showToast('Ort übernommen – bitte speichern', 'success');
+            }));
+        } catch (e) { box.innerHTML = '<div class="text-muted">Suche fehlgeschlagen</div>'; }
+    });
+    $('#live-place-q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#live-place-search').click(); } });
+
+    $('#live-osm-search').addEventListener('click', async () => {
+        const box = $('#live-osm-results');
+        if (!liveCfg || liveCfg.lat == null) return showToast('Bitte zuerst oben den Ort wählen und speichern', 'error');
+        box.innerHTML = '<div class="text-muted">Suche in OpenStreetMap … (kann bis zu 30 Sekunden dauern)</div>';
+        try {
+            const d = await apiJson(`/api/site/live/osm?radius=${encodeURIComponent($('#live-osm-radius').value)}&q=${encodeURIComponent($('#live-osm-q').value.trim())}`);
+            if (!d.success) { box.innerHTML = `<div class="text-muted">${escapeHtml(d.error || 'Suche fehlgeschlagen')}</div>`; return; }
+            const have = new Set(Array.from($$('#live-places .list-item')).map(el => el.dataset.osm).filter(Boolean));
+            if (!d.places.length) { box.innerHTML = '<div class="text-muted">Keine Orte mit Öffnungszeiten gefunden. Größeren Umkreis probieren oder von Hand eintragen.</div>'; return; }
+            box.innerHTML = `<div class="text-muted" style="font-size:.8rem;margin-bottom:4px">${d.places.length} Orte mit Öffnungszeiten. Klick übernimmt den Ort in die Liste.</div>` +
+                d.places.map((p, i) => `<button type="button" class="live-result" data-i="${i}"${have.has(p.osm) ? ' disabled' : ''}><strong>${escapeHtml(p.name)}</strong> <span>${escapeHtml([p.kind, p.distance].filter(Boolean).join(' · '))}</span><small>${escapeHtml(p.hours)}${p.readable ? '' : ' (Format nicht erkannt)'}</small></button>`).join('');
+            box.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => {
+                const p = d.places[+b.dataset.i];
+                $('#live-places').insertAdjacentHTML('beforeend', livePlaceRow(p));
+                b.disabled = true;
+            }));
+        } catch (e) { box.innerHTML = '<div class="text-muted">Suche fehlgeschlagen</div>'; }
+    });
+
+    $('#live-place-add').addEventListener('click', () => {
+        $('#live-places').insertAdjacentHTML('beforeend', livePlaceRow());
+        $('#live-places').lastElementChild.querySelector('input').focus();
+    });
+    $('#live-event-add').addEventListener('click', () => {
+        $('#live-events').insertAdjacentHTML('beforeend', liveEventRow());
+        $('#live-events').lastElementChild.querySelector('input').focus();
+    });
+    ['#live-places', '#live-events'].forEach(sel => $(sel).addEventListener('click', e => {
+        const btn = e.target.closest('[data-li]');
+        if (!btn) return;
+        const item = btn.closest('.list-item');
+        if (btn.dataset.li === 'del') item.remove();
+        else if (item.previousElementSibling) item.parentNode.insertBefore(item, item.previousElementSibling);
+    }));
+
+    $('#live-save').addEventListener('click', async () => {
+        const rows = sel => Array.from($$(`${sel} .list-item`)).map(item => {
+            const o = {};
+            item.querySelectorAll('[data-f]').forEach(el => { o[el.dataset.f] = el.value; });
+            if (item.dataset.osm) o.osm = item.dataset.osm;
+            return o;
+        });
+        const c = liveCfg || {};
+        const live = {
+            enabled: $('#live-enabled').checked, show_tv: $('#live-show-tv').checked, show_app: $('#live-show-app').checked,
+            weather: $('#live-weather').checked,
+            place: c.lat != null ? (c.place || $('#live-place-q').value.trim()) : $('#live-place-q').value.trim(), lat: c.lat, lon: c.lon,
+            events_days: $('#live-events-days').value, radius_km: $('#live-radius').value,
+            ics_urls: $('#live-ics').value.split(/\s+/).filter(Boolean),
+            ticketmaster_key: $('#live-tm-key').value, ticketmaster_key_clear: $('#live-tm-clear').checked,
+            places: rows('#live-places'), events: rows('#live-events')
+        };
+        try {
+            const d = await apiJson('/api/site/live', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ live }) });
+            if (!d.success) return showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+            showToast('Live-Tipps gespeichert', 'success');
+            loadLive();
+        } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
+    });
+
+    $('#live-refresh').addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try {
+            const d = await apiJson('/api/site/live/refresh', { method: 'POST' });
+            if (d.success) {
+                renderLivePreview(d.preview, d.status);
+                if (d.hours && d.hours.updated) { showToast(`${d.hours.updated} Öffnungszeit(en) aktualisiert`, 'success'); const c = await apiJson('/api/site/live'); if (c.success) fillLive(c.config); }
+            }
+        } catch (x) { showToast('Abruf fehlgeschlagen', 'error'); }
+        btn.disabled = false;
+    });
+
+    // ---- Anfahrts-Assistent (Webseite → Ankunft) ----------------------------
+    let arrCfg = null;
+    const ARR_CH = { wa: 'WhatsApp', sms: 'SMS', mail: 'E-Mail', telegram: 'Telegram (von Hand weitergeleitet)' };
+    const arrPhotoUrl = f => `/api/site/arrival/photo/${encodeURIComponent(f)}`;
+
+    function arrSlotHtml(file, label = 'Foto') {
+        return file
+            ? `<div class="site-photo" data-file="${escapeHtml(file)}"><img src="${arrPhotoUrl(file)}" alt=""><div class="site-photo-actions"><span></span><button type="button" class="btn-mini" data-arr="del-photo" title="Foto entfernen">✕</button></div></div>`
+            : `<label class="btn-mini" style="display:inline-block">+ ${label}<input type="file" accept="image/jpeg,image/png,image/webp" data-arr="upload" hidden></label>`;
+    }
+
+    function arrFillSlot(slot, file) {
+        slot.dataset.file = file || '';
+        slot.innerHTML = arrSlotHtml(file, slot.dataset.label || 'Foto');
+    }
+
+    function arrStepRow(st = {}) {
+        return `<div class="list-item arr-step">
+            <span class="arr-num"></span>
+            <div><textarea data-f="text" rows="2" maxlength="500" placeholder="z. B. Türcode eingeben: {code}">${escapeHtml(st.text || '')}</textarea></div>
+            <span></span>
+            <div class="arr-photo-slot" data-label="Foto zum Schritt"></div>
+            <div class="li-actions"><button type="button" class="btn-mini" data-li="up" title="Nach oben">▲</button><button type="button" class="btn-mini" data-li="del">Entfernen</button></div>
+        </div>`;
+    }
+
+    function arrNumber() {
+        $$('#arr-steps .arr-step').forEach((el, i) => { el.querySelector('.arr-num').textContent = i + 1; });
+        $('#arr-step-add').disabled = $$('#arr-steps .arr-step').length >= 10;
+    }
+
+    function arrAddStep(st) {
+        $('#arr-steps').insertAdjacentHTML('beforeend', arrStepRow(st));
+        arrFillSlot($('#arr-steps').lastElementChild.querySelector('.arr-photo-slot'), st && st.photo);
+        arrNumber();
+    }
+
+    function fillArrival(d) {
+        const c = d.config;
+        arrCfg = c;
+        $('#arr-auto').checked = !!c.auto_send;
+        $('#arr-time').value = c.send_time || '10:00';
+        $('#arr-notify').checked = c.notify_host !== false;
+        $('#arr-route-note').value = c.route_note || '';
+        $('#arr-parking').value = c.parking || '';
+        $('#arr-parking').placeholder = d.site.parking || 'z. B. Stellplatz Nr. 3 im Hof, kostenlos';
+        $('#arr-parking-hint').textContent = d.site.parking ? '(leer = Text aus der Gästemappe)' : '';
+        $('#arr-door').value = c.door_text || '';
+        $('#arr-address-hint').innerHTML = d.site.address
+            ? `Route führt zu <b>${escapeHtml(d.site.address)}</b> (Google Maps). Ändern unter Inhalte → Lage &amp; Umgebung.`
+            : 'Noch keine Adresse: unter Inhalte → Lage &amp; Umgebung eintragen, dann bekommt der Gast einen Routen-Link.';
+        const slots = $$('#view-website [data-pane="arrival"] > .card .arr-photo-slot[data-slot]');
+        slots.forEach(sl => { sl.dataset.label = sl.dataset.slot === 'door_photo' ? 'Foto der Haustür' : 'Foto vom Parkplatz'; arrFillSlot(sl, c[sl.dataset.slot]); });
+        $('#arr-steps').innerHTML = '';
+        (c.steps || []).forEach(arrAddStep);
+        arrNumber();
+        const ch = d.channels || {};
+        const ways = [ch.whatsapp ? 'WhatsApp verbunden' : 'WhatsApp nicht verbunden', ch.sms ? 'SMS eingerichtet' : 'SMS nicht eingerichtet', ch.mail ? 'E-Mail eingerichtet' : 'E-Mail nicht eingerichtet'];
+        $('#arr-channels').textContent = ch.enabled === false
+            ? 'Der Gäste-Chat ist ausgeschaltet: du bekommst die Nachricht immer per Telegram zum Weiterleiten.'
+            : `Stand jetzt: ${ways.join(' · ')}.${d.site.public_url ? '' : ' Ohne öffentliche Adresse der Webseite (Einrichtung) fehlt der Link zu den Fotos.'}`;
+        renderArrUpcoming(d.upcoming, d.today);
+    }
+
+    function renderArrUpcoming(list, today) {
+        const box = $('#arr-upcoming');
+        if (!list || !list.length) { box.innerHTML = '<div class="text-muted" style="font-size:.85rem">Keine Anreisen in den nächsten 30 Tagen.</div>'; return; }
+        box.innerHTML = list.map(b => {
+            let st = '', cls = '';
+            if (b.sentAt) { st = `Gesendet per ${ARR_CH[b.channel] || b.channel}, ${new Date(b.sentAt.replace(' ', 'T') + 'Z').toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`; cls = 'ok'; }
+            else if (b.error) { st = `Nicht gesendet: ${b.error}`; cls = 'bad'; }
+            else if (b.checkin === today) st = arrCfg && arrCfg.auto_send ? `Heute, wird um ${arrCfg.send_time} gesendet` : 'Heute, automatisches Senden ist aus';
+            else st = arrCfg && arrCfg.auto_send ? `Wird am ${fmtDEfull(b.checkin)} um ${arrCfg.send_time} gesendet` : 'Automatisches Senden ist aus';
+            if (!b.hasPin) st += ' · kein Türcode';
+            return `<div class="arr-row" data-id="${b.id}">
+                <div class="arr-who"><strong>${escapeHtml(b.name || 'Gast')} · ${weekdayDE(b.checkin)} ${fmtDEfull(b.checkin)}</strong><span class="arr-state ${cls}">${escapeHtml(b.source || '')}${b.source ? ' · ' : ''}${escapeHtml(st)}</span></div>
+                <div class="arr-actions"><button type="button" class="btn-mini" data-arr="preview">Vorschau</button><button type="button" class="btn-mini" data-arr="send">${b.sentAt ? 'Erneut senden' : 'Jetzt senden'}</button></div>
+            </div>`;
+        }).join('');
+    }
+
+    async function loadArrival() {
+        try {
+            const d = await apiJson('/api/site/arrival');
+            if (d.success) fillArrival(d);
+        } catch (e) { showToast('Ankunft konnte nicht geladen werden', 'error'); }
+    }
+
+    function arrCollect() {
+        const slot = name => ($(`#view-website .arr-photo-slot[data-slot="${name}"]`).dataset.file || '');
+        return {
+            auto_send: $('#arr-auto').checked, send_time: $('#arr-time').value, notify_host: $('#arr-notify').checked,
+            route_note: $('#arr-route-note').value, parking: $('#arr-parking').value, door_text: $('#arr-door').value,
+            parking_photo: slot('parking_photo'), door_photo: slot('door_photo'),
+            steps: Array.from($$('#arr-steps .arr-step')).map(el => ({ text: el.querySelector('[data-f="text"]').value, photo: el.querySelector('.arr-photo-slot').dataset.file || '' }))
+        };
+    }
+
+    $('#view-website [data-pane="arrival"]').addEventListener('change', async e => {
+        const input = e.target.closest('[data-arr="upload"]');
+        if (!input) return;
+        const file = input.files && input.files[0];
+        const slot = input.closest('.arr-photo-slot');
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('photo', file);
+        try {
+            const d = await apiJson('/api/site/arrival/photo', { method: 'POST', body: fd });
+            if (d.success) { arrFillSlot(slot, d.file); showToast('Foto hochgeladen – bitte speichern', 'success'); }
+            else showToast(d.error || 'Upload fehlgeschlagen', 'error');
+        } catch (x) { showToast('Upload fehlgeschlagen', 'error'); }
+    });
+
+    $('#view-website [data-pane="arrival"]').addEventListener('click', async e => {
+        const del = e.target.closest('[data-arr="del-photo"]');
+        if (del) { arrFillSlot(del.closest('.arr-photo-slot'), ''); return; }
+        const li = e.target.closest('#arr-steps [data-li]');
+        if (li) {
+            const item = li.closest('.list-item');
+            if (li.dataset.li === 'del') item.remove();
+            else if (item.previousElementSibling) item.parentNode.insertBefore(item, item.previousElementSibling);
+            arrNumber();
+            return;
+        }
+        const act = e.target.closest('.arr-row [data-arr]');
+        if (!act) return;
+        const id = act.closest('.arr-row').dataset.id;
+        const box = $('#arr-preview');
+        if (act.dataset.arr === 'preview') {
+            const d = await apiJson(`/api/site/arrival/preview/${id}`);
+            if (!d.success) return showToast(d.error || 'Vorschau fehlgeschlagen', 'error');
+            box.hidden = false;
+            box.innerHTML = `<pre>${escapeHtml(d.text)}</pre>${d.warnings.map(w => `<p class="arr-warn">⚠️ ${escapeHtml(w)}</p>`).join('')}
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem"><button type="button" class="btn-mini" id="arr-copy">Text kopieren</button>
+                <button type="button" class="btn-mini" id="arr-lang">${d.lang === 'en' ? 'Auf Deutsch' : 'Auf Englisch'}</button></div>`;
+            $('#arr-copy').onclick = () => navigator.clipboard.writeText(d.text).then(() => showToast('Kopiert', 'success'), () => showToast('Kopieren nicht möglich', 'error'));
+            $('#arr-lang').onclick = async () => {
+                const x = await apiJson(`/api/site/arrival/preview/${id}?lang=${d.lang === 'en' ? 'de' : 'en'}`);
+                if (x.success) { d.text = x.text; d.lang = x.lang; box.querySelector('pre').textContent = x.text; $('#arr-lang').textContent = x.lang === 'en' ? 'Auf Deutsch' : 'Auf Englisch'; }
+            };
+            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
+        if (act.dataset.arr === 'send') {
+            if (!confirm('Anfahrts-Infos jetzt an den Gast senden?')) return;
+            act.disabled = true;
+            let d = await apiJson(`/api/site/arrival/send/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            if (!d.success && d.noChannel && confirm(`${d.error}\n\nStattdessen den Text per Telegram an dich schicken, damit du ihn über Booking.com oder Airbnb weiterleitest?`)) {
+                d = await apiJson(`/api/site/arrival/send/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ telegram: true }) });
+            }
+            if (d.success) showToast(`Gesendet per ${d.channelName}`, 'success');
+            else showToast(d.error || 'Senden fehlgeschlagen', 'error', 7000);
+            if (d.upcoming) renderArrUpcoming(d.upcoming, (await apiJson('/api/site/arrival')).today);
+            act.disabled = false;
+        }
+    });
+
+    $('#arr-step-add').addEventListener('click', () => {
+        arrAddStep({});
+        $('#arr-steps').lastElementChild.querySelector('textarea').focus();
+    });
+    $('#arr-step-sample').addEventListener('click', () => {
+        if ($$('#arr-steps .arr-step').length && !confirm('Die vorhandenen Schritte durch das Beispiel ersetzen?')) return;
+        $('#arr-steps').innerHTML = '';
+        [
+            'Einmal auf das Tastenfeld tippen, damit es aufleuchtet.',
+            'Türcode eingeben: {code}',
+            'Mit der Taste mit dem Nuki-Symbol (unten rechts) bestätigen.',
+            'Kurz warten, bis das Schloss summt und die Tür entriegelt (ca. 3 Sekunden), dann die Tür aufdrücken.',
+            'Beim Gehen die Tür einfach zuziehen, sie schließt von selbst ab.'
+        ].forEach(text => arrAddStep({ text }));
+        showToast('Beispiel eingesetzt – bitte anpassen und speichern', 'success');
+    });
+
+    $('#arr-save').addEventListener('click', async () => {
+        try {
+            const d = await apiJson('/api/site/arrival', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arrival: arrCollect() }) });
+            if (!d.success) return showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+            fillArrival(d);
+            showToast('Ankunft gespeichert', 'success');
+        } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); }
+    });
+
+    // ---- WLAN für Gäste (Webseite → WLAN) -----------------------------------
+    let wifiState = null;
+    const wifiMode = () => (Array.from($$('input[name="wifi-mode"]')).find(r => r.checked) || {}).value || 'static';
+    const fmtDT = iso => iso ? new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+    function wifiIndexOptions(wlans, selected) {
+        const sel = $('#wifi-index');
+        const opts = ['<option value="0">Automatisch (Gastzugang)</option>'];
+        (wlans || []).forEach(w => opts.push(`<option value="${w.index}">${w.index}: ${escapeHtml(w.ssid || '(ohne Namen)')}${w.enabled ? '' : ' (aus)'}</option>`));
+        if (selected && !(wlans || []).some(w => w.index === selected)) opts.push(`<option value="${selected}">WLAN ${selected}</option>`);
+        sel.innerHTML = opts.join('');
+        sel.value = String(selected || 0);
+    }
+
+    function wifiToggleFritz() {
+        const mode = wifiMode();
+        $('#wifi-fritz-card').hidden = mode !== 'fritzbox';
+        $('#wifi-portal-card').hidden = mode !== 'portal';
+        $('#wifi-list-card').hidden = mode === 'static';
+        const portal = mode === 'portal';
+        $('#wifi-list-title').textContent = portal ? 'Zugangscodes der nächsten Buchungen' : 'Passwörter der nächsten Buchungen';
+        $('#wifi-list-hint').textContent = portal
+            ? 'Jede Buchung hat einen 6-stelligen Zugangscode. Der Gast sieht ihn ab dem Anreisetag auf „Meine Buchung“, in der Anfahrts-Nachricht und auf dem Fernseher. Er gilt vom Anreisetag bis zum Check-out (plus Nachlauf). „Neu“ macht den alten Code ungültig.'
+            : 'Jede Buchung bekommt automatisch ein leicht tippbares Passwort. Der Gast sieht es ab dem Anreisetag. „Neu“ erzeugt ein anderes Passwort, ist der Gast gerade da, wird die FRITZ!Box sofort umgestellt.';
+    }
+
+    function fillWifiPortal(d) {
+        const p = d.config.portal || {};
+        $('#wifi-portal-ssid').value = p.ssid || '';
+        $('#wifi-portal-wpa').value = p.wpa || '';
+        $('#wifi-portal-devices').value = p.max_devices || 5;
+        $('#wifi-portal-grace').value = p.grace_min != null ? p.grace_min : 60;
+        $('#wifi-portal-alert').checked = p.alert !== false;
+        $('#wifi-portal-vacant').checked = !!p.vacant_off;
+        $('#wifi-portal-owner').textContent = p.owner_code || '– (erst speichern)';
+        const ps = d.portal;
+        const st = $('#wifi-portal-status');
+        const cmd = $('#wifi-portal-cmd');
+        if (!ps) {
+            st.innerHTML = '<span class="wifi-dot"></span>Noch nicht gespeichert: Modus wählen und unten „Speichern“ drücken, dann erscheint der Einrichtungs-Befehl.';
+            cmd.textContent = 'Erscheint nach dem Speichern.'; cmd.classList.add('empty');
+            $('#wifi-portal-devices-list').innerHTML = '';
+            $('#wifi-portal-power').innerHTML = ''; $('#wifi-portal-stats').innerHTML = '';
+            return;
+        }
+        const r = ps.router || {};
+        if (ps.publicUrlProblem) st.innerHTML = `<span class="wifi-dot bad"></span>${escapeHtml(ps.publicUrlProblem)}`;
+        else if (r.online) st.innerHTML = `<span class="wifi-dot ok"></span><b>Router verbunden</b>${r.version ? ` (openNDS ${escapeHtml(r.version)})` : ''}. <small>Zuletzt gemeldet ${fmtDT(r.lastSeen)}.</small>`;
+        else if (r.lastSeen) st.innerHTML = `<span class="wifi-dot bad"></span><b>Router meldet sich nicht</b> seit ${fmtDT(r.lastSeen)}. Strom und Kabel zur FRITZ!Box prüfen; neue Gäste kommen sonst nicht ins WLAN.`;
+        else st.innerHTML = '<span class="wifi-dot warn"></span>Der Router hat sich noch nie gemeldet. Sobald er eingerichtet ist (Anleitung unten), steht hier „Router verbunden“.';
+        if (ps.command) { cmd.textContent = ps.command; cmd.classList.remove('empty'); }
+        else { cmd.textContent = ps.publicUrlProblem || 'Erscheint nach dem Speichern.'; cmd.classList.add('empty'); }
+        $('#wifi-portal-copy').disabled = !ps.command;
+        const up = ps.update || {}, upEl = $('#wifi-portal-update');
+        upEl.hidden = !(r.lastSeen && up.current);
+        if (!up.router) upEl.innerHTML = '<span class="wifi-dot warn"></span>Automatische Updates sind auf dem Router noch nicht eingerichtet. Einmal den Einrichtungs-Befehl unten auf dem Router ausführen, danach aktualisiert er sich selbst.';
+        else if (up.upToDate) upEl.innerHTML = '<span class="wifi-dot ok"></span>Router-Skript ist aktuell. Neue Versionen holt sich der Router selbst.';
+        else upEl.innerHTML = `<span class="wifi-dot warn"></span>${up.now ? 'Update angefordert, der Router holt es sich in den nächsten Minuten.' : 'Neue Version für den Router liegt bereit. Er holt sie nachts zwischen 3 und 5 Uhr oder sobald kein Gast online ist.'} ${up.now ? '' : '<button type="button" class="btn-mini" id="wifi-portal-update-now">Jetzt aktualisieren</button>'}`;
+        fillWifiPower(ps.power, ps.stats);
+        fillWifiStats(ps.stats);
+        const list = ps.devices || [];
+        $('#wifi-portal-devices-list').innerHTML = list.length ? list.map(x => `<div class="arr-row" data-dev="${x.id}">
+            <div class="arr-who"><strong>${escapeHtml(x.ua)} · ${escapeHtml(x.who)}</strong>
+                <span class="arr-state">seit ${fmtDT(x.since)} · online bis ${fmtDT(x.until)}${x.volume ? ` · ${escapeHtml(x.volume)}` : ''} · ${escapeHtml(x.mac)}</span></div>
+            <div class="arr-actions"><button type="button" class="btn-mini" data-wifi="forget">Vergessen</button></div>
+        </div>`).join('') : '<div class="text-muted" style="font-size:.85rem">Gerade ist kein Gerät angemeldet.</div>';
+    }
+
+    function fillWifiPower(pw, stats) {
+        const el = $('#wifi-portal-power');
+        if (!pw) { el.innerHTML = ''; return; }
+        let txt;
+        if (pw.reason === 'manual') txt = pw.on ? `<b>Von Hand eingeschaltet</b> bis ${fmtDT(pw.until)}, danach wieder Automatik.` : `<b>Von Hand ausgeschaltet</b> bis ${fmtDT(pw.until)}, danach wieder Automatik.`;
+        else if (pw.reason === 'always') txt = '<b>Immer an.</b> Den Haken oben setzen, damit das WLAN bei Leerstand ausgeht.';
+        else if (pw.reason === 'guest') txt = `<b>An</b>, weil ${escapeHtml(pw.name || 'ein Gast')} da ist (bis ${fmtDT(pw.until)}).`;
+        else txt = `<b>Aus</b>, gerade ist niemand da.${pw.next ? ` Geht am ${fmtDT(pw.next)} wieder an.` : ' Keine Buchung in Sicht.'} Für eigene Geräte „24 Std. einschalten“.`;
+        let router = '';
+        if (stats && stats.fresh && stats.wifiOn != null && stats.wifiOn !== pw.on) router = ' <small>Der Router stellt in den nächsten 2 Minuten um.</small>';
+        else if (stats && stats.fresh && stats.wifiOn != null) router = ` <small>Router meldet: WLAN ${stats.wifiOn ? 'an' : 'aus'}.</small>`;
+        el.innerHTML = `<span class="wifi-dot ${pw.on ? 'ok' : ''}"></span>${txt}${router}`;
+        $('#wifi-portal-power-auto').disabled = pw.reason !== 'manual';
+    }
+
+    function fillWifiStats(s) {
+        const el = $('#wifi-portal-stats');
+        if (!s || !s.reported) { el.innerHTML = '<div class="text-muted" style="font-size:.85rem">Noch keine Daten. Der Router meldet sich nach der Einrichtung alle 2 Minuten.</div>'; return; }
+        const max = Math.max(1, ...s.chart.map(c => c.kb));
+        const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+        el.innerHTML = `<div class="wifi-stats">
+                <div><span>Gerade online</span><strong>${s.fresh ? s.onlineCount : '–'}</strong></div>
+                <div><span>Heute</span><strong>${escapeHtml(s.today)}</strong></div>
+                <div><span>${s.stay ? escapeHtml(s.stay.name) : 'Aktueller Aufenthalt'}</span><strong>${s.stay ? escapeHtml(s.stay.volume) : '–'}</strong>${s.stay ? `<small>${s.stay.devices} Gerät${s.stay.devices === 1 ? '' : 'e'}</small>` : ''}</div>
+                <div><span>30 Tage</span><strong>${escapeHtml(s.days30)}</strong></div>
+            </div>
+            <div class="wifi-bars" role="img" aria-label="Datenvolumen der letzten 14 Tage">${s.chart.map(c => `<div title="${fmtDEfull(c.day)}: ${escapeHtml(c.label)}"><i style="height:${c.kb ? Math.max(3, Math.round(c.kb / max * 100)) : 0}%"></i><small>${wd[new Date(c.day + 'T12:00:00Z').getUTCDay()]}</small></div>`).join('')}</div>
+            ${s.fresh ? (s.online.length ? `<div class="arr-upcoming" style="margin-top:.6rem">${s.online.map(o => `<div class="arr-row"><div class="arr-who"><strong>${escapeHtml(o.kind)} · ${escapeHtml(o.who)}</strong><span class="arr-state">diese Sitzung ${escapeHtml(o.session)} · ${escapeHtml(o.mac)}</span></div></div>`).join('')}</div>` : '') : `<div class="text-muted" style="font-size:.82rem;margin-top:.5rem">Letzte Meldung vom Router: ${fmtDT(s.reported)}.</div>`}`;
+    }
+
+    function fillWifi(d) {
+        wifiState = d;
+        const c = d.config;
+        $$('input[name="wifi-mode"]').forEach(r => { r.checked = r.value === c.mode; });
+        $('#wifi-show-arrival').checked = c.show_arrival !== false;
+        $('#wifi-show-tv').checked = c.show_tv !== false;
+        $('#wifi-static-hint').innerHTML = d.site.wifi_name
+            ? `Festes WLAN: <b>${escapeHtml(d.site.wifi_name)}</b>${d.site.has_password ? ' mit Passwort' : ' ohne Passwort'} (Inhalte → Gästemappe). Bei „pro Buchung“ ist es die Rückfalllösung, solange die FRITZ!Box nicht eingerichtet ist.`
+            : 'Noch kein festes WLAN eingetragen (Inhalte → Gästemappe).';
+        $('#wifi-url').value = c.fritz.url || '';
+        $('#wifi-user').value = c.fritz.user || '';
+        $('#wifi-pass').value = c.fritz.password || '';
+        $('#wifi-insecure').checked = !!c.fritz.insecure;
+        if (!$('#wifi-index').options.length || $('#wifi-index').options.length === 1) wifiIndexOptions([], c.fritz.index);
+        else $('#wifi-index').value = String(c.fritz.index || 0);
+        $('#wifi-switch-time').value = c.switch_time || '';
+        $('#wifi-switch-hint').textContent = `(leer = Check-out-Zeit${d.site.checkout_time ? `, ${d.site.checkout_time} Uhr` : ''})`;
+        $('#wifi-vacant-off').checked = !!c.vacant_disable;
+        $('#wifi-notify').checked = c.notify !== false;
+        const st = d.state;
+        let html;
+        if (!d.ready) html = '<span class="wifi-dot"></span>Noch nicht eingerichtet: Adresse, Benutzer und Kennwort eintragen, testen, speichern.';
+        else if (st.error) html = `<span class="wifi-dot bad"></span><b>Umstellen klappt gerade nicht:</b> ${escapeHtml(st.error)} <small>(${fmtDT(st.errorAt)}, neuer Versuch alle 5 Minuten)</small>`;
+        else if (st.inSync) html = `<span class="wifi-dot ok"></span><b>${escapeHtml(st.ssid || 'Gast-WLAN')}</b> ist ${st.now && st.now.vacant ? (st.enabled === false ? 'ausgeschaltet (niemand da)' : 'auf ein Zufallspasswort gestellt (niemand da)') : `eingestellt für ${escapeHtml(st.now ? st.now.name : '')}`}. <small>Zuletzt geprüft ${fmtDT(st.lastCheck)}.</small>`;
+        else html = '<span class="wifi-dot warn"></span>Wird gleich umgestellt …';
+        $('#wifi-status').innerHTML = html;
+        $('#wifi-status').hidden = false;
+        renderWifiUpcoming(d.upcoming);
+        fillWifiPortal(d);
+        wifiToggleFritz();
+    }
+
+    function renderWifiUpcoming(list) {
+        const box = $('#wifi-upcoming');
+        if (!list || !list.length) { box.innerHTML = '<div class="text-muted" style="font-size:.85rem">Keine Buchungen in den nächsten 60 Tagen.</div>'; return; }
+        box.innerHTML = list.map(b => `<div class="arr-row" data-id="${b.id}">
+            <div class="arr-who"><strong>${escapeHtml(b.name || 'Gast')} · ${fmtDEfull(b.checkin)} – ${fmtDEfull(b.checkout)}</strong>
+                <span class="arr-state ${b.active ? 'ok' : ''}">${escapeHtml(b.source || '')}${b.source ? ' · ' : ''}${b.active ? (wifiState && wifiState.config.mode === 'portal' ? 'Code gilt gerade' : 'hat gerade das WLAN') : `ab ${fmtDEfull(b.checkin)}`}</span></div>
+            <div class="arr-actions"><code class="wifi-pw">${escapeHtml(b.password)}</code><button type="button" class="btn-mini" data-wifi="renew">Neu</button>${wifiState && wifiState.config.mode === 'portal' ? '' : `<a class="btn-mini" href="/api/site/wifi/qr?booking=${b.id}" target="_blank" rel="noopener">QR-Code</a>`}</div>
+        </div>`).join('');
+    }
+
+    async function loadWifi() {
+        try {
+            const d = await apiJson('/api/site/wifi');
+            if (d.success) fillWifi(d);
+        } catch (e) { showToast('WLAN konnte nicht geladen werden', 'error'); }
+    }
+
+    function wifiCollect() {
+        return {
+            mode: wifiMode(), show_arrival: $('#wifi-show-arrival').checked, show_tv: $('#wifi-show-tv').checked,
+            switch_time: $('#wifi-switch-time').value, vacant_disable: $('#wifi-vacant-off').checked, notify: $('#wifi-notify').checked,
+            fritz: { url: $('#wifi-url').value, user: $('#wifi-user').value, password: $('#wifi-pass').value, insecure: $('#wifi-insecure').checked, index: Number($('#wifi-index').value) || 0 },
+            portal: {
+                ssid: $('#wifi-portal-ssid').value, wpa: $('#wifi-portal-wpa').value, alert: $('#wifi-portal-alert').checked, vacant_off: $('#wifi-portal-vacant').checked,
+                max_devices: Number($('#wifi-portal-devices').value) || 5, grace_min: Number($('#wifi-portal-grace').value)
+            }
+        };
+    }
+
+    $$('input[name="wifi-mode"]').forEach(r => r.addEventListener('change', wifiToggleFritz));
+
+    $('#wifi-test').addEventListener('click', async () => {
+        const btn = $('#wifi-test');
+        const out = $('#wifi-test-result');
+        btn.disabled = true;
+        out.textContent = 'Verbinde mit der FRITZ!Box …';
+        try {
+            const d = await apiJson('/api/site/wifi/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fritz: wifiCollect().fritz }) });
+            if (!d.success) { out.innerHTML = `<span class="wifi-dot bad"></span>${escapeHtml(d.error || 'Test fehlgeschlagen')}`; return; }
+            const cur = Number($('#wifi-index').value) || 0;
+            wifiIndexOptions(d.wlans, cur);
+            const guest = d.wlans.find(w => w.index === d.guestIndex);
+            out.innerHTML = `<span class="wifi-dot ok"></span>Verbunden. Gefunden: ${d.wlans.map(w => `${escapeHtml(w.ssid || '?')}${w.enabled ? '' : ' (aus)'}`).join(', ')}. Als Gast-WLAN wird <b>${escapeHtml(guest ? guest.ssid : '?')}</b> genommen${d.wlans.length < 3 ? ' (bitte prüfen, ob das wirklich der Gastzugang ist)' : ''}. Jetzt speichern.`;
+        } catch (e) {
+            out.textContent = 'Test fehlgeschlagen';
+        } finally { btn.disabled = false; }
+    });
+
+    $('#wifi-apply').addEventListener('click', async () => {
+        try {
+            const d = await apiJson('/api/site/wifi/apply', { method: 'POST' });
+            if (d.config) fillWifi(d);
+            showToast(d.success ? (d.changed ? 'FRITZ!Box umgestellt' : 'FRITZ!Box war schon richtig eingestellt') : (d.error || 'Umstellen fehlgeschlagen'), d.success ? 'success' : 'error');
+        } catch (e) { showToast('Umstellen fehlgeschlagen', 'error'); }
+    });
+
+    $('#wifi-upcoming').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-wifi="renew"]');
+        if (!btn) return;
+        const id = btn.closest('.arr-row').dataset.id;
+        const portal = wifiState && wifiState.config.mode === 'portal';
+        if (portal && !confirm('Neuen Zugangscode erzeugen? Der alte gilt dann nicht mehr (schon angemeldete Geräte bleiben online).')) return;
+        btn.disabled = true;
+        try {
+            const d = await apiJson(portal ? `/api/site/wifi/code/${id}` : `/api/site/wifi/renew/${id}`, { method: 'POST' });
+            if (d.config) fillWifi(d);
+            showToast(d.success ? (portal ? `Neuer Code: ${d.code}` : (d.applied ? 'Neues Passwort, FRITZ!Box umgestellt' : 'Neues Passwort erzeugt')) : (d.error || 'Fehlgeschlagen'), d.success ? 'success' : 'error');
+        } catch (err) { showToast('Fehlgeschlagen', 'error'); } finally { btn.disabled = false; }
+    });
+
+    $('#wifi-portal-update').addEventListener('click', async e => {
+        if (!e.target.closest('#wifi-portal-update-now')) return;
+        if (!confirm('Router jetzt aktualisieren? Das WLAN ist dabei etwa eine Minute weg. Bekannte Geräte kommen danach ohne Code wieder rein, die Anmeldeseite kann kurz aufgehen.')) return;
+        try {
+            const d = await apiJson('/api/site/wifi/portal/update', { method: 'POST' });
+            if (d.config) fillWifi(d);
+            showToast('Update angefordert, der Router holt es sich innerhalb von 2 Minuten', 'success');
+        } catch (err) { showToast('Fehlgeschlagen', 'error'); }
+    });
+
+    $('#wifi-portal-copy').addEventListener('click', async () => {
+        const text = $('#wifi-portal-cmd').textContent;
+        try { await navigator.clipboard.writeText(text); showToast('Befehl kopiert', 'success'); }
+        catch (e) {
+            const r = document.createRange(); r.selectNodeContents($('#wifi-portal-cmd'));
+            const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+            showToast('Markiert, jetzt mit Strg+C kopieren', 'info');
+        }
+    });
+    async function wifiPortalRenew(what, question) {
+        if (!confirm(question)) return;
+        try {
+            const d = await apiJson('/api/site/wifi/portal/renew', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ what }) });
+            if (d.config) fillWifi(d);
+            showToast(d.success ? (what === 'key' ? 'Neuer Schlüssel. Jetzt den Befehl auf dem Router noch einmal ausführen.' : 'Neuer Gastgeber-Code') : (d.error || 'Fehlgeschlagen'), d.success ? 'success' : 'error');
+        } catch (e) { showToast('Fehlgeschlagen', 'error'); }
+    }
+    $('#wifi-portal-owner-new').addEventListener('click', () => wifiPortalRenew('owner', 'Neuen Gastgeber-Code erzeugen? Der alte gilt dann nicht mehr.'));
+    $('#wifi-portal-key-new').addEventListener('click', () => wifiPortalRenew('key', 'Neuen Schlüssel erzeugen? Bis du den neuen Befehl auf dem Router ausgeführt hast, kommt niemand neu ins WLAN.'));
+    $('#wifi-portal-card').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-power]');
+        if (!btn) return;
+        btn.disabled = true;
+        try {
+            const d = await apiJson('/api/site/wifi/portal/power', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: btn.dataset.power }) });
+            if (d.success) { showToast({ on24: 'WLAN 24 Stunden an', off24: 'WLAN 24 Stunden aus', auto: 'Wieder Automatik' }[btn.dataset.power], 'success'); await loadWifi(); }
+            else showToast(d.error || 'Fehlgeschlagen', 'error');
+        } finally { btn.disabled = false; }
+    });
+    $('#wifi-portal-devices-list').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-wifi="forget"]');
+        if (!btn) return;
+        const id = btn.closest('.arr-row').dataset.dev;
+        try {
+            const d = await apiJson(`/api/site/wifi/portal/device/${id}`, { method: 'DELETE' });
+            if (d.config) fillWifi(d);
+            showToast('Gerät vergessen: es wird in spätestens 2 Minuten vom WLAN abgemeldet und muss den Code neu eingeben', 'success');
+        } catch (err) { showToast('Fehlgeschlagen', 'error'); }
+    });
+
+    $('#wifi-save').addEventListener('click', async () => {
+        const btn = $('#wifi-save');
+        btn.disabled = true;
+        try {
+            const d = await apiJson('/api/site/wifi', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wifi: wifiCollect() }) });
+            if (!d.success) return showToast(d.error || 'Speichern fehlgeschlagen', 'error');
+            fillWifi(d);
+            showToast(d.state && d.state.error && d.ready ? 'Gespeichert, aber die FRITZ!Box ist nicht erreichbar' : 'WLAN gespeichert', d.state && d.state.error && d.ready ? 'error' : 'success');
+        } catch (e) { showToast('Speichern fehlgeschlagen', 'error'); } finally { btn.disabled = false; }
+    });
+
     async function loadSiteRequests() {
         const list = $('#site-requests');
         try {
@@ -2796,7 +3750,7 @@
                 </div>
                 <div>
                     <div>${fmtDEfull(r.checkin)} – ${fmtDEfull(r.checkout)}</div>
-                    <div class="booking-sub">${nightsTxt(r.nights)} · ${guests}${r.price_total ? ' · ' + formatCurrency(r.price_total) : ''}</div>
+                    <div class="booking-sub">${nightsTxt(r.nights)} · ${guests}${r.price_total ? ' · ' + formatCurrency(r.price_total) : ''}${r.voucher_code ? ` · 🎁 ${escapeHtml(r.voucher_code)} (−${formatCurrency(r.voucher_discount || 0)})` : ''}</div>
                     ${r.conflict ? `<div class="req-conflict">⚠️ Belegt durch ${escapeHtml(r.conflict.source)} (${fmtDEfull(r.conflict.checkin)} – ${fmtDEfull(r.conflict.checkout)})</div>` : ''}
                 </div>
                 <div class="booking-actions">${actions}</div>
@@ -2899,6 +3853,7 @@
             set('nuki', !d.nuki.configured ? '' : d.nuki.ok ? 'ok' : 'bad', !d.nuki.configured ? 'Nicht eingerichtet' : d.nuki.ok ? `Verbunden (${d.nuki.codes} Codes)` : 'Fehler: ' + (d.nuki.error || ''));
             const feeds = d.calendars.feeds || [];
             const calCls = !d.calendars.configured.length ? '' : (!feeds.length ? 'warn' : feeds.every(f => f.ok) ? 'ok' : 'bad');
+            renderWatchdog(d.watchdog);
             if (canDo('users')) {
                 const b = await apiJson('/api/backup').catch(() => null);
                 if (b && b.success) set('backup', ...backupDot(b));
@@ -3001,6 +3956,25 @@
         showToast(d ? d.message : 'Test fehlgeschlagen', d && d.success ? 'success' : 'error', 7000);
     }));
 
+    function renderWatchdog(w) {
+        const ul = $('#watchdog-status');
+        if (!ul) return;
+        const time = ms => ms ? new Date(ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' Uhr' : '–';
+        const li = (ok, text) => `<li>${ok === null ? 'ℹ️' : ok ? '✅' : '🔴'} ${escapeHtml(text)}</li>`;
+        if (!w || !w.installed) {
+            ul.innerHTML = li(null, 'Noch nicht eingerichtet. Auf dem Server im App-Ordner ./update.sh ausführen, dann startet der Wächter automatisch.');
+            return;
+        }
+        const c = w.checks || {};
+        const rows = [li(w.running, w.running ? `Wächter läuft (letzte Prüfung ${time(w.lastRun)})` : `Wächter läuft nicht! Letzte Prüfung ${time(w.lastRun)}. Auf dem Server: pm2 restart beckhome-watchdog`)];
+        if (c.app) rows.push(li(c.app.ok, c.app.ok ? 'App antwortet' : `App: ${c.app.reason || 'keine Antwort'} (seit ${time(c.app.since)})`));
+        if (c.public) rows.push(li(c.public.ok, c.public.ok ? `${w.publicHost || 'Domain'} über Tunnel erreichbar` : `${w.publicHost || 'Domain'}: ${c.public.reason || 'nicht erreichbar'} (seit ${time(c.public.since)})`));
+        else rows.push(li(null, 'Keine eigene Domain als Öffentliche Adresse eingetragen, Tunnel wird nicht geprüft'));
+        if (c.disk && c.disk.free) rows.push(li(c.disk.ok, `Festplatte: ${(c.disk.free / 1024 ** 3).toFixed(1).replace('.', ',')} GB frei (${String(c.disk.pct).replace('.', ',')} %)`));
+        if (w.noTelegram) rows.push(li(false, 'Kein Telegram-Token oder keine Benachrichtigungs-ID eingetragen, Meldungen können nicht gesendet werden'));
+        rows.push(li(w.heartbeat ? true : null, w.heartbeat ? 'Externer Heartbeat aktiv (meldet auch einen Totalausfall des Servers)' : 'Ohne externen Heartbeat meldet sich ein Totalausfall des Servers erst nach dem Neustart'));
+        ul.innerHTML = rows.join('');
+    }
     const settingsBtn = $('#btn-settings');
     if (settingsBtn) settingsBtn.addEventListener('click', () => loadStatusDots(false));
 
@@ -3071,8 +4045,7 @@
         if (window.myRevenueChart) window.myRevenueChart.destroy();
         // Schrift und Linien wie im restlichen Design
         Chart.defaults.font.family = "'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif";
-        Chart.defaults.color = '#675e52';
-        Chart.defaults.borderColor = '#e4dccf';
+        setChartDefaults();
         window.myRevenueChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -3085,13 +4058,13 @@
                     {
                         label: 'Umsatz',
                         data: revValues,
-                        backgroundColor: '#2b62e3',
+                        backgroundColor: chartColors().bar,
                         borderRadius: 1
                     },
                     {
                         label: 'Ausgaben',
                         data: expValues,
-                        backgroundColor: '#c4b8a5',
+                        backgroundColor: chartColors().bar2,
                         borderRadius: 1
                     }
                 ]
@@ -3189,8 +4162,9 @@
         const canvas = $('#reviewRevenueChart');
         if (!canvas || typeof Chart === 'undefined') return;
         if (window.myReviewRevenueChart) window.myReviewRevenueChart.destroy();
-        const datasets = [{ label: String(r.year), data: r.revenueByMonth, backgroundColor: '#2b62e3', borderRadius: 1 }];
-        if (r.previous && r.previous.revenueByMonth) datasets.push({ label: String(r.year - 1), data: r.previous.revenueByMonth, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        const datasets = [{ label: String(r.year), data: r.revenueByMonth, backgroundColor: chartColors().bar, borderRadius: 1 }];
+        if (r.previous && r.previous.revenueByMonth) datasets.push({ label: String(r.year - 1), data: r.previous.revenueByMonth, backgroundColor: chartColors().bar2, borderRadius: 1 });
+        setChartDefaults();
         window.myReviewRevenueChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: { labels: MONTHS_SHORT, datasets },
@@ -3266,8 +4240,9 @@
         const canvas = $('#reviewMonthsChart');
         if (!canvas || typeof Chart === 'undefined') return;
         if (window.myReviewChart) window.myReviewChart.destroy();
-        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: '#2b62e3', borderRadius: 1 }];
-        if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: '#c4b8a5', borderRadius: 1 });
+        const datasets = [{ label: String(r.year), data: r.months, backgroundColor: chartColors().bar, borderRadius: 1 }];
+        if (r.previous) datasets.push({ label: String(r.year - 1), data: r.previous.months, backgroundColor: chartColors().bar2, borderRadius: 1 });
+        setChartDefaults();
         window.myReviewChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: { labels: MONTHS_SHORT, datasets },
@@ -3462,6 +4437,9 @@
             ? `${t.staysWithoutInvoice} von ${t.stays} Aufenthalten im Zeitraum haben keine Rechnung hier (z. B. Booking.com/Airbnb, die über das Portal abrechnen). Sie stehen im Export im Blatt „Belegung“.`
             : (t.stays ? `Alle ${t.stays} Aufenthalte im Zeitraum haben eine Rechnung.` : '');
         $('#fin-pdfs').disabled = !t.invoices;
+        const nReceipts = (r.expenses || []).filter(e => e.receipt === 'ja').length;
+        const rz = $('#fin-receipts');
+        if (rz) { rz.hidden = !nReceipts; rz.textContent = `Alle Belege als ZIP (${nReceipts})`; }
     }
 
     if (viewFinance) {
@@ -3517,58 +4495,233 @@
     // =======================
     // Expenses Module
     // =======================
+    // Ausgaben & Belege (Telegram-Fotos, Uploads, Paperless)
+    const ex = { rows: [], years: [], categories: [], year: String(new Date().getFullYear()), category: '', q: '', paperlessReady: false, paperlessUrl: null, editing: null, file: null, scan: null, poll: null };
+    const exMoney = n => formatCurrency(Number(n) || 0);
+    const exNum = v => {
+        const t = String(v == null ? '' : v).replace(/[€\s]/g, '');
+        if (!t) return null;
+        const n = parseFloat(/,\d{1,2}$/.test(t) ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, ''));
+        return Number.isFinite(n) ? n : null;
+    };
+    const exFmtNum = n => n == null || n === '' ? '' : Number(n).toFixed(2).replace('.', ',');
+
     async function loadExpenses() {
-        try {
-            const res = await fetch('/api/expenses');
-            const data = await res.json();
-            if (data.success) {
-                renderExpensesList(data.expenses);
-            }
-        } catch (e) {
-            console.error('Expenses load error:', e);
-        }
+        const qs = new URLSearchParams();
+        if (ex.year) qs.set('year', ex.year);
+        if (ex.category) qs.set('category', ex.category);
+        if (ex.q) qs.set('q', ex.q);
+        const d = await apiJson('/api/expenses?' + qs).catch(() => null);
+        if (!d || !d.success) { $('#expenses-list').innerHTML = '<tr class="ex-empty-row"><td colspan="6" class="ex-empty">Ausgaben konnten nicht geladen werden.</td></tr>'; return; }
+        ex.rows = d.expenses; ex.years = d.years || []; ex.categories = d.categories || [];
+        ex.paperlessReady = !!d.paperlessReady; ex.paperlessUrl = d.paperlessUrl;
+        renderExpenseFilters();
+        renderExpensesList();
+        // Paperless-Status von gerade hochgeladenen Belegen nachladen
+        clearTimeout(ex.poll);
+        if (ex.rows.some(r => r.paperless_status === 'pending') && currentView === 'expenses') ex.poll = setTimeout(loadExpenses, 5000);
     }
 
-    function renderExpensesList(expenses) {
-        const list = $('#expenses-list');
-        list.innerHTML = '';
+    function renderExpenseFilters() {
+        const yNow = String(new Date().getFullYear());
+        const years = [...new Set([yNow, ...ex.years])].sort().reverse();
+        $('#ex-year').innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('') + '<option value="">Alle Jahre</option>';
+        $('#ex-year').value = ex.year;
+        const cats = [...new Set([...ex.categories, ...ex.rows.map(r => r.category).filter(Boolean)])];
+        $('#ex-category').innerHTML = '<option value="">Alle Kategorien</option>' + cats.map(c => `<option>${escapeHtml(c)}</option>`).join('');
+        $('#ex-category').value = ex.category;
+        $('#btn-sync-paperless').hidden = !ex.paperlessReady || !canDo('finance', 'edit');
+        $('#btn-new-expense').hidden = !canDo('finance', 'edit');
+    }
 
-        if (expenses.length === 0) {
-            list.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Keine Ausgaben vorhanden.</td></tr>';
+    function renderExpensesList() {
+        const list = $('#expenses-list');
+        const rows = ex.rows;
+        const sum = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const vat = rows.reduce((s, r) => s + (Number(r.vat_amount) || 0), 0);
+        const withFile = rows.filter(r => r.hasReceipt).length;
+        const byCat = {};
+        rows.forEach(r => { const c = r.category || 'Ohne Kategorie'; byCat[c] = (byCat[c] || 0) + (Number(r.amount) || 0); });
+        const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+        const tile = (label, value, sub) => `<div class="card stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${sub ? `<div class="review-sub">${sub}</div>` : ''}</div>`;
+        $('#ex-kpis').innerHTML = [
+            tile(ex.year ? `Ausgaben ${ex.year}` : 'Ausgaben gesamt', exMoney(sum), `${rows.length} Ausgabe${rows.length === 1 ? '' : 'n'}${ex.category || ex.q ? ' (gefiltert)' : ''}`),
+            tile('Mit Beleg', `${withFile} / ${rows.length}`, rows.length && withFile < rows.length ? `${rows.length - withFile} ohne Foto/PDF` : 'alle belegt'),
+            tile('Vorsteuer', exMoney(vat), 'soweit auf den Belegen erkannt'),
+            tile('Größte Kategorie', top ? escapeHtml(top[0]) : '–', top ? exMoney(top[1]) : '').replace('class="stat-value"', 'class="stat-value ex-kpi-text"')
+        ].join('');
+        if (!rows.length) {
+            list.innerHTML = `<tr class="ex-empty-row"><td colspan="6" class="ex-empty">${ex.q || ex.category ? 'Keine Ausgaben in dieser Auswahl.' : 'Noch keine Ausgaben in diesem Zeitraum. Schick ein Foto vom Kassenbon an den Telegram-Bot oder lege oben eine Ausgabe an.'}</td></tr>`;
             return;
         }
+        const edit = canDo('finance', 'edit');
+        const icoEdit = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>';
+        const icoDel = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+        list.innerHTML = rows.map(r => {
+            const who = r.vendor || r.description || 'Ausgabe';
+            const sub = [r.vendor && r.description ? r.description : '', r.payment_method, r.invoice_number ? `Nr. ${r.invoice_number}` : '', r.sourceLabel].filter(Boolean).map(escapeHtml).join(' · ');
+            const chips = [];
+            if (r.receipt_mime || r.paperless_id) chips.push(`<a class="ex-chip file" href="/api/expenses/${r.id}/receipt" target="_blank" rel="noopener" title="${escapeHtml(r.receipt_name || 'Beleg ansehen')}">📎 ${r.receipt_mime && /pdf/.test(r.receipt_mime) ? 'PDF' : r.receipt_mime ? 'Foto' : 'Beleg'}</a>`);
+            if (r.paperless_id) {
+                chips.push(ex.paperlessUrl ? `<a class="ex-chip pl-done" href="${escapeHtml(ex.paperlessUrl)}/documents/${r.paperless_id}/details" target="_blank" rel="noopener" title="In Paperless öffnen">✓ Paperless</a>` : '<span class="ex-chip pl-done">✓ Paperless</span>');
+            } else if (r.paperless_status === 'pending') {
+                chips.push('<span class="ex-chip pl-pending">Paperless …</span>');
+            } else if (r.paperless_status === 'error' && r.receipt_mime) {
+                chips.push(`<button type="button" class="ex-chip pl-error" data-ex="pl" title="${escapeHtml(r.paperless_error || '')} – nochmal versuchen">⚠ Paperless</button>`);
+            } else if (r.receipt_mime && ex.paperlessReady && edit) {
+                chips.push(`<button type="button" class="ex-chip pl-send" data-ex="pl" title="Beleg an Paperless schicken">→ Paperless</button>`);
+            }
+            if (!chips.length) chips.push('<span class="ex-chip none">kein Beleg</span>');
+            return `<tr data-id="${r.id}">
+                <td class="ex-c-date">${fmtDEfull(r.date)}</td>
+                <td class="ex-c-who"><div class="ex-who">${escapeHtml(who)}</div>${sub ? `<div class="ex-sub">${sub}</div>` : ''}</td>
+                <td class="ex-c-cat"><span class="ex-cat">${escapeHtml(r.category || 'Ohne Kategorie')}</span></td>
+                <td class="ex-c-rec"><div class="ex-receipt">${chips.join('')}</div></td>
+                <td class="ex-c-amount text-right expense-amount">${exMoney(r.amount)}</td>
+                <td class="ex-c-act">${edit ? `<div class="ex-actions"><button type="button" data-ex="edit" title="Bearbeiten">${icoEdit}</button><button type="button" class="del" data-ex="del" title="Löschen">${icoDel}</button></div>` : ''}</td>
+            </tr>`;
+        }).join('');
+    }
 
-        expenses.forEach(ex => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${formatDate(ex.date)}</td>
-                <td>${escapeHtml(ex.description || '—')}</td>
-                <td>${escapeHtml(ex.category || '—')}</td>
-                <td><span class="source-badge source-${ex.source}">${ex.source === 'paperless' ? 'Paperless' : 'Manuell'}</span></td>
-                <td class="text-right expense-amount negative">${formatCurrency(ex.amount)}</td>
-                <td class="text-right">
-                    <button class="btn btn-ghost btn-danger btn-sm btn-delete-expense" data-id="${ex.id}" title="Löschen">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    </button>
-                </td>
-            `;
-            list.appendChild(tr);
+    function exSetFile(file) {
+        ex.file = file || null;
+        const prev = $('#ex-preview');
+        prev.style.backgroundImage = '';
+        prev.textContent = '';
+        if (!file) return;
+        $('#ex-file-name').textContent = file.name || 'Beleg';
+        if (/^image\//.test(file.type)) prev.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
+        else prev.textContent = '📄';
+    }
+
+    function exFill(d) {
+        if (!d) return;
+        if (d.vendor) $('#ex-vendor').value = d.vendor;
+        if (d.date) $('#ex-date').value = d.date;
+        if (d.amount != null) $('#ex-amount').value = exFmtNum(d.amount);
+        if (d.category) $('#ex-cat').value = d.category;
+        if (d.description) $('#ex-desc').value = d.description;
+        if (d.vat_rate != null) $('#ex-vat-rate').value = String(d.vat_rate);
+        if (d.vat_amount != null) $('#ex-vat').value = exFmtNum(d.vat_amount);
+        if (d.payment_method) $('#ex-pay').value = d.payment_method;
+        if (d.invoice_number) $('#ex-invno').value = d.invoice_number;
+    }
+
+    async function exScan(file) {
+        exSetFile(file);
+        const msg = $('#ex-scan-msg');
+        msg.hidden = false; msg.className = 'nb-msg ex-scan-msg busy';
+        msg.textContent = 'Beleg wird gelesen …';
+        $('#ex-file-hint').textContent = file.size < 1048576 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1048576).toFixed(1).replace('.', ',')} MB`;
+        const fd = new FormData();
+        fd.append('receipt', file);
+        const d = await apiJson('/api/expenses/scan', { method: 'POST', body: fd }).catch(() => null);
+        if (ex.file !== file) return;
+        if (!d || !d.success) { msg.className = 'nb-msg ex-scan-msg'; msg.textContent = (d && d.error) || 'Der Beleg konnte nicht gelesen werden. Bitte die Felder selbst ausfüllen.'; return; }
+        ex.scan = d;
+        exFill(d.result);
+        const found = ['vendor', 'date', 'amount', 'category'].filter(k => d.result && d.result[k] != null).length;
+        msg.className = 'nb-msg ex-scan-msg ' + (found >= 3 ? 'ok' : '');
+        msg.textContent = `${d.engine === 'ki' ? 'KI' : 'Texterkennung'}: ${found} von 4 Angaben erkannt. Bitte kurz prüfen.` + (d.aiError ? ` (KI nicht erreichbar: ${d.aiError})` : '');
+    }
+
+    function openExpenseModal(row) {
+        ex.editing = row || null; ex.file = null; ex.scan = null;
+        $('#ex-form').reset();
+        exSetFile(null);
+        $('#ex-file-name').textContent = row && (row.receipt_mime || row.paperless_id) ? (row.receipt_name || 'Beleg vorhanden') : 'Beleg (Foto oder PDF)';
+        $('#ex-file-hint').textContent = row ? (row.receipt_mime ? 'Neue Datei wählen, um den Beleg zu ersetzen.' : 'Foto oder PDF nachreichen.') : 'Wird automatisch ausgelesen. Ohne Beleg einfach die Felder ausfüllen.';
+        $('#btn-ex-file').textContent = row && row.receipt_mime ? 'Ersetzen' : 'Datei wählen';
+        $('#ex-scan-msg').hidden = true; $('#ex-msg').hidden = true;
+        $('#ex-cat').innerHTML = ex.categories.map(c => `<option>${escapeHtml(c)}</option>`).join('');
+        if (row && row.category && !ex.categories.includes(row.category)) $('#ex-cat').insertAdjacentHTML('afterbegin', `<option>${escapeHtml(row.category)}</option>`);
+        $('#ex-title').textContent = row ? 'Ausgabe bearbeiten' : 'Neue Ausgabe';
+        $('#ex-date').value = row ? row.date : berlinYmd();
+        $('#ex-cat').value = row && row.category ? row.category : 'Sonstiges';
+        if (row) exFill(row);
+        $('#ex-pl-wrap').hidden = !ex.paperlessReady || (row && row.paperless_id);
+        $('#ex-pl').checked = true;
+        $('#modal-expense').style.display = 'flex';
+        if (row && row.receipt_mime && /^image\//.test(row.receipt_mime)) $('#ex-preview').style.backgroundImage = `url(/api/expenses/${row.id}/receipt)`;
+        else if (row && (row.receipt_mime || row.paperless_id)) $('#ex-preview').textContent = '📄';
+    }
+    const closeExpenseModal = () => { $('#modal-expense').style.display = 'none'; ex.file = null; };
+
+    if ($('#modal-expense')) {
+        $('#btn-new-expense').addEventListener('click', () => openExpenseModal(null));
+        $('#btn-close-expense').addEventListener('click', closeExpenseModal);
+        $('#btn-cancel-expense').addEventListener('click', closeExpenseModal);
+        $('#modal-expense').addEventListener('click', e => { if (e.target.id === 'modal-expense') closeExpenseModal(); });
+        $('#btn-ex-file').addEventListener('click', () => $('#ex-file').click());
+        $('#ex-file').addEventListener('change', e => { const f = e.target.files[0]; if (f) exScan(f); e.target.value = ''; });
+        $('#ex-vat-rate').addEventListener('change', () => {
+            const a = exNum($('#ex-amount').value), r = parseFloat($('#ex-vat-rate').value);
+            if (a != null && Number.isFinite(r)) $('#ex-vat').value = exFmtNum(Math.round((a - a / (1 + r / 100)) * 100) / 100);
+        });
+        // Datei auf das Formular oder die Hinweisfläche ziehen
+        const dropOn = (el, onFile) => {
+            ['dragenter', 'dragover'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.add('drag'); }));
+            ['dragleave', 'drop'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.remove('drag'); }));
+            el.addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) onFile(f); });
+        };
+        dropOn($('#ex-file-box'), f => exScan(f));
+        dropOn($('#ex-drop'), f => { if (!canDo('finance', 'edit')) return; openExpenseModal(null); exScan(f); });
+        $('#ex-drop').addEventListener('click', () => { if (canDo('finance', 'edit')) { openExpenseModal(null); $('#ex-file').click(); } });
+
+        $('#ex-year').addEventListener('change', e => { ex.year = e.target.value; loadExpenses(); });
+        $('#ex-category').addEventListener('change', e => { ex.category = e.target.value; loadExpenses(); });
+        let exT = null;
+        $('#ex-search').addEventListener('input', e => { clearTimeout(exT); exT = setTimeout(() => { ex.q = e.target.value.trim(); loadExpenses(); }, 250); });
+
+        $('#ex-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const msg = $('#ex-msg');
+            const amount = exNum($('#ex-amount').value);
+            if (amount == null || amount < 0) { msg.hidden = false; msg.textContent = 'Bitte einen Betrag eingeben.'; return; }
+            if (!$('#ex-date').value) { msg.hidden = false; msg.textContent = 'Bitte ein Datum eingeben.'; return; }
+            const fd = new FormData();
+            const fields = {
+                date: $('#ex-date').value, amount: String(amount), vendor: $('#ex-vendor').value, category: $('#ex-cat').value,
+                description: $('#ex-desc').value, vat_rate: $('#ex-vat-rate').value, vat_amount: exNum($('#ex-vat').value) ?? '',
+                payment_method: $('#ex-pay').value, invoice_number: $('#ex-invno').value
+            };
+            Object.entries(fields).forEach(([k, v]) => fd.append(k, v == null ? '' : v));
+            if (ex.file) fd.append('receipt', ex.file);
+            if (ex.scan) { fd.append('engine', ex.scan.engine || ''); fd.append('ocr_text', ex.scan.text || ''); }
+            if (!$('#ex-pl-wrap').hidden) fd.append('paperless', $('#ex-pl').checked ? 'true' : 'false');
+            const btn = $('#btn-save-expense');
+            btn.disabled = true;
+            const editing = ex.editing;
+            const d = await apiJson(editing ? `/api/expenses/${editing.id}` : '/api/expenses', { method: editing ? 'PUT' : 'POST', body: fd }).catch(() => null);
+            btn.disabled = false;
+            if (!d || !d.success) { msg.hidden = false; msg.textContent = (d && d.error) || 'Speichern fehlgeschlagen'; return; }
+            closeExpenseModal();
+            // Bearbeitet mit neuem Beleg: auf Wunsch gleich an Paperless
+            if (editing && fd.get('receipt') && fd.get('paperless') === 'true') apiJson(`/api/expenses/${editing.id}/paperless`, { method: 'POST' }).then(() => loadExpenses()).catch(() => { });
+            showToast(d.paperless === 'pending' ? 'Ausgabe gespeichert, Beleg geht an Paperless' : 'Ausgabe gespeichert', 'success');
+            if (!editing && d.expense && ex.year && d.expense.date.slice(0, 4) !== ex.year) ex.year = d.expense.date.slice(0, 4);
+            loadExpenses();
         });
 
-        // Delete event listeners
-        $$('.btn-delete-expense').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                if (!confirm('Ausgabe wirklich löschen?')) return;
-                const id = btn.dataset.id;
-                try {
-                    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-                    const d = await res.json();
-                    if (d.success) {
-                        showToast('Ausgabe gelöscht');
-                        loadExpenses();
-                    }
-                } catch (e) { console.error(e); }
-            });
+        $('#expenses-list').addEventListener('click', async e => {
+            const b = e.target.closest('[data-ex]');
+            if (!b) return;
+            const id = b.closest('tr').dataset.id;
+            const row = ex.rows.find(r => String(r.id) === id);
+            if (!row) return;
+            if (b.dataset.ex === 'edit') return openExpenseModal(row);
+            if (b.dataset.ex === 'del') {
+                if (!confirm(`Ausgabe „${row.vendor || row.description || 'Ausgabe'}“ über ${exMoney(row.amount)} löschen?${row.receipt_mime ? ' Die Belegdatei wird mit gelöscht (in Paperless bleibt sie).' : ''}`)) return;
+                const d = await apiJson(`/api/expenses/${row.id}`, { method: 'DELETE' }).catch(() => null);
+                if (d && d.success) { showToast('Ausgabe gelöscht'); loadExpenses(); } else showToast((d && d.error) || 'Löschen fehlgeschlagen', 'error');
+                return;
+            }
+            if (b.dataset.ex === 'pl') {
+                b.disabled = true; b.textContent = 'Paperless …';
+                const d = await apiJson(`/api/expenses/${row.id}/paperless`, { method: 'POST' }).catch(() => null);
+                showToast(d && d.success ? d.message : (d && d.error) || 'Paperless nicht erreichbar', d && d.success ? 'success' : 'error', 6000);
+                loadExpenses();
+            }
         });
     }
 
@@ -3576,20 +4729,13 @@
         const btn = $('#btn-sync-paperless');
         const originalText = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<span class="update-spinner" style="width:14px; height:14px; border-width:2px;"></span> Sync läuft...';
-
+        btn.innerHTML = '<span class="update-spinner" style="width:14px; height:14px; border-width:2px;"></span> Übernahme läuft …';
         try {
-            const res = await fetch('/api/expenses/sync', { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                showToast(data.message);
-                loadExpenses();
-            } else {
-                showToast(data.error || 'Sync fehlgeschlagen', 'error');
-            }
+            const data = await apiJson('/api/expenses/sync', { method: 'POST' });
+            if (data.success) { showToast(data.message, 'success', 6000); loadExpenses(); }
+            else showToast(data.error || 'Übernahme fehlgeschlagen', 'error', 6000);
         } catch (e) {
-            console.error('Sync error:', e);
-            showToast('Server-Fehler beim Sync', 'error');
+            showToast('Server-Fehler bei der Übernahme', 'error');
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
@@ -3598,6 +4744,140 @@
 
     btnSyncPaperless.addEventListener('click', syncPaperlessExpenses);
 
+    // Einstellungen → Belege & KI-Erkennung
+    var receiptSettingsLoaded = false;
+    async function loadReceiptSettings() {
+        const d = await apiJson('/api/receipts/settings').catch(() => null);
+        if (!d || !d.success) { $('#rc-msg').textContent = (d && d.error) || 'Einstellungen konnten nicht geladen werden.'; return; }
+        const c = d.settings;
+        $('#rc-ai-model').innerHTML = c.models.map(m => `<option value="${m.id}">${escapeHtml(m.label)}</option>`).join('');
+        $('#rc-ai-enabled').checked = !!c.ai.enabled;
+        $('#rc-ai-key').value = c.ai.apiKey || '';
+        $('#rc-ai-model').value = c.ai.model;
+        $('#rc-ask-bot').checked = !!c.askInBot;
+        $('#rc-up-enabled').checked = !!c.upload.enabled;
+        $('#rc-up-tags').value = c.upload.tags || '';
+        $('#rc-up-doctype').value = c.upload.docType || '';
+        $('#rc-up-field').value = c.upload.amountField || '';
+        $('#rc-up-corr').checked = !!c.upload.correspondent;
+        $('#rc-up-cattag').checked = !!c.upload.categoryTag;
+        $('#rc-up-create').checked = !!c.upload.createMissing;
+        $('#rc-im-tag').value = c.import.tag || '';
+        $('#rc-im-field').value = c.import.amountField || '';
+        $('#rc-im-auto').checked = !!c.import.auto;
+        $('#rc-pl-state').textContent = c.paperlessReady ? 'Paperless ist verbunden (Zugang unter „Paperless NGX“).' : 'Paperless ist noch nicht eingerichtet: Adresse und Token unter „Paperless NGX“ eintragen.';
+        $('#rc-msg').textContent = '';
+        receiptSettingsLoaded = true;
+    }
+    const receiptSettingsBody = () => ({
+        ai: { enabled: $('#rc-ai-enabled').checked, apiKey: $('#rc-ai-key').value.trim(), model: $('#rc-ai-model').value },
+        askInBot: $('#rc-ask-bot').checked,
+        upload: { enabled: $('#rc-up-enabled').checked, tags: $('#rc-up-tags').value, docType: $('#rc-up-doctype').value, amountField: $('#rc-up-field').value,
+            correspondent: $('#rc-up-corr').checked, categoryTag: $('#rc-up-cattag').checked, createMissing: $('#rc-up-create').checked },
+        import: { tag: $('#rc-im-tag').value, amountField: $('#rc-im-field').value, auto: $('#rc-im-auto').checked }
+    });
+    document.addEventListener('click', e => {
+        const j = e.target.closest('.nav-jump');
+        if (!j) return;
+        e.preventDefault();
+        const item = document.querySelector(`.nav-item[data-target="${j.dataset.jump}"]`);
+        if (item) item.click();
+    });
+    if ($('#settings-receipts')) {
+        $('#btn-rc-save').addEventListener('click', async () => {
+            const d = await apiJson('/api/receipts/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(receiptSettingsBody()) }).catch(() => null);
+            $('#rc-msg').textContent = d && d.success ? '✓ Gespeichert.' : (d && d.error) || 'Speichern fehlgeschlagen';
+            if (d && d.success) showToast('Belege & KI gespeichert', 'success');
+        });
+        $('#btn-rc-test-ai').addEventListener('click', async () => {
+            $('#rc-msg').textContent = 'Teste die KI …';
+            const d = await apiJson('/api/receipts/test-ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: $('#rc-ai-key').value.trim(), model: $('#rc-ai-model').value }) }).catch(() => null);
+            $('#rc-msg').textContent = d && d.success ? `✓ ${d.message}` : `✗ ${(d && d.error) || 'Test fehlgeschlagen'}`;
+        });
+        $('#btn-rc-test-pl').addEventListener('click', async () => {
+            $('#rc-msg').textContent = 'Prüfe Paperless (gespeicherte Einstellungen) …';
+            const d = await apiJson('/api/receipts/test-paperless', { method: 'POST' }).catch(() => null);
+            $('#rc-msg').innerHTML = d && d.success ? '✓ Paperless erreichbar.<br>' + d.lines.map(escapeHtml).join('<br>') : `✗ ${escapeHtml((d && d.error) || 'Paperless nicht erreichbar')}`;
+        });
+    }
+
+
+
+    // =======================
+    // Anschriften prüfen (invoices/guests that probably carry another guest's address)
+    // =======================
+    const modalAddrCheck = $('#modal-addr-check');
+    async function openAddressCheck() {
+        if (!modalAddrCheck) return;
+        modalAddrCheck.style.display = 'flex';
+        const body = $('#addr-check-body');
+        body.innerHTML = '<p class="ac-empty">Wird geprüft …</p>';
+        let d = null;
+        try { d = await apiJson('/api/invoices/address-check'); } catch (e) { d = null; }
+        if (!d || !d.success) { body.innerHTML = `<p class="ac-empty">${escapeHtml((d && d.error) || 'Prüfung fehlgeschlagen')}</p>`; return; }
+        const nl = t => escapeHtml(t || '').replace(/\n/g, '<br>');
+        const stay = x => x.arrival && x.departure ? `${fmtDEfull(x.arrival)} – ${fmtDEfull(x.departure)}` : '';
+        const inv = d.invoices.map(x => `
+            <div class="ac-item" data-kind="inv" data-id="${x.invoiceId}" data-key="${escapeHtml(x.key)}">
+                <div class="ac-head"><b>Rechnung ${escapeHtml(x.number)} · ${escapeHtml(x.name)}</b><small>${stay(x)}${x.guestInvoice ? ' · vom Gast selbst erstellt' : ''}</small></div>
+                ${x.reasons.map(r => `<div class="ac-reason">⚠️ ${escapeHtml(r)}</div>`).join('')}
+                <div class="ac-addr">
+                    <div><label>Steht auf der Rechnung</label><div class="ac-old">${nl(x.address)}</div></div>
+                    <div><label>${x.suggestion ? `Richtige Anschrift (Vorschlag: ${escapeHtml(x.suggestionSource)})` : 'Richtige Anschrift'}</label><textarea>${escapeHtml(x.suggestion || '')}</textarea></div>
+                </div>
+                <div class="ac-actions">
+                    <button type="button" class="btn btn-primary btn-sm" data-ac="save">Anschrift übernehmen</button>
+                    <button type="button" class="btn btn-outline btn-sm" data-ac="open">Rechnung öffnen</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-ac="ok">Ist richtig</button>
+                </div>
+            </div>`).join('');
+        const gst = d.guests.map(x => `
+            <div class="ac-item" data-kind="guest" data-id="${x.guestId}" data-key="${escapeHtml(x.key)}">
+                <div class="ac-head"><b>Gast ${escapeHtml(x.name)}</b></div>
+                ${x.reasons.map(r => `<div class="ac-reason">⚠️ ${escapeHtml(r)}</div>`).join('')}
+                <div class="ac-addr">
+                    <div><label>Gespeicherte Anschrift</label><div class="ac-old">${nl(x.address)}</div></div>
+                    <div><label>${x.suggestion ? `Richtige Anschrift (Vorschlag: ${escapeHtml(x.suggestionSource)})` : 'Richtige Anschrift (leer lassen, wenn unbekannt)'}</label><textarea>${escapeHtml(x.suggestion || '')}</textarea></div>
+                </div>
+                <div class="ac-actions">
+                    <button type="button" class="btn btn-primary btn-sm" data-ac="save">Anschrift speichern</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-ac="ok">Ist richtig</button>
+                </div>
+            </div>`).join('');
+        if (!inv && !gst) { body.innerHTML = '<p class="ac-empty">✅ Keine auffälligen Anschriften gefunden.</p>'; return; }
+        body.innerHTML =
+            (inv ? `<h4 class="ac-section">Rechnungen (${d.invoices.length})</h4>${inv}<p class="ac-note">Wurde eine Rechnung schon verschickt: nach dem Korrigieren über „Rechnung öffnen“ das PDF neu erstellen und dem Gast schicken.</p>` : '') +
+            (gst ? `<h4 class="ac-section">Gästeliste (${d.guests.length})</h4>${gst}<p class="ac-note">Eine leere Anschrift ist besser als eine falsche: sie wird beim nächsten Meldeschein oder der nächsten Anschrift per Telegram gefüllt.</p>` : '');
+    }
+
+    if (modalAddrCheck) {
+        $('#btn-close-addr-check').addEventListener('click', () => { modalAddrCheck.style.display = 'none'; });
+        modalAddrCheck.addEventListener('click', async e => {
+            if (e.target === modalAddrCheck) { modalAddrCheck.style.display = 'none'; return; }
+            const btn = e.target.closest('[data-ac]');
+            if (!btn) return;
+            const item = btn.closest('.ac-item');
+            const { kind, id, key } = item.dataset;
+            const act = btn.dataset.ac;
+            const post = (url, payload) => apiJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            try {
+                if (act === 'open') { modalAddrCheck.style.display = 'none'; return loadArchivedInvoiceById(id); }
+                let r;
+                if (act === 'ok') r = await post('/api/invoices/address-check/ack', { key });
+                else {
+                    const address = item.querySelector('textarea').value.trim();
+                    if (kind === 'inv' && address.length < 5) { showToast('Bitte die richtige Anschrift eintragen', 'error'); return; }
+                    r = await post(kind === 'inv' ? `/api/invoices/${id}/address` : `/api/guests/${id}/address`, { address });
+                }
+                if (!r || !r.success) { showToast((r && r.error) || 'Speichern fehlgeschlagen', 'error'); return; }
+                showToast(act === 'ok' ? 'Als richtig markiert' : 'Anschrift gespeichert', 'success');
+                item.remove();
+                if (kind === 'inv' && act === 'save') fetchArchive();
+                if (!$('#addr-check-body .ac-item')) openAddressCheck();
+                loadOverview();
+            } catch (err) { showToast('Speichern fehlgeschlagen', 'error'); }
+        });
+    }
 
     async function loadArchivedInvoiceById(dbId) {
         if (!dbId) return;
@@ -3630,6 +4910,7 @@
         $('#g-name').value = d.gName || '';
         $('#g-adresse').value = d.gAdresse || '';
         $('#g-email').value = d.gEmail || '';
+        invoiceLink = { bookingId: d.bookingId || null, guestId: d.guestId || null };
 
         // Invoice details
         $('#r-nummer').value = d.rNummer || '';
@@ -3773,6 +5054,9 @@
                 // The backup page saves with its own button (separate API); the general save button would confuse there
                 const cf = document.querySelector('#modal-settings .content-footer');
                 if (cf) cf.style.display = targetId === 'settings-backup' ? 'none' : '';
+                if (targetId === 'settings-tvbox') { loadTvbox(); loadTvGuest(); }
+                if (targetId === 'settings-printer') loadPrinter();
+                if (targetId === 'settings-receipts') loadReceiptSettings();
 
                 // Toggle larger modal for designer
                 if (targetId === 'settings-invoice-designer') {
@@ -4342,6 +5626,8 @@
         // Clear guest
         $('#g-name').value = '';
         $('#g-adresse').value = '';
+        if ($('#g-email')) $('#g-email').value = '';
+        invoiceLink = { bookingId: null, guestId: null };
 
         // Clear dates
         $('#a-anreise').value = '';
@@ -4366,6 +5652,7 @@
         // Clear positions
         positions = [];
         renderPositions();
+        if ($('#inv-voucher-info')) $('#inv-voucher-info').hidden = true;
 
         // Clear draft
         clearDraft();
@@ -4920,6 +6207,260 @@
         return `${os}${browser ? ' · ' + browser : ''}${isStandalone() ? ' (App)' : ''}`;
     }
 
+    // TV-Box: app versions (GitHub build, approved, installed on the box) and approval
+    async function loadTvbox() {
+        const fmtV = v => v && v.versionCode ? `${v.versionName || '?'} (Build ${v.versionCode})` : '–';
+        const fmtT = t => t ? new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        const btn = $('#btn-tvbox-approve');
+        const hint = $('#tvbox-hint');
+        if (!btn) return;
+        btn.disabled = true;
+        hint.textContent = 'Lade …';
+        const d = await apiJson('/api/settings/tvbox').catch(() => null);
+        if (!d || !d.success) { hint.textContent = 'Konnte den Stand nicht laden.'; return; }
+        $('#tvbox-device').textContent = d.device ? `${fmtV(d.device)}, zuletzt gemeldet ${fmtT(d.device.lastSeen)}` : 'noch nicht gemeldet';
+        $('#tvbox-approved').textContent = d.approved ? `${fmtV(d.approved)}, am ${fmtT(d.approved.approvedAt)}` : 'noch keine';
+        $('#tvbox-latest').textContent = d.latest ? `${fmtV(d.latest)}, gebaut ${fmtT(d.latest.published)}` : '–';
+        const newer = d.latest && (!d.approved || d.latest.versionCode > d.approved.versionCode
+            || (d.latest.versionCode === d.approved.versionCode && d.latest.sha256 !== d.approved.sha256));
+        btn.disabled = !newer;
+        if (d.error) hint.textContent = d.error;
+        else if (newer) hint.textContent = 'Eine neue Version ist da. Nach der Freigabe installiert die Box sie beim nächsten Nachfragen.';
+        else if (d.device && d.approved && d.device.versionCode < d.approved.versionCode) hint.textContent = 'Freigegeben, die Box hat das Update aber noch nicht installiert.';
+        else hint.textContent = 'Alles aktuell.';
+        window.__tvboxLive = d.live || null;
+        renderTvboxRemote(d);
+        loadTvboxRc();
+    }
+
+    const TVBOX_CMD_LABELS = {
+        show_welcome: 'Welcome-Screen zeigen', reload: 'Seite neu laden', update_check: 'Nach Update suchen',
+        open_settings: 'Android-Einstellungen öffnen', reboot: 'Box neu starten'
+    };
+    function renderTvboxRemote(d) {
+        const fmtT = t => t ? new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        const ago = t => {
+            const m = Math.round((Date.now() - t) / 60000);
+            return m < 1 ? 'gerade eben' : m < 60 ? `vor ${m} Min.` : m < 48 * 60 ? `vor ${Math.round(m / 60)} Std.` : fmtT(t);
+        };
+        const p = d.paired, live = d.live, cfg = d.config || {};
+        $('#tvbox-paired').textContent = p ? `${p.model || 'TV-Box'}${p.ip ? ' · ' + p.ip : ''}, gekoppelt am ${fmtT(p.pairedAt)}` : 'noch keine';
+        const show = (el, on) => { el.style.display = on ? '' : 'none'; };
+        const pend = d.pending || [];
+        show($('#tvbox-pending'), pend.length > 0);
+        $('#tvbox-pending-text').textContent = pend.map(x => `${x.model || 'TV-Box'}${x.ip ? ' · ' + x.ip : ''} (App ${x.versionName || '?'}), zuletzt ${ago(x.lastSeen)}`).join('; ');
+        $('#btn-tvbox-pair').textContent = p ? 'Andere Box koppeln (ersetzt die jetzige)' : 'Box koppeln';
+        $('#tvbox-pair-label').textContent = p ? 'Neue Box? Kopplungs-Code vom Fernseher' : 'Kopplungs-Code vom Fernseher';
+        show($('#btn-tvbox-unpair'), !!p);
+        show($('#tvbox-remote'), !!p);
+        if (!p) return;
+
+        const online = live && Date.now() - live.lastSeen < 3 * 60 * 1000;
+        $('#tvbox-live-online').textContent = !live ? 'noch keine Meldung seit dem Server-Start'
+            : online ? `online (${ago(live.lastSeen)})` : `offline, zuletzt ${ago(live.lastSeen)}`;
+        $('#tvbox-live-kiosk').textContent = !live ? '–' : live.kioskActive ? 'aktiv (gesperrt)'
+            : live.deviceOwner ? 'aus' : 'aus (App ist kein Geräte-Eigentümer, .bat erneut ausführen)';
+        $('#tvbox-live-screen').textContent = !live ? '–' : !live.screenOn ? 'Fernseher aus / Standby'
+            : live.onWelcome ? 'Welcome-Screen' : 'eine andere App (z.B. Waipu)';
+        $('#tvbox-live-idle').textContent = !live ? '–' : (live.idleMinutes < 1 ? 'gerade eben' : live.idleMinutes < 120 ? `vor ${live.idleMinutes} Min.` : `vor ${Math.round(live.idleMinutes / 60)} Std.`)
+            + (live.keyWatch ? '' : ' (Ruhe-Erkennung nicht aktiv, .bat erneut ausführen)');
+        $('#tvbox-live-device').textContent = !live ? '–' : `${live.model || '?'}, Android ${live.android || '?'}, App ${live.versionName || '?'}${live.ip ? ', IP ' + live.ip : ''}`;
+
+        const form = $('#tvbox-cfg-kiosk');
+        if (document.activeElement !== form) form.value = cfg.kiosk === false ? '0' : '1';
+        const idle = $('#tvbox-cfg-idle');
+        if (document.activeElement !== idle) idle.value = cfg.idleHours != null ? cfg.idleHours : 4;
+        const applied = live && cfg.version && live.configVersion >= cfg.version;
+        $('#tvbox-cfg-state').textContent = (cfg.adminPin ? 'Eine PIN ist hinterlegt. ' : 'Noch keine PIN über den Admin gesetzt (es gilt die PIN aus der Einrichtung). ')
+            + (!cfg.version ? '' : applied ? 'Die Box hat die Einstellungen übernommen.' : 'Die Box hat die letzten Einstellungen noch nicht abgeholt.');
+
+        const c = d.command;
+        $('#tvbox-cmd-state').textContent = !c ? '' : `Zuletzt: „${TVBOX_CMD_LABELS[c.type] || c.type}“ am ${fmtT(c.createdAt)}, `
+            + (live && live.ackSeq >= c.seq ? 'ausgeführt.' : 'wartet auf die Box.');
+    }
+
+    async function tvboxPost(url, body, method = 'POST') {
+        const d = await apiJson(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).catch(() => null);
+        if (!d || !d.success) showToast((d && d.error) || 'Hat nicht geklappt', 'error');
+        return d && d.success ? d : null;
+    }
+    if ($('#btn-tvbox-pair')) $('#btn-tvbox-pair').addEventListener('click', async () => {
+        const code = $('#tvbox-pair-code').value.replace(/\D/g, '');
+        if (code.length !== 6) { showToast('Bitte den 6-stelligen Code vom Fernseher eingeben', 'error'); return; }
+        if (await tvboxPost('/api/settings/tvbox/pair', { code })) {
+            $('#tvbox-pair-code').value = '';
+            showToast('Box gekoppelt, sie zeigt gleich den Welcome-Screen', 'success');
+            loadTvbox();
+        }
+    });
+    if ($('#btn-tvbox-preview')) $('#btn-tvbox-preview').addEventListener('click', () => window.open('/welcome.html', '_blank', 'noopener'));
+    if ($('#btn-tvbox-unpair')) $('#btn-tvbox-unpair').addEventListener('click', async () => {
+        if (!confirm('Kopplung aufheben? Die Box behält ihre Einstellungen, bekommt aber keine neuen mehr.')) return;
+        if (await tvboxPost('/api/settings/tvbox/unpair')) loadTvbox();
+    });
+    if ($('#btn-tvbox-cfg-save')) $('#btn-tvbox-cfg-save').addEventListener('click', async () => {
+        const body = { kiosk: $('#tvbox-cfg-kiosk').value === '1', idleHours: Number($('#tvbox-cfg-idle').value) };
+        const pin = $('#tvbox-cfg-pin').value.trim();
+        if (pin) body.adminPin = pin;
+        if (await tvboxPost('/api/settings/tvbox/config', body, 'PUT')) {
+            $('#tvbox-cfg-pin').value = '';
+            showToast('Gespeichert, die Box übernimmt es in etwa einer Minute', 'success');
+            loadTvbox();
+        }
+    });
+    document.querySelectorAll('[data-tvbox-cmd]').forEach(b => b.addEventListener('click', async () => {
+        const type = b.dataset.tvboxCmd;
+        if (type === 'reboot' && !confirm('Die TV-Box jetzt neu starten?')) return;
+        if (await tvboxPost('/api/settings/tvbox/command', { type })) {
+            showToast(`„${TVBOX_CMD_LABELS[type]}“ gesendet, die Box führt es in etwa einer Minute aus`, 'success');
+            loadTvbox();
+        }
+    }));
+    if ($('#btn-tvbox-refresh')) $('#btn-tvbox-refresh').addEventListener('click', loadTvbox);
+
+    // TV-Box Fernwartung (ws-scrcpy über den ADB-Tunnel der Box, tv-remote.js)
+    function renderTvboxRc(d) {
+        if (!d || !d.success) return;
+        const live = window.__tvboxLive || null;
+        $('#tvbox-rc-enabled').checked = !!d.enabled;
+        $('#tvbox-rc-scrcpy').textContent = d.scrcpy ? 'läuft' : 'nicht eingerichtet (Skript unten, Schritt 1)';
+        $('#tvbox-rc-tunnel').textContent = !d.enabled ? 'aus' : d.tunnel
+            ? `verbunden seit ${new Date(d.tunnel.since).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+            : 'wartet auf die Box (bis zu 1 Minute, braucht TV-App 1.12)';
+        const local = d.tunnel && d.tunnel.adbLocal != null ? d.tunnel.adbLocal : live ? live.adbLocal : null;
+        $('#tvbox-rc-adblocal').textContent = local == null ? '–' : local ? 'an (Port 5555)' : 'aus → TV-Box-Fernwartung.bat am PC ausführen';
+        const st = d.adb && d.adb.state;
+        $('#tvbox-rc-adb').textContent = !d.tunnel ? '–' : st === 'device' ? 'erteilt, bereit'
+            : st === 'unauthorized' ? 'wartet: am Fernseher „USB-Debugging zulassen?“ mit „Immer“ bestätigen'
+            : st === 'kein adb' ? 'adb fehlt auf dem Server (Skript unten, Schritt 1)'
+            : st === 'offline' || st === 'host' ? 'Box antwortet nicht, „Neu verbinden“ versuchen'
+            : (st || '–') + (d.adb && d.adb.error ? ` (${d.adb.error})` : '');
+        let hint = '';
+        if (!d.scrcpy) hint = 'ws-scrcpy läuft auf dem Server noch nicht. Einmal das Skript im Container ausführen (siehe „Einmalig einrichten“).';
+        else if (d.enabled && d.tunnel && st === 'device') hint = 'Alles bereit. „Fernwartung öffnen“ und beim Gerät auf „H264 Converter“ klicken.';
+        else if (d.enabled && d.tunnel && local === false) hint = 'Die Box ist verbunden, aber ADB über Netzwerk ist aus (z. B. nach einem Neustart). Am PC TV-Box-Fernwartung.bat ausführen.';
+        $('#tvbox-rc-hint').textContent = hint;
+        $('#btn-tvbox-rc-open').disabled = !d.scrcpy;
+        $('#btn-tvbox-rc-reconnect').style.display = d.tunnel ? '' : 'none';
+    }
+    async function loadTvboxRc() {
+        if (!$('#tvbox-rc-card')) return;
+        renderTvboxRc(await apiJson('/api/settings/tvbox/remote').catch(() => null));
+    }
+    if ($('#tvbox-rc-enabled')) $('#tvbox-rc-enabled').addEventListener('change', async (e) => {
+        const d = await tvboxPost('/api/settings/tvbox/remote', { enabled: e.target.checked }, 'PUT');
+        if (d) { renderTvboxRc(d); showToast(e.target.checked ? 'Fernwartung erlaubt, die Box verbindet sich innerhalb einer Minute' : 'Fernwartung ausgeschaltet', 'success'); }
+    });
+    if ($('#btn-tvbox-rc-open')) $('#btn-tvbox-rc-open').addEventListener('click', () => window.open('/tv-fernwartung/', '_blank', 'noopener'));
+    if ($('#btn-tvbox-rc-refresh')) $('#btn-tvbox-rc-refresh').addEventListener('click', loadTvboxRc);
+    if ($('#btn-tvbox-rc-reconnect')) $('#btn-tvbox-rc-reconnect').addEventListener('click', async () => {
+        const d = await tvboxPost('/api/settings/tvbox/remote/reconnect');
+        if (d) renderTvboxRc(d);
+    });
+
+    // TV: farewell on departure day + towel button (tv-guest.js)
+    let tvGuestDefaults = [];
+    async function loadTvGuest() {
+        const d = await apiJson('/api/settings/tv-guest').catch(() => null);
+        if (!d || !d.success) return;
+        tvGuestDefaults = d.defaults || [];
+        $('#tvguest-farewell').checked = d.config.farewell !== false;
+        $('#tvguest-towels').checked = d.config.towels !== false;
+        $('#tvguest-hints').value = (d.config.hints || []).join('\n');
+        $('#tvguest-message').value = d.config.message || '';
+        const fmt = ts => new Date(ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const list = $('#tvguest-requests');
+        list.innerHTML = (d.requests || []).length
+            ? d.requests.map(r => `<li>${escapeHtml(fmt(r.at))} Uhr: ${escapeHtml(r.name || 'Gast')}${r.stay ? ' (' + escapeHtml(r.stay) + ')' : ''}${r.source === 'wlan' ? ' · über die WLAN-Seite' : ''}${r.preview ? ' · Test aus der Vorschau' : ''}${r.sent ? '' : ' · Nachricht nicht zugestellt'}</li>`).join('')
+            : '<li style="list-style:none; margin-left:-1.1rem">Noch keine Anfragen.</li>';
+    }
+    if ($('#btn-tvguest-defaults')) $('#btn-tvguest-defaults').addEventListener('click', () => { $('#tvguest-hints').value = tvGuestDefaults.join('\n'); });
+    if ($('#btn-tvguest-save')) $('#btn-tvguest-save').addEventListener('click', async () => {
+        const body = {
+            farewell: $('#tvguest-farewell').checked,
+            towels: $('#tvguest-towels').checked,
+            hints: $('#tvguest-hints').value,
+            message: $('#tvguest-message').value
+        };
+        if (await tvboxPost('/api/settings/tv-guest', body, 'PUT')) { showToast('Gespeichert, der Fernseher zeigt es spätestens nach 10 Minuten', 'success'); loadTvGuest(); }
+    });
+
+    // Drucker: new bookings are printed by the TV box in the apartment's network (print-jobs.js)
+    const PRINT_STATUS = { waiting: 'wartet auf Name/Screenshot per Telegram', pending: 'wartet auf die Box', sent: 'wird gedruckt …', printed: 'gedruckt ✓', failed: 'fehlgeschlagen' };
+    async function loadPrinter() {
+        const d = await apiJson('/api/settings/printer').catch(() => null);
+        if (!d || !d.success) { $('#printer-box-state').textContent = 'Konnte die Einstellungen nicht laden.'; return; }
+        const c = d.config || {};
+        $('#printer-enabled').checked = !!c.enabled;
+        $('#printer-host').value = c.host || '';
+        $('#printer-mode').value = c.mode || 'auto';
+        $('#printer-port').value = c.port || '';
+        $('#printer-path').value = c.path || '';
+        $('#printer-copies').value = c.copies || 1;
+        $('#printer-manual').checked = c.manual !== false;
+
+        const box = d.box;
+        const online = box && Date.now() - box.lastSeen < 3 * 60 * 1000;
+        $('#printer-box-state').textContent = !box ? 'Die TV-Box hat sich seit dem Server-Start noch nicht gemeldet (oder ist nicht gekoppelt, siehe TV-Box).'
+            : (online ? 'TV-Box ist online.' : 'TV-Box ist gerade offline, Aufträge warten, bis sie wieder da ist.')
+              + (box.error ? ` Letzter Druckfehler: ${box.error}` : '');
+        const found = $('#printer-found');
+        const printers = (box && box.printers) || [];
+        found.style.display = printers.length ? '' : 'none';
+        found.innerHTML = printers.length ? '<span>Im WLAN gefunden:</span> ' + printers.map((p, i) =>
+            `<button type="button" class="btn btn-ghost btn-sm" data-printer-pick="${i}">${escapeHtml(p.name || p.host)} · ${escapeHtml(p.host)}</button>`).join(' ') : '';
+        found.querySelectorAll('[data-printer-pick]').forEach(b => b.addEventListener('click', () => {
+            const p = printers[Number(b.dataset.printerPick)];
+            $('#printer-host').value = p.host;
+            $('#printer-port').value = p.port || 631;
+            if (p.path) $('#printer-path').value = p.path;
+            $('#printer-mode').value = 'auto';
+            showToast('Übernommen, bitte noch speichern', 'success');
+        }));
+
+        const jobs = d.jobs || [];
+        const fmtT = t => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+        $('#printer-jobs').innerHTML = !jobs.length ? 'Noch nichts gedruckt.' : jobs.map(j => `
+            <div class="info-row" style="align-items:center">
+                <span>${escapeHtml(j.title || 'Druck')} <small class="text-muted">(${fmtT(j.created_at)})</small></span>
+                <strong>${PRINT_STATUS[j.status] || escapeHtml(j.status)}${j.error && j.status !== 'printed' ? ` <small class="text-muted">(Versuch ${j.attempts})</small>` : ''}${j.error && j.status !== 'printed' ? ` <small class="text-muted">${escapeHtml(j.error)}</small>` : ''}
+                ${['failed', 'printed', 'waiting'].includes(j.status) ? ` <button type="button" class="btn btn-ghost btn-sm" data-printer-retry="${j.id}">${j.status === 'failed' ? 'Erneut versuchen' : j.status === 'waiting' ? 'Jetzt drucken' : 'Nochmal drucken'}</button>` : ''}</strong>
+            </div>`).join('');
+        $('#printer-jobs').querySelectorAll('[data-printer-retry]').forEach(b => b.addEventListener('click', async () => {
+            const r = await apiJson(`/api/settings/printer/jobs/${b.dataset.printerRetry}/retry`, { method: 'POST' }).catch(() => null);
+            if (r && r.success) { showToast('Wird erneut gedruckt', 'success'); loadPrinter(); }
+            else showToast('Hat nicht geklappt', 'error');
+        }));
+    }
+    async function savePrinter() {
+        const body = {
+            enabled: $('#printer-enabled').checked, host: $('#printer-host').value.trim(), mode: $('#printer-mode').value,
+            port: $('#printer-port').value, path: $('#printer-path').value.trim(), copies: $('#printer-copies').value,
+            manual: $('#printer-manual').checked
+        };
+        const d = await tvboxPost('/api/settings/printer', body, 'PUT');
+        if (d) showToast('Drucker gespeichert', 'success');
+        return !!d;
+    }
+    if ($('#btn-printer-save')) $('#btn-printer-save').addEventListener('click', async () => { if (await savePrinter()) loadPrinter(); });
+    if ($('#btn-printer-test')) $('#btn-printer-test').addEventListener('click', async () => {
+        if (!(await savePrinter())) return;
+        if (await tvboxPost('/api/settings/printer/test')) {
+            showToast('Testseite geschickt, die TV-Box druckt sie in etwa einer Minute', 'success');
+            loadPrinter();
+            setTimeout(loadPrinter, 75000);
+        }
+    });
+    if ($('#btn-printer-preview')) $('#btn-printer-preview').addEventListener('click', () => window.open('/api/settings/printer/preview', '_blank', 'noopener'));
+    if ($('#btn-tvbox-approve')) $('#btn-tvbox-approve').addEventListener('click', async () => {
+        const btn = $('#btn-tvbox-approve');
+        btn.disabled = true;
+        const d = await apiJson('/api/settings/tvbox/approve', { method: 'POST' }).catch(() => null);
+        if (d && d.success) showToast('Update für die TV-Box freigegeben', 'success');
+        else showToast((d && d.error) || 'Freigabe fehlgeschlagen', 'error');
+        loadTvbox();
+    });
+
     async function loadPushSettings() {
         const status = $('#push-status');
         const btnOn = $('#btn-push-enable');
@@ -5052,8 +6593,11 @@
     let acTimer = null;
 
     if (gNameInput && acDropdown) {
-        gNameInput.addEventListener('input', () => {
+        gNameInput.addEventListener('input', e => {
+            // Name typed by hand: no longer tied to the picked guest (the booking link stays)
             clearTimeout(acTimer);
+            if (!e.isTrusted) { acDropdown.style.display = 'none'; return; } // filled by the app, not typed
+            invoiceLink.guestId = null;
             const q = gNameInput.value.trim();
             if (q.length < 2) { acDropdown.style.display = 'none'; return; }
             acTimer = setTimeout(async () => {
@@ -5081,6 +6625,7 @@
                 gNameInput.value = item.dataset.name;
                 $('#g-email').value = item.dataset.email || '';
                 $('#g-adresse').value = item.dataset.address || '';
+                invoiceLink.guestId = Number(item.dataset.id) || null;
                 acDropdown.style.display = 'none';
                 updatePreview();
                 scheduleDraftSave();
@@ -7390,6 +8935,258 @@
         });
         const nav = document.querySelector('.nav-item[data-target="settings-chat"]');
         if (nav) nav.addEventListener('click', () => loadChatSettings());
+    }
+    // =======================
+    // Gutscheine
+    // =======================
+    let vouchersData = [];
+    let vcFilter = 'open';
+    let vcQuery = '';
+    let vcEditing = null;   // voucher being edited, null = new
+    let vcKind = 'nights';
+    const VC_STATUS = {
+        active: ['Offen', 'confirmed'], reserved: ['Vorgemerkt', 'pending'], upcoming: ['Noch nicht gültig', 'pending'],
+        redeemed: ['Eingelöst', 'redeemed'], expired: ['Abgelaufen', 'cancelled'], cancelled: ['Entwertet', 'cancelled']
+    };
+    const vcDate = ymd => ymd ? fmtDEfull(ymd) : '';
+
+    /** Code of the voucher position in the invoice form ("Gutschein GS-… (…)"), or null. */
+    function invoiceVoucherCode() {
+        const p = positions.find(x => /^Gutschein [A-Z0-9-]{4,}/.test(String(x.desc || '')));
+        return p ? String(p.desc).split(' ')[1] : null;
+    }
+
+    /** Checks a code for the stay in the invoice form and adds the discount position. */
+    async function applyInvoiceVoucher(code, bookingId) {
+        const info = $('#inv-voucher-info');
+        code = String(code || '').trim();
+        if (!code) return;
+        const anreise = $('#a-anreise').value, abreise = $('#a-abreise').value;
+        if (!anreise || !abreise) { showToast('Bitte zuerst An- und Abreise eintragen', 'error'); return; }
+        if (invoiceVoucherCode()) { showToast('Diese Rechnung enthält schon einen Gutschein', 'error'); return; }
+        const nights = calcNights(anreise, abreise);
+        // Nightly price: the position with the nights as quantity, else one called "Übernachtung"
+        const perNight = positions.find(p => p.qty === nights && p.price > 0);
+        const lump = !perNight && positions.find(p => /nacht|übernacht|aufenthalt/i.test(p.desc) && p.qty === 1 && p.price > 0);
+        const nightPrice = perNight ? perNight.price : lump && nights > 0 ? Math.round(lump.price / nights * 100) / 100 : '';
+        const mwst = $('#kleinunternehmer').checked ? 0 : getMwstRate();
+        const subtotal = getSubtotal();
+        const q = new URLSearchParams({ code, checkin: anreise, checkout: abreise, mwst: String(mwst) });
+        if (nightPrice) q.set('nightPrice', String(nightPrice));
+        if (subtotal > 0) q.set('total', String(Math.round(subtotal * (1 + mwst / 100) * 100) / 100));
+        if (bookingId) q.set('bookingId', String(bookingId));
+        const d = await apiJson(`/api/vouchers/check?${q}`).catch(() => null);
+        if (!d || !d.success) {
+            info.hidden = false; info.classList.add('bad');
+            info.textContent = (d && d.error) || 'Gutschein konnte nicht geprüft werden';
+            return;
+        }
+        info.classList.remove('bad');
+        info.hidden = false;
+        info.textContent = `✓ ${d.label}${d.voucher.guestName ? ` (für ${d.voucher.guestName})` : ''} verrechnet: −${formatCurrency(d.discount)}. Wird beim Speichern der Rechnung als eingelöst markiert.`;
+        $('#inv-voucher-form').hidden = true;
+        $('#btn-inv-voucher').hidden = false;
+        addPosition(d.line.desc, d.line.qty, d.line.price);
+    }
+
+    if ($('#btn-inv-voucher')) {
+        $('#btn-inv-voucher').addEventListener('click', () => {
+            $('#inv-voucher-form').hidden = false;
+            $('#btn-inv-voucher').hidden = true;
+            $('#inv-voucher-code').value = '';
+            $('#inv-voucher-code').focus();
+        });
+        $('#btn-inv-voucher-cancel').addEventListener('click', () => {
+            $('#inv-voucher-form').hidden = true;
+            $('#btn-inv-voucher').hidden = false;
+            $('#inv-voucher-info').hidden = true;
+        });
+        $('#btn-inv-voucher-apply').addEventListener('click', () => applyInvoiceVoucher($('#inv-voucher-code').value));
+        $('#inv-voucher-code').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyInvoiceVoucher($('#inv-voucher-code').value); } });
+    }
+
+    async function loadVouchers() {
+        const d = await apiJson('/api/vouchers').catch(() => null);
+        if (!d || !d.success) { $('#vc-list').innerHTML = '<div class="bookings-empty">Gutscheine konnten nicht geladen werden.</div>'; return; }
+        vouchersData = d.vouchers;
+        const sm = d.summary;
+        const tile = (label, value, sub) => `<div class="card stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${sub ? `<div class="review-sub">${sub}</div>` : ''}</div>`;
+        $('#vc-kpis').innerHTML = [
+            tile('Offene Gutscheine', sm.open, sm.open ? [sm.openNights ? `${sm.openNights} Gratisnächte` : '', sm.openAmount ? formatCurrency(sm.openAmount) : '', sm.openPercent ? `${sm.openPercent}× Rabatt` : ''].filter(Boolean).join(' · ') : 'keine offenen'),
+            tile('Eingelöst', sm.redeemed, sm.redeemedValue ? `Wert ${formatCurrency(sm.redeemedValue)}` : ''),
+            tile('Gesamt', vouchersData.length, 'angelegte Gutscheine')
+        ].join('');
+        renderVouchers();
+    }
+
+    function renderVouchers() {
+        const list = $('#vc-list');
+        const q = vcQuery.toLowerCase();
+        const groups = { open: ['active', 'reserved', 'upcoming'], redeemed: ['redeemed'], closed: ['expired', 'cancelled'] };
+        const rows = vouchersData.filter(v => (vcFilter === 'all' || groups[vcFilter].includes(v.status)) &&
+            (!q || [v.code, v.guestName, v.note, v.label].some(x => String(x || '').toLowerCase().includes(q))));
+        if (!rows.length) {
+            list.innerHTML = `<div class="bookings-empty">${vouchersData.length ? 'Keine Gutscheine in dieser Auswahl.' : 'Noch keine Gutscheine. Mit „+ Neuer Gutschein“ z. B. 2 Gratisnächte für einen Stammgast anlegen.'}</div>`;
+            return;
+        }
+        const edit = canDo('vouchers', 'edit');
+        list.innerHTML = rows.map(v => {
+            const [stLabel, stCls] = VC_STATUS[v.status] || [v.status, ''];
+            const validity = [v.validFrom ? `ab ${vcDate(v.validFrom)}` : '', v.validUntil ? `bis ${vcDate(v.validUntil)}` : 'unbegrenzt'].filter(Boolean).join(' ');
+            let redeemed = '';
+            if (v.status === 'redeemed') {
+                redeemed = `Eingelöst${v.redeemedAt ? ` am ${fmtDEfull(String(v.redeemedAt).slice(0, 10))}` : ''}${v.redeemedVia ? ` · ${escapeHtml(v.redeemedVia)}` : ''}` +
+                    `${v.redeemedCheckin ? ` · Aufenthalt ${fmtDEfull(v.redeemedCheckin)} – ${fmtDEfull(v.redeemedCheckout)}` : ''}` +
+                    `${v.redeemedValue ? ` · ${formatCurrency(v.redeemedValue)}` : ''}${v.invoice ? ` · Rechnung ${escapeHtml(v.invoice.number)}` : ''}`;
+            } else if (v.status === 'reserved' && v.request) {
+                redeemed = `Vorgemerkt für Anfrage von ${escapeHtml(v.request.name)} (${fmtDEfull(v.request.checkin)} – ${fmtDEfull(v.request.checkout)})`;
+            }
+            const actions = [
+                '<button class="btn-mini" data-vc="print">Drucken</button>',
+                '<button class="btn-mini" data-vc="text">Text kopieren</button>',
+                edit ? '<button class="btn-mini" data-vc="edit">Bearbeiten</button>' : '',
+                edit && ['active', 'upcoming', 'expired', 'reserved'].includes(v.status) ? '<button class="btn-mini" data-vc="cancel">Entwerten</button>' : '',
+                edit && ['redeemed', 'cancelled'].includes(v.status) ? '<button class="btn-mini" data-vc="activate">Wieder aktivieren</button>' : '',
+                edit && v.status === 'active' ? '<button class="btn-mini" data-vc="redeem">Als eingelöst markieren</button>' : '',
+                edit && v.rawStatus !== 'redeemed' && !v.invoice ? '<button class="btn-mini" data-vc="delete">Löschen</button>' : ''
+            ].join('');
+            return `<div class="card req-card vc-card" data-id="${v.id}">
+                <div>
+                    <div class="booking-name"><code class="vc-code">${escapeHtml(v.code)}</code><span class="req-status ${stCls}">${stLabel}</span></div>
+                    <div class="vc-label">${escapeHtml(v.label)}${v.minNights ? ` <small>· ab ${v.minNights} Nächten</small>` : ''}</div>
+                    <div class="booking-sub">${v.guestName ? `für ${escapeHtml(v.guestName)}` : 'ohne Gast'} · angelegt ${fmtDEfull(String(v.createdAt || '').slice(0, 10))}${v.createdBy ? ` von ${escapeHtml(v.createdBy)}` : ''}</div>
+                </div>
+                <div>
+                    <div>Einlösbar ${validity}</div>
+                    ${redeemed ? `<div class="booking-sub">${redeemed}</div>` : ''}
+                </div>
+                ${v.dedication ? `<div class="req-msg">„${escapeHtml(v.dedication)}“</div>` : ''}
+                ${v.note ? `<div class="req-msg">📝 ${escapeHtml(v.note)}</div>` : ''}
+                <div class="booking-actions">${actions}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function vcSetKind(kind) {
+        vcKind = kind;
+        $$('#vc-kind button').forEach(b => b.classList.toggle('active', b.dataset.kind === kind));
+        const el = $('#vc-value');
+        $('#vc-value-label').textContent = kind === 'nights' ? 'Anzahl Nächte' : kind === 'percent' ? 'Rabatt in %' : 'Betrag in €';
+        el.step = kind === 'amount' ? '0.01' : '1';
+        el.max = kind === 'percent' ? '100' : kind === 'nights' ? '60' : '';
+    }
+
+    async function openVoucherModal(v, preset = {}) {
+        vcEditing = v || null;
+        $('#vc-form').reset();
+        $('#vc-msg').hidden = true;
+        $('#vc-title').textContent = v ? `Gutschein ${v.code} bearbeiten` : 'Neuer Gutschein';
+        $('#btn-save-voucher').textContent = v ? 'Speichern' : 'Gutschein anlegen';
+        $('#vc-code-wrap').hidden = !!v;
+        const today = berlinYmd();
+        vcSetKind(v ? v.kind : 'nights');
+        $('#vc-value').value = v ? v.value : 2;
+        $('#vc-min').value = v && v.minNights ? v.minNights : '';
+        $('#vc-guest').value = v ? v.guestName : (preset.guestName || '');
+        $('#vc-guest').dataset.guestId = v ? (v.guestId || '') : (preset.guestId || '');
+        $('#vc-from').value = v ? v.validFrom : today;
+        // Default: redeemable until the end of the third year (usual period for vouchers in Germany)
+        $('#vc-until').value = v ? v.validUntil : `${Number(today.slice(0, 4)) + 3}-12-31`;
+        $('#vc-dedication').value = v ? v.dedication : '';
+        $('#vc-note').value = v ? v.note : '';
+        $('#modal-voucher').style.display = 'flex';
+        setTimeout(() => $('#vc-value').focus(), 50);
+        // Guest names for the suggestion list (needs the bookings right; without it the field stays free text)
+        const g = await apiJson('/api/guests').catch(() => null);
+        const guests = Array.isArray(g) ? g : (g && (g.guests || g.data)) || [];
+        $('#vc-guest-list').innerHTML = guests.slice(0, 500).map(x => `<option value="${escapeHtml(x.name)}"></option>`).join('');
+        $('#vc-guest-list').dataset.map = JSON.stringify(guests.map(x => [x.name, x.id]));
+    }
+    const closeVoucherModal = () => { $('#modal-voucher').style.display = 'none'; };
+
+    if ($('#modal-voucher')) {
+        $('#btn-new-voucher').addEventListener('click', () => openVoucherModal(null));
+        $('#btn-close-voucher').addEventListener('click', closeVoucherModal);
+        $('#btn-cancel-voucher').addEventListener('click', closeVoucherModal);
+        $('#modal-voucher').addEventListener('click', e => { if (e.target.id === 'modal-voucher') closeVoucherModal(); });
+        $$('#vc-kind button').forEach(b => b.addEventListener('click', () => {
+            vcSetKind(b.dataset.kind);
+            $('#vc-value').value = b.dataset.kind === 'nights' ? 2 : b.dataset.kind === 'percent' ? 10 : 50;
+        }));
+        $('#vc-guest').addEventListener('input', () => { $('#vc-guest').dataset.guestId = ''; });
+        $$('#vc-filter button').forEach(b => b.addEventListener('click', () => {
+            vcFilter = b.dataset.filter;
+            $$('#vc-filter button').forEach(x => x.classList.toggle('active', x === b));
+            renderVouchers();
+        }));
+        $('#vc-search').addEventListener('input', e => { vcQuery = e.target.value.trim(); renderVouchers(); });
+
+        $('#vc-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const msg = $('#vc-msg');
+            const name = $('#vc-guest').value.trim();
+            let guestId = $('#vc-guest').dataset.guestId || '';
+            if (!guestId && name) {
+                try { const hit = JSON.parse($('#vc-guest-list').dataset.map || '[]').find(([n]) => n.toLowerCase() === name.toLowerCase()); if (hit) guestId = hit[1]; } catch (x) { /* free text */ }
+            }
+            const body = {
+                kind: vcKind, value: $('#vc-value').value, minNights: $('#vc-min').value, guestId, guestName: name,
+                validFrom: $('#vc-from').value, validUntil: $('#vc-until').value,
+                dedication: $('#vc-dedication').value, note: $('#vc-note').value, code: vcEditing ? undefined : $('#vc-code').value.trim()
+            };
+            const btn = $('#btn-save-voucher');
+            btn.disabled = true;
+            const d = await apiJson(vcEditing ? `/api/vouchers/${vcEditing.id}` : '/api/vouchers', {
+                method: vcEditing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            }).catch(() => null);
+            btn.disabled = false;
+            if (!d || !d.success) { msg.hidden = false; msg.textContent = (d && d.error) || 'Speichern fehlgeschlagen'; return; }
+            closeVoucherModal();
+            showToast(vcEditing ? 'Gutschein gespeichert' : `Gutschein ${d.voucher.code} angelegt`, 'success', 5000);
+            if (currentView === 'vouchers') loadVouchers(); else switchView('vouchers');
+        });
+
+        $('#vc-list').addEventListener('click', async e => {
+            const btn = e.target.closest('[data-vc]');
+            if (!btn) return;
+            const v = vouchersData.find(x => String(x.id) === btn.closest('.vc-card').dataset.id);
+            if (!v) return;
+            const act = btn.dataset.vc;
+            if (act === 'print') return window.open(`/api/vouchers/${v.id}/print`, '_blank', 'noopener');
+            if (act === 'edit') return openVoucherModal(v);
+            if (act === 'text') {
+                const d = await apiJson(`/api/vouchers/${v.id}/text`).catch(() => null);
+                if (d && d.success) { await copyText(d.text); showToast('Text für den Gast kopiert (WhatsApp, E-Mail …)', 'success'); }
+                else showToast('Text konnte nicht erstellt werden', 'error');
+                return;
+            }
+            let req;
+            if (act === 'delete') {
+                if (!confirm(`Gutschein ${v.code} löschen?`)) return;
+                req = apiJson(`/api/vouchers/${v.id}`, { method: 'DELETE' });
+            } else {
+                const ask = { cancel: `Gutschein ${v.code} entwerten? Er kann danach nicht mehr eingelöst werden.`, activate: `Gutschein ${v.code} wieder aktivieren? Eine Einlösung wird dabei zurückgenommen.` }[act];
+                if (ask && !confirm(ask)) return;
+                const body = { action: act };
+                if (act === 'redeem') {
+                    const val = prompt(`Gutschein ${v.code} (${v.label}) als eingelöst markieren.\n\nWert in € (optional, für die Übersicht):`, '');
+                    if (val === null) return;
+                    if (val.trim()) body.value = parseFloat(val.replace(',', '.'));
+                }
+                req = apiJson(`/api/vouchers/${v.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            }
+            const d = await req.catch(() => null);
+            if (d && d.success) loadVouchers();
+            else showToast((d && d.error) || 'Aktion fehlgeschlagen', 'error');
+        });
+    }
+
+    if ($('#btn-guest-voucher')) {
+        $('#btn-guest-voucher').addEventListener('click', () => {
+            if (!currentGuestId) { showToast('Bitte den Gast zuerst speichern', 'info'); return; }
+            $('#modal-guests').style.display = 'none';
+            openVoucherModal(null, { guestId: currentGuestId, guestName: $('#guest-edit-name').value.trim() });
+        });
     }
 })();
 // Version 3.0 - SQLite Database Migration

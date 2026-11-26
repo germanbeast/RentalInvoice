@@ -146,6 +146,10 @@ function initSchema() {
     if (!tableInfo.some(col => col.name === 'phone')) {
         db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''");
     }
+    if (!tableInfo.some(col => col.name === 'theme')) {
+        // Hell/Dunkel/Automatisch im Admin, je Benutzer
+        db.exec("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'auto'");
+    }
 
     // Migration: add status + updated_at to telegram_requests
     const tgReqInfo = db.prepare("PRAGMA table_info(telegram_requests)").all();
@@ -277,6 +281,13 @@ function getUser(username) {
 
 function getUserById(id) {
     return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id);
+}
+
+const THEMES = ['auto', 'light', 'dark'];
+function setUserTheme(id, theme) {
+    if (!THEMES.includes(theme)) return false;
+    getDb().prepare('UPDATE users SET theme = ? WHERE id = ?').run(theme, id);
+    return true;
 }
 
 function getAllUsers() {
@@ -556,19 +567,36 @@ function deleteGuest(id) {
     })();
 }
 
+function guestNameWords(n) {
+    return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9ß ]+/g, ' ').split(/\s+/).filter(w => w.length > 1);
+}
+
+/** Same person as far as the names tell (same name or same last name); an empty name never counts as different. */
+function sameGuestName(a, b) {
+    const x = guestNameWords(a), y = guestNameWords(b);
+    if (!x.length || !y.length) return true;
+    return x.join(' ') === y.join(' ') || x[x.length - 1] === y[y.length - 1];
+}
+
 function findOrCreateGuest(name, email, address) {
-    // Try to find by email first, then by name
+    // E-mail first, but only together with a matching name (shared or reused addresses must not
+    // merge two people), then the exact name
     let guest = null;
     if (email) {
-        guest = getDb().prepare('SELECT * FROM guests WHERE email = ?').get(email);
+        const byMail = getDb().prepare('SELECT * FROM guests WHERE lower(email) = lower(?) ORDER BY updated_at DESC').all(email);
+        guest = byMail.find(g => !name || sameGuestName(g.name, name)) || null;
     }
     if (!guest && name) {
         guest = getDb().prepare('SELECT * FROM guests WHERE name = ?').get(name);
     }
     if (guest) {
-        // Update if address changed
-        if (address && address !== guest.address) {
+        // A match by name or e-mail is no proof that this is the same stay: only fill a missing address,
+        // never overwrite one. (Overwriting is how the previous guest's address used to spread.)
+        // Deliberate changes go through address-check.bindInvoiceGuest (invoice tied to its booking/guest).
+        if (address && !String(guest.address || '').trim()) {
             updateGuest(guest.id, { ...guest, address });
+            guest = { ...guest, address };
         }
         return guest;
     }
@@ -1172,6 +1200,7 @@ module.exports = {
     // Users
     getUser,
     getUserById,
+    setUserTheme,
     getAllUsers,
     getUserByPhone,
     getUserByTelegramId,

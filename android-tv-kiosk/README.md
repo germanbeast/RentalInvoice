@@ -9,8 +9,12 @@ Diese APK zeigt einen Welcome Screen für Gäste auf Google TV / Android TV.
 ✅ **WebView** - Lädt deine Welcome-Seite
 ✅ **Vollbild** - Optimiert für TV-Displays
 ✅ **App-Launch** - Buttons starten Waipu TV, Netflix, etc.
+✅ **Ruhe-Rückkehr** - Nach 4 Stunden ohne Tastendruck zurück zum Welcome-Screen (auch aus Waipu)
+✅ **Fernsteuerung** - Beim ersten Start zeigt die Box einen Kopplungs-Code; im Admin (Einstellungen → TV-Box) eingeben, dann Kiosk an/aus, Ruhezeit, PIN und Befehle. Die Welcome-Seite sieht nur die gekoppelte Box (und der Admin als Vorschau)
 
 ## Installation
+
+👉 Einfachster Weg: **TV-Box-einrichten.bat** (siehe [INSTALL.md](INSTALL.md)). Standard-Server ist https://beckhome.cloud.
 
 ### Voraussetzungen
 - Android TV / Google TV Gerät

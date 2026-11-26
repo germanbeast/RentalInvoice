@@ -29,26 +29,26 @@
     <header class="masthead solid">
         <a href="./" class="brand" id="brand">Ferienwohnung Beckhome</a>
         <nav class="mast-nav" aria-label="Konto">
-            <button type="button" class="mast-cta mast-logout" id="mast-logout" hidden>Abmelden</button>
+            <button type="button" class="mast-cta mast-logout" id="mast-logout" hidden data-t>Abmelden</button>
         </nav>
     </header>
 
     <main class="door">
-        <p class="door-kicker">Notfall-Zugang</p>
-        <h1>Tür öffnen</h1>
-        <div id="door-box" aria-live="polite"><p>Einen Moment …</p></div>
+        <p class="door-kicker" data-t>Notfall-Zugang</p>
+        <h1 data-t>Tür öffnen</h1>
+        <div id="door-box" aria-live="polite"><p data-t>Einen Moment …</p></div>
 
         <div id="login-box" hidden>
-            <p class="guest-lead">Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer Nachricht über Booking.com, Airbnb oder per E-Mail.</p>
+            <p class="guest-lead" data-t>Melden Sie sich mit Ihrem Buchungscode und Ihrem Anreisedatum an. Den Code finden Sie in unserer Nachricht über Booking.com, Airbnb oder per E-Mail.</p>
             <form class="login" id="login-form" novalidate>
-                <label>Buchungscode
+                <label><span data-t>Buchungscode</span>
                     <input type="text" name="code" placeholder="BH-XXXXXX" autocomplete="off" autocapitalize="characters" maxlength="20" required>
                 </label>
-                <label>Anreisedatum
+                <label><span data-t>Anreisedatum</span>
                     <input type="date" name="arrival" required>
                 </label>
                 <div class="form-error" id="login-error" role="alert" hidden></div>
-                <button type="submit" class="btn btn-dark btn-block">Anmelden</button>
+                <button type="submit" class="btn btn-dark btn-block" data-t>Anmelden</button>
             </form>
         </div>
 
@@ -56,6 +56,7 @@
         <div class="door-contact" id="door-contact" hidden></div>
     </main>
 
+    <script src="i18n.js"></script>
     <script src="notfall.js"></script>
 </body>
 </html>
